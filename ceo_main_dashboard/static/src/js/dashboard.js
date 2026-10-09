@@ -1,19 +1,17 @@
 /** @odoo-module **/
 
-import { Component, onWillStart, useState } from "@odoo/owl";
+import { Component, onMounted, onWillStart, useRef, useState } from "@odoo/owl";
 import { _t } from "@web/core/l10n/translation";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { useDebounced } from "@web/core/utils/timing";
+import { useSetupAction } from "@web/search/action_hook";
 
 const { DateTime } = luxon;
 
 const CHART_WIDTH = 560;
 const CHART_HEIGHT = 150;
 const CHART_PADDING = 22;
-
-const CEO_DASHBOARD_STORAGE_KEY = "ceo_main_dashboard_state";
-const BILLING_FILTERS = ["all", "invoiced", "not_invoiced"];
 
 export class CeoMainDashboard extends Component {
     static template = "ceo_main_dashboard.Dashboard";
@@ -27,41 +25,19 @@ export class CeoMainDashboard extends Component {
         this.limitOptions = [15, 30, 50, 100];
         const today = DateTime.local().toISODate();
 
-        let saved = this.props.action?._dashboardState || null;
-        if (!saved) {
-            try {
-                const raw = sessionStorage.getItem(CEO_DASHBOARD_STORAGE_KEY);
-                if (raw) {
-                    saved = JSON.parse(raw);
-                }
-            } catch (e) {
-                console.warn("Failed to load CEO dashboard state from sessionStorage", e);
-            }
-        }
-
-        this._restoringFromSaved = !!saved;
-
-        const preset = (saved && saved.preset) || "today";
-        const dateFrom = (saved && saved.dateFrom) || today;
-        const dateTo = (saved && saved.dateTo) || today;
-        const activeTab = (saved && saved.activeTab) || "purchase";
-        const billing = saved && BILLING_FILTERS.includes(saved.billing) ? saved.billing : "all";
-        const trendFilter = (saved && saved.trendFilter) || "all";
-        const limit = (saved && saved.limit) || 100;
-        const currentPage = (saved && saved.currentPage) || 1;
-
         this.state = useState({
-            activeTab: activeTab,
+            activeTab: "purchase",
             loading: true,
             syncing: false,
-            preset: preset,
-            dateFrom: dateFrom,
-            dateTo: dateTo,
+            preset: "today",
+            dateFrom: today,
+            dateTo: today,
             data: null,
-            billing: billing, // 'all' | 'invoiced' | 'not_invoiced'
-            trendFilter: trendFilter, // 'all' | 'up' | 'down'
-            limit: limit,
-            currentPage: currentPage,
+            billing: "all", // 'all' | 'invoiced' | 'not_invoiced'
+            trendFilter: "all", // 'all' | 'up' | 'down'
+            impactFilter: null, // null | 'extra' | 'saved' | 'net'
+            limit: 100,
+            currentPage: 1,
             searchTerm: "",
             searchResults: null,
             searching: false,
@@ -70,36 +46,54 @@ export class CeoMainDashboard extends Component {
             historyLoading: false,
         });
 
-        this.debouncedSearch = useDebounced(this.runSearch, 400);
-        onWillStart(() => this.loadData());
-    }
-
-    _saveState() {
-        try {
-            const stateToSave = {
-                preset: this.state.preset,
-                dateFrom: this.state.dateFrom,
-                dateTo: this.state.dateTo,
-                activeTab: this.state.activeTab,
-                billing: this.state.billing,
-                trendFilter: this.state.trendFilter,
-                limit: this.state.limit,
-                currentPage: this.state.currentPage,
-            };
-            if (this.props.action) {
-                this.props.action._dashboardState = stateToSave;
-            }
-            sessionStorage.setItem(CEO_DASHBOARD_STORAGE_KEY, JSON.stringify(stateToSave));
-        } catch (e) {
-            console.warn("Failed to save CEO dashboard state", e);
+        // Filters restored when coming back through the breadcrumbs.
+        const saved = (this.props.state && this.props.state.dashboard) || null;
+        if (saved) {
+            Object.assign(this.state, saved.filters);
         }
+
+        this.rootRef = useRef("root");
+        useSetupAction({
+            getLocalState: () => ({
+                dashboard: {
+                    filters: {
+                        preset: this.state.preset,
+                        dateFrom: this.state.dateFrom,
+                        dateTo: this.state.dateTo,
+                        billing: this.state.billing,
+                        trendFilter: this.state.trendFilter,
+                        impactFilter: this.state.impactFilter,
+                        limit: this.state.limit,
+                        searchTerm: this.state.searchTerm,
+                    },
+                    currentPage: this.state.currentPage,
+                    expandedProductId: this.state.expandedProductId,
+                    scrollTop: this.rootRef.el ? this.rootRef.el.scrollTop : 0,
+                },
+            }),
+        });
+
+        this.debouncedSearch = useDebounced(this.runSearch, 400);
+        onWillStart(async () => {
+            await this.loadData();
+            if (saved) {
+                this.state.currentPage = saved.currentPage || 1;
+                if (saved.expandedProductId) {
+                    await this.toggleHistory({ product_id: saved.expandedProductId });
+                }
+            }
+        });
+        onMounted(() => {
+            if (saved && saved.scrollTop && this.rootRef.el) {
+                this.rootRef.el.scrollTop = saved.scrollTop;
+            }
+        });
     }
 
     // ------------------------------------------------------------------
     // Data loading
     // ------------------------------------------------------------------
     async loadData() {
-        this._saveState();
         this.state.loading = true;
         try {
             this.state.data = await this.orm.call("ceo.main.dashboard", "get_purchase_dashboard", [
@@ -109,10 +103,7 @@ export class CeoMainDashboard extends Component {
             ]);
             this.state.history = {};
             this.state.expandedProductId = null;
-            if (!this._restoringFromSaved) {
-                this.state.currentPage = 1;
-            }
-            this._restoringFromSaved = false;
+            this.state.currentPage = 1;
             if (this.state.searchTerm.trim()) {
                 await this.runSearch();
             }
@@ -133,7 +124,6 @@ export class CeoMainDashboard extends Component {
 
     switchTab(tab) {
         this.state.activeTab = tab;
-        this._saveState();
     }
 
     // ------------------------------------------------------------------
@@ -173,7 +163,6 @@ export class CeoMainDashboard extends Component {
     onDateChange(field, ev) {
         this.state.preset = "custom";
         this.state[field] = ev.target.value;
-        this._saveState();
     }
 
     applyCustomRange() {
@@ -196,17 +185,39 @@ export class CeoMainDashboard extends Component {
         this.state.trendFilter = trend;
         this.state.currentPage = 1;
         this.state.expandedProductId = null;
-        this._saveState();
+    }
+
+    setImpactFilter(filter) {
+        this.state.impactFilter = this.state.impactFilter === filter ? null : filter;
+        this.state.trendFilter = "all";
+        this.state.searchTerm = "";
+        this.state.searchResults = null;
+        this.state.currentPage = 1;
+        this.state.expandedProductId = null;
+        if (this.state.impactFilter) {
+            const panel = document.querySelector(".cmd_price_panel");
+            if (panel) {
+                panel.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+        }
+    }
+
+    impactFilterLabel(filter) {
+        return {
+            extra: _t("Extra paid (products with a positive period impact)"),
+            saved: _t("Saved (products with a negative period impact)"),
+            net: _t("Net impact (all products with a period impact)"),
+        }[filter];
     }
 
     onLimitChange(ev) {
         this.state.limit = parseInt(ev.target.value, 10) || 100;
         this.state.currentPage = 1;
         this.state.expandedProductId = null;
-        this._saveState();
     }
 
     onSearchInput(ev) {
+        this.state.impactFilter = null;
         this.state.searchTerm = ev.target.value;
         this.state.currentPage = 1;
         this.state.expandedProductId = null;
@@ -235,7 +246,6 @@ export class CeoMainDashboard extends Component {
             const rows = await this.orm.call("ceo.main.dashboard", "search_purchase_prices", [
                 term,
                 this.state.dateTo,
-                this.state.billing,
             ]);
             if (term === this.state.searchTerm.trim()) {
                 this.state.searchResults = rows;
@@ -261,7 +271,19 @@ export class CeoMainDashboard extends Component {
         if (this.state.trendFilter !== "all") {
             rows = rows.filter((r) => r.trend === this.state.trendFilter);
         }
+        const impactFilter = !this.isSearchMode && this.state.impactFilter;
+        if (impactFilter === "extra") {
+            rows = rows.filter((r) => r.impact > 0).sort((a, b) => b.impact - a.impact);
+        } else if (impactFilter === "saved") {
+            rows = rows.filter((r) => r.impact < 0).sort((a, b) => a.impact - b.impact);
+        } else if (impactFilter === "net") {
+            rows = rows.filter((r) => r.impact).sort((a, b) => Math.abs(b.impact) - Math.abs(a.impact));
+        }
         return rows;
+    }
+
+    get filteredImpactTotal() {
+        return this.filteredRows.reduce((total, r) => total + (r.impact || 0), 0);
     }
 
     get totalPages() {
@@ -322,7 +344,6 @@ export class CeoMainDashboard extends Component {
         if (this.state.currentPage !== target) {
             this.state.currentPage = target;
             this.state.expandedProductId = null;
-            this._saveState();
             const tableElem = document.querySelector(".cmd_panel .cmd_table_wrap");
             if (tableElem) {
                 tableElem.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -366,7 +387,7 @@ export class CeoMainDashboard extends Component {
                 this.state.history[productId] = await this.orm.call(
                     "ceo.main.dashboard",
                     "get_product_price_history",
-                    [productId, this.state.dateTo, this.state.billing]
+                    [productId, this.state.dateTo]
                 );
             } finally {
                 this.state.historyLoading = false;
@@ -406,7 +427,6 @@ export class CeoMainDashboard extends Component {
         if (!orderId) {
             return;
         }
-        this._saveState();
         this.action.doAction({
             type: "ir.actions.act_window",
             res_model: "purchase.order",
@@ -417,7 +437,6 @@ export class CeoMainDashboard extends Component {
     }
 
     openReceipt(pickingId) {
-        this._saveState();
         this.action.doAction({
             type: "ir.actions.act_window",
             res_model: "stock.picking",
@@ -427,9 +446,18 @@ export class CeoMainDashboard extends Component {
         });
     }
 
+    openBill(moveId) {
+        this.action.doAction({
+            type: "ir.actions.act_window",
+            res_model: "account.move",
+            res_id: moveId,
+            views: [[false, "form"]],
+            target: "current",
+        });
+    }
+
     openPeriodReceipts() {
         const data = this.state.data;
-        this._saveState();
         this.action.doAction({
             type: "ir.actions.act_window",
             name: _t("Purchase Receipts"),
@@ -447,8 +475,23 @@ export class CeoMainDashboard extends Component {
         });
     }
 
+    async openBills(dateFrom = null, dateTo = null) {
+        const action = await this.orm.call("ceo.main.dashboard", "action_open_period_bills", [
+            dateFrom,
+            dateTo,
+        ]);
+        this.action.doAction(action);
+    }
+
+    openPeriodBills() {
+        this.openBills(this.state.data.date_from, this.state.data.date_to);
+    }
+
+    openTodayBills() {
+        this.openBills();
+    }
+
     openProduct(productId) {
-        this._saveState();
         this.action.doAction({
             type: "ir.actions.act_window",
             res_model: "product.product",
@@ -496,6 +539,10 @@ export class CeoMainDashboard extends Component {
 
     qtyDiffers(received, ordered) {
         return Math.abs((Number(received) || 0) - (Number(ordered) || 0)) > 1e-6;
+    }
+
+    pricesDiffer(a, b) {
+        return Math.abs((Number(a) || 0) - (Number(b) || 0)) > 1e-6;
     }
 
     barHeight(amount) {
