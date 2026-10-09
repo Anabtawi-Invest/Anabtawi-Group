@@ -78,7 +78,7 @@ class CeoCostDashboardReport(models.AbstractModel):
             JOIN account_move m ON aml.move_id = m.id
             JOIN ceo_cost_account_mapping m_map ON aml.account_id = m_map.account_id
             JOIN ceo_cost_bucket b ON m_map.bucket_id = b.id
-            WHERE m.state = 'posted'
+            WHERE m.state = 'posted' AND aml.parent_state = 'posted'
               AND aml.date >= %s AND aml.date <= %s
               {comp_clause}
             GROUP BY b.code, b.name, b.category_type, b.color, b.sequence

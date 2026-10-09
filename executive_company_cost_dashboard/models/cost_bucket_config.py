@@ -98,7 +98,7 @@ class CeoSmartScannerWizard(models.TransientModel):
 
         # Fetch accounts
         Account = self.env["account.account"]
-        domain = [("deprecated", "=", False)]
+        domain = []
         accounts = Account.search(domain)
 
         mapping_model = self.env["ceo.cost.account.mapping"]

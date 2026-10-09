@@ -44,7 +44,7 @@
                         <page string="Mapped Accounts (الحسابات المربوطة)">
                             <field name="mapping_ids">
                                 <list editable="bottom">
-                                    <field name="account_id" domain="[('deprecated', '=', False)]"/>
+                                    <field name="account_id"/>
                                     <field name="account_code"/>
                                     <field name="company_ids" widget="many2many_tags" optional="show"/>
                                 </list>
