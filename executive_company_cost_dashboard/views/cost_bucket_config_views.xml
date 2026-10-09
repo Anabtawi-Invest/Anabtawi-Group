@@ -46,7 +46,7 @@
                                 <list editable="bottom">
                                     <field name="account_id" domain="[('deprecated', '=', False)]"/>
                                     <field name="account_code"/>
-                                    <field name="company_id"/>
+                                    <field name="company_ids" widget="many2many_tags" optional="show"/>
                                 </list>
                             </field>
                         </page>

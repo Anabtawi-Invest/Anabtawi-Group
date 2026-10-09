@@ -36,7 +36,16 @@ class CeoCostAccountMapping(models.Model):
     account_id = fields.Many2one("account.account", string="General Ledger Account", required=True, ondelete="cascade", index=True)
     account_code = fields.Char(related="account_id.code", string="Account Code", store=True)
     account_name = fields.Char(related="account_id.name", string="Account Name", store=True)
-    company_id = fields.Many2one(related="account_id.company_id", string="Company", store=True)
+    company_ids = fields.Many2many("res.company", string="Companies", compute="_compute_company_ids")
+
+    def _compute_company_ids(self):
+        for rec in self:
+            if hasattr(rec.account_id, "company_ids"):
+                rec.company_ids = rec.account_id.company_ids
+            elif hasattr(rec.account_id, "company_id"):
+                rec.company_ids = rec.account_id.company_id
+            else:
+                rec.company_ids = False
 
     _sql_constraints = [
         ("unique_account_bucket", "unique(account_id)", "Each account can only be mapped to one cost bucket!")
