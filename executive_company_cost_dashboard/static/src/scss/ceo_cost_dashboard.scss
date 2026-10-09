@@ -1,240 +1,411 @@
-/* CEO Executive Financial Intelligence Dashboard Styling */
-.o_ceo_cost_dashboard {
-    background-color: #f8fafc;
+/* ==========================================================================
+   Executive Company Cost Dashboard (Styled using CEO Main Dashboard Design)
+   ========================================================================== */
+
+$cmd-primary: #0d9488;
+$cmd-primary-dark: #0f766e;
+$cmd-up: #dc2626;
+$cmd-up-bg: #fef2f2;
+$cmd-up-border: #fecaca;
+$cmd-down: #16a34a;
+$cmd-down-bg: #f0fdf4;
+$cmd-down-border: #bbf7d0;
+$cmd-border: #e2e8f0;
+$cmd-muted: #64748b;
+$cmd-text: #1e293b;
+
+.cmd_container {
+    display: flex;
+    flex-direction: column;
     min-height: 100vh;
-    padding: 1.5rem;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    color: #0f172a;
+    background: #f8fafc;
+    color: $cmd-text;
+    overflow-y: auto;
+    overflow-x: hidden;
+    font-size: 13px;
 
-    .dashboard-header {
-        background: #ffffff;
-        border-radius: 12px;
-        padding: 1.25rem 1.75rem;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.06);
-        margin-bottom: 1.5rem;
-        border: 1px solid #e2e8f0;
+    * {
+        box-sizing: border-box;
+    }
 
-        .brand-title {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: #1e293b;
-            letter-spacing: -0.02em;
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
+    a {
+        color: $cmd-primary-dark;
+        text-decoration: none;
+        &:hover {
+            text-decoration: underline;
+        }
+    }
 
-            .badge-group {
-                background: #0ea5e9;
-                color: #ffffff;
-                font-size: 0.75rem;
-                padding: 0.2rem 0.6rem;
-                border-radius: 9999px;
-                font-weight: 600;
-                text-transform: uppercase;
-            }
+    .cmd_muted { color: $cmd-muted; }
+    .cmd_small { font-size: 11.5px; }
+    .cmd_strong { font-weight: 600; }
+    .cmd_text_up { color: $cmd-up !important; }
+    .cmd_text_down { color: $cmd-down !important; }
+
+    /* ---------------------------------------------------------------- Navbar */
+    .cmd_navbar {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        background: #fff;
+        border-bottom: 1px solid $cmd-border;
+        padding: 0 24px;
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        flex-shrink: 0;
+    }
+
+    .cmd_brand {
+        display: flex;
+        align-items: center;
+        font-size: 15px;
+        font-weight: 700;
+        color: $cmd-primary-dark;
+        white-space: nowrap;
+
+        .cmd_company_badge {
+            margin-inline-start: 10px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #0f766e;
+            background: #ccfbf1;
+            padding: 3px 10px;
+            border-radius: 9999px;
+            letter-spacing: 0.02em;
+            text-transform: uppercase;
+        }
+    }
+
+    .cmd_tabs {
+        display: flex;
+        flex: 1;
+        gap: 4px;
+        overflow-x: auto;
+    }
+
+    .cmd_tab {
+        background: transparent;
+        border: none;
+        border-bottom: 3px solid transparent;
+        padding: 14px 16px;
+        font-weight: 500;
+        font-size: 13px;
+        color: $cmd-muted;
+        white-space: nowrap;
+        cursor: pointer;
+        transition: all 0.15s ease;
+
+        &:hover {
+            color: $cmd-primary;
         }
 
-        .filter-controls {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.75rem;
-            align-items: center;
+        &.cmd_tab_active {
+            color: $cmd-primary-dark;
+            font-weight: 600;
+            border-bottom-color: $cmd-primary;
         }
+    }
 
-        .period-pill-group {
-            display: inline-flex;
+    .cmd_nav_actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .cmd_btn {
+        display: inline-flex;
+        align-items: center;
+        background: #fff;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        padding: 6px 12px;
+        font-size: 12.5px;
+        font-weight: 500;
+        color: #475569;
+        cursor: pointer;
+        transition: background 0.15s ease, border-color 0.15s ease;
+
+        &:hover {
             background: #f1f5f9;
-            padding: 0.25rem;
-            border-radius: 8px;
+            border-color: #94a3b8;
+        }
 
-            button {
-                border: none;
-                background: transparent;
-                padding: 0.4rem 0.85rem;
-                border-radius: 6px;
-                font-size: 0.825rem;
-                font-weight: 600;
-                color: #64748b;
-                transition: all 0.15s ease-in-out;
-                cursor: pointer;
-
-                &.active {
-                    background: #ffffff;
-                    color: #0f172a;
-                    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-                }
-
-                &:hover:not(.active) {
-                    color: #1e293b;
-                }
+        &.cmd_btn_primary {
+            background: $cmd-primary;
+            color: #fff;
+            border-color: $cmd-primary-dark;
+            &:hover {
+                background: $cmd-primary-dark;
             }
         }
     }
 
-    /* KPI Cards */
-    .kpi-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-        gap: 1rem;
-        margin-bottom: 1.5rem;
+    /* ---------------------------------------------------------- Filter bar */
+    .cmd_filter_bar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        background: #fff;
+        border-bottom: 1px solid $cmd-border;
+        padding: 10px 24px;
+    }
 
-        .kpi-card {
-            background: #ffffff;
-            border-radius: 12px;
-            padding: 1.25rem;
-            border: 1px solid #e2e8f0;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-            transition: transform 0.15s ease, box-shadow 0.15s ease;
+    .cmd_pills {
+        display: flex;
+        flex-wrap: wrap;
+        background: #f1f5f9;
+        padding: 3px;
+        border-radius: 7px;
+        gap: 2px;
+
+        .cmd_pill {
+            background: transparent;
+            border: none;
+            padding: 5px 12px;
+            border-radius: 5px;
+            font-size: 12px;
+            font-weight: 500;
+            color: #475569;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: all 0.15s ease;
 
             &:hover {
-                transform: translateY(-2px);
-                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.08);
-            }
-
-            .kpi-label {
-                font-size: 0.8rem;
-                font-weight: 600;
-                text-transform: uppercase;
-                letter-spacing: 0.05em;
-                color: #64748b;
-                margin-bottom: 0.5rem;
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-            }
-
-            .kpi-value {
-                font-size: 1.75rem;
-                font-weight: 700;
                 color: #0f172a;
-                line-height: 1.2;
             }
 
-            .kpi-subtext {
-                margin-top: 0.5rem;
-                font-size: 0.8rem;
-                font-weight: 500;
-
-                &.positive { color: #10b981; }
-                &.negative { color: #ef4444; }
-                &.warning { color: #f59e0b; }
-                &.neutral { color: #64748b; }
+            &.cmd_pill_active {
+                background: #fff;
+                color: $cmd-primary-dark;
+                font-weight: 600;
+                box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
             }
-
-            &.border-highlight-emerald { border-left: 4px solid #10b981; }
-            &.border-highlight-blue { border-left: 4px solid #3b82f6; }
-            &.border-highlight-amber { border-left: 4px solid #f59e0b; }
-            &.border-highlight-indigo { border-left: 4px solid #6366f1; }
-            &.border-highlight-purple { border-left: 4px solid #8b5cf6; }
-            &.border-highlight-rose { border-left: 4px solid #f43f5e; }
         }
     }
 
-    /* Sister Company Cards */
-    .section-card {
-        background: #ffffff;
-        border-radius: 12px;
-        border: 1px solid #e2e8f0;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-        padding: 1.5rem;
-        margin-bottom: 1.5rem;
+    .cmd_select {
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        padding: 5px 10px;
+        font-size: 12.5px;
+        color: #334155;
+        background: #fff;
+        cursor: pointer;
 
-        .section-header {
+        &:focus {
+            outline: none;
+            border-color: $cmd-primary;
+        }
+    }
+
+    .cmd_currency {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+
+        .cmd_currency_val {
+            font-weight: 600;
+            background: #f1f5f9;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+    }
+
+    /* ---------------------------------------------------------------- Body */
+    .cmd_body {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        padding: 24px;
+    }
+
+    .cmd_grid {
+        display: grid;
+        gap: 16px;
+
+        &.cmd_grid_4 {
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        }
+
+        &.cmd_grid_3 {
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        }
+
+        &.cmd_grid_2 {
+            grid-template-columns: repeat(auto-fit, minmax(460px, 1fr));
+        }
+    }
+
+    /* --------------------------------------------------------------- Cards */
+    .cmd_card {
+        background: #fff;
+        border: 1px solid $cmd-border;
+        border-radius: 10px;
+        padding: 16px 18px;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+
+        &:hover {
+            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+            transform: translateY(-1px);
+        }
+
+        .cmd_card_label {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: $cmd-muted;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 1.25rem;
-            padding-bottom: 0.75rem;
+        }
+
+        .cmd_card_value {
+            font-size: 24px;
+            font-weight: 700;
+            margin: 8px 0 6px;
+            color: #0f172a;
+
+            &.text-profit { color: #16a34a; }
+            &.text-loss { color: #dc2626; }
+            &.text-warning { color: #d97706; }
+            &.text-teal { color: #0d9488; }
+        }
+
+        .cmd_card_sub {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 6px;
+            font-size: 12px;
+            color: $cmd-muted;
+        }
+
+        &.cmd_border_teal { border-top: 3px solid #0d9488; }
+        &.cmd_border_blue { border-top: 3px solid #3b82f6; }
+        &.cmd_border_amber { border-top: 3px solid #f59e0b; }
+        &.cmd_border_green { border-top: 3px solid #10b981; }
+        &.cmd_border_purple { border-top: 3px solid #8b5cf6; }
+        &.cmd_border_rose { border-top: 3px solid #f43f5e; }
+        &.cmd_border_cyan { border-top: 3px solid #06b6d4; }
+    }
+
+    /* Section Card */
+    .cmd_section {
+        background: #fff;
+        border: 1px solid $cmd-border;
+        border-radius: 10px;
+        padding: 20px;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+
+        .cmd_section_header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
             border-bottom: 1px solid #f1f5f9;
 
             h3 {
-                font-size: 1.15rem;
+                font-size: 14px;
                 font-weight: 700;
                 color: #1e293b;
                 margin: 0;
+                display: flex;
+                align-items: center;
+                gap: 8px;
             }
         }
     }
 
-    .sister-companies-grid {
+    /* Sister Companies Cards */
+    .cmd_sister_grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-        gap: 1rem;
+        grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+        gap: 16px;
 
-        .sister-card {
-            border: 1px solid #e2e8f0;
-            border-radius: 10px;
-            padding: 1.25rem;
+        .cmd_sister_box {
             background: #fafafa;
+            border: 1px solid $cmd-border;
+            border-radius: 8px;
+            padding: 14px 16px;
 
-            .company-name {
-                font-size: 1.1rem;
+            .cmd_sister_head {
+                font-size: 14px;
                 font-weight: 700;
                 color: #0f172a;
-                margin-bottom: 0.75rem;
+                margin-bottom: 10px;
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
             }
 
-            .metric-row {
+            .cmd_row {
                 display: flex;
                 justify-content: space-between;
-                font-size: 0.85rem;
-                padding: 0.35rem 0;
+                font-size: 12px;
+                padding: 4px 0;
                 border-bottom: 1px dashed #e2e8f0;
 
                 &:last-child { border-bottom: none; }
-                .metric-label { color: #64748b; }
-                .metric-val { font-weight: 600; color: #1e293b; }
+                .cmd_lbl { color: $cmd-muted; }
+                .cmd_val { font-weight: 600; color: #1e293b; }
             }
         }
     }
 
     /* Badges */
-    .status-badge {
-        padding: 0.25rem 0.65rem;
-        border-radius: 9999px;
-        font-size: 0.75rem;
-        font-weight: 600;
+    .cmd_badge {
         display: inline-flex;
         align-items: center;
-        gap: 0.35rem;
+        gap: 4px;
+        padding: 2px 8px;
+        border-radius: 9999px;
+        font-size: 11px;
+        font-weight: 600;
 
-        &.profitable {
+        &.cmd_badge_profit {
             background: #dcfce7;
             color: #166534;
         }
-        &.warning {
+
+        &.cmd_badge_warn {
             background: #fef3c7;
             color: #92400e;
         }
-        &.loss {
+
+        &.cmd_badge_loss {
             background: #fee2e2;
             color: #991b1b;
         }
     }
 
-    /* Table styles */
-    .executive-table {
+    /* Table */
+    .cmd_table {
         width: 100%;
         border-collapse: collapse;
-        font-size: 0.875rem;
+        font-size: 12.5px;
 
         th {
             background: #f8fafc;
             color: #475569;
             font-weight: 600;
-            padding: 0.75rem 1rem;
+            padding: 10px 14px;
             text-align: right;
-            border-bottom: 2px solid #e2e8f0;
+            border-bottom: 2px solid $cmd-border;
             white-space: nowrap;
 
             &:first-child { text-align: left; }
         }
 
         td {
-            padding: 0.75rem 1rem;
+            padding: 10px 14px;
             border-bottom: 1px solid #f1f5f9;
             text-align: right;
             color: #1e293b;

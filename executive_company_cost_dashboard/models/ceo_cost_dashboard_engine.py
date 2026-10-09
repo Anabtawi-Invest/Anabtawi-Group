@@ -12,6 +12,14 @@ class CeoCostDashboardReport(models.AbstractModel):
         if not filters:
             filters = {}
 
+        # 0. Auto-run Smart Scanner on first run if no mappings exist
+        mapping_count = self.env["ceo.cost.account.mapping"].search_count([])
+        if mapping_count == 0:
+            try:
+                self.env["ceo.smart.scanner.wizard"].create({}).action_run_smart_scan()
+            except Exception:
+                pass
+
         today = fields.Date.context_today(self)
         period_mode = filters.get("period_mode", "this_month")
         
@@ -75,10 +83,9 @@ class CeoCostDashboardReport(models.AbstractModel):
                 SUM(aml.debit) AS total_debit,
                 SUM(aml.credit) AS total_credit
             FROM account_move_line aml
-            JOIN account_move m ON aml.move_id = m.id
             JOIN ceo_cost_account_mapping m_map ON aml.account_id = m_map.account_id
             JOIN ceo_cost_bucket b ON m_map.bucket_id = b.id
-            WHERE m.state = 'posted' AND aml.parent_state = 'posted'
+            WHERE aml.parent_state = 'posted'
               AND aml.date >= %s AND aml.date <= %s
               {comp_clause}
             GROUP BY b.code, b.name, b.category_type, b.color, b.sequence
@@ -148,8 +155,7 @@ class CeoCostDashboardReport(models.AbstractModel):
                 COALESCE(SUM(CASE WHEN b.category_type = 'cogs' THEN (aml.debit - aml.credit) ELSE 0 END), 0) AS cogs,
                 COALESCE(SUM(CASE WHEN b.category_type = 'expense' THEN (aml.debit - aml.credit) ELSE 0 END), 0) AS opex
             FROM res_company c
-            LEFT JOIN account_move_line aml ON aml.company_id = c.id AND aml.date >= %s AND aml.date <= %s
-            LEFT JOIN account_move m ON aml.move_id = m.id AND m.state = 'posted'
+            LEFT JOIN account_move_line aml ON aml.company_id = c.id AND aml.parent_state = 'posted' AND aml.date >= %s AND aml.date <= %s
             LEFT JOIN ceo_cost_account_mapping m_map ON aml.account_id = m_map.account_id
             LEFT JOIN ceo_cost_bucket b ON m_map.bucket_id = b.id
             GROUP BY c.id, c.name
@@ -186,32 +192,34 @@ class CeoCostDashboardReport(models.AbstractModel):
                 "status": status,
             })
 
-        # 4. Department Breakdown (Analytic Accounting)
-        # Combines accounts like IT, HR, Maintenance, Camera Surveillance, Security
-        analytic_query = f"""
+        # 4. Department Breakdown (Analytic Accounting) - Safe ORM Name Resolution
+        analytic_query = """
             SELECT 
-                COALESCE(aaa.name, 'General / Other') AS department_name,
+                aal.account_id,
                 SUM(ABS(aal.amount)) AS total_amount
             FROM account_analytic_line aal
-            LEFT JOIN account_analytic_account aaa ON aal.account_id = aaa.id
             WHERE aal.amount < 0
               AND aal.date >= %s AND aal.date <= %s
-            GROUP BY aaa.name
+            GROUP BY aal.account_id
             ORDER BY total_amount DESC
             LIMIT 15
         """
         self.env.cr.execute(analytic_query, (date_from, date_to))
         dept_rows = self.env.cr.dictfetchall()
 
+        acc_ids = [r["account_id"] for r in dept_rows if r.get("account_id")]
+        accounts_map = {a.id: a.display_name for a in self.env["account.analytic.account"].browse(acc_ids)}
+
         departments_list = []
         for d in dept_rows:
+            acc_id = d.get("account_id")
+            dept_name = accounts_map.get(acc_id) or _("General / Operations")
             departments_list.append({
-                "name": d["department_name"],
+                "name": dept_name,
                 "amount": round(float(d["total_amount"] or 0.0), 3),
             })
 
         # 5. 21-Branch Matrix & Leaderboard
-        # Group by Branch / Store (res.company or analytic branch)
         branch_query = f"""
             SELECT 
                 c.id AS branch_id,
@@ -225,8 +233,7 @@ class CeoCostDashboardReport(models.AbstractModel):
                 COALESCE(SUM(CASE WHEN b.code IN ('SECURITY', 'MAINTENANCE') THEN (aml.debit - aml.credit) ELSE 0 END), 0) AS maint_security,
                 COALESCE(SUM(CASE WHEN b.category_type = 'expense' THEN (aml.debit - aml.credit) ELSE 0 END), 0) AS total_opex
             FROM res_company c
-            LEFT JOIN account_move_line aml ON aml.company_id = c.id AND aml.date >= %s AND aml.date <= %s
-            LEFT JOIN account_move m ON aml.move_id = m.id AND m.state = 'posted'
+            LEFT JOIN account_move_line aml ON aml.company_id = c.id AND aml.parent_state = 'posted' AND aml.date >= %s AND aml.date <= %s
             LEFT JOIN ceo_cost_account_mapping m_map ON aml.account_id = m_map.account_id
             LEFT JOIN ceo_cost_bucket b ON m_map.bucket_id = b.id
             GROUP BY c.id, c.name
@@ -287,10 +294,10 @@ class CeoCostDashboardReport(models.AbstractModel):
                 COALESCE(SUM(CASE WHEN b.category_type = 'revenue' THEN (aml.credit - aml.debit) ELSE 0 END), 0) AS revenue,
                 COALESCE(SUM(CASE WHEN b.category_type = 'expense' THEN (aml.debit - aml.credit) ELSE 0 END), 0) AS opex
             FROM account_move_line aml
-            JOIN account_move m ON aml.move_id = m.id AND m.state = 'posted'
             JOIN ceo_cost_account_mapping m_map ON aml.account_id = m_map.account_id
             JOIN ceo_cost_bucket b ON m_map.bucket_id = b.id
-            WHERE aml.date >= %s
+            WHERE aml.parent_state = 'posted'
+              AND aml.date >= %s
               {comp_clause}
             GROUP BY TO_CHAR(aml.date, 'YYYY-MM')
             ORDER BY month_key ASC
