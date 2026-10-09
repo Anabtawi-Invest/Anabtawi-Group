@@ -456,6 +456,24 @@ $cmd-text: #1e293b;
                 color: $cmd-down;
             }
         }
+
+        &.cmd_impact_click {
+            cursor: pointer;
+            transition: box-shadow 0.15s ease, transform 0.15s ease;
+
+            &:hover {
+                box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+                transform: translateY(-1px);
+            }
+        }
+
+        &.cmd_impact_active {
+            box-shadow: 0 0 0 2px #0f766e;
+        }
+    }
+
+    .cmd_impact_lines {
+        margin-bottom: 12px;
     }
 
     /* ------------------------------------------------------------- Toolbar */

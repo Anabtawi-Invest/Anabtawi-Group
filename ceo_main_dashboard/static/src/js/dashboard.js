@@ -34,6 +34,7 @@ export class CeoMainDashboard extends Component {
             data: null,
             billing: "all", // 'all' | 'invoiced' | 'not_invoiced'
             trendFilter: "all", // 'all' | 'up' | 'down'
+            impactFilter: null, // null | 'extra' | 'saved' | 'net'
             limit: 100,
             currentPage: 1,
             searchTerm: "",
@@ -145,6 +146,29 @@ export class CeoMainDashboard extends Component {
         this.state.expandedProductId = null;
     }
 
+    setImpactFilter(filter) {
+        this.state.impactFilter = this.state.impactFilter === filter ? null : filter;
+        this.state.trendFilter = "all";
+        this.state.searchTerm = "";
+        this.state.searchResults = null;
+        this.state.currentPage = 1;
+        this.state.expandedProductId = null;
+        if (this.state.impactFilter) {
+            const panel = document.querySelector(".cmd_price_panel");
+            if (panel) {
+                panel.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+        }
+    }
+
+    impactFilterLabel(filter) {
+        return {
+            extra: _t("Extra paid (products with a positive period impact)"),
+            saved: _t("Saved (products with a negative period impact)"),
+            net: _t("Net impact (all products with a period impact)"),
+        }[filter];
+    }
+
     onLimitChange(ev) {
         this.state.limit = parseInt(ev.target.value, 10) || 100;
         this.state.currentPage = 1;
@@ -152,6 +176,7 @@ export class CeoMainDashboard extends Component {
     }
 
     onSearchInput(ev) {
+        this.state.impactFilter = null;
         this.state.searchTerm = ev.target.value;
         this.state.currentPage = 1;
         this.state.expandedProductId = null;
@@ -205,7 +230,19 @@ export class CeoMainDashboard extends Component {
         if (this.state.trendFilter !== "all") {
             rows = rows.filter((r) => r.trend === this.state.trendFilter);
         }
+        const impactFilter = !this.isSearchMode && this.state.impactFilter;
+        if (impactFilter === "extra") {
+            rows = rows.filter((r) => r.impact > 0).sort((a, b) => b.impact - a.impact);
+        } else if (impactFilter === "saved") {
+            rows = rows.filter((r) => r.impact < 0).sort((a, b) => a.impact - b.impact);
+        } else if (impactFilter === "net") {
+            rows = rows.filter((r) => r.impact).sort((a, b) => Math.abs(b.impact) - Math.abs(a.impact));
+        }
         return rows;
+    }
+
+    get filteredImpactTotal() {
+        return this.filteredRows.reduce((total, r) => total + (r.impact || 0), 0);
     }
 
     get totalPages() {

@@ -138,19 +138,24 @@
             <div class="cmd_panel cmd_impact">
                 <div class="cmd_panel_head">
                     <span class="cmd_panel_title"><i class="fa fa-balance-scale me-1"/> Money impact of price changes</span>
-                    <span class="cmd_muted">Every billed receipt in the period: its highest bill price compared with the highest bill price of the previous billed purchase of the same product × quantity received</span>
+                    <span class="cmd_muted">Every billed receipt in the period: its highest bill price compared with the highest bill price of the previous billed purchase of the same product × quantity received, netted per product. Click a box to see its products.</span>
                 </div>
                 <div class="cmd_grid cmd_grid_3">
-                    <div class="cmd_impact_box cmd_impact_up">
+                    <div class="cmd_impact_box cmd_impact_up cmd_impact_click"
+                         t-att-class="{ 'cmd_impact_active': state.impactFilter === 'extra' }"
+                         t-on-click="() => this.setImpactFilter('extra')" title="Show the products behind this amount">
                         <span class="cmd_impact_label">Extra paid (price increases)</span>
                         <span class="cmd_impact_value" t-esc="fmtMoney(impact.extra_paid)"/>
                     </div>
-                    <div class="cmd_impact_box cmd_impact_down">
+                    <div class="cmd_impact_box cmd_impact_down cmd_impact_click"
+                         t-att-class="{ 'cmd_impact_active': state.impactFilter === 'saved' }"
+                         t-on-click="() => this.setImpactFilter('saved')" title="Show the products behind this amount">
                         <span class="cmd_impact_label">Saved (price decreases)</span>
                         <span class="cmd_impact_value" t-esc="fmtMoney(impact.saved)"/>
                     </div>
-                    <div class="cmd_impact_box"
-                         t-att-class="impact.net > 0 ? 'cmd_impact_up' : impact.net &lt; 0 ? 'cmd_impact_down' : ''">
+                    <div class="cmd_impact_box cmd_impact_click"
+                         t-att-class="(impact.net > 0 ? 'cmd_impact_up' : impact.net &lt; 0 ? 'cmd_impact_down' : '') + (state.impactFilter === 'net' ? ' cmd_impact_active' : '')"
+                         t-on-click="() => this.setImpactFilter('net')" title="Show the products behind this amount">
                         <span class="cmd_impact_label">Net impact</span>
                         <span class="cmd_impact_value" t-esc="fmtSignedMoney(impact.net)"/>
                         <span class="cmd_impact_hint" t-if="impact.net > 0">You paid more than before</span>
@@ -161,7 +166,7 @@
             </div>
 
             <!-- Price comparison -->
-            <div class="cmd_panel">
+            <div class="cmd_panel cmd_price_panel">
                 <div class="cmd_panel_head cmd_panel_head_wrap">
                     <span class="cmd_panel_title">
                         <i class="fa fa-exchange me-1"/> Purchase price comparison
@@ -198,6 +203,17 @@
                             </select>
                         </label>
                     </div>
+                </div>
+
+                <div class="cmd_search_notice" t-if="!isSearchMode and state.impactFilter">
+                    <i class="fa fa-filter me-1"/>
+                    <span>Showing:</span> <strong t-esc="impactFilterLabel(state.impactFilter)"/>
+                    · <t t-esc="filteredRows.length"/> <span>products</span>
+                    · <span>Total</span> <strong t-esc="fmtSignedMoney(filteredImpactTotal)"/>.
+                    <span>Click a product to see the purchases behind its impact.</span>
+                    <a href="#" class="ms-1" t-on-click.prevent="() => this.setImpactFilter(state.impactFilter)">
+                        <i class="fa fa-times"/> <span>Clear</span>
+                    </a>
                 </div>
 
                 <div class="cmd_search_notice" t-if="isSearchMode">
@@ -298,6 +314,63 @@
                                 <!-- Expanded price history -->
                                 <tr class="cmd_history_row" t-if="state.expandedProductId === row.product_id">
                                     <td t-att-colspan="isSearchMode ? 10 : 11">
+                                        <div class="cmd_impact_lines" t-if="!isSearchMode and row.impact_lines and row.impact_lines.length">
+                                            <div class="cmd_small cmd_strong mb-1">
+                                                <i class="fa fa-balance-scale me-1"/> Impact in this period:
+                                                <span t-att-class="changeClass(row.impact)" t-esc="fmtSignedMoney(row.impact)"/>
+                                            </div>
+                                            <table class="cmd_table cmd_table_sm">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Purchase</th>
+                                                        <th>Vendor</th>
+                                                        <th>First received</th>
+                                                        <th class="text-end">Bill price used</th>
+                                                        <th>Compared with</th>
+                                                        <th class="text-end">Previous bill price</th>
+                                                        <th class="text-end">Difference</th>
+                                                        <th class="text-end">Qty received in period</th>
+                                                        <th class="text-end">Impact</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <t t-foreach="row.impact_lines" t-as="il" t-key="il.line_id">
+                                                        <tr>
+                                                            <td>
+                                                                <a href="#" t-esc="il.order_name"
+                                                                   t-on-click.prevent.stop="() => this.openOrder(il.order_id)"/>
+                                                            </td>
+                                                            <td t-esc="il.vendor"/>
+                                                            <td t-esc="fmtDate(il.date)"/>
+                                                            <td class="text-end" t-att-class="{ 'cmd_text_up': il.multi_price }">
+                                                                <i class="fa fa-flag me-1" t-if="il.multi_price"
+                                                                   title="Billed at different prices on several bills, the highest one is used"/>
+                                                                <span class="cmd_strong" t-esc="fmtPrice(il.price)"/>
+                                                                <div class="cmd_small" t-if="il.bill_id">
+                                                                    <a href="#" t-esc="il.bill_name"
+                                                                       t-on-click.prevent.stop="() => this.openBill(il.bill_id)"/>
+                                                                </div>
+                                                            </td>
+                                                            <td>
+                                                                <a href="#" t-esc="il.prev_order_name"
+                                                                   t-on-click.prevent.stop="() => this.openOrder(il.prev_order_id)"/>
+                                                                <div class="cmd_muted cmd_small" t-esc="il.prev_vendor"/>
+                                                            </td>
+                                                            <td class="text-end" t-esc="fmtPrice(il.prev_price)"/>
+                                                            <td class="text-end" t-att-class="changeClass(il.diff)">
+                                                                <t t-esc="fmtSignedPrice(il.diff)"/>
+                                                                <div class="cmd_small" t-if="il.pct !== null" t-esc="fmtPct(il.pct)"/>
+                                                            </td>
+                                                            <td class="text-end">
+                                                                <t t-esc="fmtQty(il.qty)"/> <span class="cmd_muted" t-esc="row.uom"/>
+                                                            </td>
+                                                            <td class="text-end cmd_strong" t-att-class="changeClass(il.impact)"
+                                                                t-esc="fmtSignedMoney(il.impact)"/>
+                                                        </tr>
+                                                    </t>
+                                                </tbody>
+                                            </table>
+                                        </div>
                                         <div class="cmd_loading_sm" t-if="state.historyLoading and !state.history[row.product_id]">
                                             <i class="fa fa-circle-o-notch fa-spin me-2"/> Loading price history…
                                         </div>

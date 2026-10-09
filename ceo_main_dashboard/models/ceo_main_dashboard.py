@@ -281,20 +281,47 @@ class CeoMainDashboard(models.AbstractModel):
         bills = self._bill_unit_prices(self._lines_recordset(lines))
         prev_of = {rec['id']: rec['prev_id'] for rec in fetched}
 
-        # Receipts and returns of the same line are netted before splitting into extra paid / saved.
-        line_impact = defaultdict(float)
+        # Receipts and returns are netted per line, then lines per product, before splitting
+        # products into extra paid / saved.
+        line_qty = defaultdict(float)
         for move in moves:
-            line = move.purchase_line_id
-            prev_id = prev_of.get(line.id)
-            if not prev_id:
-                continue
-            diff = self._compare_price(line, bills) - self._compare_price(lines[prev_id], bills)
-            if not currency.is_zero(diff):
-                line_impact[line] += diff * self._move_received_qty(move)
+            if prev_of.get(move.purchase_line_id.id):
+                line_qty[move.purchase_line_id] += self._move_received_qty(move)
 
+        first_date_of = {rec['id']: rec['first_date'] for rec in fetched}
         product_impact = defaultdict(float)
-        for line, amount in line_impact.items():
+        impact_lines = defaultdict(list)
+        for line, qty in line_qty.items():
+            prev_line = lines[prev_of[line.id]]
+            price = self._compare_price(line, bills)
+            prev_price = self._compare_price(prev_line, bills)
+            diff = price - prev_price
+            if currency.is_zero(diff) or currency.is_zero(diff * qty):
+                continue
+            amount = diff * qty
             product_impact[line.product_id.id] += amount
+            bill = self._compared_bill(line, bills)
+            impact_lines[line.product_id.id].append({
+                'line_id': line.id,
+                'order_id': line.order_id.id,
+                'order_name': line.order_id.name,
+                'vendor': line.order_id.partner_id.display_name,
+                'date': self._local_date_str(first_date_of[line.id]),
+                'price': price,
+                'bill_id': bill['id'] if bill else False,
+                'bill_name': bill['name'] if bill else '',
+                'multi_price': self._has_multi_bill_price(line, bills, currency),
+                'prev_order_id': prev_line.order_id.id,
+                'prev_order_name': prev_line.order_id.name,
+                'prev_vendor': prev_line.order_id.partner_id.display_name,
+                'prev_price': prev_price,
+                'diff': diff,
+                'pct': (diff / prev_price * 100.0) if prev_price else None,
+                'qty': qty,
+                'impact': amount,
+            })
+
+        for amount in product_impact.values():
             if amount > 0:
                 impact['extra_paid'] += amount
             else:
@@ -310,6 +337,7 @@ class CeoMainDashboard(models.AbstractModel):
         for product_id, rec in latest.items():
             row = self._build_row(rec, lines, ratios, bills, currency)
             row['impact'] = product_impact.get(product_id, 0.0)
+            row['impact_lines'] = sorted(impact_lines.get(product_id, []), key=lambda l: -abs(l['impact']))
             impact[f"{row['trend']}_count"] += 1
             rows.append(row)
 
@@ -522,6 +550,12 @@ class CeoMainDashboard(models.AbstractModel):
         """Highest unit price of the line on its posted vendor bills (PO price if it has none)."""
         prices = self._invoice_prices(line, bills)
         return max(prices) if prices else self._unit_price(line)
+
+    @staticmethod
+    def _compared_bill(line, bills):
+        """The posted vendor bill holding the line's highest bill price."""
+        invoices = [bill for bill in bills.get(line.id, []) if not bill['is_refund']]
+        return max(invoices, key=lambda bill: bill['price']) if invoices else None
 
     def _has_multi_bill_price(self, line, bills, currency):
         prices = self._invoice_prices(line, bills)
