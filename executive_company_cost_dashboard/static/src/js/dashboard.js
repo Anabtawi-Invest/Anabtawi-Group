@@ -87,19 +87,13 @@ export class ExecutiveCostDashboard extends Component {
             dateFrom: saved.dateFrom || "",
             dateTo: saved.dateTo || "",
             companyId: saved.companyId || 0,
-            // branches
-            branchSearch: "",
-            branchSort: "revenue",
-            branchDir: "desc",
-            branchStatus: "all",
-            expandedBranch: null,
-            // companies / costs / departments
-            selectedBucket: saved.selectedBucket || "",
             hoverMonth: null,
-            matrixTopic: saved.matrixTopic || "hr",
-            matrixKind: saved.matrixTopic && saved.matrixTopic !== "hr" ? "branch" : "department",
-            matrixSort: "total",
-            matrixDir: "desc",
+            explorerId: saved.explorerId || 0,
+            explorerSearch: "",
+            explorerKind: saved.explorerKind || "all",
+            finderQuery: saved.finderQuery || "",
+            finderSelected: null,
+            finderGroup: "",
         });
         onWillStart(() => this.load());
     }
@@ -119,10 +113,10 @@ export class ExecutiveCostDashboard extends Component {
 
     saveState() {
         try {
-            const { tab, periodMode, year, dateFrom, dateTo, companyId, selectedBucket, matrixTopic } = this.state;
+            const { tab, periodMode, year, dateFrom, dateTo, companyId, explorerId, explorerKind, finderQuery } = this.state;
             sessionStorage.setItem(
                 STORAGE_KEY,
-                JSON.stringify({ tab, periodMode, year, dateFrom, dateTo, companyId, selectedBucket, matrixTopic })
+                JSON.stringify({ tab, periodMode, year, dateFrom, dateTo, companyId, explorerId, explorerKind, finderQuery })
             );
         } catch {
             /* storage may be unavailable */
@@ -141,10 +135,6 @@ export class ExecutiveCostDashboard extends Component {
             if (this.state.periodMode === "custom" && !this.state.dateFrom) {
                 this.state.dateFrom = data.period.date_from;
                 this.state.dateTo = data.period.date_to;
-            }
-            const costs = data.buckets.filter((b) => b.family === "cost");
-            if (!costs.some((b) => b.code === this.state.selectedBucket)) {
-                this.state.selectedBucket = (costs[0] && costs[0].code) || "";
             }
         } catch (error) {
             this.state.error = (error && error.data && error.data.message) || (error && error.message) || String(error);
@@ -180,18 +170,23 @@ export class ExecutiveCostDashboard extends Component {
         return [
             { key: "overview", label: _t("Overview"), icon: "fa-tachometer" },
             { key: "companies", label: _t("Companies"), icon: "fa-industry" },
-            { key: "branches", label: _t("Branches"), icon: "fa-shopping-basket" },
-            { key: "matrix", label: _t("Cost Breakdown"), icon: "fa-table" },
-            { key: "costs", label: _t("Cost Intelligence"), icon: "fa-pie-chart" },
-            { key: "departments", label: _t("Departments"), icon: "fa-sitemap" },
+            { key: "explorer", label: _t("Branches & Departments"), icon: "fa-sitemap" },
+            { key: "finder", label: _t("Expenses"), icon: "fa-search" },
         ];
     }
 
     setTab(tab, bucket) {
-        this.state.tab = tab;
-        if (bucket) {
-            this.state.selectedBucket = bucket;
+        if (tab === "costs") {
+            // a cost group: open the expense list filtered on that group
+            tab = "finder";
+            this.state.finderGroup = bucket || "";
+            this.state.finderQuery = "";
+            this.state.finderSelected = null;
+        } else if (tab === "branches" || tab === "departments") {
+            tab = "explorer";
+            this.state.explorerKind = tab === "branches" ? "branch" : "department";
         }
+        this.state.tab = tab;
         this.saveState();
     }
 
@@ -223,11 +218,6 @@ export class ExecutiveCostDashboard extends Component {
             this.state.periodMode = "custom";
             await this.load();
         }
-    }
-
-    selectBucket(code) {
-        this.state.selectedBucket = code;
-        this.saveState();
     }
 
     // ------------------------------------------------------------------
@@ -691,45 +681,15 @@ export class ExecutiveCostDashboard extends Component {
         return d ? d.buckets.filter((b) => b.family === "income" && b.kind === "revenue") : [];
     }
 
-    get incomeBuckets() {
-        const d = this.state.data;
-        return d ? d.buckets.filter((b) => b.family === "income") : [];
-    }
-
-    hasTrend(bucket) {
-        return bucket.trend.some((v) => v !== 0);
-    }
-
     goBucket(segment) {
         if (!segment.profit && segment.code) {
             this.setTab("costs", segment.code);
         }
     }
 
-    get costBuckets() {
-        const d = this.state.data;
-        return d ? d.buckets.filter((b) => b.family === "cost").sort((a, b) => b.amount - a.amount) : [];
-    }
-
-    get selectedBucketData() {
-        const d = this.state.data;
-        if (!d) {
-            return null;
-        }
-        return d.buckets.find((b) => b.code === this.state.selectedBucket) || null;
-    }
-
     bucketMeta(code) {
         const d = this.state.data;
         return (d && d.buckets.find((b) => b.code === code)) || { name: code, color: "#94a3b8" };
-    }
-
-    branchBreakdown(row) {
-        const total = row.cost || 1;
-        return Object.entries(row.buckets || {})
-            .map(([code, amount]) => ({ ...this.bucketMeta(code), code, amount, pct: (amount / total) * 100 }))
-            .sort((a, b) => b.amount - a.amount)
-            .slice(0, 8);
     }
 
     // ------------------------------------------------------------------
@@ -777,82 +737,10 @@ export class ExecutiveCostDashboard extends Component {
     // ------------------------------------------------------------------
     // Branches
     // ------------------------------------------------------------------
-    get branchColumns() {
-        return [
-            { key: "name", label: _t("Branch"), left: true },
-            { key: "revenue", label: _t("Revenue") },
-            { key: "cost", label: _t("Costs") },
-            { key: "rent", label: _t("Rent") },
-            { key: "rent_pct", label: _t("Rent / Sales") },
-            { key: "payroll", label: _t("People") },
-            { key: "delivery", label: _t("Delivery") },
-            { key: "net_profit", label: _t("Net Result") },
-            { key: "net_margin", label: _t("Margin") },
-        ];
-    }
-
-    get filteredBranches() {
-        const d = this.state.data;
-        if (!d) {
-            return [];
-        }
-        const q = this.state.branchSearch.trim().toLowerCase();
-        const key = this.state.branchSort;
-        const dir = this.state.branchDir === "asc" ? 1 : -1;
-        let rows = d.branches.rows.filter(
-            (r) =>
-                (this.state.branchStatus === "all" || r.status === this.state.branchStatus) &&
-                (!q || r.name.toLowerCase().includes(q) || (r.full_name || "").toLowerCase().includes(q))
-        );
-        rows = [...rows].sort((a, b) => {
-            const va = a[key];
-            const vb = b[key];
-            if (typeof va === "string") {
-                return va.localeCompare(vb) * dir;
-            }
-            return ((va || 0) - (vb || 0)) * dir;
-        });
-        return rows;
-    }
-
-    sortBranches(key) {
-        if (this.state.branchSort === key) {
-            this.state.branchDir = this.state.branchDir === "asc" ? "desc" : "asc";
-        } else {
-            this.state.branchSort = key;
-            this.state.branchDir = key === "name" ? "asc" : "desc";
-        }
-    }
-
-    toggleBranch(id) {
-        this.state.expandedBranch = this.state.expandedBranch === id ? null : id;
-    }
-
-    marginWidth(margin) {
-        return Math.min(Math.abs(margin || 0), 40) * 2.5;
-    }
-
-    rentTone(pct) {
-        const th = this.state.data.thresholds;
-        return pct >= th.rent_danger_pct ? "bad" : pct >= th.rent_warn_pct ? "warn" : "";
-    }
-
-    regionName(region) {
-        return region ? _t("Region %s", region) : _t("Other");
-    }
-
     // ------------------------------------------------------------------
     // Cost breakdown matrix (HR / utilities / rent per branch & department)
     // ------------------------------------------------------------------
-    get matrixTopics() {
-        return [
-            { key: "hr", label: _t("People cost (HR)"), icon: "fa-users", rgb: "59,111,224", kind: "department" },
-            { key: "utilities", label: _t("Utilities"), icon: "fa-bolt", rgb: "14,165,198", kind: "branch" },
-            { key: "rent", label: _t("Rent & occupancy"), icon: "fa-building", rgb: "109,91,208", kind: "branch" },
-        ];
-    }
-
-    get matrixKinds() {
+    get entityKinds() {
         return [
             { key: "all", label: _t("Everything") },
             { key: "branch", label: _t("Branches") },
@@ -865,93 +753,256 @@ export class ExecutiveCostDashboard extends Component {
         return { branch: _t("Branch"), department: _t("Dept."), factory: _t("Factory") }[kind] || kind;
     }
 
-    get matrixView() {
+    // ------------------------------------------------------------------
+    // Explorer: pick any branch / department and see every cost
+    // ------------------------------------------------------------------
+    get explorerList() {
         const d = this.state.data;
-        const m = d && d.matrix && d.matrix[this.state.matrixTopic];
-        if (!m) {
-            return null;
+        if (!d) {
+            return [];
         }
-        const rgb = this.matrixTopics.find((t) => t.key === this.state.matrixTopic).rgb;
-        const kind = this.state.matrixKind;
-        const key = this.state.matrixSort;
-        const dir = this.state.matrixDir === "asc" ? 1 : -1;
-        const value = (r) => {
-            if (key === "name") {
-                return r.name;
-            }
-            if (key === "total") {
-                return r.total;
-            }
-            if (key === "pct_revenue") {
-                return r.pct_revenue || 0;
-            }
-            return r.values[key] || 0;
-        };
-        const rows = m.rows
-            .filter((r) => kind === "all" || r.kind === kind)
-            .sort((a, b) => {
-                const va = value(a);
-                const vb = value(b);
-                return (typeof va === "string" ? va.localeCompare(vb) : va - vb) * dir;
-            });
-        const max = {};
-        m.columns.forEach((c) => {
-            max[c.key] = Math.max(0, ...rows.map((r) => r.values[c.key] || 0));
-        });
-        const cells = (values) =>
-            m.columns.map((c) => {
-                const v = values[c.key] || 0;
-                const alpha = v && max[c.key] ? (0.05 + (0.3 * v) / max[c.key]).toFixed(2) : 0;
-                return { key: c.key, value: v, style: alpha ? "background: rgba(" + rgb + ", " + alpha + ")" : "" };
-            });
-        const allocated = m.rows.reduce((acc, r) => acc + r.total, 0);
-        return {
-            ...m,
-            rows: rows.map((r) => ({ ...r, cells: cells(r.values) })),
-            allocated,
-            allocatedPct: m.totals.total ? (allocated / m.totals.total) * 100 : 0,
-            unallocatedCells: m.columns.map((c) => ({ key: c.key, value: m.unallocated.values[c.key] || 0 })),
-            totalCells: m.columns.map((c) => ({ key: c.key, value: m.totals.values[c.key] || 0 })),
-            top: [...rows].sort((a, b) => b.total - a.total)[0] || null,
-        };
-    }
-
-    setMatrixTopic(topic) {
-        this.state.matrixTopic = topic;
-        this.state.matrixKind = this.matrixTopics.find((t) => t.key === topic).kind;
-        this.state.matrixSort = "total";
-        this.state.matrixDir = "desc";
-        this.saveState();
-    }
-
-    setMatrixKind(kind) {
-        this.state.matrixKind = kind;
-    }
-
-    sortMatrix(key) {
-        if (this.state.matrixSort === key) {
-            this.state.matrixDir = this.state.matrixDir === "asc" ? "desc" : "asc";
-        } else {
-            this.state.matrixSort = key;
-            this.state.matrixDir = key === "name" ? "asc" : "desc";
-        }
-    }
-
-    drillMatrix(row) {
-        const m = this.state.data.matrix[this.state.matrixTopic];
-        this.openJournalItems(
-            [...this.baseDomain(), ["account_id", "in", m.account_ids], ["analytic_distribution", "in", [row.id]]],
-            m.title + " – " + row.name
+        const q = this.state.explorerSearch.trim().toLowerCase();
+        const kind = this.state.explorerKind;
+        return d.entities.filter(
+            (e) =>
+                (kind === "all" || e.kind === kind) &&
+                (!q || e.name.toLowerCase().includes(q) || (e.full_name || "").toLowerCase().includes(q))
         );
     }
 
-    exportMatrix() {
-        const v = this.matrixView;
-        const header = ["Name", "Type", ...v.columns.map((c) => c.name), "Total", "% of revenue"];
-        const rows = v.rows.map((r) => [r.name, r.kind, ...v.columns.map((c) => r.values[c.key] || 0), r.total, r.pct_revenue]);
-        rows.push(["Not allocated", "", ...v.unallocatedCells.map((c) => c.value), v.unallocated.total, ""]);
-        rows.push(["Group total", "", ...v.totalCells.map((c) => c.value), v.totals.total, ""]);
-        this.downloadCsv(this.state.matrixTopic + "_breakdown.csv", header, rows);
+    get selectedEntity() {
+        const d = this.state.data;
+        if (!d || !d.entities.length) {
+            return null;
+        }
+        return (
+            d.entities.find((e) => e.id === this.state.explorerId) ||
+            d.entities.find((e) => e.cost > 0) ||
+            d.entities[0]
+        );
+    }
+
+    get entityView() {
+        const d = this.state.data;
+        const e = this.selectedEntity;
+        if (!d || !e) {
+            return null;
+        }
+        const names = (topic) => Object.fromEntries(((d.matrix[topic] || {}).columns || []).map((c) => [c.key, c.name]));
+        const detail = (topic) => {
+            const labels = names(topic);
+            const subs = e.subs[topic] || {};
+            const total = Object.values(subs).reduce((a, b) => a + b, 0);
+            return Object.entries(subs)
+                .map(([key, amount]) => ({ key, name: labels[key] || key, amount, pct: total ? (amount / total) * 100 : 0 }))
+                .sort((a, b) => b.amount - a.amount);
+        };
+        const cards = [
+            { code: "PAYROLL", label: _t("People cost (HR)"), icon: "fa-users" },
+            { code: "UTILITIES", label: _t("Utilities"), icon: "fa-bolt" },
+            { code: "RENT", label: _t("Rent & occupancy"), icon: "fa-building" },
+        ].map((c) => {
+            const amount = e.buckets[c.code] || 0;
+            const prev = e.prev_buckets[c.code] || 0;
+            return {
+                ...c,
+                amount,
+                delta: this.rel(amount, prev),
+                pct: e.cost ? (amount / e.cost) * 100 : 0,
+                color: this.bucketMeta(c.code).color,
+            };
+        });
+        const buckets = Object.entries(e.buckets)
+            .map(([code, amount]) => {
+                const prev = e.prev_buckets[code] || 0;
+                return {
+                    ...this.bucketMeta(code),
+                    code,
+                    amount,
+                    prev,
+                    delta: this.rel(amount, prev),
+                    pct: e.cost ? (amount / e.cost) * 100 : 0,
+                };
+            })
+            .sort((a, b) => b.amount - a.amount);
+        return {
+            e,
+            cards,
+            buckets,
+            hr: detail("hr"),
+            utilities: detail("utilities"),
+            rent: detail("rent"),
+            bars: this.miniBars(e.trend.map((t) => t.cost), e.trend.map((t) => t.month), "#d9822b"),
+        };
+    }
+
+    selectEntity(id) {
+        this.state.explorerId = id;
+        this.saveState();
+    }
+
+    openEntity(id) {
+        this.state.explorerId = id;
+        this.setTab("explorer");
+    }
+
+    drillEntity(e) {
+        this.openJournalItems([...this.baseDomain(), ["analytic_distribution", "in", [e.id]]], e.full_name || e.name);
+    }
+
+    exportEntity() {
+        const v = this.entityView;
+        const rows = v.buckets.map((b) => [b.name, b.amount, b.prev, b.delta, b.pct]);
+        this.downloadCsv("cost_detail_" + v.e.name + ".csv", ["Cost", "Amount", "Previous period", "Change %", "% of total cost"], rows);
+    }
+
+    /** Small bar chart (inline SVG) for a monthly series. */
+    miniBars(values, months, color) {
+        if (!values || !values.length) {
+            return null;
+        }
+        const w = 560;
+        const h = 120;
+        const pad = { l: 8, r: 8, t: 14, b: 20 };
+        const max = Math.max(...values, 1);
+        const slot = (w - pad.l - pad.r) / values.length;
+        const bw = Math.min(26, slot * 0.6);
+        return {
+            w,
+            h,
+            color,
+            base: h - pad.b,
+            bars: values.map((v, i) => {
+                const bh = (v / max) * (h - pad.t - pad.b);
+                return {
+                    key: "mb" + i,
+                    x: pad.l + slot * i + (slot - bw) / 2,
+                    y: h - pad.b - bh,
+                    w: bw,
+                    h: Math.max(bh, v ? 1.5 : 0),
+                    cx: pad.l + slot * i + slot / 2,
+                    label: this.monthLabel(months[i]),
+                    value: v,
+                    tip: this.monthLabel(months[i], true) + ": " + this.money(v),
+                };
+            }),
+        };
+    }
+
+    // ------------------------------------------------------------------
+    // Expense finder: every expense with its total, click one for the breakdown
+    // ------------------------------------------------------------------
+    get finderChips() {
+        return [
+            { q: "internet", label: _t("Internet") },
+            { q: "software", label: _t("Software / Odoo") },
+            { q: "electricity", label: _t("Electricity") },
+            { q: "water", label: _t("Water") },
+            { q: "rent", label: _t("Rent") },
+            { q: "salary", label: _t("Salaries") },
+            { q: "social security", label: _t("Social security") },
+            { q: "health", label: _t("Health insurance") },
+            { q: "phone", label: _t("Phones") },
+            { q: "fuel", label: _t("Fuel") },
+            { q: "security", label: _t("Security") },
+            { q: "delivery", label: _t("Delivery commissions") },
+        ];
+    }
+
+    get finderMatches() {
+        const d = this.state.data;
+        if (!d) {
+            return [];
+        }
+        const tokens = this.state.finderQuery.trim().toLowerCase().split(/\s+/).filter(Boolean);
+        const group = this.state.finderGroup;
+        return d.expenses.filter((a) => (!group || a.bucket === group) && tokens.every((t) => a.search.includes(t)));
+    }
+
+    get finderGroups() {
+        const d = this.state.data;
+        return d ? d.buckets.filter((b) => b.family === "cost").sort((a, b) => b.amount - a.amount) : [];
+    }
+
+    onFinderGroup(ev) {
+        this.state.finderGroup = ev.target.value;
+        this.state.finderSelected = null;
+    }
+
+    get explorerTotal() {
+        return this.explorerList.reduce((acc, e) => acc + e.cost, 0);
+    }
+
+    get finderView() {
+        const d = this.state.data;
+        const matches = this.finderMatches;
+        if (!d) {
+            return null;
+        }
+        const picked = matches.find((a) => a.id === this.state.finderSelected);
+        const items = picked ? [picked] : matches;
+        const months = d.monthly.map((m) => m.month);
+        const sum = (key) => items.reduce((acc, a) => acc + a[key], 0);
+        const merge = (key, field) => {
+            const map = new Map();
+            items.forEach((a) =>
+                a[key].forEach((x) => {
+                    const cur = map.get(x.id) || { ...x, amount: 0 };
+                    cur.amount += x.amount;
+                    map.set(x.id, cur);
+                })
+            );
+            return [...map.values()].sort((a, b) => b.amount - a.amount);
+        };
+        const amount = sum("amount");
+        const prev = sum("prev");
+        const trend = months.map((m, i) => items.reduce((acc, a) => acc + (a.trend[i] || 0), 0));
+        const unallocated = sum("unallocated");
+        const entities = merge("entities");
+        const companies = merge("companies");
+        return {
+            picked,
+            count: items.length,
+            total: matches.reduce((acc, a) => acc + a.amount, 0),
+            title: picked
+                ? picked.name
+                : this.state.finderGroup
+                  ? this.bucketMeta(this.state.finderGroup).name
+                  : this.state.finderQuery.trim()
+                    ? _t("All matching expenses")
+                    : _t("All expenses"),
+            subtitle: picked ? picked.code + " · " + picked.bucket_name : _t("%s accounts", items.length),
+            amount,
+            prev,
+            delta: this.rel(amount, prev),
+            pctRevenue: d.summary.revenue ? (amount / d.summary.revenue) * 100 : 0,
+            entities: entities.slice(0, 30),
+            entityMax: Math.max(1, ...entities.map((x) => x.amount), unallocated),
+            unallocated,
+            companies,
+            bars: this.miniBars(trend, months, picked ? picked.color : "#3b6fe0"),
+            accountIds: items.map((a) => a.id),
+        };
+    }
+
+    setFinder(query) {
+        this.state.finderQuery = query;
+        this.state.finderGroup = "";
+        this.state.finderSelected = null;
+        this.saveState();
+    }
+
+    selectExpense(id) {
+        this.state.finderSelected = this.state.finderSelected === id ? null : id;
+    }
+
+    drillExpenses(view) {
+        this.openJournalItems([...this.baseDomain(), ["account_id", "in", view.accountIds]], view.title);
+    }
+
+    exportFinder() {
+        const rows = this.finderMatches.map((a) => [a.code, a.name, a.bucket_name, a.amount, a.prev, a.delta_pct, a.pct_revenue]);
+        this.downloadCsv("expenses.csv", ["Code", "Expense", "Group", "Amount", "Previous period", "Change %", "% of revenue"], rows);
     }
 
     // ------------------------------------------------------------------
@@ -983,18 +1034,6 @@ export class ExecutiveCostDashboard extends Component {
             ["date", "<=", d.period.date_to],
             ["company_id", "in", d.filters.company_ids],
         ];
-    }
-
-    drillBucket(bucket) {
-        this.openJournalItems([...this.baseDomain(), ["account_id", "in", bucket.account_ids]], bucket.name);
-    }
-
-    drillAccount(bucket, acc) {
-        this.openJournalItems([...this.baseDomain(), ["account_id", "=", acc.id]], `${acc.code} ${acc.name}`);
-    }
-
-    drillBranch(row) {
-        this.openJournalItems([...this.baseDomain(), ["analytic_distribution", "in", [row.id]]], row.full_name || row.name);
     }
 
     openPurchasing() {
@@ -1051,27 +1090,6 @@ export class ExecutiveCostDashboard extends Component {
         setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
 
-    exportBranches() {
-        const rows = this.filteredBranches.map((r) => [
-            r.name,
-            r.region,
-            r.revenue,
-            r.cost,
-            r.rent,
-            r.rent_pct,
-            r.payroll,
-            r.delivery,
-            r.net_profit,
-            r.net_margin,
-            r.status,
-        ]);
-        this.downloadCsv(
-            "branches.csv",
-            ["Branch", "Region", "Revenue", "Costs", "Rent", "Rent %", "People", "Delivery", "Net", "Margin %", "Status"],
-            rows
-        );
-    }
-
     exportCompanies() {
         const rows = this.companyRows.map((c) => [
             c.name,
@@ -1092,10 +1110,6 @@ export class ExecutiveCostDashboard extends Component {
         );
     }
 
-    exportBuckets() {
-        const rows = this.state.data.buckets.map((b) => [b.name, b.family, b.amount, b.prev_amount, b.delta_pct, b.pct_revenue]);
-        this.downloadCsv("cost_buckets.csv", ["Bucket", "Family", "Amount", "Previous period", "Change %", "% of revenue"], rows);
-    }
 }
 
 registry.category("actions").add("executive_company_cost_dashboard_main", ExecutiveCostDashboard);

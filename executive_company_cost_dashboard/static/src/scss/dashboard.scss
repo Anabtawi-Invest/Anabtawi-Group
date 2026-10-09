@@ -311,6 +311,19 @@
     }
     .ecd_table_compact td { padding: 7px 10px; }
     .ecd_table td.ecd_left { min-width: 150px; }
+    .ecd_pick_tools { display: flex; flex-direction: column; gap: 8px; padding: 6px 6px 10px; .ecd_input { width: 100%; } }
+    .ecd_finder_search { display: flex; flex-direction: column; gap: 10px; }
+    .ecd_search_box { display: flex; align-items: center; gap: 12px; padding: 0 16px; height: 52px; border: 2px solid var(--ecd-line); border-radius: 14px; background: #fff; color: var(--ecd-muted);
+        &:focus-within { border-color: var(--ecd-info); } i { font-size: 18px; } }
+    .ecd_search_input { flex: 1; border: 0; outline: none; background: transparent; font-size: 16px; color: var(--ecd-text); min-width: 0; }
+    .ecd_chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .ecd_qchip { border: 1px solid var(--ecd-line); background: #f7f9fc; color: #44566e; border-radius: 20px; padding: 5px 13px; font-size: 12.5px; font-weight: 600; &:hover { background: #eef3fb; } }
+    .ecd_qchip_active { background: var(--ecd-navy); color: #fff; border-color: var(--ecd-navy); }
+    .ecd_group_row { display: flex; align-items: center; gap: 10px; }
+    .ecd_expense_amt { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .ecd_focus_three { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 4px; }
+    .ecd_picked_note { margin: 0 0 10px; padding: 8px 12px; border-radius: 8px; background: var(--ecd-info-bg); color: #1d4f91; }
+    .ecd_gap_top { margin-top: 6px; }
     .ecd_matrix_bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
     .ecd_heat { transition: background 0.15s; }
     .ecd_row_unalloc td { background: #fff8ee !important; color: #8a5a14; font-style: italic; }

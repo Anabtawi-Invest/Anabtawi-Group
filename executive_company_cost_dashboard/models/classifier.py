@@ -80,6 +80,9 @@ def load_rules():
             ]
             for bucket, rules in raw.get("subcategories", {}).items()
         },
+        "aliases": [
+            {"subs": _compile_words(a["words"])[0], "alias": a["alias"]} for a in raw.get("aliases", [])
+        ],
         "platforms": [
             {"key": p["key"], "name": p["name"], "subs": _compile_words(p["words"])[0]}
             for p in raw.get("platforms", [])
@@ -155,6 +158,13 @@ def classify_sub(bucket, name):
         if any(w in padded for w in rule["subs"]) or any(" %s " % w in padded for w in rule["whole"]):
             return rule["key"]
     return "OTHER"
+
+
+def search_aliases(name):
+    """English search terms for an (Arabic) account name, so 'internet' finds 'مصروف انترنت'."""
+    padded = " %s " % re.sub(r"(^| )تشغيل( |$)", " ", normalize(name))
+    found = [a["alias"] for a in load_rules()["aliases"] if any(w in padded for w in a["subs"])]
+    return " ".join(found)
 
 
 def platform_of(name):
