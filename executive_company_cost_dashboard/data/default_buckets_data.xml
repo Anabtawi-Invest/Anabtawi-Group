@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- noupdate: users may rename / recolor buckets without losing changes on upgrade -->
+    <data noupdate="1">
+        <!-- ============ REVENUE FAMILY ============ -->
+        <record id="bucket_rev_retail" model="ceo.cost.bucket">
+            <field name="name">Retail Branch Sales</field>
+            <field name="code">REV_RETAIL</field>
+            <field name="category_type">revenue</field>
+            <field name="color">#0f9d75</field>
+            <field name="sequence">10</field>
+        </record>
+        <record id="bucket_rev_local" model="ceo.cost.bucket">
+            <field name="name">Local &amp; Wholesale Sales</field>
+            <field name="code">REV_LOCAL</field>
+            <field name="category_type">revenue</field>
+            <field name="color">#2f80ed</field>
+            <field name="sequence">12</field>
+        </record>
+        <record id="bucket_rev_export" model="ceo.cost.bucket">
+            <field name="name">Export Sales</field>
+            <field name="code">REV_EXPORT</field>
+            <field name="category_type">revenue</field>
+            <field name="color">#7c5cff</field>
+            <field name="sequence">14</field>
+        </record>
+        <record id="bucket_rev_adj" model="ceo.cost.bucket">
+            <field name="name">Discounts &amp; Platform Allowances</field>
+            <field name="code">REV_ADJ</field>
+            <field name="category_type">revenue</field>
+            <field name="color">#f2994a</field>
+            <field name="sequence">16</field>
+        </record>
+        <record id="bucket_revenue" model="ceo.cost.bucket">
+            <field name="name">Other Revenue</field>
+            <field name="code">REVENUE</field>
+            <field name="category_type">revenue</field>
+            <field name="color">#10b981</field>
+            <field name="sequence">18</field>
+        </record>
+        <record id="bucket_other_income" model="ceo.cost.bucket">
+            <field name="name">Other Income</field>
+            <field name="code">OTHER_INCOME</field>
+            <field name="category_type">other_income</field>
+            <field name="color">#14b8a6</field>
+            <field name="sequence">19</field>
+        </record>
+
+        <!-- ============ COST FAMILY ============ -->
+        <record id="bucket_cogs" model="ceo.cost.bucket">
+            <field name="name">Cost of Goods &amp; Materials</field>
+            <field name="code">COGS</field>
+            <field name="category_type">expense</field>
+            <field name="color">#d9822b</field>
+            <field name="sequence">20</field>
+        </record>
+        <record id="bucket_factory_oh" model="ceo.cost.bucket">
+            <field name="name">Allocated Factory Overhead</field>
+            <field name="code">FACTORY_OH</field>
+            <field name="category_type">expense</field>
+            <field name="color">#a16207</field>
+            <field name="sequence">25</field>
+        </record>
+        <record id="bucket_payroll" model="ceo.cost.bucket">
+            <field name="name">People &amp; Labor</field>
+            <field name="code">PAYROLL</field>
+            <field name="category_type">expense</field>
+            <field name="color">#3b6fe0</field>
+            <field name="sequence">30</field>
+        </record>
+        <record id="bucket_rent" model="ceo.cost.bucket">
+            <field name="name">Rent &amp; Occupancy</field>
+            <field name="code">RENT</field>
+            <field name="category_type">expense</field>
+            <field name="color">#6d5bd0</field>
+            <field name="sequence">40</field>
+        </record>
+        <record id="bucket_utilities" model="ceo.cost.bucket">
+            <field name="name">Utilities (Power, Water, Fuel)</field>
+            <field name="code">UTILITIES</field>
+            <field name="category_type">expense</field>
+            <field name="color">#0ea5c6</field>
+            <field name="sequence">50</field>
+        </record>
+        <record id="bucket_tech" model="ceo.cost.bucket">
+            <field name="name">IT, Telecom &amp; Software</field>
+            <field name="code">TECH</field>
+            <field name="category_type">expense</field>
+            <field name="color">#8b5cf6</field>
+            <field name="sequence">60</field>
+        </record>
+        <record id="bucket_delivery" model="ceo.cost.bucket">
+            <field name="name">Delivery Platform Commissions</field>
+            <field name="code">DELIVERY</field>
+            <field name="category_type">expense</field>
+            <field name="color">#e0457b</field>
+            <field name="sequence">70</field>
+        </record>
+        <record id="bucket_fleet" model="ceo.cost.bucket">
+            <field name="name">Fleet &amp; Logistics</field>
+            <field name="code">FLEET</field>
+            <field name="category_type">expense</field>
+            <field name="color">#12a594</field>
+            <field name="sequence">80</field>
+        </record>
+        <record id="bucket_security" model="ceo.cost.bucket">
+            <field name="name">Security &amp; Guarding</field>
+            <field name="code">SECURITY</field>
+            <field name="category_type">expense</field>
+            <field name="color">#e5484d</field>
+            <field name="sequence">90</field>
+        </record>
+        <record id="bucket_maintenance" model="ceo.cost.bucket">
+            <field name="name">Maintenance &amp; Cleaning</field>
+            <field name="code">MAINTENANCE</field>
+            <field name="category_type">expense</field>
+            <field name="color">#d4a017</field>
+            <field name="sequence">100</field>
+        </record>
+        <record id="bucket_loss" model="ceo.cost.bucket">
+            <field name="name">Waste, Shrinkage &amp; Discrepancies</field>
+            <field name="code">LOSS</field>
+            <field name="category_type">expense</field>
+            <field name="color">#c2410c</field>
+            <field name="sequence">110</field>
+        </record>
+        <record id="bucket_marketing" model="ceo.cost.bucket">
+            <field name="name">Marketing &amp; Sales Commissions</field>
+            <field name="code">MARKETING</field>
+            <field name="category_type">expense</field>
+            <field name="color">#c026d3</field>
+            <field name="sequence">120</field>
+        </record>
+        <record id="bucket_govt" model="ceo.cost.bucket">
+            <field name="name">Government, Legal &amp; Compliance</field>
+            <field name="code">GOVT</field>
+            <field name="category_type">expense</field>
+            <field name="color">#4b6584</field>
+            <field name="sequence">130</field>
+        </record>
+        <record id="bucket_finance" model="ceo.cost.bucket">
+            <field name="name">Finance Costs</field>
+            <field name="code">FINANCE</field>
+            <field name="category_type">expense</field>
+            <field name="color">#64748b</field>
+            <field name="sequence">140</field>
+        </record>
+        <record id="bucket_depreciation" model="ceo.cost.bucket">
+            <field name="name">Depreciation &amp; Amortization</field>
+            <field name="code">DEPRECIATION</field>
+            <field name="category_type">expense</field>
+            <field name="color">#94a3b8</field>
+            <field name="sequence">150</field>
+        </record>
+        <record id="bucket_other" model="ceo.cost.bucket">
+            <field name="name">Other Operating Costs</field>
+            <field name="code">OTHER_OPEX</field>
+            <field name="category_type">expense</field>
+            <field name="color">#78716c</field>
+            <field name="sequence">160</field>
+        </record>
+    </data>
+</odoo>

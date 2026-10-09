@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_ceo_cost_analytic_map_list" model="ir.ui.view">
+        <field name="name">ceo.cost.analytic.map.list</field>
+        <field name="model">ceo.cost.analytic.map</field>
+        <field name="arch" type="xml">
+            <list string="Branches &amp; Departments" editable="bottom">
+                <field name="analytic_id"/>
+                <field name="kind"/>
+                <field name="short_name"/>
+                <field name="region"/>
+                <field name="pos_keywords" optional="show"/>
+                <field name="auto" readonly="1" optional="hide"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_ceo_cost_analytic_map_search" model="ir.ui.view">
+        <field name="name">ceo.cost.analytic.map.search</field>
+        <field name="model">ceo.cost.analytic.map</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="analytic_id"/>
+                <field name="short_name"/>
+                <filter name="branches" string="Branches" domain="[('kind', '=', 'branch')]"/>
+                <filter name="factory" string="Factory" domain="[('kind', '=', 'factory')]"/>
+                <filter name="departments" string="Departments" domain="[('kind', '=', 'department')]"/>
+                <filter name="inactive" string="Archived" domain="[('active', '=', False)]"/>
+                <group>
+                    <filter name="group_kind" string="Role" context="{'group_by': 'kind'}"/>
+                    <filter name="group_region" string="Region" context="{'group_by': 'region'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_ceo_cost_analytic_map" model="ir.actions.act_window">
+        <field name="name">Branches &amp; Departments</field>
+        <field name="res_model">ceo.cost.analytic.map</field>
+        <field name="view_mode">list</field>
+        <field name="context">{'search_default_group_kind': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Run the Smart Scanner to classify your analytic accounts</p>
+        </field>
+    </record>
+</odoo>

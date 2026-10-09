@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="group_ceo_cost_dashboard_viewer" model="res.groups">
+        <field name="name">Executive Cost Dashboard / Viewer</field>
+        <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+        <field name="comment">Can open the Executive Company Cost Dashboard (read-only analytics).</field>
+    </record>
+
+    <record id="group_ceo_cost_dashboard_manager" model="res.groups">
+        <field name="name">Executive Cost Dashboard / Manager</field>
+        <field name="implied_ids" eval="[(4, ref('group_ceo_cost_dashboard_viewer'))]"/>
+        <field name="user_ids" eval="[(4, ref('base.user_root')), (4, ref('base.user_admin'))]"/>
+        <field name="comment">Can also edit the cost buckets, account mappings and run the Smart Scanner.</field>
+    </record>
+</odoo>

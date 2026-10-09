@@ -1,0 +1,786 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <!-- ============================================================ shared bits -->
+    <t t-name="executive_company_cost_dashboard.Delta">
+        <span t-if="delta !== null and delta !== undefined" t-attf-class="ecd_delta ecd_{{ this.tone(delta, higher) }}">
+            <i t-attf-class="fa {{ this.arrow(delta) }}"/>
+            <t t-if="points"><t t-out="(delta &gt; 0 ? '+' : '') + delta.toFixed(1) + ' pp'"/></t>
+            <t t-else=""><t t-out="this.signedPct(delta)"/></t>
+        </span>
+        <span t-else="" class="ecd_delta ecd_flat">–</span>
+    </t>
+
+    <t t-name="executive_company_cost_dashboard.Spark">
+        <t t-set="sp" t-value="this.sparkPaths(values, sw, sh)"/>
+        <svg t-if="sp" class="ecd_spark" t-att-viewBox="'0 0 ' + sp.w + ' ' + sp.h" preserveAspectRatio="none" t-att-width="sw" t-att-height="sh">
+            <path t-att-d="sp.area" t-att-fill="color" fill-opacity="0.13"/>
+            <path t-att-d="sp.line" fill="none" t-att-stroke="color" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
+        </svg>
+    </t>
+
+    <t t-name="executive_company_cost_dashboard.Chip">
+        <span t-attf-class="ecd_chip ecd_chip_{{ status }}" t-out="this.statusLabel(status)"/>
+    </t>
+
+    <t t-name="executive_company_cost_dashboard.Empty">
+        <div class="ecd_empty">
+            <i t-attf-class="fa {{ icon || 'fa-inbox' }}"/>
+            <div class="ecd_empty_title" t-out="title"/>
+            <div class="ecd_empty_text" t-out="text"/>
+        </div>
+    </t>
+
+    <!-- ============================================================ main -->
+    <t t-name="executive_company_cost_dashboard.Dashboard">
+        <div class="ecd" t-att-class="{ 'ecd_busy': state.busy }">
+
+            <!-- Header -->
+            <header class="ecd_header">
+                <div class="ecd_brand">
+                    <div class="ecd_mark"><i class="fa fa-bar-chart"/></div>
+                    <div class="ecd_brand_text">
+                        <div class="ecd_kicker">Executive Cockpit</div>
+                        <h1 class="ecd_title">Group Financial Overview</h1>
+                        <div class="ecd_sub" t-if="state.data">
+                            <i class="fa fa-calendar-o"/> <t t-out="this.periodLabel"/>
+                            <span class="ecd_dot"/>
+                            <i class="fa fa-building-o"/> <t t-out="this.companyLabel"/>
+                            <span class="ecd_dot"/>
+                            <t t-out="state.data.currency.name"/>
+                        </div>
+                    </div>
+                </div>
+                <div class="ecd_actions">
+                    <button class="ecd_btn" t-if="state.data and state.data.meta.purchasing_action_id" t-on-click="this.openPurchasing">
+                        <i class="fa fa-shopping-cart"/> <span>Purchasing Dashboard</span>
+                    </button>
+                    <button class="ecd_btn" t-if="state.data and state.data.meta.is_manager" t-on-click="this.runScan" title="Re-classify accounts and branches">
+                        <i class="fa fa-magic"/> <span>Smart Scan</span>
+                    </button>
+                    <button class="ecd_btn" t-on-click="this.printPage"><i class="fa fa-print"/> <span>Print</span></button>
+                    <button class="ecd_btn ecd_btn_primary" t-on-click="this.refresh">
+                        <i t-attf-class="fa fa-refresh {{ state.busy ? 'fa-spin' : '' }}"/> <span>Refresh</span>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Toolbar: tabs + filters -->
+            <section class="ecd_toolbar">
+                <nav class="ecd_tabs">
+                    <button t-foreach="this.tabs" t-as="tab" t-key="tab.key"
+                            t-attf-class="ecd_tab {{ state.tab === tab.key ? 'ecd_tab_active' : '' }}"
+                            t-on-click="() => this.setTab(tab.key)">
+                        <i t-attf-class="fa {{ tab.icon }}"/> <span t-out="tab.label"/>
+                    </button>
+                </nav>
+                <div class="ecd_filters">
+                    <div class="ecd_pills">
+                        <button t-foreach="this.periods" t-as="p" t-key="p.key"
+                                t-attf-class="ecd_pill {{ state.periodMode === p.key ? 'ecd_pill_active' : '' }}"
+                                t-on-click="() => this.setPeriod(p.key)" t-out="p.label"/>
+                    </div>
+                    <select class="ecd_select" t-if="state.data and state.data.period.years.length"
+                            t-on-change="this.onYear" title="Full calendar year">
+                        <option t-foreach="state.data.period.years" t-as="y" t-key="y" t-att-value="y"
+                                t-att-selected="state.periodMode === 'year' and state.year === y" t-out="y"/>
+                    </select>
+                    <div class="ecd_range" t-if="state.periodMode === 'custom'">
+                        <input type="date" class="ecd_date" t-att-value="state.dateFrom" t-on-change="(ev) => this.onDate('dateFrom', ev)"/>
+                        <span>→</span>
+                        <input type="date" class="ecd_date" t-att-value="state.dateTo" t-on-change="(ev) => this.onDate('dateTo', ev)"/>
+                    </div>
+                    <select class="ecd_select" t-if="state.data and state.data.companies_available.length &gt; 1" t-on-change="this.onCompany">
+                        <option value="0" t-att-selected="!state.companyId">All companies</option>
+                        <option t-foreach="state.data.companies_available" t-as="c" t-key="c.id" t-att-value="c.id"
+                                t-att-selected="state.companyId === c.id" t-out="c.name"/>
+                    </select>
+                </div>
+            </section>
+
+            <!-- Body -->
+            <main class="ecd_body">
+                <div t-if="state.loading" class="ecd_loading">
+                    <div class="ecd_skel_row">
+                        <div class="ecd_skel" t-foreach="[1,2,3,4,5,6]" t-as="i" t-key="i"/>
+                    </div>
+                    <div class="ecd_skel ecd_skel_wide"/>
+                </div>
+                <div t-elif="state.error" class="ecd_error">
+                    <i class="fa fa-exclamation-triangle"/>
+                    <div>
+                        <strong>The dashboard could not be loaded</strong>
+                        <div t-out="state.error"/>
+                        <button class="ecd_btn" t-on-click="this.refresh">Try again</button>
+                    </div>
+                </div>
+                <t t-elif="state.data">
+                    <t t-if="state.tab === 'overview'" t-call="executive_company_cost_dashboard.Overview"/>
+                    <t t-elif="state.tab === 'companies'" t-call="executive_company_cost_dashboard.Companies"/>
+                    <t t-elif="state.tab === 'branches'" t-call="executive_company_cost_dashboard.Branches"/>
+                    <t t-elif="state.tab === 'matrix'" t-call="executive_company_cost_dashboard.Matrix"/>
+                    <t t-elif="state.tab === 'costs'" t-call="executive_company_cost_dashboard.Costs"/>
+                    <t t-elif="state.tab === 'departments'" t-call="executive_company_cost_dashboard.Departments"/>
+
+                    <footer class="ecd_footer">
+                        <span><i class="fa fa-lock"/> Read-only · posted journal entries only · reconciles with Odoo's Profit &amp; Loss</span>
+                        <span><t t-out="state.data.meta.lines"/> ledger lines analysed</span>
+                        <span>Compared with <t t-out="this.prevLabel"/></span>
+                        <span>Updated <t t-out="this.updatedAt"/></span>
+                    </footer>
+                </t>
+            </main>
+        </div>
+    </t>
+
+    <!-- ============================================================ OVERVIEW -->
+    <t t-name="executive_company_cost_dashboard.Overview">
+        <div t-if="!this.hasData">
+            <t t-call="executive_company_cost_dashboard.Empty">
+                <t t-set="icon" t-value="'fa-calendar-times-o'"/>
+                <t t-set="title">No posted entries in this period</t>
+                <t t-set="text">Pick another period or company. Only posted journal entries are counted.</t>
+            </t>
+        </div>
+        <t t-else="">
+            <!-- KPI strip -->
+            <section class="ecd_kpis">
+                <article t-foreach="this.kpis" t-as="k" t-key="k.key"
+                         t-attf-class="ecd_card ecd_kpi {{ k.hero ? 'ecd_kpi_hero' : '' }} {{ k.value &lt; 0 ? 'ecd_kpi_neg' : '' }}">
+                    <div class="ecd_kpi_top">
+                        <span class="ecd_kpi_icon" t-attf-style="color: {{ k.color }}"><i t-attf-class="fa {{ k.icon }}"/></span>
+                        <span class="ecd_kpi_label" t-out="k.label"/>
+                    </div>
+                    <div class="ecd_kpi_value">
+                        <t t-if="k.isRatio"><t t-out="this.money(k.value, 3)"/></t>
+                        <t t-else=""><t t-out="this.money(k.value)"/><small class="ecd_unit" t-out="state.data.currency.name"/></t>
+                    </div>
+                    <div class="ecd_kpi_foot">
+                        <t t-call="executive_company_cost_dashboard.Delta">
+                            <t t-set="delta" t-value="k.delta"/>
+                            <t t-set="higher" t-value="k.higher"/>
+                            <t t-set="points" t-value="k.deltaIsPoints"/>
+                        </t>
+                        <span class="ecd_muted" t-out="k.sub"/>
+                    </div>
+                    <div class="ecd_kpi_spark" t-if="k.spark">
+                        <t t-call="executive_company_cost_dashboard.Spark">
+                            <t t-set="values" t-value="k.spark"/>
+                            <t t-set="color" t-value="k.color"/>
+                            <t t-set="sw" t-value="220"/>
+                            <t t-set="sh" t-value="34"/>
+                        </t>
+                    </div>
+                </article>
+            </section>
+
+            <!-- Trend + alerts -->
+            <section class="ecd_grid ecd_grid_main">
+                <article class="ecd_card">
+                    <header class="ecd_card_head">
+                        <h3>Monthly performance</h3>
+                        <div class="ecd_legend">
+                            <span><i class="ecd_sw ecd_sw_rev"/>Revenue</span>
+                            <span><i class="ecd_sw ecd_sw_cost"/>Costs</span>
+                            <span><i class="ecd_sw ecd_sw_net"/>Net profit</span>
+                        </div>
+                    </header>
+                    <t t-set="tc" t-value="this.trendChart"/>
+                    <div class="ecd_chart" t-if="tc">
+                        <svg class="ecd_svg" t-att-viewBox="'0 0 ' + tc.w + ' ' + tc.h" preserveAspectRatio="xMidYMid meet">
+                            <g t-foreach="tc.grid" t-as="g" t-key="g_index">
+                                <line t-att-x1="tc.l" t-att-x2="tc.r" t-att-y1="g.y" t-att-y2="g.y" t-attf-class="ecd_gridline {{ g.zero ? 'ecd_zero' : '' }}"/>
+                                <text t-att-x="tc.l - 8" t-att-y="g.y + 3.5" class="ecd_axis" text-anchor="end" t-out="g.label"/>
+                            </g>
+                            <rect t-foreach="tc.bars" t-as="bar" t-key="bar.key" t-attf-class="ecd_bar ecd_bar_{{ bar.cls }}"
+                                  t-att-x="bar.x" t-att-y="bar.y" t-att-width="bar.w" t-att-height="bar.h" rx="2"/>
+                            <path t-if="tc.line" t-att-d="tc.line" class="ecd_netline"/>
+                            <circle t-foreach="tc.dots" t-as="dot" t-key="dot.key" t-attf-class="ecd_netdot {{ dot.neg ? 'ecd_neg' : '' }}"
+                                    t-att-cx="dot.x" t-att-cy="dot.y" r="3.4"/>
+                            <text t-foreach="tc.labels" t-as="lb" t-key="lb.key" class="ecd_axis" text-anchor="middle"
+                                  t-att-x="lb.x" t-att-y="tc.labelY" t-out="lb.text"/>
+                            <rect t-foreach="state.data.monthly" t-as="m" t-key="m.month" class="ecd_hit"
+                                  t-att-x="tc.l + tc.slot * m_index" t-att-y="tc.t" t-att-width="tc.slot" t-att-height="tc.innerH"
+                                  t-on-mouseenter="() => this.setHover(m_index)" t-on-mouseleave="() => this.setHover(null)"/>
+                        </svg>
+                    </div>
+                    <t t-set="fm" t-value="this.hoveredMonth or state.data.monthly[state.data.monthly.length - 1]"/>
+                    <div class="ecd_chart_foot" t-if="fm">
+                        <strong t-out="this.monthLabel(fm.month, true)"/>
+                        <span>Revenue <b t-out="this.money(fm.revenue)"/></span>
+                        <span>Costs <b t-out="this.money(fm.cost)"/></span>
+                        <span t-attf-class="{{ fm.net_profit &lt; 0 ? 'ecd_text_bad' : 'ecd_text_good' }}">Net <b t-out="this.money(fm.net_profit)"/></span>
+                    </div>
+                </article>
+
+                <article class="ecd_card ecd_alerts">
+                    <header class="ecd_card_head"><h3><i class="fa fa-bell-o"/> Needs your attention</h3></header>
+                    <div class="ecd_alert_list">
+                        <div t-foreach="state.data.alerts" t-as="al" t-key="al_index"
+                             t-attf-class="ecd_alert ecd_alert_{{ al.level }} {{ al.tab ? 'ecd_clickable' : '' }}"
+                             t-on-click="() => this.openAlert(al)">
+                            <span class="ecd_alert_icon"><i t-attf-class="fa {{ al.icon }}"/></span>
+                            <div>
+                                <div class="ecd_alert_title" t-out="al.title"/>
+                                <div class="ecd_alert_text" t-out="al.text"/>
+                            </div>
+                            <i t-if="al.tab" class="fa fa-angle-right ecd_alert_go"/>
+                        </div>
+                        <div t-if="!state.data.alerts.length" class="ecd_muted ecd_pad">Nothing unusual detected for this period.</div>
+                    </div>
+                </article>
+            </section>
+
+            <!-- Allocation + waterfall -->
+            <section class="ecd_grid ecd_grid_two">
+                <article class="ecd_card">
+                    <header class="ecd_card_head">
+                        <h3>Where every 1.00 of sales goes</h3>
+                        <span class="ecd_muted ecd_small">share of revenue</span>
+                    </header>
+                    <t t-set="al" t-value="this.allocation"/>
+                    <t t-if="al">
+                        <div class="ecd_stack">
+                            <div t-foreach="al.segs" t-as="sg" t-key="sg.key" class="ecd_stack_seg ecd_clickable"
+                                 t-attf-style="width: {{ sg.pct }}%; background: {{ sg.color }}"
+                                 t-att-title="sg.name + ': ' + this.pct(sg.ofRevenue)"
+                                 t-on-click="() => this.goBucket(sg)"/>
+                        </div>
+                        <div class="ecd_loss_note" t-if="al.loss"><i class="fa fa-exclamation-triangle"/> Costs exceed revenue by <b t-out="this.money(al.loss)"/></div>
+                        <ul class="ecd_alloc_list">
+                            <li t-foreach="al.segs.slice(0, 9)" t-as="sg" t-key="sg.key" t-attf-class="{{ sg.profit ? '' : 'ecd_clickable' }}"
+                                t-on-click="() => this.goBucket(sg)">
+                                <i class="ecd_dotc" t-attf-style="background: {{ sg.color }}"/>
+                                <span class="ecd_alloc_name" t-out="sg.name"/>
+                                <span class="ecd_alloc_amt" t-out="this.money(sg.amount)"/>
+                                <b class="ecd_alloc_pct" t-out="this.pct(sg.ofRevenue)"/>
+                            </li>
+                        </ul>
+                    </t>
+                </article>
+
+                <article class="ecd_card">
+                    <header class="ecd_card_head"><h3>Profit waterfall</h3><span class="ecd_muted ecd_small">revenue → net profit</span></header>
+                    <t t-set="wf" t-value="this.waterfall"/>
+                    <div class="ecd_chart" t-if="wf">
+                        <svg class="ecd_svg" t-att-viewBox="'0 0 ' + wf.w + ' ' + wf.h" preserveAspectRatio="xMidYMid meet">
+                            <line t-att-x1="wf.l" t-att-x2="wf.r" t-att-y1="wf.zero" t-att-y2="wf.zero" class="ecd_gridline ecd_zero"/>
+                            <g t-foreach="wf.bars" t-as="b" t-key="b.key">
+                                <line t-if="b.connector !== null" t-att-x1="b.x2" t-att-x2="b.nextX" t-att-y1="b.connector" t-att-y2="b.connector" class="ecd_connector"/>
+                                <rect t-attf-class="ecd_bar ecd_wf_{{ b.cls }}" t-att-x="b.x" t-att-y="b.y" t-att-width="b.w" t-att-height="b.h" rx="2">
+                                    <title><t t-out="b.label + ': ' + this.money(b.value)"/></title>
+                                </rect>
+                                <text class="ecd_wf_value" text-anchor="middle" t-att-x="b.cx" t-att-y="b.valueY" t-out="this.compact(b.value)"/>
+                                <text class="ecd_axis" text-anchor="middle" t-att-x="b.cx" t-att-y="b.labelY" t-out="b.label"/>
+                            </g>
+                        </svg>
+                    </div>
+                </article>
+            </section>
+
+            <!-- Focus cards -->
+            <section>
+                <div class="ecd_section_title">
+                    <h2>CEO focus areas</h2>
+                    <span class="ecd_muted">Tap a card for the account-level detail</span>
+                </div>
+                <div class="ecd_focus">
+                    <article t-foreach="this.focusCards" t-as="f" t-key="f.code" t-attf-class="ecd_card ecd_focus_card ecd_clickable ecd_tone_{{ f.tone }}"
+                             t-on-click="() => this.setTab('costs', f.code)">
+                        <div class="ecd_focus_top">
+                            <span class="ecd_focus_icon" t-attf-style="background: {{ f.color }}"><i t-attf-class="fa {{ this.icon(f.code) }}"/></span>
+                            <span class="ecd_focus_name" t-out="f.name"/>
+                        </div>
+                        <div class="ecd_focus_value"><t t-out="this.money(f.amount)"/></div>
+                        <div class="ecd_focus_foot">
+                            <b t-out="this.pct(f.pct_revenue)"/> <span class="ecd_muted">of revenue</span>
+                            <t t-call="executive_company_cost_dashboard.Delta">
+                                <t t-set="delta" t-value="f.delta_pct"/>
+                                <t t-set="higher" t-value="false"/>
+                                <t t-set="points" t-value="false"/>
+                            </t>
+                        </div>
+                    </article>
+                </div>
+            </section>
+
+            <!-- Revenue streams / companies / branches -->
+            <section class="ecd_grid ecd_grid_three">
+                <article class="ecd_card">
+                    <header class="ecd_card_head"><h3>Revenue streams</h3></header>
+                    <div class="ecd_bars">
+                        <div class="ecd_bar_row" t-foreach="this.revenueStreams" t-as="r" t-key="r.code">
+                            <div class="ecd_bar_label"><i class="ecd_dotc" t-attf-style="background: {{ r.color }}"/><span t-out="r.name"/></div>
+                            <div class="ecd_bar_track"><div class="ecd_bar_fill" t-attf-style="width: {{ Math.min(Math.abs(r.share), 100) }}%; background: {{ r.color }}"/></div>
+                            <div class="ecd_bar_val"><b t-out="this.money(r.amount)"/><span class="ecd_muted" t-out="this.pct(r.share)"/></div>
+                        </div>
+                        <div t-if="!this.revenueStreams.length" class="ecd_muted ecd_pad">No revenue recorded.</div>
+                    </div>
+                </article>
+
+                <article class="ecd_card">
+                    <header class="ecd_card_head">
+                        <h3>Sister companies</h3>
+                        <a class="ecd_link" t-on-click="() => this.setTab('companies')">All <i class="fa fa-angle-right"/></a>
+                    </header>
+                    <table class="ecd_mini_table">
+                        <tbody>
+                            <tr t-foreach="state.data.companies" t-as="co" t-key="co.id">
+                                <td class="ecd_cell_name" t-out="co.name"/>
+                                <td class="ecd_num" t-out="this.compact(co.revenue)"/>
+                                <td t-attf-class="ecd_num {{ co.net_profit &lt; 0 ? 'ecd_text_bad' : 'ecd_text_good' }}" t-out="this.compact(co.net_profit)"/>
+                                <td class="ecd_cell_chip"><t t-call="executive_company_cost_dashboard.Chip"><t t-set="status" t-value="co.status"/></t></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </article>
+
+                <article class="ecd_card">
+                    <header class="ecd_card_head">
+                        <h3>Branches</h3>
+                        <a class="ecd_link" t-on-click="() => this.setTab('branches')">All <i class="fa fa-angle-right"/></a>
+                    </header>
+                    <t t-if="this.rankedBranches.length">
+                        <div class="ecd_rank_title">Top performers</div>
+                        <div class="ecd_rank_row" t-foreach="this.topBranches" t-as="br" t-key="br.id">
+                            <span class="ecd_rank_name" t-out="br.name"/>
+                            <span t-attf-class="ecd_rank_val {{ br.net_profit &lt; 0 ? 'ecd_text_bad' : 'ecd_text_good' }}" t-out="this.compact(br.net_profit)"/>
+                            <span class="ecd_muted" t-out="this.pct(br.net_margin)"/>
+                        </div>
+                        <t t-if="this.bottomBranches.length">
+                            <div class="ecd_rank_title ecd_rank_title_bad">Needs attention</div>
+                            <div class="ecd_rank_row" t-foreach="this.bottomBranches" t-as="br" t-key="br.id">
+                                <span class="ecd_rank_name" t-out="br.name"/>
+                                <span t-attf-class="ecd_rank_val {{ br.net_profit &lt; 0 ? 'ecd_text_bad' : 'ecd_text_good' }}" t-out="this.compact(br.net_profit)"/>
+                                <span class="ecd_muted" t-out="this.pct(br.net_margin)"/>
+                            </div>
+                        </t>
+                    </t>
+                    <div t-else="" class="ecd_muted ecd_pad">No branch-level entries yet. Tag journal items with the branch analytic account.</div>
+                </article>
+            </section>
+        </t>
+    </t>
+
+    <!-- ============================================================ COMPANIES -->
+    <t t-name="executive_company_cost_dashboard.Companies">
+        <div class="ecd_section_title">
+            <h2>Sister companies, side by side</h2>
+            <button class="ecd_btn ecd_btn_sm" t-on-click="this.exportCompanies"><i class="fa fa-download"/> Export CSV</button>
+        </div>
+        <section class="ecd_company_cards">
+            <article t-foreach="this.companyRows" t-as="co" t-key="co.id" t-attf-class="ecd_card ecd_company ecd_border_{{ co.status }}">
+                <header class="ecd_company_head">
+                    <div>
+                        <div class="ecd_company_name" t-out="co.name"/>
+                        <div class="ecd_muted ecd_small"><t t-out="this.pct(co.revenue_share)"/> of group revenue</div>
+                    </div>
+                    <t t-call="executive_company_cost_dashboard.Chip"><t t-set="status" t-value="co.status"/></t>
+                </header>
+                <div class="ecd_company_main">
+                    <div>
+                        <div class="ecd_label">Revenue</div>
+                        <div class="ecd_big" t-out="this.money(co.revenue)"/>
+                        <t t-call="executive_company_cost_dashboard.Delta"><t t-set="delta" t-value="co.revenue_delta"/><t t-set="higher" t-value="true"/><t t-set="points" t-value="false"/></t>
+                    </div>
+                    <div>
+                        <div class="ecd_label">Net profit</div>
+                        <div t-attf-class="ecd_big {{ co.net_profit &lt; 0 ? 'ecd_text_bad' : '' }}" t-out="this.money(co.net_profit)"/>
+                        <span class="ecd_muted" t-out="this.pct(co.net_margin) + ' margin'"/>
+                    </div>
+                </div>
+                <div class="ecd_share_track"><div class="ecd_share_fill" t-attf-style="width: {{ Math.min(co.revenue_share, 100) }}%"/></div>
+                <dl class="ecd_dl">
+                    <div><dt>Cost of revenue</dt><dd t-out="this.money(co.cogs)"/></div>
+                    <div><dt>Gross profit</dt><dd><t t-out="this.money(co.gross_profit)"/> <span class="ecd_muted" t-out="this.pct(co.gross_margin)"/></dd></div>
+                    <div><dt>Operating expenses</dt><dd t-out="this.money(co.opex)"/></div>
+                    <div><dt>Operating profit</dt><dd t-out="this.money(co.operating_profit)"/></div>
+                    <div t-if="co.other_income"><dt>Other income</dt><dd t-out="this.money(co.other_income)"/></div>
+                </dl>
+            </article>
+        </section>
+
+        <t t-set="bm" t-value="this.benchmark"/>
+        <article class="ecd_card" t-if="bm.cols.length">
+            <header class="ecd_card_head">
+                <h3>Cost benchmark between companies</h3>
+                <span class="ecd_muted ecd_small">each cost as % of that company's revenue · <span class="ecd_text_good">lowest</span> / <span class="ecd_text_bad">highest</span></span>
+            </header>
+            <div class="ecd_table_wrap">
+                <table class="ecd_table">
+                    <thead>
+                        <tr>
+                            <th class="ecd_left">Company</th>
+                            <th>Gross margin</th>
+                            <th t-foreach="bm.cols" t-as="c" t-key="c.code" t-out="c.name"/>
+                            <th>Net margin</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr t-foreach="bm.rows" t-as="row" t-key="row.id">
+                            <td class="ecd_left ecd_strong" t-out="row.name"/>
+                            <td class="ecd_num" t-out="this.pct(row.gross_margin)"/>
+                            <td t-foreach="bm.cols" t-as="c" t-key="c.code"
+                                t-attf-class="ecd_num ecd_cell_{{ this.cellTone(c, row.cells[c_index]) }}"
+                                t-out="row.cells[c_index] === null ? '–' : this.pct(row.cells[c_index])"/>
+                            <td t-attf-class="ecd_num ecd_strong {{ row.net_margin &lt; 0 ? 'ecd_text_bad' : '' }}" t-out="this.pct(row.net_margin)"/>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <p class="ecd_note"><i class="fa fa-info-circle"/> Figures are shown before inter-company eliminations. Sales between sister companies appear in both revenue and cost.</p>
+        </article>
+    </t>
+
+    <!-- ============================================================ BRANCHES -->
+    <t t-name="executive_company_cost_dashboard.Branches">
+        <t t-set="br" t-value="state.data.branches"/>
+        <t t-if="!br.rows.length">
+            <t t-call="executive_company_cost_dashboard.Empty">
+                <t t-set="icon" t-value="'fa-sitemap'"/>
+                <t t-set="title">No branches configured</t>
+                <t t-set="text">Run the Smart Scan so analytic accounts are recognised as branches, or set the role manually under Configuration → Branches &amp; Departments.</t>
+            </t>
+        </t>
+        <t t-else="">
+            <section class="ecd_tiles">
+                <article class="ecd_card ecd_tile"><div class="ecd_label">Branches</div><div class="ecd_big" t-out="br.rows.length"/></article>
+                <article class="ecd_card ecd_tile ecd_tile_good"><div class="ecd_label">Healthy (margin ≥ <t t-out="state.data.thresholds.branch_healthy_margin"/>%)</div><div class="ecd_big" t-out="br.counts.healthy"/></article>
+                <article class="ecd_card ecd_tile ecd_tile_warn"><div class="ecd_label">Watch</div><div class="ecd_big" t-out="br.counts.watch"/></article>
+                <article class="ecd_card ecd_tile ecd_tile_bad"><div class="ecd_label">Operating at a loss</div><div class="ecd_big" t-out="br.counts.loss"/></article>
+                <article class="ecd_card ecd_tile" t-if="br.counts.salesonly + br.counts.nodata"><div class="ecd_label">Sales only / no data</div><div class="ecd_big" t-out="br.counts.salesonly + br.counts.nodata"/></article>
+                <article class="ecd_card ecd_tile"><div class="ecd_label">Revenue traced to branches</div><div class="ecd_big" t-out="this.pct(br.coverage.revenue_pct, 0)"/></article>
+            </section>
+
+            <div class="ecd_banner" t-if="br.coverage.revenue_pct &lt; 80 or br.coverage.pos_branches">
+                <i class="fa fa-info-circle"/>
+                <div>
+                    <b>Branch figures cover <t t-out="this.pct(br.coverage.revenue_pct, 0)"/> of group revenue.</b>
+                    <t t-if="br.coverage.pos_branches"> <t t-out="br.coverage.pos_branches"/> branch(es) show Point-of-Sale sales (marked <span class="ecd_pos_tag">POS</span>) because the ledger has no analytic revenue for them yet.</t>
+                    Costs and sales appear per branch only when the journal items carry the branch analytic account.
+                </div>
+            </div>
+
+            <article class="ecd_card" t-if="br.regions.length &gt; 1">
+                <header class="ecd_card_head"><h3>By region</h3></header>
+                <div class="ecd_regions">
+                    <div class="ecd_region" t-foreach="br.regions" t-as="rg" t-key="rg.region">
+                        <div class="ecd_region_name" t-out="this.regionName(rg.region)"/>
+                        <div class="ecd_big ecd_big_sm" t-out="this.compact(rg.revenue)"/>
+                        <div class="ecd_muted ecd_small"><t t-out="rg.count"/> branches · net <b t-attf-class="{{ rg.net_profit &lt; 0 ? 'ecd_text_bad' : 'ecd_text_good' }}" t-out="this.compact(rg.net_profit)"/></div>
+                        <div class="ecd_margin_track"><div t-attf-class="ecd_margin_fill {{ rg.net_profit &lt; 0 ? 'ecd_fill_bad' : 'ecd_fill_good' }}" t-attf-style="width: {{ this.marginWidth(rg.margin) }}%"/></div>
+                    </div>
+                </div>
+            </article>
+
+            <article class="ecd_card">
+                <header class="ecd_card_head ecd_head_tools">
+                    <h3>Branch leaderboard</h3>
+                    <div class="ecd_tools">
+                        <input class="ecd_input" type="search" placeholder="Search branch…" t-model="state.branchSearch"/>
+                        <select class="ecd_select" t-model="state.branchStatus">
+                            <option value="all">All statuses</option>
+                            <option value="healthy">Healthy</option>
+                            <option value="watch">Watch</option>
+                            <option value="loss">Loss</option>
+                            <option value="salesonly">Sales only</option>
+                            <option value="nodata">No data</option>
+                        </select>
+                        <button class="ecd_btn ecd_btn_sm" t-on-click="this.exportBranches"><i class="fa fa-download"/> CSV</button>
+                    </div>
+                </header>
+                <div class="ecd_table_wrap">
+                    <table class="ecd_table ecd_table_branches">
+                        <thead>
+                            <tr>
+                                <th class="ecd_rank">#</th>
+                                <th t-foreach="this.branchColumns" t-as="col" t-key="col.key"
+                                    t-attf-class="ecd_sortable {{ col.left ? 'ecd_left' : '' }} {{ state.branchSort === col.key ? 'ecd_sorted' : '' }}"
+                                    t-on-click="() => this.sortBranches(col.key)">
+                                    <t t-out="col.label"/>
+                                    <i t-if="state.branchSort === col.key" t-attf-class="fa {{ state.branchDir === 'asc' ? 'fa-caret-up' : 'fa-caret-down' }}"/>
+                                </th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <t t-foreach="this.filteredBranches" t-as="row" t-key="row.id">
+                                <tr t-attf-class="ecd_row_click {{ state.expandedBranch === row.id ? 'ecd_row_open' : '' }}" t-on-click="() => this.toggleBranch(row.id)">
+                                    <td class="ecd_rank" t-out="row_index + 1"/>
+                                    <td class="ecd_left ecd_strong">
+                                        <t t-out="row.name"/>
+                                        <span class="ecd_pos_tag" t-if="row.source === 'pos'" title="Sales from Point of Sale">POS</span>
+                                    </td>
+                                    <td class="ecd_num" t-out="this.money(row.revenue)"/>
+                                    <td class="ecd_num" t-out="this.money(row.cost)"/>
+                                    <td class="ecd_num" t-out="this.money(row.rent)"/>
+                                    <td t-attf-class="ecd_num ecd_cell_{{ this.rentTone(row.rent_pct) }}" t-out="row.revenue ? this.pct(row.rent_pct) : '–'"/>
+                                    <td class="ecd_num" t-out="this.money(row.payroll)"/>
+                                    <td class="ecd_num" t-out="this.money(row.delivery)"/>
+                                    <td t-attf-class="ecd_num ecd_strong {{ row.net_profit &lt; 0 ? 'ecd_text_bad' : '' }}" t-out="this.money(row.net_profit)"/>
+                                    <td class="ecd_num">
+                                        <div class="ecd_margin_cell">
+                                            <span t-out="row.revenue and row.cost ? this.pct(row.net_margin) : '–'"/>
+                                            <div class="ecd_margin_track ecd_margin_mini"><div t-attf-class="ecd_margin_fill {{ row.net_profit &lt; 0 ? 'ecd_fill_bad' : 'ecd_fill_good' }}" t-attf-style="width: {{ this.marginWidth(row.net_margin) }}%"/></div>
+                                        </div>
+                                    </td>
+                                    <td><t t-call="executive_company_cost_dashboard.Chip"><t t-set="status" t-value="row.status"/></t></td>
+                                </tr>
+                                <tr t-if="state.expandedBranch === row.id" class="ecd_row_detail">
+                                    <td colspan="11">
+                                        <div class="ecd_detail">
+                                            <div class="ecd_detail_bars">
+                                                <div class="ecd_detail_title">Where this branch's costs go</div>
+                                                <div class="ecd_bar_row" t-foreach="this.branchBreakdown(row)" t-as="part" t-key="part.code">
+                                                    <div class="ecd_bar_label"><i class="ecd_dotc" t-attf-style="background: {{ part.color }}"/><span t-out="part.name"/></div>
+                                                    <div class="ecd_bar_track"><div class="ecd_bar_fill" t-attf-style="width: {{ part.pct }}%; background: {{ part.color }}"/></div>
+                                                    <div class="ecd_bar_val"><b t-out="this.money(part.amount)"/><span class="ecd_muted" t-out="this.pct(part.pct, 0)"/></div>
+                                                </div>
+                                                <div t-if="!row.cost" class="ecd_muted">No costs tagged to this branch in the period.</div>
+                                            </div>
+                                            <div class="ecd_detail_side">
+                                                <div class="ecd_muted ecd_small" t-out="row.full_name"/>
+                                                <div t-if="row.source === 'pos'" class="ecd_small">POS sales: <b t-out="this.money(row.pos_sales)"/></div>
+                                                <button class="ecd_btn ecd_btn_sm" t-on-click.stop="() => this.drillBranch(row)"><i class="fa fa-list"/> Journal items</button>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </t>
+                        </tbody>
+                    </table>
+                </div>
+            </article>
+        </t>
+    </t>
+
+    <!-- ============================================================ COSTS -->
+    <t t-name="executive_company_cost_dashboard.Costs">
+        <div class="ecd_section_title">
+            <h2>Cost intelligence</h2>
+            <button class="ecd_btn ecd_btn_sm" t-on-click="this.exportBuckets"><i class="fa fa-download"/> Export CSV</button>
+        </div>
+        <section class="ecd_costs">
+            <aside class="ecd_card ecd_bucket_list">
+                <div class="ecd_list_title">Cost buckets <span class="ecd_muted">% of revenue</span></div>
+                <div t-foreach="this.costBuckets" t-as="b" t-key="b.code"
+                     t-attf-class="ecd_bucket_item ecd_clickable {{ state.selectedBucket === b.code ? 'ecd_bucket_active' : '' }}"
+                     t-on-click="() => this.selectBucket(b.code)">
+                    <span class="ecd_focus_icon ecd_icon_sm" t-attf-style="background: {{ b.color }}"><i t-attf-class="fa {{ this.icon(b.code) }}"/></span>
+                    <div class="ecd_bucket_main">
+                        <div class="ecd_bucket_name" t-out="b.name"/>
+                        <div class="ecd_bucket_sub">
+                            <b t-out="this.money(b.amount)"/>
+                            <t t-call="executive_company_cost_dashboard.Delta"><t t-set="delta" t-value="b.delta_pct"/><t t-set="higher" t-value="false"/><t t-set="points" t-value="false"/></t>
+                        </div>
+                    </div>
+                    <div class="ecd_bucket_pct"><b t-out="this.pct(b.pct_revenue)"/></div>
+                </div>
+                <div class="ecd_list_title ecd_list_title_gap">Revenue streams</div>
+                <div t-foreach="this.incomeBuckets" t-as="b" t-key="b.code"
+                     t-attf-class="ecd_bucket_item ecd_clickable {{ state.selectedBucket === b.code ? 'ecd_bucket_active' : '' }}"
+                     t-on-click="() => this.selectBucket(b.code)">
+                    <span class="ecd_focus_icon ecd_icon_sm" t-attf-style="background: {{ b.color }}"><i t-attf-class="fa {{ this.icon(b.code) }}"/></span>
+                    <div class="ecd_bucket_main">
+                        <div class="ecd_bucket_name" t-out="b.name"/>
+                        <div class="ecd_bucket_sub">
+                            <b t-out="this.money(b.amount)"/>
+                            <t t-call="executive_company_cost_dashboard.Delta"><t t-set="delta" t-value="b.delta_pct"/><t t-set="higher" t-value="true"/><t t-set="points" t-value="false"/></t>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <div class="ecd_bucket_detail">
+                <t t-set="sb" t-value="this.selectedBucketData"/>
+                <article class="ecd_card" t-if="sb">
+                    <header class="ecd_bucket_head">
+                        <span class="ecd_focus_icon" t-attf-style="background: {{ sb.color }}"><i t-attf-class="fa {{ this.icon(sb.code) }}"/></span>
+                        <div class="ecd_bucket_head_text">
+                            <h3 t-out="sb.name"/>
+                            <div class="ecd_muted ecd_small"><t t-out="sb.account_count"/> ledger accounts</div>
+                        </div>
+                        <button class="ecd_btn ecd_btn_sm" t-on-click="() => this.drillBucket(sb)"><i class="fa fa-list"/> Journal items</button>
+                    </header>
+                    <div class="ecd_bucket_stats">
+                        <div><div class="ecd_label">This period</div><div class="ecd_big" t-out="this.money(sb.amount)"/></div>
+                        <div><div class="ecd_label">Previous period</div><div class="ecd_big ecd_big_muted" t-out="this.money(sb.prev_amount)"/>
+                            <t t-call="executive_company_cost_dashboard.Delta"><t t-set="delta" t-value="sb.delta_pct"/><t t-set="higher" t-value="sb.family === 'income'"/><t t-set="points" t-value="false"/></t>
+                        </div>
+                        <div><div class="ecd_label">% of revenue</div><div class="ecd_big" t-out="this.pct(sb.pct_revenue)"/></div>
+                        <div><div class="ecd_label" t-out="sb.family === 'income' ? 'Share of revenue' : 'Share of total costs'"/><div class="ecd_big" t-out="this.pct(sb.share)"/></div>
+                    </div>
+                    <div class="ecd_bucket_trend" t-if="this.hasTrend(sb)">
+                        <div class="ecd_label">Last 12 months</div>
+                        <t t-call="executive_company_cost_dashboard.Spark">
+                            <t t-set="values" t-value="sb.trend"/>
+                            <t t-set="color" t-value="sb.color"/>
+                            <t t-set="sw" t-value="560"/>
+                            <t t-set="sh" t-value="54"/>
+                        </t>
+                    </div>
+                    <div class="ecd_table_wrap">
+                        <table class="ecd_table ecd_table_compact">
+                            <thead><tr><th class="ecd_left">Account</th><th>Amount</th><th>Share</th><th/></tr></thead>
+                            <tbody>
+                                <tr t-foreach="sb.accounts" t-as="acc" t-key="acc.id" class="ecd_row_click" t-on-click="() => this.drillAccount(sb, acc)">
+                                    <td class="ecd_left"><span class="ecd_code" t-out="acc.code"/> <t t-out="acc.name"/></td>
+                                    <td class="ecd_num" t-out="this.money(acc.amount)"/>
+                                    <td class="ecd_num ecd_share_cell">
+                                        <div class="ecd_bar_track ecd_bar_mini"><div class="ecd_bar_fill" t-attf-style="width: {{ Math.min(Math.abs(acc.pct), 100) }}%; background: {{ sb.color }}"/></div>
+                                        <span t-out="this.pct(acc.pct, 0)"/>
+                                    </td>
+                                    <td class="ecd_go"><i class="fa fa-angle-right"/></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <p class="ecd_note" t-if="sb.account_count &gt; sb.accounts.length">Showing the top <t t-out="sb.accounts.length"/> of <t t-out="sb.account_count"/> accounts. Use “Journal items” for the full list.</p>
+                    </div>
+                </article>
+
+                <article class="ecd_card" t-if="state.data.platforms.length">
+                    <header class="ecd_card_head">
+                        <h3><i class="fa fa-motorcycle"/> Delivery platforms</h3>
+                        <span class="ecd_muted ecd_small">commissions + discounts funded</span>
+                    </header>
+                    <div class="ecd_table_wrap">
+                        <table class="ecd_table ecd_table_compact">
+                            <thead><tr><th class="ecd_left">Platform</th><th>Commission</th><th>Discounts</th><th>Total cost</th><th>% of revenue</th></tr></thead>
+                            <tbody>
+                                <tr t-foreach="state.data.platforms" t-as="pl" t-key="pl.key">
+                                    <td class="ecd_left ecd_strong" t-out="pl.name"/>
+                                    <td class="ecd_num" t-out="this.money(pl.commission)"/>
+                                    <td class="ecd_num" t-out="this.money(pl.discount)"/>
+                                    <td class="ecd_num ecd_strong" t-out="this.money(pl.total)"/>
+                                    <td class="ecd_num" t-out="this.pct(pl.pct_revenue)"/>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </article>
+            </div>
+        </section>
+    </t>
+
+    <!-- ============================================================ MATRIX -->
+    <t t-name="executive_company_cost_dashboard.Matrix">
+        <t t-set="mv" t-value="this.matrixView"/>
+        <t t-set="showPct" t-value="state.matrixKind === 'all' or state.matrixKind === 'branch'"/>
+        <div class="ecd_section_title">
+            <h2>Cost breakdown by branch and department</h2>
+            <button class="ecd_btn ecd_btn_sm" t-if="mv and mv.totals.total" t-on-click="this.exportMatrix"><i class="fa fa-download"/> Export CSV</button>
+        </div>
+        <div class="ecd_matrix_bar">
+            <div class="ecd_pills">
+                <button t-foreach="this.matrixTopics" t-as="tp" t-key="tp.key"
+                        t-attf-class="ecd_pill {{ state.matrixTopic === tp.key ? 'ecd_pill_active' : '' }}"
+                        t-on-click="() => this.setMatrixTopic(tp.key)">
+                    <i t-attf-class="fa {{ tp.icon }}"/> <t t-out="tp.label"/>
+                </button>
+            </div>
+            <div class="ecd_pills">
+                <button t-foreach="this.matrixKinds" t-as="kd" t-key="kd.key"
+                        t-attf-class="ecd_pill {{ state.matrixKind === kd.key ? 'ecd_pill_active' : '' }}"
+                        t-on-click="() => this.setMatrixKind(kd.key)" t-out="kd.label"/>
+            </div>
+        </div>
+        <t t-if="mv and mv.totals.total">
+            <section class="ecd_tiles">
+                <article class="ecd_card ecd_tile"><div class="ecd_label" t-out="mv.title"/><div class="ecd_big" t-out="this.money(mv.totals.total)"/></article>
+                <article class="ecd_card ecd_tile"><div class="ecd_label">Tagged to a branch or department</div><div class="ecd_big" t-out="this.money(mv.allocated)"/><span class="ecd_muted" t-out="this.pct(mv.allocatedPct, 0)"/></article>
+                <article class="ecd_card ecd_tile ecd_tile_warn" t-if="mv.unallocated.total"><div class="ecd_label">Not allocated</div><div class="ecd_big" t-out="this.money(mv.unallocated.total)"/><span class="ecd_muted ecd_small">no analytic account on the journal item</span></article>
+                <article class="ecd_card ecd_tile" t-if="mv.top"><div class="ecd_label">Highest</div><div class="ecd_big ecd_big_sm" t-out="mv.top.name"/><span class="ecd_muted" t-out="this.money(mv.top.total)"/></article>
+            </section>
+            <article class="ecd_card">
+                <div class="ecd_table_wrap">
+                    <table class="ecd_table">
+                        <thead>
+                            <tr>
+                                <th t-attf-class="ecd_sortable ecd_left {{ state.matrixSort === 'name' ? 'ecd_sorted' : '' }}" t-on-click="() => this.sortMatrix('name')">Name</th>
+                                <th class="ecd_left">Type</th>
+                                <th t-foreach="mv.columns" t-as="c" t-key="c.key"
+                                    t-attf-class="ecd_sortable {{ state.matrixSort === c.key ? 'ecd_sorted' : '' }}"
+                                    t-on-click="() => this.sortMatrix(c.key)" t-out="c.name"/>
+                                <th t-attf-class="ecd_sortable {{ state.matrixSort === 'total' ? 'ecd_sorted' : '' }}" t-on-click="() => this.sortMatrix('total')">Total</th>
+                                <th t-if="showPct" t-attf-class="ecd_sortable {{ state.matrixSort === 'pct_revenue' ? 'ecd_sorted' : '' }}" t-on-click="() => this.sortMatrix('pct_revenue')">% of sales</th>
+                                <th/>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr t-foreach="mv.rows" t-as="r" t-key="r.id" class="ecd_row_click" t-on-click="() => this.drillMatrix(r)">
+                                <td class="ecd_left ecd_strong" t-att-title="r.full_name" t-out="r.name"/>
+                                <td class="ecd_left"><span class="ecd_kind" t-out="this.kindLabel(r.kind)"/></td>
+                                <td t-foreach="r.cells" t-as="cell" t-key="cell.key" class="ecd_num ecd_heat" t-att-style="cell.style" t-out="cell.value ? this.money(cell.value) : '–'"/>
+                                <td class="ecd_num ecd_strong" t-out="this.money(r.total)"/>
+                                <td t-if="showPct" class="ecd_num" t-out="r.pct_revenue === null ? '–' : this.pct(r.pct_revenue)"/>
+                                <td class="ecd_go"><i class="fa fa-angle-right"/></td>
+                            </tr>
+                            <tr class="ecd_row_unalloc" t-if="mv.unallocated.total">
+                                <td class="ecd_left" colspan="2"><i class="fa fa-question-circle-o"/> Not allocated to any branch or department</td>
+                                <td t-foreach="mv.unallocatedCells" t-as="cell" t-key="cell.key" class="ecd_num" t-out="cell.value ? this.money(cell.value) : '–'"/>
+                                <td class="ecd_num ecd_strong" t-out="this.money(mv.unallocated.total)"/>
+                                <td t-if="showPct"/>
+                                <td/>
+                            </tr>
+                        </tbody>
+                        <tfoot>
+                            <tr class="ecd_row_total">
+                                <td class="ecd_left" colspan="2">Group total</td>
+                                <td t-foreach="mv.totalCells" t-as="cell" t-key="cell.key" class="ecd_num" t-out="this.money(cell.value)"/>
+                                <td class="ecd_num" t-out="this.money(mv.totals.total)"/>
+                                <td t-if="showPct"/>
+                                <td/>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+                <p class="ecd_note"><i class="fa fa-info-circle"/> Click a row to open its journal items. An amount reaches a branch or department only when the journal item (payroll, bill, entry) carries that analytic account.</p>
+            </article>
+        </t>
+        <t t-else="">
+            <t t-call="executive_company_cost_dashboard.Empty">
+                <t t-set="icon" t-value="'fa-table'"/>
+                <t t-set="title">No cost recorded for this topic in the period</t>
+                <t t-set="text">Pick another period or topic.</t>
+            </t>
+        </t>
+    </t>
+
+    <!-- ============================================================ DEPARTMENTS -->
+    <t t-name="executive_company_cost_dashboard.Departments">
+        <t t-set="dp" t-value="state.data.departments"/>
+        <t t-if="!dp.rows.length">
+            <t t-call="executive_company_cost_dashboard.Empty">
+                <t t-set="icon" t-value="'fa-sitemap'"/>
+                <t t-set="title">No department costs in this period</t>
+                <t t-set="text">Department and factory costs appear when journal items carry an analytic account (payroll, expenses, bills).</t>
+            </t>
+        </t>
+        <t t-else="">
+            <section class="ecd_tiles">
+                <article class="ecd_card ecd_tile"><div class="ecd_label">Costs tagged to departments</div><div class="ecd_big" t-out="this.money(dp.total)"/></article>
+                <article class="ecd_card ecd_tile"><div class="ecd_label">Factory &amp; supply chain</div><div class="ecd_big" t-out="this.money(dp.by_kind.factory)"/></article>
+                <article class="ecd_card ecd_tile"><div class="ecd_label">Administration &amp; commercial</div><div class="ecd_big" t-out="this.money(dp.by_kind.department)"/></article>
+            </section>
+            <article class="ecd_card">
+                <header class="ecd_card_head"><h3>Cost by department</h3><span class="ecd_muted ecd_small">top cost drivers shown for each</span></header>
+                <div class="ecd_dept_list">
+                    <div class="ecd_dept" t-foreach="dp.rows" t-as="d" t-key="d.id">
+                        <div class="ecd_dept_name">
+                            <b t-out="d.name"/>
+                            <span class="ecd_kind" t-out="d.kind === 'factory' ? 'Factory' : 'Dept.'"/>
+                        </div>
+                        <div class="ecd_dept_bar">
+                            <div class="ecd_dept_track">
+                                <div t-foreach="d.top" t-as="tp" t-key="tp.code" class="ecd_dept_seg"
+                                     t-attf-style="width: {{ d.cost ? tp.amount / d.cost * 100 : 0 }}%; background: {{ this.bucketMeta(tp.code).color }}"
+                                     t-att-title="this.bucketMeta(tp.code).name + ': ' + this.money(tp.amount)"/>
+                            </div>
+                        </div>
+                        <div class="ecd_dept_val"><b t-out="this.money(d.cost)"/><span class="ecd_muted" t-out="this.pct(d.share)"/></div>
+                    </div>
+                </div>
+            </article>
+        </t>
+    </t>
+</templates>
