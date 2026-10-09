@@ -1,10 +1,11 @@
 /** @odoo-module **/
 
-import { Component, onWillStart, useState } from "@odoo/owl";
+import { Component, onMounted, onWillStart, useRef, useState } from "@odoo/owl";
 import { _t } from "@web/core/l10n/translation";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { useDebounced } from "@web/core/utils/timing";
+import { useSetupAction } from "@web/search/action_hook";
 
 const { DateTime } = luxon;
 
@@ -45,8 +46,48 @@ export class CeoMainDashboard extends Component {
             historyLoading: false,
         });
 
+        // Filters restored when coming back through the breadcrumbs.
+        const saved = (this.props.state && this.props.state.dashboard) || null;
+        if (saved) {
+            Object.assign(this.state, saved.filters);
+        }
+
+        this.rootRef = useRef("root");
+        useSetupAction({
+            getLocalState: () => ({
+                dashboard: {
+                    filters: {
+                        preset: this.state.preset,
+                        dateFrom: this.state.dateFrom,
+                        dateTo: this.state.dateTo,
+                        billing: this.state.billing,
+                        trendFilter: this.state.trendFilter,
+                        impactFilter: this.state.impactFilter,
+                        limit: this.state.limit,
+                        searchTerm: this.state.searchTerm,
+                    },
+                    currentPage: this.state.currentPage,
+                    expandedProductId: this.state.expandedProductId,
+                    scrollTop: this.rootRef.el ? this.rootRef.el.scrollTop : 0,
+                },
+            }),
+        });
+
         this.debouncedSearch = useDebounced(this.runSearch, 400);
-        onWillStart(() => this.loadData());
+        onWillStart(async () => {
+            await this.loadData();
+            if (saved) {
+                this.state.currentPage = saved.currentPage || 1;
+                if (saved.expandedProductId) {
+                    await this.toggleHistory({ product_id: saved.expandedProductId });
+                }
+            }
+        });
+        onMounted(() => {
+            if (saved && saved.scrollTop && this.rootRef.el) {
+                this.rootRef.el.scrollTop = saved.scrollTop;
+            }
+        });
     }
 
     // ------------------------------------------------------------------

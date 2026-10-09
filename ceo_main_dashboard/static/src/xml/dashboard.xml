@@ -2,7 +2,7 @@
 <templates xml:space="preserve">
 
 <t t-name="ceo_main_dashboard.Dashboard">
-    <div class="cmd_container">
+    <div class="cmd_container" t-ref="root">
 
         <!-- Top navigation -->
         <header class="cmd_navbar">
