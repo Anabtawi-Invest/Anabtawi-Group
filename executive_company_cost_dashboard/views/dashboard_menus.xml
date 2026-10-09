@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_ceo_cost_dashboard_client" model="ir.actions.client">
+        <field name="name">Executive Company Cost Dashboard</field>
+        <field name="tag">executive_company_cost_dashboard_main</field>
+    </record>
+
+    <menuitem id="menu_ceo_executive_root"
+              name="Executive P&amp;L"
+              web_icon="executive_company_cost_dashboard,static/description/icon.png"
+              groups="executive_company_cost_dashboard.group_ceo_cost_dashboard_viewer"
+              sequence="3"/>
+
+    <menuitem id="menu_ceo_financial_dashboard"
+              name="Dashboard"
+              parent="menu_ceo_executive_root"
+              action="action_ceo_cost_dashboard_client"
+              sequence="10"/>
+
+    <menuitem id="menu_ceo_dashboard_config"
+              name="Configuration"
+              parent="menu_ceo_executive_root"
+              groups="executive_company_cost_dashboard.group_ceo_cost_dashboard_manager"
+              sequence="90"/>
+
+    <menuitem id="menu_ceo_cost_buckets"
+              name="Cost Buckets"
+              parent="menu_ceo_dashboard_config"
+              action="action_ceo_cost_bucket"
+              sequence="10"/>
+
+    <menuitem id="menu_ceo_account_mapping"
+              name="Account Classification"
+              parent="menu_ceo_dashboard_config"
+              action="action_ceo_cost_account_mapping"
+              sequence="20"/>
+
+    <menuitem id="menu_ceo_analytic_map"
+              name="Branches &amp; Departments"
+              parent="menu_ceo_dashboard_config"
+              action="action_ceo_cost_analytic_map"
+              sequence="30"/>
+
+    <menuitem id="menu_ceo_smart_scanner"
+              name="Smart Scanner"
+              parent="menu_ceo_dashboard_config"
+              action="action_ceo_smart_scanner_wizard"
+              sequence="40"/>
+
+    <!-- Shortcut for the CFO inside Accounting > Reporting -->
+    <menuitem id="menu_ceo_dashboard_accounting_reporting"
+              name="Executive Company Cost Dashboard"
+              parent="account.menu_finance_reports"
+              action="action_ceo_cost_dashboard_client"
+              groups="executive_company_cost_dashboard.group_ceo_cost_dashboard_viewer"
+              sequence="1"/>
+</odoo>

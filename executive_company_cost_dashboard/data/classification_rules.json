@@ -1,0 +1,47 @@
+{
+  "_comment": "Ordered rules (first match wins). 'words' are matched as substrings of the normalized account name; a word starting with '=' must match a whole word. 'prefixes' match the account code. Arabic is normalized (alef/taa marbuta/yaa/diacritics) before matching.",
+  "income_rules": [
+    {"bucket": "REV_EXPORT", "words": ["تصدير", "export"], "prefixes": ["6101002", "6102006"]},
+    {"bucket": "REV_ADJ", "words": ["خصومات مبيعات", "خصم مسموح", "discount"], "prefixes": ["6103", "710107", "710108"]},
+    {"bucket": "REV_RETAIL", "words": ["الفروع", "فروع", "retail", "=pos"], "prefixes": ["6101003", "6102005"]},
+    {"bucket": "REV_LOCAL", "words": ["المحليه", "محليه", "local"], "prefixes": ["6101001", "6102004"]}
+  ],
+  "cost_rules": [
+    {"bucket": "FACTORY_OH", "words": ["صناعيه غير مباشره", "manufacturing overhead"]},
+    {"bucket": "DEPRECIATION", "types": ["expense_depreciation"], "words": ["استهلاك", "اطفاء", "depreciation", "amortization"], "prefixes": ["74"]},
+    {"bucket": "OTHER_OPEX", "prefixes": ["7201008"]},
+    {"bucket": "FINANCE", "words": ["فوائد", "مرابحه", "ضمان القروض", "بنكيه", "حوالات", "عمولات الفيزا", "فروقات العمله", "تكلفه فائده", "bank charge", "interest"], "prefixes": ["72"]},
+    {"bucket": "GOVT", "words": ["مساهمه وطنيه", "ضريبه الدخل", "income tax"], "prefixes": ["7501"]},
+    {"bucket": "COGS", "words": ["كلفه البضاعه", "تكلفه البضائع", "البضائع المجانيه", "عينات", "شحن وتخليص", "جمركيه", "فحص مخبري", "تعبئه وتغليف", "طبالي", "cogs", "cost of goods"]},
+    {"bucket": "DELIVERY", "words": ["عموله مبيعات", "عمولات شركات التوصيل", "خدمات توصيل", "talabat", "careem", "aggregator"]},
+    {"bucket": "SECURITY", "words": ["حراسه", "كاميرات", "مراقبه", "امن وحمايه", "=cctv", "=guard", "surveillance"]},
+    {"bucket": "FLEET", "words": ["سيارات", "مركبات", "=gps", "اصطفاف", "استخدام سياره", "وقود", "نقل وتوصيل", "vehicle", "fleet"]},
+    {"bucket": "MAINTENANCE", "words": ["صيانه", "نظافه", "تعقيم", "ادوات مستهلكه", "maintenance", "repair", "cleaning"]},
+    {"bucket": "LOSS", "words": ["تالفه", "صلاحيه", "فروقات وزن", "عجز", "ارضاء عميل", "شكاوى", "damaged", "expired", "shortage", "spoilage", "shrinkage"]},
+    {"bucket": "UTILITIES", "words": ["كهرباء", "مياه", "محروقات", "غاز", "سولار", "ديزل", "electricity", "=water", "utility", "generator"]},
+    {"bucket": "TECH", "words": ["انترنت", "هاتف", "هواتف", "برق بريد", "اتصالات", "برامج", "ايميل", "فواتيركم", "كميوتر", "كمبيوتر", "خلوي", "internet", "telecom", "software", "=email", "=erp"]},
+    {"bucket": "RENT", "words": ["ايجار", "مسقفات", "معارف", "rent", "lease"], "prefixes": ["7101021", "7301025"]},
+    {"bucket": "PAYROLL", "words": ["رواتب", "اجور", "عمل اضافي", "مياومه", "ضمان اجتماعي", "تامين صحي", "تصاريح عمل", "اقامه وسفر", "مواصلات وتنقلات", "بدل سكن", "بدل غربه", "بدل طعام", "نهايه خدمه", "عيديات", "اجازات", "علاج موظفين", "ملابس عمال", "تدريب", "مكافات", "اكراميات", "salary", "allowance", "wage", "payroll", "social security", "overtime"], "prefixes": ["5003"]},
+    {"bucket": "MARKETING", "words": ["دعايه", "اعلان", "معارض", "عمولات بيعيه", "ادلاء", "عطاءات", "marketing", "advertis"]},
+    {"bucket": "GOVT", "words": ["رسوم ورخص", "شهادات صحيه", "طوابع", "زكاه", "غرامات", "اتعاب", "محاماه", "قضايا", "تدقيق", "ضريبه"]}
+  ],
+  "fallback": {
+    "income": "REVENUE",
+    "income_other": "OTHER_INCOME",
+    "expense_direct_cost": "OTHER_OPEX",
+    "expense": "OTHER_OPEX",
+    "expense_depreciation": "DEPRECIATION"
+  },
+  "analytic": {
+    "branch_patterns": ["(^| )فرع ", "كافيه", "كافية", "منطقه ?\\d+ ?[/ ] ?\\S", "(^| )branch ", "(^| )cafe "],
+    "department_override": ["ادارة الفروع", "ادارة فروع", "ادارة المعارض"],
+    "factory_patterns": ["المصنع", "مصنع", "الانتاج", "دائره سلاسله", "سلسله التزويد", "دائره الصيانه", "مستودع"],
+    "ignore_patterns": ["^none$", "non billable", "^false$"]
+  },
+  "platforms": [
+    {"key": "talabat", "name": "Talabat", "words": ["طلبات", "talabat"]},
+    {"key": "careem", "name": "Careem", "words": ["كريم", "careem"]},
+    {"key": "ashyai", "name": "Ashya'i", "words": ["اشيائي", "ashyai"]},
+    {"key": "kabsa", "name": "Kabsa", "words": ["كبسه", "kabsa"]}
+  ]
+}

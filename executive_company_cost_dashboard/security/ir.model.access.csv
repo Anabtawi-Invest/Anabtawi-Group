@@ -1,5 +1,8 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_ceo_cost_bucket_viewer,ceo.cost.bucket.viewer,model_ceo_cost_bucket,group_ceo_cost_dashboard_viewer,1,0,0,0
-access_ceo_cost_bucket_manager,ceo.cost.bucket.manager,model_ceo_cost_bucket,group_ceo_cost_dashboard_manager,1,1,1,1
-access_ceo_cost_account_mapping_viewer,ceo.cost.account.mapping.viewer,model_ceo_cost_account_mapping,group_ceo_cost_dashboard_viewer,1,0,0,0
-access_ceo_cost_account_mapping_manager,ceo.cost.account.mapping.manager,model_ceo_cost_account_mapping,group_ceo_cost_dashboard_manager,1,1,1,1
+access_ceo_cost_bucket_viewer,ceo.cost.bucket viewer,model_ceo_cost_bucket,group_ceo_cost_dashboard_viewer,1,0,0,0
+access_ceo_cost_bucket_manager,ceo.cost.bucket manager,model_ceo_cost_bucket,group_ceo_cost_dashboard_manager,1,1,1,1
+access_ceo_cost_account_mapping_viewer,ceo.cost.account.mapping viewer,model_ceo_cost_account_mapping,group_ceo_cost_dashboard_viewer,1,0,0,0
+access_ceo_cost_account_mapping_manager,ceo.cost.account.mapping manager,model_ceo_cost_account_mapping,group_ceo_cost_dashboard_manager,1,1,1,1
+access_ceo_cost_analytic_map_viewer,ceo.cost.analytic.map viewer,model_ceo_cost_analytic_map,group_ceo_cost_dashboard_viewer,1,0,0,0
+access_ceo_cost_analytic_map_manager,ceo.cost.analytic.map manager,model_ceo_cost_analytic_map,group_ceo_cost_dashboard_manager,1,1,1,1
+access_ceo_smart_scanner_manager,ceo.smart.scanner.wizard manager,model_ceo_smart_scanner_wizard,group_ceo_cost_dashboard_manager,1,1,1,1

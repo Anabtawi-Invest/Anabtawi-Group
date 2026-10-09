@@ -1,0 +1,1242 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# 	* executive_company_cost_dashboard
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 19.0\n"
+"Report-Msgid-Bugs-To: \n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: \n"
+"Language: ar\n"
+"Plural-Forms: nplurals=6; plural=n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 && n%100<=99 ? 4 : 5;\n"
+
+#. module: executive_company_cost_dashboard
+#: model:ceo.cost.bucket,name:executive_company_cost_dashboard.bucket_rev_retail
+msgid "Retail Branch Sales"
+msgstr "مبيعات الفروع"
+
+#. module: executive_company_cost_dashboard
+#: model:ceo.cost.bucket,name:executive_company_cost_dashboard.bucket_rev_local
+msgid "Local & Wholesale Sales"
+msgstr "المبيعات المحلية والجملة"
+
+#. module: executive_company_cost_dashboard
+#: model:ceo.cost.bucket,name:executive_company_cost_dashboard.bucket_rev_export
+msgid "Export Sales"
+msgstr "مبيعات التصدير"
+
+#. module: executive_company_cost_dashboard
+#: model:ceo.cost.bucket,name:executive_company_cost_dashboard.bucket_rev_adj
+msgid "Discounts & Platform Allowances"
+msgstr "الخصومات وتخفيضات التطبيقات"
+
+#. module: executive_company_cost_dashboard
+#: model:ceo.cost.bucket,name:executive_company_cost_dashboard.bucket_revenue
+msgid "Other Revenue"
+msgstr "إيرادات أخرى"
+
+#. module: executive_company_cost_dashboard
+#: model:ceo.cost.bucket,name:executive_company_cost_dashboard.bucket_other_income
+msgid "Other Income"
+msgstr "إيرادات متنوعة"
+
+#. module: executive_company_cost_dashboard
+#: model:ceo.cost.bucket,name:executive_company_cost_dashboard.bucket_cogs
+msgid "Cost of Goods & Materials"
+msgstr "تكلفة البضاعة والمواد"
+
+#. module: executive_company_cost_dashboard
+#: model:ceo.cost.bucket,name:executive_company_cost_dashboard.bucket_factory_oh
+msgid "Allocated Factory Overhead"
+msgstr "المصاريف الصناعية غير المباشرة"
+
+#. module: executive_company_cost_dashboard
+#: model:ceo.cost.bucket,name:executive_company_cost_dashboard.bucket_payroll
+msgid "People & Labor"
+msgstr "الرواتب والأجور والعمالة"
+
+#. module: executive_company_cost_dashboard
+#: model:ceo.cost.bucket,name:executive_company_cost_dashboard.bucket_rent
+msgid "Rent & Occupancy"
+msgstr "الإيجارات والإشغال"
+
+#. module: executive_company_cost_dashboard
+#: model:ceo.cost.bucket,name:executive_company_cost_dashboard.bucket_utilities
+msgid "Utilities (Power, Water, Fuel)"
+msgstr "الكهرباء والمياه والمحروقات"
+
+#. module: executive_company_cost_dashboard
+#: model:ceo.cost.bucket,name:executive_company_cost_dashboard.bucket_tech
+msgid "IT, Telecom & Software"
+msgstr "تكنولوجيا المعلومات والاتصالات والبرمجيات"
+
+#. module: executive_company_cost_dashboard
+#: model:ceo.cost.bucket,name:executive_company_cost_dashboard.bucket_delivery
+msgid "Delivery Platform Commissions"
+msgstr "عمولات تطبيقات التوصيل"
+
+#. module: executive_company_cost_dashboard
+#: model:ceo.cost.bucket,name:executive_company_cost_dashboard.bucket_fleet
+msgid "Fleet & Logistics"
+msgstr "الأسطول والنقل"
+
+#. module: executive_company_cost_dashboard
+#: model:ceo.cost.bucket,name:executive_company_cost_dashboard.bucket_security
+msgid "Security & Guarding"
+msgstr "الأمن والحراسة"
+
+#. module: executive_company_cost_dashboard
+#: model:ceo.cost.bucket,name:executive_company_cost_dashboard.bucket_maintenance
+msgid "Maintenance & Cleaning"
+msgstr "الصيانة والنظافة"
+
+#. module: executive_company_cost_dashboard
+#: model:ceo.cost.bucket,name:executive_company_cost_dashboard.bucket_loss
+msgid "Waste, Shrinkage & Discrepancies"
+msgstr "التالف والهدر والفروقات"
+
+#. module: executive_company_cost_dashboard
+#: model:ceo.cost.bucket,name:executive_company_cost_dashboard.bucket_marketing
+msgid "Marketing & Sales Commissions"
+msgstr "التسويق وعمولات المبيعات"
+
+#. module: executive_company_cost_dashboard
+#: model:ceo.cost.bucket,name:executive_company_cost_dashboard.bucket_govt
+msgid "Government, Legal & Compliance"
+msgstr "الرسوم الحكومية والقانونية والامتثال"
+
+#. module: executive_company_cost_dashboard
+#: model:ceo.cost.bucket,name:executive_company_cost_dashboard.bucket_finance
+msgid "Finance Costs"
+msgstr "التكاليف المالية"
+
+#. module: executive_company_cost_dashboard
+#: model:ceo.cost.bucket,name:executive_company_cost_dashboard.bucket_depreciation
+msgid "Depreciation & Amortization"
+msgstr "الاستهلاك والإطفاء"
+
+#. module: executive_company_cost_dashboard
+#: model:ceo.cost.bucket,name:executive_company_cost_dashboard.bucket_other
+msgid "Other Operating Costs"
+msgstr "مصاريف تشغيلية أخرى"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/js/dashboard.js:0
+msgid "Dashboard refreshed"
+msgstr "تم تحديث لوحة المعلومات"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/js/dashboard.js:0
+msgid "This Month"
+msgstr "هذا الشهر"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/js/dashboard.js:0
+msgid "Last Month"
+msgstr "الشهر الماضي"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/js/dashboard.js:0
+msgid "This Quarter"
+msgstr "هذا الربع"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/js/dashboard.js:0
+msgid "Year to Date"
+msgstr "منذ بداية السنة"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/js/dashboard.js:0
+msgid "Last 12 Months"
+msgstr "آخر 12 شهراً"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/js/dashboard.js:0
+msgid "Full Year"
+msgstr "سنة كاملة"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/js/dashboard.js:0
+msgid "Custom"
+msgstr "مخصص"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/js/dashboard.js:0
+msgid "Overview"
+msgstr "نظرة عامة"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/js/dashboard.js:0
+msgid "Companies"
+msgstr "الشركات"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/js/dashboard.js:0
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+#: code:addons/executive_company_cost_dashboard/views/cost_bucket_views.xml:0
+msgid "Branches"
+msgstr "الفروع"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/js/dashboard.js:0
+msgid "Cost Intelligence"
+msgstr "ذكاء التكاليف"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/js/dashboard.js:0
+#: code:addons/executive_company_cost_dashboard/views/cost_bucket_views.xml:0
+msgid "Departments"
+msgstr "الأقسام"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/js/dashboard.js:0
+msgid "All companies (consolidated)"
+msgstr "جميع الشركات (موحّد)"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/js/dashboard.js:0
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Healthy"
+msgstr "جيد"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/js/dashboard.js:0
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Watch"
+msgstr "تحت المراقبة"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/js/dashboard.js:0
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Loss"
+msgstr "خسارة"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/js/dashboard.js:0
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Sales only"
+msgstr "مبيعات فقط"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/js/dashboard.js:0
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "No data"
+msgstr "لا توجد بيانات"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/js/dashboard.js:0
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Revenue"
+msgstr "الإيرادات"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/js/dashboard.js:0
+#, python-format
+msgid "Gross margin %s"
+msgstr "هامش الربح الإجمالي %s"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/js/dashboard.js:0
+msgid "Gross Profit"
+msgstr "مجمل الربح"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/js/dashboard.js:0
+#, python-format
+msgid "%s of revenue"
+msgstr "%s من الإيرادات"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/js/dashboard.js:0
+msgid "Total Costs"
+msgstr "إجمالي التكاليف"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/js/dashboard.js:0
+msgid "Operating Profit"
+msgstr "الربح التشغيلي"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/js/dashboard.js:0
+#, python-format
+msgid "%s operating margin"
+msgstr "%s هامش تشغيلي"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/js/dashboard.js:0
+msgid "Net Profit"
+msgstr "صافي الربح"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/js/dashboard.js:0
+#, python-format
+msgid "%s net margin"
+msgstr "%s هامش صافٍ"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/js/dashboard.js:0
+msgid "Cost per 1 of Sales"
+msgstr "التكلفة لكل 1 من المبيعات"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/js/dashboard.js:0
+#, python-format
+msgid "Operating result per 1.00 of sales: %s"
+msgstr "النتيجة التشغيلية لكل 1.00 من المبيعات: %s"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/js/dashboard.js:0
+msgid "Cost of Revenue"
+msgstr "تكلفة الإيرادات"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/js/dashboard.js:0
+msgid "Operating Exp."
+msgstr "مصاريف تشغيلية"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/js/dashboard.js:0
+msgid "Other Income"
+msgstr "إيرادات أخرى"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/js/dashboard.js:0
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Operating profit"
+msgstr "الربح التشغيلي"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/js/dashboard.js:0
+msgid "Other buckets"
+msgstr "مجموعات أخرى"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/js/dashboard.js:0
+msgid "Branch"
+msgstr "الفرع"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/js/dashboard.js:0
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Costs"
+msgstr "التكاليف"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/js/dashboard.js:0
+msgid "Rent"
+msgstr "الإيجار"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/js/dashboard.js:0
+msgid "Rent / Sales"
+msgstr "الإيجار / المبيعات"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/js/dashboard.js:0
+msgid "People"
+msgstr "الموظفون"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/js/dashboard.js:0
+msgid "Delivery"
+msgstr "التوصيل"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/js/dashboard.js:0
+msgid "Net Result"
+msgstr "النتيجة الصافية"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/js/dashboard.js:0
+msgid "Margin"
+msgstr "الهامش"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/js/dashboard.js:0
+#, python-format
+msgid "Region %s"
+msgstr "المنطقة %s"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/js/dashboard.js:0
+msgid "Other"
+msgstr "أخرى"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/js/dashboard.js:0
+msgid "Journal Items"
+msgstr "القيود المحاسبية"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/js/dashboard.js:0
+msgid "You need accounting access rights to open journal items."
+msgstr "تحتاج إلى صلاحيات المحاسبة لفتح القيود المحاسبية."
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/js/dashboard.js:0
+#, python-format
+msgid "Scanner finished: %s accounts and %s analytic accounts classified."
+msgstr "اكتمل المسح: تم تصنيف %s حساباً و %s حساباً تحليلياً."
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Executive Cockpit"
+msgstr "لوحة القيادة التنفيذية"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Group Financial Overview"
+msgstr "النظرة المالية الشاملة للمجموعة"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Purchasing Dashboard"
+msgstr "لوحة المشتريات"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Smart Scan"
+msgstr "المسح الذكي"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Print"
+msgstr "طباعة"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Refresh"
+msgstr "تحديث"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "All companies"
+msgstr "جميع الشركات"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "The dashboard could not be loaded"
+msgstr "تعذّر تحميل لوحة المعلومات"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Try again"
+msgstr "إعادة المحاولة"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Read-only · posted journal entries only · reconciles with Odoo's Profit & Loss"
+msgstr "للقراءة فقط · القيود المرحّلة فقط · تتطابق مع قائمة الأرباح والخسائر في أودو"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "ledger lines analysed"
+msgstr "سطر محاسبي تم تحليله"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Compared with"
+msgstr "مقارنةً بالفترة"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Updated"
+msgstr "آخر تحديث"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "No posted entries in this period"
+msgstr "لا توجد قيود مرحّلة في هذه الفترة"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Pick another period or company. Only posted journal entries are counted."
+msgstr "اختر فترة أو شركة أخرى. يتم احتساب القيود المرحّلة فقط."
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Monthly performance"
+msgstr "الأداء الشهري"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Net profit"
+msgstr "صافي الربح"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Net"
+msgstr "الصافي"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Needs your attention"
+msgstr "يحتاج إلى اهتمامك"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Nothing unusual detected for this period."
+msgstr "لم يتم رصد أي أمر غير معتاد في هذه الفترة."
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Where every 1.00 of sales goes"
+msgstr "أين يذهب كل 1.00 من المبيعات"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "share of revenue"
+msgstr "نسبة من الإيرادات"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Costs exceed revenue by"
+msgstr "التكاليف تتجاوز الإيرادات بمقدار"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Profit waterfall"
+msgstr "شلال الأرباح"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "revenue → net profit"
+msgstr "من الإيرادات إلى صافي الربح"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "CEO focus areas"
+msgstr "محاور تركيز الإدارة العليا"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Tap a card for the account-level detail"
+msgstr "اضغط على البطاقة لعرض تفاصيل الحسابات"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "of revenue"
+msgstr "من الإيرادات"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Revenue streams"
+msgstr "مصادر الإيرادات"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "No revenue recorded."
+msgstr "لا توجد إيرادات مسجّلة."
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Sister companies"
+msgstr "الشركات الشقيقة"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "All"
+msgstr "الكل"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Top performers"
+msgstr "الأفضل أداءً"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Needs attention"
+msgstr "تحتاج إلى متابعة"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "No branch-level entries yet. Tag journal items with the branch analytic account."
+msgstr "لا توجد قيود على مستوى الفروع بعد. قم بوسم القيود بالحساب التحليلي للفرع."
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Sister companies, side by side"
+msgstr "الشركات الشقيقة جنباً إلى جنب"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Export CSV"
+msgstr "تصدير CSV"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "of group revenue"
+msgstr "من إيرادات المجموعة"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Cost of revenue"
+msgstr "تكلفة الإيرادات"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Gross profit"
+msgstr "مجمل الربح"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Operating expenses"
+msgstr "المصاريف التشغيلية"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Other income"
+msgstr "إيرادات أخرى"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Cost benchmark between companies"
+msgstr "مقارنة التكاليف بين الشركات"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "each cost as % of that company's revenue ·"
+msgstr "كل بند كنسبة من إيرادات الشركة ·"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "lowest"
+msgstr "الأدنى"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "highest"
+msgstr "الأعلى"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Company"
+msgstr "الشركة"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Gross margin"
+msgstr "هامش الربح الإجمالي"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Net margin"
+msgstr "هامش صافي الربح"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Figures are shown before inter-company eliminations. Sales between sister companies appear in both revenue and cost."
+msgstr "الأرقام معروضة قبل استبعاد المعاملات بين الشركات. المبيعات بين الشركات الشقيقة تظهر في الإيرادات والتكاليف معاً."
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "No branches configured"
+msgstr "لم يتم تعريف أي فروع"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Run the Smart Scan so analytic accounts are recognised as branches, or set the role manually under Configuration → Branches & Departments."
+msgstr "شغّل المسح الذكي ليتم التعرف على الحسابات التحليلية كفروع، أو حدّد الدور يدوياً من الإعدادات ← الفروع والأقسام."
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Healthy (margin ≥"
+msgstr "جيد (الهامش ≥"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Operating at a loss"
+msgstr "تعمل بخسارة"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Revenue traced to branches"
+msgstr "الإيرادات المنسوبة للفروع"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Branch figures cover"
+msgstr "أرقام الفروع تغطي"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "of group revenue."
+msgstr "من إيرادات المجموعة."
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "branch(es) show Point-of-Sale sales (marked"
+msgstr "فرع تظهر له مبيعات نقاط البيع (مُعلَّمة"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "POS"
+msgstr "نقطة بيع"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid ") because the ledger has no analytic revenue for them yet."
+msgstr ") لعدم وجود إيرادات تحليلية لها في الدفاتر بعد."
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Costs and sales appear per branch only when the journal items carry the branch analytic account."
+msgstr "تظهر التكاليف والمبيعات لكل فرع فقط عندما تحمل القيود الحساب التحليلي للفرع."
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "By region"
+msgstr "حسب المنطقة"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "branches · net"
+msgstr "فروع · الصافي"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Branch leaderboard"
+msgstr "ترتيب الفروع"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "All statuses"
+msgstr "جميع الحالات"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "CSV"
+msgstr "CSV"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Status"
+msgstr "الحالة"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Where this branch's costs go"
+msgstr "أين تذهب تكاليف هذا الفرع"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "No costs tagged to this branch in the period."
+msgstr "لا توجد تكاليف موسومة بهذا الفرع في الفترة."
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "POS sales:"
+msgstr "مبيعات نقاط البيع:"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Journal items"
+msgstr "القيود المحاسبية"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Cost intelligence"
+msgstr "ذكاء التكاليف"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Cost buckets"
+msgstr "مجموعات التكلفة"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "% of revenue"
+msgstr "% من الإيرادات"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "ledger accounts"
+msgstr "حساب محاسبي"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "This period"
+msgstr "هذه الفترة"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Previous period"
+msgstr "الفترة السابقة"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Last 12 months"
+msgstr "آخر 12 شهراً"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Account"
+msgstr "الحساب"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Amount"
+msgstr "المبلغ"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Share"
+msgstr "النسبة"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Showing the top"
+msgstr "عرض أعلى"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "of"
+msgstr "من"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "accounts. Use “Journal items” for the full list."
+msgstr "حساب. استخدم «القيود المحاسبية» للقائمة الكاملة."
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Delivery platforms"
+msgstr "تطبيقات التوصيل"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "commissions + discounts funded"
+msgstr "العمولات + الخصومات المموَّلة"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Platform"
+msgstr "التطبيق"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Commission"
+msgstr "العمولة"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Discounts"
+msgstr "الخصومات"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Total cost"
+msgstr "إجمالي التكلفة"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "No department costs in this period"
+msgstr "لا توجد تكاليف أقسام في هذه الفترة"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Department and factory costs appear when journal items carry an analytic account (payroll, expenses, bills)."
+msgstr "تظهر تكاليف الأقسام والمصنع عندما تحمل القيود حساباً تحليلياً (الرواتب، المصاريف، الفواتير)."
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Costs tagged to departments"
+msgstr "التكاليف الموسومة بالأقسام"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Factory & supply chain"
+msgstr "المصنع وسلسلة التزويد"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Administration & commercial"
+msgstr "الإدارة والمبيعات"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Cost by department"
+msgstr "التكلفة حسب القسم"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "top cost drivers shown for each"
+msgstr "أهم بنود التكلفة لكل قسم"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Re-classify accounts and branches"
+msgstr "إعادة تصنيف الحسابات والفروع"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Full calendar year"
+msgstr "سنة كاملة"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Search branch…"
+msgstr "بحث عن فرع…"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/static/src/xml/dashboard.xml:0
+msgid "Sales from Point of Sale"
+msgstr "مبيعات من نقاط البيع"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/models/dashboard_engine.py:0
+msgid "You are not allowed to access the Executive Company Cost Dashboard."
+msgstr "غير مصرّح لك بالدخول إلى لوحة تكاليف الشركة التنفيذية."
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/models/dashboard_engine.py:0
+msgid "Other / unallocated"
+msgstr "أخرى / غير موزّعة"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/models/dashboard_engine.py:0
+msgid "The group is running at a net loss"
+msgstr "المجموعة تعمل بصافي خسارة"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/models/dashboard_engine.py:0
+#, python-format
+msgid "Net result is %(net)s on revenue of %(rev)s."
+msgstr "صافي النتيجة %(net)s على إيرادات بقيمة %(rev)s."
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/models/dashboard_engine.py:0
+msgid "Thin net margin"
+msgstr "هامش صافٍ ضعيف"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/models/dashboard_engine.py:0
+#, python-format
+msgid "Net margin is only %(m).1f%% of revenue."
+msgstr "هامش صافي الربح %(m).1f%% فقط من الإيرادات."
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/models/dashboard_engine.py:0
+msgid "Healthy profitability"
+msgstr "ربحية جيدة"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/models/dashboard_engine.py:0
+#, python-format
+msgid "Net margin is %(m).1f%% on revenue of %(rev)s."
+msgstr "هامش صافي الربح %(m).1f%% على إيرادات بقيمة %(rev)s."
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/models/dashboard_engine.py:0
+#, python-format
+msgid "Revenue is down %(c).1f%%"
+msgstr "الإيرادات انخفضت %(c).1f%%"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/models/dashboard_engine.py:0
+#, python-format
+msgid "Revenue fell from %(a)s to %(b)s versus the previous period."
+msgstr "انخفضت الإيرادات من %(a)s إلى %(b)s مقارنةً بالفترة السابقة."
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/models/dashboard_engine.py:0
+#, python-format
+msgid "Revenue is up %(c).1f%%"
+msgstr "الإيرادات ارتفعت %(c).1f%%"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/models/dashboard_engine.py:0
+#, python-format
+msgid "Revenue grew from %(a)s to %(b)s versus the previous period."
+msgstr "ارتفعت الإيرادات من %(a)s إلى %(b)s مقارنةً بالفترة السابقة."
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/models/dashboard_engine.py:0
+#, python-format
+msgid "Gross margin %(dir)s %(v).1f points"
+msgstr "هامش الربح الإجمالي %(dir)s %(v).1f نقطة"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/models/dashboard_engine.py:0
+msgid "dropped"
+msgstr "انخفض"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/models/dashboard_engine.py:0
+msgid "improved"
+msgstr "تحسّن"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/models/dashboard_engine.py:0
+#, python-format
+msgid "From %(a).1f%% to %(b).1f%% of revenue."
+msgstr "من %(a).1f%% إلى %(b).1f%% من الإيرادات."
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/models/dashboard_engine.py:0
+#, python-format
+msgid "Rent consumes %(p).1f%% of revenue"
+msgstr "الإيجار يستهلك %(p).1f%% من الإيرادات"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/models/dashboard_engine.py:0
+#, python-format
+msgid "Above the %(t).0f%% ceiling. Review leases and underperforming locations."
+msgstr "أعلى من السقف %(t).0f%%. راجع عقود الإيجار والمواقع ضعيفة الأداء."
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/models/dashboard_engine.py:0
+#, python-format
+msgid "Rent is %(p).1f%% of revenue"
+msgstr "الإيجار يمثل %(p).1f%% من الإيرادات"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/models/dashboard_engine.py:0
+#, python-format
+msgid "Above the %(t).0f%% watch level."
+msgstr "أعلى من مستوى المراقبة %(t).0f%%."
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/models/dashboard_engine.py:0
+#, python-format
+msgid "Delivery platforms take %(p).1f%% of revenue"
+msgstr "تطبيقات التوصيل تأخذ %(p).1f%% من الإيرادات"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/models/dashboard_engine.py:0
+#, python-format
+msgid "Commissions of %(a)s. Compare platform profitability."
+msgstr "عمولات بقيمة %(a)s. قارن ربحية التطبيقات."
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/models/dashboard_engine.py:0
+#, python-format
+msgid "Waste & shrinkage at %(p).1f%% of revenue"
+msgstr "الهدر والفاقد %(p).1f%% من الإيرادات"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/models/dashboard_engine.py:0
+#, python-format
+msgid "Damaged goods, expiry, weight gaps and cash shortages cost %(a)s."
+msgstr "البضاعة التالفة وانتهاء الصلاحية وفروقات الوزن وعجز الصندوق كلّفت %(a)s."
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/models/dashboard_engine.py:0
+#, python-format
+msgid "%(n)s jumped %(p).0f%%"
+msgstr "%(n)s ارتفع %(p).0f%%"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/models/dashboard_engine.py:0
+#, python-format
+msgid "From %(a)s to %(b)s versus the previous period."
+msgstr "من %(a)s إلى %(b)s مقارنةً بالفترة السابقة."
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/models/dashboard_engine.py:0
+#, python-format
+msgid "%(n)s branch(es) operating at a loss"
+msgstr "%(n)s فرع يعمل بخسارة"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/models/dashboard_engine.py:0
+#, python-format
+msgid "Weakest: %(names)s."
+msgstr "الأضعف: %(names)s."
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/models/dashboard_engine.py:0
+#, python-format
+msgid "%(n)s branch(es) pay more than %(t).0f%% of sales as rent"
+msgstr "%(n)s فرع يدفع أكثر من %(t).0f%% من مبيعاته كإيجار"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/models/dashboard_engine.py:0
+#, python-format
+msgid "Highest: %(names)s."
+msgstr "الأعلى: %(names)s."
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/models/dashboard_engine.py:0
+#, python-format
+msgid "Branch P&L covers %(p).0f%% of revenue"
+msgstr "أرباح وخسائر الفروع تغطي %(p).0f%% من الإيرادات"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/models/dashboard_engine.py:0
+msgid "Tag sales and expense journal items with the branch analytic account to complete the branch view."
+msgstr "قم بوسم قيود المبيعات والمصاريف بالحساب التحليلي للفرع لاستكمال صورة الفروع."
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/models/dashboard_engine.py:0
+#, python-format
+msgid "%(n)s company(ies) in loss"
+msgstr "%(n)s شركة بخسارة"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/models/dashboard_engine.py:0
+#, python-format
+msgid "%(names)s."
+msgstr "%(names)s."
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/models/dashboard_engine.py:0
+msgid "Companies use different currencies"
+msgstr "الشركات تستخدم عملات مختلفة"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/models/dashboard_engine.py:0
+msgid "Amounts are summed as booked, without conversion."
+msgstr "يتم جمع المبالغ كما هي مسجّلة دون تحويل."
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/models/dashboard_engine.py:0
+#, python-format
+msgid "Account %(account)s is a %(atype)s account and cannot be placed in the bucket '%(bucket)s'."
+msgstr "الحساب %(account)s من نوع %(atype)s ولا يمكن وضعه في المجموعة '%(bucket)s'."
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/models/dashboard_engine.py:0
+msgid "No cost buckets found. Please update the module to load the initial data."
+msgstr "لم يتم العثور على مجموعات تكلفة. يرجى تحديث التطبيق لتحميل البيانات الأولية."
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/models/dashboard_engine.py:0
+#, python-format
+msgid "Accounts: %(ac)s new, %(au)s refreshed. Analytic accounts: %(nc)s new, %(nu)s refreshed."
+msgstr "الحسابات: %(ac)s جديد، %(au)s محدّث. الحسابات التحليلية: %(nc)s جديد، %(nu)s محدّث."
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/models/dashboard_engine.py:0
+msgid "Smart Scan completed"
+msgstr "اكتمل المسح الذكي"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/views/cost_bucket_views.xml:0
+msgid "Cost Buckets"
+msgstr "مجموعات التكلفة"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/views/cost_bucket_views.xml:0
+msgid "Cost Bucket"
+msgstr "مجموعة تكلفة"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/views/cost_bucket_views.xml:0
+msgid "e.g. Rent & Occupancy"
+msgstr "مثال: الإيجارات والإشغال"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/views/cost_bucket_views.xml:0
+msgid "Mapped Accounts"
+msgstr "الحسابات المربوطة"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/views/cost_bucket_views.xml:0
+msgid "Archived"
+msgstr "مؤرشف"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/views/cost_bucket_views.xml:0
+msgid "Family"
+msgstr "النوع المالي"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/views/cost_bucket_views.xml:0
+msgid "Account Classification"
+msgstr "تصنيف الحسابات"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/views/cost_bucket_views.xml:0
+msgid "Manual"
+msgstr "يدوي"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/views/cost_bucket_views.xml:0
+msgid "Auto-classified"
+msgstr "مصنّف تلقائياً"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/views/cost_bucket_views.xml:0
+msgid "Bucket"
+msgstr "المجموعة"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/views/cost_bucket_views.xml:0
+msgid "Account Type"
+msgstr "نوع الحساب"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/views/cost_bucket_views.xml:0
+msgid "Smart Scanner"
+msgstr "المسح الذكي"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/views/cost_bucket_views.xml:0
+msgid "Run Scanner"
+msgstr "تشغيل المسح"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/views/cost_bucket_views.xml:0
+msgid "Cancel"
+msgstr "إلغاء"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/views/cost_bucket_views.xml:0
+msgid "Define the functional buckets the Chairman sees (Rent, Payroll, Utilities...)"
+msgstr "عرّف مجموعات التكلفة التي يراها رئيس المجلس (الإيجارات، الرواتب، الخدمات...)"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/views/cost_bucket_views.xml:0
+msgid "Reads your whole chart of accounts (Arabic & English) and your analytic accounts, then classifies every Profit & Loss account into an executive bucket and every analytic account as a branch, factory unit or department. Anything you set by hand is kept."
+msgstr "يقرأ دليل الحسابات بالكامل (عربي وإنجليزي) والحسابات التحليلية، ثم يصنّف كل حساب أرباح وخسائر ضمن مجموعة تنفيذية وكل حساب تحليلي كفرع أو وحدة مصنع أو قسم. ما تحدده يدوياً يبقى كما هو."
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/views/cost_bucket_views.xml:0
+msgid "Branches & Departments"
+msgstr "الفروع والأقسام"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/views/cost_bucket_views.xml:0
+msgid "Factory"
+msgstr "المصنع"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/views/cost_bucket_views.xml:0
+msgid "Role"
+msgstr "الدور"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/views/cost_bucket_views.xml:0
+msgid "Region"
+msgstr "المنطقة"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/views/cost_bucket_views.xml:0
+msgid "Run the Smart Scanner to classify your analytic accounts"
+msgstr "شغّل المسح الذكي لتصنيف الحسابات التحليلية"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/views/cost_bucket_views.xml:0
+msgid "Executive Company Cost Dashboard"
+msgstr "لوحة تكاليف الشركة التنفيذية"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/views/cost_bucket_views.xml:0
+msgid "Executive P&L"
+msgstr "الأرباح والخسائر التنفيذية"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/views/cost_bucket_views.xml:0
+msgid "Dashboard"
+msgstr "لوحة المعلومات"
+
+#. module: executive_company_cost_dashboard
+#: code:addons/executive_company_cost_dashboard/views/cost_bucket_views.xml:0
+msgid "Configuration"
+msgstr "الإعدادات"
+

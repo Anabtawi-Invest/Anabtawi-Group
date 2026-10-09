@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ===================== Buckets ===================== -->
+    <record id="view_ceo_cost_bucket_list" model="ir.ui.view">
+        <field name="name">ceo.cost.bucket.list</field>
+        <field name="model">ceo.cost.bucket</field>
+        <field name="arch" type="xml">
+            <list string="Cost Buckets" editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="code"/>
+                <field name="category_type"/>
+                <field name="color" widget="color"/>
+                <field name="account_count"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_ceo_cost_bucket_form" model="ir.ui.view">
+        <field name="name">ceo.cost.bucket.form</field>
+        <field name="model">ceo.cost.bucket</field>
+        <field name="arch" type="xml">
+            <form string="Cost Bucket">
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" placeholder="e.g. Rent &amp; Occupancy"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="code"/>
+                            <field name="category_type"/>
+                            <field name="color" widget="color"/>
+                        </group>
+                        <group>
+                            <field name="sequence"/>
+                            <field name="active"/>
+                            <field name="account_count"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Mapped Accounts" name="accounts">
+                            <field name="mapping_ids">
+                                <list editable="bottom">
+                                    <field name="account_id"/>
+                                    <field name="account_code"/>
+                                    <field name="account_type"/>
+                                    <field name="auto" readonly="1"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_ceo_cost_bucket_search" model="ir.ui.view">
+        <field name="name">ceo.cost.bucket.search</field>
+        <field name="model">ceo.cost.bucket</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="code"/>
+                <filter name="inactive" string="Archived" domain="[('active', '=', False)]"/>
+                <group>
+                    <filter name="group_family" string="Family" context="{'group_by': 'category_type'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_ceo_cost_bucket" model="ir.actions.act_window">
+        <field name="name">Cost Buckets</field>
+        <field name="res_model">ceo.cost.bucket</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Define the functional buckets the Chairman sees (Rent, Payroll, Utilities...)</p>
+        </field>
+    </record>
+
+    <!-- ===================== Account mapping ===================== -->
+    <record id="view_ceo_cost_account_mapping_list" model="ir.ui.view">
+        <field name="name">ceo.cost.account.mapping.list</field>
+        <field name="model">ceo.cost.account.mapping</field>
+        <field name="arch" type="xml">
+            <list string="Account Classification" editable="bottom">
+                <field name="account_id"/>
+                <field name="account_code"/>
+                <field name="account_type"/>
+                <field name="bucket_id"/>
+                <field name="auto" readonly="1"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_ceo_cost_account_mapping_search" model="ir.ui.view">
+        <field name="name">ceo.cost.account.mapping.search</field>
+        <field name="model">ceo.cost.account.mapping</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="account_id"/>
+                <field name="bucket_id"/>
+                <filter name="manual" string="Manual" domain="[('auto', '=', False)]"/>
+                <filter name="automatic" string="Auto-classified" domain="[('auto', '=', True)]"/>
+                <group>
+                    <filter name="group_bucket" string="Bucket" context="{'group_by': 'bucket_id'}"/>
+                    <filter name="group_type" string="Account Type" context="{'group_by': 'account_type'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_ceo_cost_account_mapping" model="ir.actions.act_window">
+        <field name="name">Account Classification</field>
+        <field name="res_model">ceo.cost.account.mapping</field>
+        <field name="view_mode">list</field>
+        <field name="context">{'search_default_group_bucket': 1}</field>
+    </record>
+
+    <!-- ===================== Smart scanner wizard ===================== -->
+    <record id="view_ceo_smart_scanner_wizard_form" model="ir.ui.view">
+        <field name="name">ceo.smart.scanner.wizard.form</field>
+        <field name="model">ceo.smart.scanner.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Smart Scanner">
+                <div class="alert alert-info" role="alert">
+                    Reads your whole chart of accounts (Arabic &amp; English) and your analytic accounts, then
+                    classifies every Profit &amp; Loss account into an executive bucket and every analytic account as a
+                    branch, factory unit or department. Anything you set by hand is kept.
+                </div>
+                <group>
+                    <field name="overwrite_existing"/>
+                </group>
+                <footer>
+                    <button string="Run Scanner" type="object" name="action_run_smart_scan" class="btn-primary" data-hotkey="q"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel" data-hotkey="x"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_ceo_smart_scanner_wizard" model="ir.actions.act_window">
+        <field name="name">Smart Scanner</field>
+        <field name="res_model">ceo.smart.scanner.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>
