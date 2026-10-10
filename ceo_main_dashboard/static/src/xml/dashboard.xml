@@ -425,16 +425,24 @@
                                                             </td>
                                                             <td class="text-end" t-att-rowspan="billRows.length" t-esc="fmtPrice(h.po_price)"/>
                                                             </t>
-                                                            <td class="text-end" t-att-class="{ 'cmd_text_up': h.multi_price and b and !b.is_refund }">
+                                                            <t t-set="activeBill" t-value="b and !b.is_refund and !b.fully_refunded"/>
+                                                            <td class="text-end" t-att-class="{ 'cmd_text_up': h.multi_price and activeBill }">
                                                                 <t t-if="b">
-                                                                    <i class="fa fa-flag me-1" t-if="h.multi_price and !b.is_refund"
+                                                                    <i class="fa fa-flag me-1" t-if="h.multi_price and activeBill"
                                                                        title="Billed at different prices on several bills, the highest one is used"/>
-                                                                    <span t-att-class="{ 'cmd_strong': !b.is_refund and !pricesDiffer(b.price, h.price) }"
-                                                                          t-esc="fmtPrice(b.price)"/>
+                                                                    <span t-att-class="{ 'cmd_strong': activeBill and !pricesDiffer(b.price, h.price), 'text-decoration-line-through cmd_muted': b.fully_refunded }"
+                                                                          t-esc="fmtPrice(b.fully_refunded ? b.gross_price : b.price)"/>
+                                                                    <span class="cmd_trend cmd_trend_up ms-1" t-if="b.fully_refunded"
+                                                                          t-att-title="b.refunded_by.join(', ')">Fully refunded</span>
+                                                                    <div class="cmd_muted cmd_small" t-if="activeBill and pricesDiffer(b.price, b.gross_price)"
+                                                                         t-att-title="b.refunded_by.join(', ')">
+                                                                        <span>After refunds · billed</span> <t t-esc="fmtPrice(b.gross_price)"/>
+                                                                    </div>
                                                                     <div class="cmd_muted cmd_small">
                                                                         <a href="#" t-esc="b.name"
                                                                            t-on-click.prevent.stop="() => this.openBill(b.id)"/>
                                                                         <span class="cmd_trend cmd_trend_up ms-1" t-if="b.is_refund">Refund</span>
+                                                                        <t t-if="b.is_refund and b.reverses"> <span>of</span> <t t-esc="b.reverses"/></t>
                                                                         · <t t-esc="fmtQty(b.qty)"/> <t t-esc="h.uom"/>
                                                                         · <t t-esc="fmtDate(b.date)"/>
                                                                     </div>
@@ -442,7 +450,7 @@
                                                                 <span t-else="" class="cmd_muted">—</span>
                                                             </td>
                                                             <td class="text-end" t-att-class="b ? changeClass(b.diff) : ''">
-                                                                <span t-if="!b" class="cmd_muted">—</span>
+                                                                <span t-if="!b or b.diff === null" class="cmd_muted">—</span>
                                                                 <span t-elif="!b.diff" class="cmd_muted">No difference</span>
                                                                 <t t-else="">
                                                                     <t t-esc="fmtSignedPrice(b.diff)"/>
