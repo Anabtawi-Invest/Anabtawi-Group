@@ -120,6 +120,9 @@ class CeoMainDashboard(models.AbstractModel):
             po_price = self._unit_price(line)
             bills = bills_by_line.get(line.id, [])
             for bill in bills:
+                if bill.get('fully_refunded'):
+                    bill['diff'] = bill['pct'] = None
+                    continue
                 diff = bill['price'] - po_price
                 bill['diff'] = 0.0 if currency.is_zero(diff) else diff
                 bill['pct'] = (bill['diff'] / po_price * 100.0) if po_price else None
@@ -355,13 +358,14 @@ class CeoMainDashboard(models.AbstractModel):
         """
         if not product_ids:
             return []
+        billed_ids = self._billed_line_ids(company, product_ids)
+        if not billed_ids:
+            return []
         self.env['purchase.order'].flush_model(['state', 'company_id'])
         self.env['purchase.order.line'].flush_model(
             ['order_id', 'product_id', 'display_type', 'is_downpayment', 'qty_received'])
         self.env['stock.move'].flush_model(
             ['state', 'date', 'purchase_line_id', 'product_id', 'location_dest_id', 'origin_returned_move_id'])
-        self.env['account.move'].flush_model(['state', 'move_type'])
-        self.env['account.move.line'].flush_model(['move_id', 'purchase_line_id', 'quantity'])
         self.env.cr.execute(SQL(
             """
             WITH receipts AS (
@@ -393,15 +397,7 @@ class CeoMainDashboard(models.AbstractModel):
                    AND pol.display_type IS NULL
                    AND COALESCE(pol.is_downpayment, FALSE) = FALSE
                    AND pol.qty_received > 0
-                   AND EXISTS (
-                       SELECT 1
-                         FROM account_move_line aml
-                         JOIN account_move am ON am.id = aml.move_id
-                        WHERE aml.purchase_line_id = pol.id
-                          AND am.state = 'posted'
-                          AND am.move_type = 'in_invoice'
-                          AND aml.quantity > 0
-                   )
+                   AND pol.id = ANY(%(billed_ids)s)
                 WINDOW w_asc AS (PARTITION BY pol.product_id ORDER BY r.first_date, pol.id),
                        w_desc AS (PARTITION BY pol.product_id ORDER BY r.first_date DESC, pol.id DESC)
             )
@@ -412,6 +408,7 @@ class CeoMainDashboard(models.AbstractModel):
             """,
             company_id=company.id,
             end=end,
+            billed_ids=list(billed_ids),
             product_ids=list(product_ids),
             outer=outer_condition,
         ))
@@ -506,13 +503,30 @@ class CeoMainDashboard(models.AbstractModel):
         return ratios
 
     def _bill_unit_prices(self, lines):
-        """Per line, one entry per posted vendor bill / refund with its untaxed unit price (discount
-        included, per product base unit, in company currency), ordered by bill date."""
         if not lines:
             return {}
+        return self._bills_by_line([('purchase_line_id', 'in', lines.ids)])
+
+    def _billed_line_ids(self, company, product_ids):
+        """Purchase lines of the products with at least one posted vendor bill not fully refunded."""
+        bills = self._bills_by_line([
+            ('company_id', '=', company.id),
+            ('purchase_line_id.product_id', 'in', list(product_ids)),
+        ])
+        return [line_id for line_id, entries in bills.items() if any(self._is_active_bill(e) for e in entries)]
+
+    def _bills_by_line(self, domain):
+        """Per purchase line, one entry per posted vendor bill / refund, ordered by bill date.
+
+        Prices are untaxed unit prices (discount included, per product base unit, in company
+        currency). Refunds created from a bill (reversed_entry_id) are netted into that bill:
+        a refund at the bill's unit price returns quantity, any other price corrects the amount.
+        A bill whose whole quantity was returned is marked fully refunded. Bill 'price' is the
+        net price after its refunds, 'gross_price' the price on the bill itself.
+        """
+        currency = self.env.company.currency_id
         groups = self.env['account.move.line'].sudo()._read_group(
-            [
-                ('purchase_line_id', 'in', lines.ids),
+            domain + [
                 ('parent_state', '=', 'posted'),
                 ('move_id.move_type', 'in', ('in_invoice', 'in_refund')),
             ],
@@ -525,40 +539,72 @@ class CeoMainDashboard(models.AbstractModel):
             if uom and to_uom:
                 quantity = uom._compute_quantity(quantity, to_uom, rounding_method='HALF-UP')
             totals[line, move][0] += quantity
-            totals[line, move][1] += balance
+            totals[line, move][1] += abs(balance)
 
         bills = defaultdict(list)
-        for (line, move), (quantity, balance) in sorted(
+        refunds = []
+        invoice_of = {}
+        for (line, move), (quantity, value) in sorted(
                 totals.items(), key=lambda item: (item[0][1].date, item[0][1].id)):
             if quantity <= 0:
                 continue
-            bills[line.id].append({
+            entry = {
                 'id': move.id,
                 'name': move.name,
                 'date': fields.Date.to_string(move.date),
                 'is_refund': move.move_type == 'in_refund',
                 'qty': quantity,
-                'price': abs(balance) / quantity,
-            })
+                'price': value / quantity,
+                'value': value,
+            }
+            if entry['is_refund']:
+                entry['reverses'] = ''
+                refunds.append((line, move, entry))
+            else:
+                entry.update(gross_price=entry['price'], returned_qty=0.0, refunded_value=0.0,
+                             fully_refunded=False, refunded_by=[])
+                invoice_of[line.id, move.id] = entry
+            bills[line.id].append(entry)
+
+        for line, move, refund in refunds:
+            invoice = invoice_of.get((line.id, move.reversed_entry_id.id))
+            if not invoice:
+                continue
+            refund['reverses'] = invoice['name']
+            invoice['refunded_by'].append(refund['name'])
+            invoice['refunded_value'] += refund['value']
+            if currency.is_zero(refund['price'] - invoice['gross_price']):
+                invoice['returned_qty'] += refund['qty']
+
+        for invoice in invoice_of.values():
+            net_qty = invoice['qty'] - invoice['returned_qty']
+            net_value = invoice['value'] - invoice['refunded_value']
+            if net_qty <= 1e-6 or net_value <= 0 or currency.is_zero(net_value):
+                invoice['fully_refunded'] = True
+            elif invoice['refunded_value']:
+                invoice['price'] = net_value / net_qty
         return bills
 
     @staticmethod
-    def _invoice_prices(line, bills):
-        return [bill['price'] for bill in bills.get(line.id, []) if not bill['is_refund']]
+    def _is_active_bill(entry):
+        return not entry['is_refund'] and not entry['fully_refunded']
+
+    def _active_bills(self, line, bills):
+        return [bill for bill in bills.get(line.id, []) if self._is_active_bill(bill)]
 
     def _compare_price(self, line, bills):
-        """Highest unit price of the line on its posted vendor bills (PO price if it has none)."""
-        prices = self._invoice_prices(line, bills)
+        """Highest net unit price of the line on its posted, not fully refunded vendor bills
+        (PO price if it has none)."""
+        prices = [bill['price'] for bill in self._active_bills(line, bills)]
         return max(prices) if prices else self._unit_price(line)
 
-    @staticmethod
-    def _compared_bill(line, bills):
-        """The posted vendor bill holding the line's highest bill price."""
-        invoices = [bill for bill in bills.get(line.id, []) if not bill['is_refund']]
-        return max(invoices, key=lambda bill: bill['price']) if invoices else None
+    def _compared_bill(self, line, bills):
+        """The vendor bill holding the line's highest net bill price."""
+        active = self._active_bills(line, bills)
+        return max(active, key=lambda bill: bill['price']) if active else None
 
     def _has_multi_bill_price(self, line, bills, currency):
-        prices = self._invoice_prices(line, bills)
+        prices = [bill['price'] for bill in self._active_bills(line, bills)]
         return len(prices) > 1 and not currency.is_zero(max(prices) - min(prices))
 
     @staticmethod
