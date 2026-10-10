@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_career_history_list" model="ir.ui.view">
+        <field name="name">hr.employee.career.history.list</field>
+        <field name="model">hr.employee.career.history</field>
+        <field name="arch" type="xml">
+            <list decoration-muted="state == 'cancelled'" decoration-info="state == 'scheduled'">
+                <field name="effective_date"/>
+                <field name="employee_id" optional="show"/>
+                <field name="event_type"/>
+                <field name="entry_mode" widget="badge" optional="show"/>
+                <field name="old_job_id" optional="show"/>
+                <field name="new_job_id"/>
+                <field name="old_department_id" optional="hide"/>
+                <field name="new_department_id" optional="hide"/>
+                <field name="old_wage" optional="show"/>
+                <field name="new_wage"/>
+                <field name="wage_change_pct" optional="show"/>
+                <field name="state" widget="badge"
+                       decoration-success="state in ('applied', 'recorded')"
+                       decoration-info="state == 'scheduled'"
+                       decoration-muted="state == 'cancelled'"/>
+                <field name="company_id" column_invisible="True"/>
+                <field name="currency_id" column_invisible="True"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_career_history_form" model="ir.ui.view">
+        <field name="name">hr.employee.career.history.form</field>
+        <field name="model">hr.employee.career.history</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_confirm" type="object" string="Confirm &amp; Apply"
+                            class="btn-primary"
+                            invisible="state != 'draft' or entry_mode != 'apply'"/>
+                    <button name="action_cancel" type="object" string="Cancel"
+                            invisible="state not in ('draft', 'scheduled', 'recorded')"/>
+                    <button name="action_reset_to_draft" type="object" string="Reset to Draft"
+                            invisible="state not in ('scheduled', 'cancelled') or entry_mode != 'apply'"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,scheduled,applied"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="employee_id"
+                                   readonly="state in ('applied', 'scheduled', 'cancelled')"/>
+                            <field name="entry_mode"
+                                   readonly="state in ('applied', 'scheduled', 'recorded', 'cancelled')"/>
+                            <field name="event_type"
+                                   readonly="state in ('applied', 'scheduled', 'cancelled')"/>
+                            <field name="effective_date"
+                                   readonly="state in ('applied', 'scheduled', 'cancelled')"/>
+                        </group>
+                        <group>
+                            <field name="version_id" invisible="not version_id"/>
+                            <field name="company_id"/>
+                            <field name="currency_id" invisible="True"/>
+                        </group>
+                    </group>
+                    <group string="Position">
+                        <group>
+                            <field name="old_job_id"
+                                   readonly="entry_mode == 'apply' or state in ('applied', 'cancelled')"/>
+                            <field name="old_department_id"
+                                   readonly="entry_mode == 'apply' or state in ('applied', 'cancelled')"/>
+                        </group>
+                        <group>
+                            <field name="new_job_id"
+                                   readonly="state in ('applied', 'scheduled', 'cancelled')"/>
+                            <field name="new_department_id"
+                                   readonly="state in ('applied', 'scheduled', 'cancelled')"/>
+                        </group>
+                    </group>
+                    <group string="Salary">
+                        <group>
+                            <field name="old_wage"
+                                   readonly="entry_mode == 'apply' or state in ('applied', 'cancelled')"/>
+                        </group>
+                        <group>
+                            <field name="new_wage"
+                                   readonly="state in ('applied', 'scheduled', 'cancelled')"/>
+                            <field name="wage_change_pct"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="reason"/>
+                        <field name="attachment_ids" widget="many2many_binary"/>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_career_history_search" model="ir.ui.view">
+        <field name="name">hr.employee.career.history.search</field>
+        <field name="model">hr.employee.career.history</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="employee_id"/>
+                <field name="new_job_id"/>
+                <field name="new_department_id"/>
+                <filter name="filter_promotion" string="Promotions"
+                        domain="[('event_type', '=', 'promotion')]"/>
+                <filter name="filter_transfer" string="Transfers"
+                        domain="[('event_type', '=', 'transfer')]"/>
+                <filter name="filter_wage" string="Wage Adjustments"
+                        domain="[('event_type', '=', 'wage_adjustment')]"/>
+                <separator/>
+                <filter name="filter_scheduled" string="Scheduled"
+                        domain="[('state', '=', 'scheduled')]"/>
+                <filter name="filter_manual" string="Manual History"
+                        domain="[('entry_mode', '=', 'record_only')]"/>
+                <group>
+                    <filter name="group_employee" string="Employee"
+                            context="{'group_by': 'employee_id'}"/>
+                    <filter name="group_event" string="Event"
+                            context="{'group_by': 'event_type'}"/>
+                    <filter name="group_year" string="Year"
+                            context="{'group_by': 'effective_date:year'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_career_history" model="ir.actions.act_window">
+        <field name="name">Career History</field>
+        <field name="res_model">hr.employee.career.history</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_career_history_search"/>
+    </record>
+
+    <menuitem id="menu_career_history"
+              name="Career History"
+              parent="hr.menu_hr_employee_payroll"
+              action="action_career_history"
+              groups="hr_career_history.group_career_history_manager"
+              sequence="40"/>
+</odoo>

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="group_career_history_manager" model="res.groups">
+        <field name="name">Career History Manager</field>
+        <field name="privilege_id" ref="hr.res_groups_privilege_employees"/>
+        <field name="implied_ids" eval="[(4, ref('hr.group_hr_user'))]"/>
+    </record>
+
+    <!-- HR Administrators manage career history by default. -->
+    <record id="hr.group_hr_manager" model="res.groups">
+        <field name="implied_ids" eval="[(4, ref('hr_career_history.group_career_history_manager'))]"/>
+    </record>
+
+    <record id="rule_career_history_company" model="ir.rule">
+        <field name="name">Career history: multi-company</field>
+        <field name="model_id" ref="model_hr_employee_career_history"/>
+        <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+    </record>
+</odoo>

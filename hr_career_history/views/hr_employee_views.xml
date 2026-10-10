@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_employee_form_inherit_career_history" model="ir.ui.view">
+        <field name="name">hr.employee.form.inherit.career.history</field>
+        <field name="model">hr.employee</field>
+        <field name="inherit_id" ref="hr.view_employee_form"/>
+        <field name="priority" eval="99"/>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook" position="inside">
+                <page string="Career &amp; Salary" name="career_history"
+                      groups="hr.group_hr_user">
+                    <field name="career_history_ids">
+                        <list editable="bottom"
+                              decoration-muted="state == 'cancelled'"
+                              decoration-info="state == 'scheduled'">
+                            <field name="effective_date"
+                                   readonly="state in ('applied', 'scheduled', 'cancelled')"/>
+                            <field name="event_type"
+                                   readonly="state in ('applied', 'scheduled', 'cancelled')"/>
+                            <field name="entry_mode" widget="badge"
+                                   readonly="state != 'draft'"/>
+                            <field name="old_job_id"
+                                   readonly="entry_mode == 'apply' or state in ('applied', 'cancelled')"/>
+                            <field name="new_job_id"
+                                   readonly="state in ('applied', 'scheduled', 'cancelled')"/>
+                            <field name="old_department_id" optional="hide"
+                                   readonly="entry_mode == 'apply' or state in ('applied', 'cancelled')"/>
+                            <field name="new_department_id" optional="hide"
+                                   readonly="state in ('applied', 'scheduled', 'cancelled')"/>
+                            <field name="old_wage"
+                                   readonly="entry_mode == 'apply' or state in ('applied', 'cancelled')"/>
+                            <field name="new_wage"
+                                   readonly="state in ('applied', 'scheduled', 'cancelled')"/>
+                            <field name="wage_change_pct"/>
+                            <field name="reason" optional="show"/>
+                            <field name="state" widget="badge"
+                                   decoration-success="state in ('applied', 'recorded')"
+                                   decoration-info="state == 'scheduled'"
+                                   decoration-muted="state == 'cancelled'"/>
+                            <field name="company_id" column_invisible="True"/>
+                            <field name="currency_id" column_invisible="True"/>
+                            <button name="action_confirm" type="object" string="Apply"
+                                    icon="fa-check" invisible="state != 'draft' or entry_mode != 'apply'"
+                                    groups="hr_career_history.group_career_history_manager"/>
+                        </list>
+                    </field>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>

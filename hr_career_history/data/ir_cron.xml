@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="ir_cron_apply_scheduled_career_history" model="ir.cron">
+        <field name="name">Career history: apply scheduled changes</field>
+        <field name="model_id" ref="model_hr_employee_career_history"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_apply_scheduled()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+    </record>
+
+    <!-- One-time backfill: started by the post-init hook, deactivates itself when done.
+         noupdate so a module upgrade never re-pauses a run in progress. -->
+    <data noupdate="1">
+        <record id="ir_cron_backfill_career_history" model="ir.cron">
+            <field name="name">Career history: one-time backfill from employee versions</field>
+            <field name="model_id" ref="model_hr_employee_career_history"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_backfill_from_versions()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">hours</field>
+            <field name="active" eval="False"/>
+        </record>
+    </data>
+</odoo>
