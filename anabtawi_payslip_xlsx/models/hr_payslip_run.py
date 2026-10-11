@@ -556,29 +556,36 @@ class HrPayslipRun(models.Model):
                 lines = payslip.line_ids
 
                 # Base Allowances
-                basic_sal = sum(lines.filtered(lambda l: l.code in ("BASIC", "SALARY") or (l.category_id and l.category_id.code in ("BASIC", "Basic")) or (l.category_id and l.category_id.name in ("BASIC", "Basic", "Basic Salary"))).mapped("total"))
+                # Actual Salary may sit in the Basic category: it has its own column, so never count it here
+                basic_sal = sum(lines.filtered(
+                    lambda l: (l.code in ("BASIC", "SALARY") or (l.category_id and l.category_id.code in ("BASIC", "Basic")) or (l.category_id and l.category_id.name in ("BASIC", "Basic", "Basic Salary")))
+                    and not (l.code in ("FULL_WAGE", "ACTUAL_SALARY", "ACTUAL") or "actual salary" in (l.name or "").lower() or "الراتب الفعلي" in (l.name or ""))
+                ).mapped("total"))
                 actual_sal = sum(lines.filtered(lambda l: l.code in ("FULL_WAGE", "ACTUAL_SALARY", "ACTUAL") or "actual salary" in (l.name or "").lower() or "الراتب الفعلي" in (l.name or "")).mapped("total"))
                 rem_leave = sum(lines.filtered(lambda l: l.code in ("vacation_leave", "remain_lev", "REM_LEAVE", "LEAVE_COMP", "ANNUAL_LEAVE")).mapped("total"))
                 gross_att_ot = sum(lines.filtered(lambda l: l.code in ("OT_NET", "ETH_NET", "RD-S", "OVERTIME", "GROSS_ATT", "OT_COMP", "EXTRA_HOURS")).mapped("total"))
 
                 # Dynamic Allowance Values (Prioritize computed rule lines over raw input lines to avoid double counting)
                 dyn_alw_vals = []
+                gross_dyn_alw = 0.0          # only amounts a salary rule really paid count in the gross
                 for _c_name, _w, rule_keys, input_type_ids in dynamic_alw_cols:
                     val = 0.0
+                    rule_val = 0.0
                     if rule_keys:
                         r_lines = lines.filtered(lambda l: (l.salary_rule_id and l.salary_rule_id.id in rule_keys) or l.code in rule_keys)
                         if r_lines:
-                            val = sum(r_lines.mapped("total"))
+                            val = rule_val = sum(r_lines.mapped("total"))
                     if abs(val) < 0.0001 and input_type_ids:
                         in_lines = payslip.input_line_ids.filtered(lambda l: l.input_type_id and l.input_type_id.id in input_type_ids)
                         if in_lines:
                             in_val = sum((l.amount if l.amount != 0.0 else l.quantity) or 0.0 for l in in_lines)
                             if abs(in_val) > 0.0001:
-                                val = in_val
+                                val = in_val      # shown for information (input not paid by a rule)
                     dyn_alw_vals.append(val)
+                    gross_dyn_alw += rule_val
 
-                # Gross Salary (calculated from Actual Salary + Allowances)
-                gross_sal = actual_sal + rem_leave + gross_att_ot + sum(dyn_alw_vals)
+                # Gross Salary (calculated from Actual Salary + paid allowances; salary inputs are not added again)
+                gross_sal = actual_sal + rem_leave + gross_att_ot + gross_dyn_alw
 
                 # Fixed Deductions
                 tax_val = sum(lines.filtered(lambda l: l.code in ("INCOME_TAX", "TAX", "IT") or "ضريبة" in l.name).mapped("total"))
