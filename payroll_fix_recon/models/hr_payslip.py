@@ -233,12 +233,31 @@ class HrPayslip(models.Model):
         return res
 
     def _pfr_reset_preview(self):
-        """The side preview shows a stored PDF; drop it on draft slips so it is rebuilt from the new lines."""
-        for fname in ('payslip_file', 'payslip_pdf', 'payslip_report_file'):
-            if fname in self._fields and self._fields[fname].type == 'binary':
-                drafts = self.filtered(lambda s: s.state in ('draft', 'verify'))
-                if drafts:
-                    drafts.with_context(skip_reconcile_revert=True).sudo().write({fname: False})
+        """The side preview (o_attachment_preview) shows the PDF attachment saved on the payslip.
+        On draft slips drop the stale PDF and, for a handful of slips, render a fresh one so the
+        preview matches the new lines. Bulk runs only drop it (rendering is one wkhtmltopdf per slip)."""
+        drafts = self.filtered(lambda s: s.id and s.state in ('draft', 'verify'))
+        if not drafts:
+            return
+        Attachment = self.env['ir.attachment'].sudo()
+        stale = Attachment.search([('res_model', '=', 'hr.payslip'), ('res_id', 'in', drafts.ids),
+                                   ('mimetype', '=', 'application/pdf'), ('res_field', '=', False)])
+        stale.unlink()
+        if len(drafts) > 5:
+            return
+        for slip in drafts:
+            try:
+                report = slip.struct_id.report_id if 'report_id' in slip.struct_id._fields else False
+                report = report or self.env.ref('hr_payroll.action_report_payslip', raise_if_not_found=False)
+                if not report:
+                    continue
+                pdf, _fmt = report.sudo()._render_qweb_pdf(report.report_name, slip.ids)
+                Attachment.create({
+                    'name': f"{slip.name or 'Payslip'}.pdf", 'raw': pdf, 'mimetype': 'application/pdf',
+                    'res_model': 'hr.payslip', 'res_id': slip.id,
+                })
+            except Exception:
+                _logger.exception("[payroll_fix_recon] could not refresh the PDF preview for slip %s", slip.id)
 
     @api.onchange('employee_id', 'struct_id')
     def _onchange_termination_clearance(self):
