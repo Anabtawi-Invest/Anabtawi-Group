@@ -10,7 +10,8 @@ from . import pfr_utils as U
 _logger = logging.getLogger(__name__)
 
 RECON_FIELDS = (
-    'attendance_gross_overtime', 'rest_days_taken', 'attendance_gross_undertime',
+    'attendance_gross_overtime', 'overtime_holiday_hours', 'overtime_regular_hours', 'overtime_rest_hours',
+    'rest_days_taken', 'attendance_gross_undertime',
     'attendance_net_reconciled', 'total_extra_hours_available', 'lateness_covered_by_extra_hours',
     'lateness_covered_by_annual_leave', 'remaining_extra_hours_balance', 'undertime_cash_deduction_hours',
 )
@@ -25,6 +26,15 @@ class HrPayslip(models.Model):
 
     attendance_gross_overtime = fields.Float(
         string="Monthly Overtime Earned", compute="_compute_attendance_reconciliation_fields", store=True)
+    overtime_holiday_hours = fields.Float(
+        string="Public Holiday Overtime (x1.5)", compute="_compute_attendance_reconciliation_fields", store=True,
+        help="Approved hours worked on public holidays, weighted x1.5. Part of Monthly Overtime Earned.")
+    overtime_regular_hours = fields.Float(
+        string="Regular Overtime (x1.25)", compute="_compute_attendance_reconciliation_fields", store=True,
+        help="Approved daily extra hours and extra worked days, weighted x1.25. Part of Monthly Overtime Earned.")
+    overtime_rest_hours = fields.Float(
+        string="Unused Rest Days Overtime", compute="_compute_attendance_reconciliation_fields", store=True,
+        help="Unused rest days of the monthly allowance, 8h x 1.5 each. Part of Monthly Overtime Earned.")
     rest_days_taken = fields.Float(
         string="Rest Days Taken", compute="_compute_attendance_reconciliation_fields", store=True,
         help="Unworked days excluding public holidays and approved leave. Allowance is 4; each unused "
@@ -126,16 +136,27 @@ class HrPayslip(models.Model):
         days_in_month = calendar.monthrange(slip.date_to.year, slip.date_to.month)[1]
         day_rate = slip._pfr_wage() / float(days_in_month)
 
+        # Layout: days close at the calendar days of the period, hours close at days x 8
+        # (lateness lines carry 0 days; their hours are carved out of the attendance hours).
+        absent_days = float(L.count('ABSENT'))
+        covered_hours = (slip.lateness_covered_by_extra_hours or 0.0) + (slip.lateness_covered_by_annual_leave or 0.0)
+        # hours reconciled from Extra Hours / Annual Leave become paid leave, in whole 8h days only
+        reconciled_days = min(float(int(covered_hours / U.DAILY_HOURS + 1e-9)), absent_days)
+        punch_lateness = max(0.0, (slip.attendance_gross_undertime or 0.0) - L.absent_hours)
+
         # (kind, days, hours)
         rows = []
-        we_only = len([d for d in L.dates('WORK') if d not in L.physical_dates])
-        rows.append(('WORK', L.base_attendance_days,
-                     L.regular_net_hours + U.DAILY_HOURS * (L.count('REST') + L.count('PH') + we_only)))
-        rows.append(('PHD', float(L.count('PHD')), L.holiday_net_hours * U.PH_RATE))
+        # public holidays (worked or not) are paid on their own line, never inside Attendance
+        attendance_days = float(L.count('WORK') + L.count('REST')) + reconciled_days
+        rows.append(('WORK', attendance_days, max(0.0, attendance_days * U.DAILY_HOURS - punch_lateness)))
+        phd_days = float(L.count('PHD') + L.count('PH'))
+        rows.append(('PHD', phd_days, phd_days * U.DAILY_HOURS))
         for bucket in sorted({b for b in L.days.values() if b not in ('OUT', 'PHD', 'WORK', 'PH', 'REST', 'ABSENT')},
                              key=lambda b: (LINE_SEQUENCE.get(b, 12), str(b))):
-            rows.append((bucket, float(L.count(bucket)), L.entry_hours.get(bucket, 0.0)))
-        rows.append(('ABSENT', float(L.count('ABSENT')), L.absent_hours))
+            bucket_days = float(L.count(bucket))
+            rows.append((bucket, bucket_days, bucket_days * U.DAILY_HOURS))
+        remaining_absent = absent_days - reconciled_days
+        rows.append(('ABSENT', remaining_absent, remaining_absent * U.DAILY_HOURS))
         rows.append(('OUT', float(L.count('OUT')), L.count('OUT') * U.DAILY_HOURS))
 
         lines = []
@@ -154,13 +175,12 @@ class HrPayslip(models.Model):
                 'number_of_hours': round(hours, 2),
                 'amount': 0.0 if kind == 'OUT' else round(days * wet._pfr_pay_factor() * day_rate, 3),
             })
-        cash_hrs = slip.undertime_cash_deduction_hours
-        if cash_hrs >= 0.01:                                  # informational: step 3 leftover
+        if punch_lateness >= 0.01:                            # punch lateness only; absent hours stay on Absent
             wet = slip._pfr_line_type(L, 'LATENESS')
             lines.append({
                 'name': 'Lateness / Undertime Deduction', 'sequence': LINE_SEQUENCE['LATENESS'],
-                'work_entry_type_id': wet.id, 'number_of_days': 0.0, 'number_of_hours': round(cash_hrs, 2),
-                'amount': round(cash_hrs * slip._pfr_wage() / U.HOURLY_DIVISOR, 3),
+                'work_entry_type_id': wet.id, 'number_of_days': 0.0, 'number_of_hours': round(punch_lateness, 2),
+                'amount': round(punch_lateness * slip._pfr_wage() / U.HOURLY_DIVISOR, 3),
             })
         return lines
 
@@ -209,7 +229,35 @@ class HrPayslip(models.Model):
                 slip.worked_days_line_ids = [(5, 0, 0)] + [(0, 0, v) for v in slip._get_worked_day_lines()]
         res = super().compute_sheet()
         slips.with_context(skip_reconcile_revert=True).write({'is_reconciled': True})
+        slips._pfr_reset_preview()
         return res
+
+    def _pfr_reset_preview(self):
+        """The side preview (o_attachment_preview) shows the PDF attachment saved on the payslip.
+        On draft slips drop the stale PDF and, for a handful of slips, render a fresh one so the
+        preview matches the new lines. Bulk runs only drop it (rendering is one wkhtmltopdf per slip)."""
+        drafts = self.filtered(lambda s: s.id and s.state in ('draft', 'verify'))
+        if not drafts:
+            return
+        Attachment = self.env['ir.attachment'].sudo()
+        stale = Attachment.search([('res_model', '=', 'hr.payslip'), ('res_id', 'in', drafts.ids),
+                                   ('mimetype', '=', 'application/pdf'), ('res_field', '=', False)])
+        stale.unlink()
+        if len(drafts) > 5:
+            return
+        for slip in drafts:
+            try:
+                report = slip.struct_id.report_id if 'report_id' in slip.struct_id._fields else False
+                report = report or self.env.ref('hr_payroll.action_report_payslip', raise_if_not_found=False)
+                if not report:
+                    continue
+                pdf, _fmt = report.sudo()._render_qweb_pdf(report.report_name, slip.ids)
+                Attachment.create({
+                    'name': f"{slip.name or 'Payslip'}.pdf", 'raw': pdf, 'mimetype': 'application/pdf',
+                    'res_model': 'hr.payslip', 'res_id': slip.id,
+                })
+            except Exception:
+                _logger.exception("[payroll_fix_recon] could not refresh the PDF preview for slip %s", slip.id)
 
     @api.onchange('employee_id', 'struct_id')
     def _onchange_termination_clearance(self):

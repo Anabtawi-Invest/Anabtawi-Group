@@ -105,21 +105,26 @@ class PfrSettlement(models.AbstractModel):
             by_date[d].append(att)
 
         total = 0.0
+        ph_total = reg_total = rest_total = 0.0             # breakdown: holiday x1.5 / regular x1.25 / rest days
         for d, atts in by_date.items():
             line_ot = approved.get((emp.id, d), 0.0)
             if not (line_ot > 0 or any(a.overtime_status == 'approved' or a.validated_overtime_hours > 0
                                        for a in atts)):
                 continue                                    # unapproved extra hours never reach the payslip
             if d in L.holiday_dates or any(a.is_public_holiday for a in atts):
-                total += sum(a.net_worked_hours or a.worked_hours for a in atts) * U.PH_RATE
+                ph_hours = sum(a.net_worked_hours or a.worked_hours for a in atts) * U.PH_RATE
+                total += ph_hours
+                ph_total += ph_hours
             elif line_ot > 0:
                 total += line_ot * U.OT_RATE
+                reg_total += line_ot * U.OT_RATE
             else:
                 day_ot = sum(a.validated_overtime_hours or a.daily_overtime_hours for a in atts
                              if a.overtime_status == 'approved' or a.validated_overtime_hours > 0
                              or a.daily_overtime_hours >= U.OT_MIN_HOURS)
                 if day_ot >= U.OT_MIN_HOURS:
                     total += day_ot * U.OT_RATE
+                    reg_total += day_ot * U.OT_RATE
 
         # worked more regular days than the monthly target (full periods only)
         active = L.active_days
@@ -128,7 +133,9 @@ class PfrSettlement(models.AbstractModel):
             extra_days = len(regular_days) - (active - active // 7)
             if extra_days > 0:
                 approved_days = sum(1 for d in L.physical_dates if approved.get((emp.id, d), 0) > 0)
-                total += min(extra_days, approved_days) * U.DAILY_HOURS * U.OT_RATE
+                extra_day_hours = min(extra_days, approved_days) * U.DAILY_HOURS * U.OT_RATE
+                total += extra_day_hours
+                reg_total += extra_day_hours
 
         # earned rest days that were worked instead of taken
         total_days = (slip.date_to - slip.date_from).days + 1
@@ -137,9 +144,10 @@ class PfrSettlement(models.AbstractModel):
             off = sum(1 for d in U.daterange(slip.date_from, slip.date_to)
                       if d not in L.physical_dates and (d in L.leave_calendar_dates or d in L.holiday_dates))
             rest_taken = max(0, total_days - worked - off)
-            total += max(0, U.MONTHLY_REST_ALLOWANCE - rest_taken) * U.REST_DAY_OT_HOURS
-            return total, float(rest_taken)
-        return total, 0.0
+            rest_total = max(0, U.MONTHLY_REST_ALLOWANCE - rest_taken) * U.REST_DAY_OT_HOURS
+            total += rest_total
+            return total, float(rest_taken), (ph_total, reg_total, rest_total)
+        return total, 0.0, (ph_total, reg_total, rest_total)
 
     # ------------------------------------------------------------------
     # Settlement
@@ -152,9 +160,10 @@ class PfrSettlement(models.AbstractModel):
         exempt = emp.is_manager_exempt()
 
         gross_ot, rest_taken, punch = 0.0, 0.0, 0.0
+        ot_parts = (0.0, 0.0, 0.0)
         if not exempt:                                       # managers: no hourly lateness / overtime
             if getattr(company, 'enable_overtime_calculation', True):
-                gross_ot, rest_taken = self.overtime_hours(slip, L, pre)
+                gross_ot, rest_taken, ot_parts = self.overtime_hours(slip, L, pre)
             punch = sum(a.daily_undertime_hours for d, a in L.attendances
                         if not a.is_public_holiday and d in L.days and L.days[d] != 'OUT')
         gross_ot = round(gross_ot, 2)
@@ -179,6 +188,9 @@ class PfrSettlement(models.AbstractModel):
             remaining = round(remaining - covered_annual, 2)
         return {
             'attendance_gross_overtime': gross_ot,
+            'overtime_holiday_hours': round(ot_parts[0], 2),
+            'overtime_regular_hours': round(ot_parts[1], 2),
+            'overtime_rest_hours': round(ot_parts[2], 2),
             'rest_days_taken': rest_taken,
             'attendance_gross_undertime': gross_ut,
             'attendance_net_reconciled': round(gross_ot - gross_ut, 2),

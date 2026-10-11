@@ -10,6 +10,9 @@
                     <group string="Gross Attendance Totals">
                         <field name="rest_days_taken" readonly="1"/>
                         <field name="attendance_gross_overtime" widget="float_time" readonly="1"/>
+                        <field name="overtime_holiday_hours" widget="float_time" readonly="1"/>
+                        <field name="overtime_regular_hours" widget="float_time" readonly="1"/>
+                        <field name="overtime_rest_hours" widget="float_time" readonly="1"/>
                         <field name="attendance_gross_undertime" widget="float_time" readonly="1"/>
                         <field name="total_extra_hours_available" widget="float_time" readonly="1"/>
                         <field name="remaining_extra_hours_balance" widget="float_time" readonly="1"/>

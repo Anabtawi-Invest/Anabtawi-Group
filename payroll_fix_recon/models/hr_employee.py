@@ -18,7 +18,11 @@ class HrEmployee(models.Model):
     allow_annual_leave_lateness_deduction = fields.Boolean(
         string="Accept Annual Deduction", default=True, tracking=True,
         help="Allow lateness to be settled from the Annual Leave balance (step 2).")
-    annual_deduction_approval_document = fields.Binary(string="Approval Document", attachment=True)
+    pfr_attendance_exempt = fields.Boolean(
+        string="Exempt from Attendance", tracking=True,
+        help="The employee does not check in/out: no absent entries, no lateness, no overtime. "
+             "Every unpunched day inside the contract is paid.")
+    annual_deduction_approval_document =fields.Binary(string="Approval Document", attachment=True)
     annual_deduction_approval_filename = fields.Char(string="Approval Document Filename")
 
     @api.onchange('employee_work_station')
@@ -33,8 +37,10 @@ class HrEmployee(models.Model):
         return 0.5 if self.employee_work_station == 'headoffice' else 1.0
 
     def is_manager_exempt(self):
-        """Managers are exempt from hourly lateness/overtime (not from full-day absence)."""
+        """Exempt from hourly lateness/overtime: managers, and employees who do not punch at all."""
         self.ensure_one()
+        if self.pfr_attendance_exempt:
+            return True
         return any(f in self._fields and getattr(self, f) for f in ('x_studio_manager', 'is_manager', 'x_manager'))
 
     def _pfr_tz(self):
