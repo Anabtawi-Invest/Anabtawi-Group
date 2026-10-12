@@ -231,6 +231,7 @@ class HrPayslip(models.Model):
                 slip.worked_days_line_ids = [(5, 0, 0)] + [(0, 0, v) for v in slip._get_worked_day_lines()]
         res = super().compute_sheet()
         slips.with_context(skip_reconcile_revert=True).write({'is_reconciled': True})
+        slips.mapped('worked_days_line_ids')._pfr_apply_amount()     # daily-wage calendar amounts
         slips._pfr_reset_preview()
         return res
 
