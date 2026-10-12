@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "POS Local SQL Backup - Advance Orders",
-    "version": "19.0.1.1.0",
+    "version": "19.0.1.1.1",
     "category": "Point of Sale",
     "summary": "Copy advance orders and pledge returns to the cashier PC backup",
     "description": """

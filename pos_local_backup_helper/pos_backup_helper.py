@@ -473,6 +473,8 @@ CASH_MOVE_TYPES = {
     "cash_delivery": "Cash delivery",
     "closing_delivery": "Closing delivery",
 }
+# Tables whose rows carry session_id / session_name.
+SESSION_TABLES = ("pos_order", "pos_advance", "pos_pledge_return", "pos_cash_move", "pos_cake")
 CAKE_STATE_LABELS = {"waiting_payment": "Waiting for payment", "in_order": "In a POS order", "paid": "Paid"}
 
 # A cake counts as paid once the POS order that carries it is paid.
@@ -633,6 +635,7 @@ class BackupDB:
     def __init__(self, path, password, allow_unencrypted=False):
         self.path = path
         self.lock = threading.RLock()
+        self.session_names = {}
         self.encrypted = sqlcipher is not None
         if self.encrypted:
             self.conn = sqlcipher.connect(path, check_same_thread=False)
@@ -690,6 +693,43 @@ class BackupDB:
         log_method = _logger.warning if level in ("warning", "error") else _logger.info
         log_method("[%s] %s %s", event, order_ref or order_uuid or "", message)
 
+    # -- session names ---------------------------------------------------------
+
+    def _session_name(self, session_id, name):
+        """
+        Odoo calls a session "/" until its opening cash is confirmed, and an open POS
+        page keeps that name. Returns the real name when known, and gives it to the
+        records already stored as "/" once it arrives.
+        """
+        session_id = _integer(session_id)
+        if session_id is None:
+            return name
+        if not name or name == "/":
+            known = self.session_names.get(session_id)
+            if known is None:
+                row = self.conn.execute(
+                    "SELECT session_name FROM pos_order WHERE session_id = ? "
+                    "AND session_name IS NOT NULL AND session_name NOT IN ('', '/') LIMIT 1",
+                    (session_id,),
+                ).fetchone()
+                known = row[0] if row else ""
+                if known:
+                    self.session_names[session_id] = known
+            return known or name
+        if self.session_names.get(session_id) != name:
+            self.session_names[session_id] = name
+            fixed = 0
+            for table in SESSION_TABLES:
+                fixed += self.conn.execute(
+                    f"UPDATE {table} SET session_name = ? WHERE session_id = ? "
+                    "AND (session_name IS NULL OR session_name IN ('', '/'))",
+                    (name, session_id),
+                ).rowcount
+            if fixed:
+                self.log("info", "session_named", f"{fixed} record(s) saved as '/' now show session {name}",
+                         commit=False)
+        return name
+
     # -- orders --------------------------------------------------------------
 
     def upsert_orders(self, orders):
@@ -718,6 +758,7 @@ class BackupDB:
         ref = order.get("pos_reference") or order.get("name") or uuid
         server_id = order.get("server_id") or None
         values = {col: order.get(col) for col in ORDER_COLUMNS}
+        values["session_name"] = self._session_name(values["session_id"], values["session_name"])
         values["synced_to_server"] = 1 if server_id else 0
         values["server_id"] = server_id
         values["payload_json"] = json.dumps(order.get("payload"), ensure_ascii=False, default=str)
@@ -847,6 +888,8 @@ class BackupDB:
                 except (ValueError, TypeError, AttributeError, *DB_ERRORS) as error:
                     self.conn.execute("ROLLBACK TO pos_event")
                     self.conn.execute("RELEASE pos_event")
+                    # A session rename done inside the rolled back event must be redone later.
+                    self.session_names.clear()
                     result["errors"] += 1
                     action = event.get("action") if isinstance(event, dict) else None
                     self.log("error", "event_rejected", f"{action or 'event'}: {error}", commit=False)
@@ -885,6 +928,7 @@ class BackupDB:
         if handler is None:
             raise ValueError(f"unknown event action {action!r}")
         event["action"] = action
+        event["session_name"] = self._session_name(event.get("session_id"), event.get("session_name"))
         # The POS retries until it gets an answer, so the same event may arrive twice.
         if self.conn.execute("SELECT 1 FROM pos_event WHERE event_uuid = ?", (event_uuid,)).fetchone():
             return False

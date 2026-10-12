@@ -1,15 +1,11 @@
 /** @odoo-module **/
 
 import { patch } from "@web/core/utils/patch";
-import { ORM } from "@web/core/orm_plugin";
 import { PosStore } from "@point_of_sale/app/services/pos_store";
 import { PledgeListPopup } from "@pos_pledge_order/js/pledge_list_popup";
 
 const PLEDGE_MODEL = "pos.advance.order.pledge";
 const RETURN_METHOD = "action_return_pledges";
-
-// The ORM has no access to the POS, so the running POS registers itself here.
-let activePosStore = null;
 
 function toNumber(value, fallback = 0) {
     const num = Number(value);
@@ -29,8 +25,51 @@ function refundOrdersFromResult(result) {
 patch(PosStore.prototype, {
     async afterProcessServerData() {
         const result = await super.afterProcessServerData(...arguments);
-        activePosStore = this;
+        this.watchPledgeReturns();
         return result;
+    },
+
+    /**
+     * The Return Pledge button calls the ORM service directly. Its class lives in a
+     * different file depending on the Odoo version, so the service object is
+     * wrapped here instead of patching the class.
+     */
+    watchPledgeReturns() {
+        const orm = this.env?.services?.orm;
+        if (!orm || orm.localBackupPledgeWatch) {
+            return;
+        }
+        const store = this;
+        const originalCall = orm.call;
+        orm.call = function (model, method, args = []) {
+            const promise = originalCall.apply(this, arguments);
+            if (model === PLEDGE_MODEL && method === RETURN_METHOD && store.isLocalBackupEnabled) {
+                store.observePledgeReturn(Array.isArray(args[0]) ? args[0] : [], promise);
+            }
+            return promise;
+        };
+        orm.localBackupPledgeWatch = true;
+    },
+
+    // Observe only: the caller still receives the original promise and its error.
+    observePledgeReturn(pledgeIds, promise) {
+        const selection = this.takePledgeReturnSelection(pledgeIds);
+        Promise.resolve(promise).then(
+            (result) => {
+                try {
+                    this.recordLocalBackupPledgeReturn(selection, result);
+                } catch (error) {
+                    console.warn("[LOCAL_BACKUP] Could not record the pledge return:", error);
+                }
+            },
+            (error) => {
+                try {
+                    this.recordLocalBackupPledgeReturnFailure(selection, error);
+                } catch (recordError) {
+                    console.warn("[LOCAL_BACKUP] Could not record the failed pledge return:", recordError);
+                }
+            }
+        );
     },
 
     rememberPledgeReturnSelection(selection) {
@@ -108,35 +147,5 @@ patch(PledgeListPopup.prototype, {
             });
         }
         return super.confirmReturn(...arguments);
-    },
-});
-
-patch(ORM.prototype, {
-    call(model, method, args = []) {
-        const promise = super.call(...arguments);
-        const store = activePosStore;
-        if (model !== PLEDGE_MODEL || method !== RETURN_METHOD || !store?.isLocalBackupEnabled) {
-            return promise;
-        }
-        const pledgeIds = Array.isArray(args[0]) ? args[0] : [];
-        const selection = store.takePledgeReturnSelection(pledgeIds);
-        // Observe only: the caller still receives the original promise and its error.
-        promise.then(
-            (result) => {
-                try {
-                    store.recordLocalBackupPledgeReturn(selection, result);
-                } catch (error) {
-                    console.warn("[LOCAL_BACKUP] Could not record the pledge return:", error);
-                }
-            },
-            (error) => {
-                try {
-                    store.recordLocalBackupPledgeReturnFailure(selection, error);
-                } catch (recordError) {
-                    console.warn("[LOCAL_BACKUP] Could not record the failed pledge return:", recordError);
-                }
-            }
-        );
-        return promise;
     },
 });

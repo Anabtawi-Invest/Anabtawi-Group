@@ -103,6 +103,16 @@ function cashMovesObserver({ store, model, method, args, result, error }) {
 
 localBackupCallObservers.push(cashMovesObserver);
 
+// Odoo names a new session "/" and renames it when the opening cash is confirmed,
+// without telling the open POS page.
+function sessionNameObserver({ store, model, method, result, error }) {
+    if (model === "pos.session" && method === "set_opening_control" && !error && result !== undefined) {
+        store.refreshLocalBackupSessionName();
+    }
+}
+
+localBackupCallObservers.push(sessionNameObserver);
+
 patch(PosData.prototype, {
     async call(model, method, args = []) {
         let result;
@@ -168,6 +178,7 @@ patch(PosStore.prototype, {
             eventsFlushing: false,
             cashMovesSignature: null,
             lastCashMovesSync: 0,
+            sessionName: null,
         };
         activeStore = this;
         this.checkLocalBackupHealth();
@@ -228,6 +239,37 @@ patch(PosStore.prototype, {
         }
     },
 
+    // -- session name ------------------------------------------------------------
+
+    get localBackupSessionName() {
+        return this.localBackup?.sessionName || this.session?.name || "";
+    },
+
+    localBackupSessionNameOf(session) {
+        return session?.id === this.session?.id ? this.localBackupSessionName : session?.name || "";
+    },
+
+    async refreshLocalBackupSessionName() {
+        const state = this.localBackup;
+        if (!state || !this.session?.id || this.session.state === "opening_control") {
+            return;
+        }
+        let records;
+        try {
+            records = await this.data.orm.read("pos.session", [this.session.id], ["name"]);
+        } catch {
+            return;
+        }
+        const name = records?.[0]?.name;
+        if (!name || name === "/" || name === state.sessionName) {
+            return;
+        }
+        state.sessionName = name;
+        // Send the orders again so they carry the real name.
+        state.signatures.clear();
+        console.info(`[LOCAL_BACKUP] session name is now ${name}`);
+    },
+
     // -- events (actions done on the server: advances, cakes, cash moves...) --
 
     get localBackupEventsKey() {
@@ -266,7 +308,7 @@ patch(PosStore.prototype, {
             config_id: this.config.id,
             config_name: this.config.name,
             session_id: this.session?.id || null,
-            session_name: this.session?.name || "",
+            session_name: this.localBackupSessionName,
             cashier: this.getCashier?.()?.name || this.user?.name || "",
             ...data,
         };
@@ -356,7 +398,9 @@ patch(PosStore.prototype, {
             config_id: this.config.id,
             config_name: this.config.name,
             session_id: order.session_id?.id || this.session?.id,
-            session_name: order.session_id?.name || this.session?.name,
+            session_name: order.session_id
+                ? this.localBackupSessionNameOf(order.session_id)
+                : this.localBackupSessionName,
             date_order: formatLocalDate(order.date_order),
             partner_id: order.partner_id?.id || null,
             partner_name: order.partner_id?.name || "",
@@ -437,6 +481,9 @@ patch(PosStore.prototype, {
         }
         await this.flushLocalBackupEvents();
         if (Date.now() - state.lastCashMovesSync >= CASH_MOVES_SYNC_MS) {
+            if (!state.sessionName && (this.session?.name || "/") === "/") {
+                await this.refreshLocalBackupSessionName();
+            }
             this.syncLocalBackupCashMoves();
         }
     },
