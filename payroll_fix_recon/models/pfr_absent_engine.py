@@ -72,11 +72,17 @@ class HrEmployee(models.Model):
         absent_type = self[:1]._pfr_get_absent_type()
 
         checkins = defaultdict(set)            # emp -> local dates with a check-in
+        after_night = defaultdict(set)         # emp -> days on which an overnight shift ended
         for att in self.env['hr.attendance'].sudo().search([
                 ('employee_id', 'in', self.ids), ('check_in', '>=', lo), ('check_in', '<=', hi)]):
-            d = U.local_date(att.check_in, att.employee_id._pfr_tz())
+            tz = att.employee_id._pfr_tz()
+            d = U.local_date(att.check_in, tz)
             if date_from <= d <= date_to:
                 checkins[att.employee_id.id].add(d)
+            if att.check_out:
+                d_out = U.local_date(att.check_out, tz)
+                if d_out > d:                  # shift crosses midnight: it belongs to the check-in day
+                    after_night[att.employee_id.id].update(U.daterange(d + timedelta(days=1), d_out))
 
         leave_days = self._pfr_sync_leave_entries(date_from, date_to)   # emp -> dates
 
@@ -91,9 +97,9 @@ class HrEmployee(models.Model):
         for m_from, m_to in U.split_months(date_from, date_to):
             for emp in self:
                 emp._pfr_apply_month(m_from, m_to, absent_type, holiday_map, checkins[emp.id],
-                                     leave_days[emp.id] | covered[emp.id])
+                                     leave_days[emp.id] | covered[emp.id], after_night[emp.id])
 
-    def _pfr_apply_month(self, m_from, m_to, absent_type, holiday_map, checkins, blocked):
+    def _pfr_apply_month(self, m_from, m_to, absent_type, holiday_map, checkins, blocked, after_night=()):
         self.ensure_one()
         c_start, c_end = self._pfr_contract_window(m_from, m_to)
         holidays = self.env['pfr.day.ledger'].holidays_for(holiday_map, self.resource_calendar_id)
@@ -113,15 +119,18 @@ class HrEmployee(models.Model):
                 candidates.append(d)
 
         rest_days = self._pfr_pick_rest_days(candidates, len([d for d in checkins if m_from <= d <= m_to]),
-                                             eff_from, eff_to)
+                                             eff_from, eff_to, after_night)
         for d in candidates:
             if d in rest_days:
                 self._pfr_remove_absence(d, absent_type)
             else:
                 self._pfr_apply_absence(d, self._pfr_expected_hours(d), absent_type)
 
-    def _pfr_pick_rest_days(self, candidates, month_checkins, eff_from, eff_to):
-        """Candidate days that stay empty (earned rest days)."""
+    def _pfr_pick_rest_days(self, candidates, month_checkins, eff_from, eff_to, after_night=()):
+        """Candidate days that stay empty (earned rest days).
+        The quota (number of Fridays / Mondays, capped by check-ins // 6) only sets HOW MANY rest days there are;
+        any unpunched day may be taken. Days after an overnight shift are taken first, then the target
+        weekday, then the rest. Candidates beyond the quota stay absent."""
         station = self.employee_work_station or 'factory'
         if self._pfr_is_fixed_schedule():
             cal = self.resource_calendar_id
@@ -132,8 +141,10 @@ class HrEmployee(models.Model):
         target = 0 if station == 'factory' else 4                    # Monday / Friday
         cap = sum(1 for d in U.daterange(eff_from, eff_to) if d.weekday() == target)
         earned = min(cap, month_checkins // U.REST_CYCLE_DAYS)
-        picked = [d for d in candidates if d.weekday() == target][:earned]
-        if len(picked) < earned:                                      # worked rest day -> any free day
+        picked = [d for d in candidates if d in after_night][:earned]          # day after a night shift
+        if len(picked) < earned:                                              # then the target weekday
+            picked += [d for d in candidates if d.weekday() == target and d not in picked][:earned - len(picked)]
+        if len(picked) < earned:                                              # then any other free day
             picked += [d for d in candidates if d not in picked][:earned - len(picked)]
         return set(picked)
 
