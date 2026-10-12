@@ -159,7 +159,9 @@
                 <t t-set="pto_days" t-value="pto_input[0].quantity if pto_input and 'quantity' in pto_input._fields else 0.0"/>
                 <t t-set="extra_hrs" t-value="extra_input[0].quantity if extra_input and 'quantity' in extra_input._fields else (o.employee_extra_hours_balance if 'employee_extra_hours_balance' in o._fields else 0.0)"/>
                 <t t-set="unpaid" t-value="o.worked_days_line_ids.filtered(lambda d: d.work_entry_type_id.code in cfg['unpaid_codes'] or 'unpaid' in (d.work_entry_type_id.code or '').lower() or 'unpaid' in (d.name or '').lower() or 'absent' in (d.work_entry_type_id.code or '').lower() or 'absent' in (d.name or '').lower())"/>
-                <t t-set="worked" t-value="o.worked_days_line_ids.filtered(lambda d: d.work_entry_type_id.code in cfg['worked_codes'] or (d.id not in unpaid.ids and d.work_entry_type_id.code not in cfg['unpaid_codes']))"/>
+                <t t-set="lateness" t-value="o.worked_days_line_ids.filtered(lambda d: d.work_entry_type_id.code in ('LAT', 'LATENESS', 'DED_UNDERTIME') or 'late' in (d.work_entry_type_id.code or '').lower() or 'late' in (d.name or '').lower() or 'undertime' in (d.work_entry_type_id.code or '').lower() or 'undertime' in (d.name or '').lower())"/>
+                <t t-set="deduction_worked_lines" t-value="unpaid | lateness"/>
+                <t t-set="worked" t-value="o.worked_days_line_ids.filtered(lambda d: d.id not in deduction_worked_lines.ids and d.work_entry_type_id.code not in cfg['unpaid_codes'] and d.work_entry_type_id.code not in ('LAT', 'LATENESS', 'DED_UNDERTIME'))"/>
                 <t t-set="rows" t-value="max(cfg['minimum_rows'], len(allowances), len(deductions))"/>
                 <t t-set="ref_date" t-value="o.date_to or o.date_from"/>
                 <t t-set="month_total_days" t-value="((29 if (ref_date.year % 4 == 0 and (ref_date.year % 100 != 0 or ref_date.year % 400 == 0)) else 28) if ref_date.month == 2 else (30 if ref_date.month in (4, 6, 9, 11) else 31)) if ref_date else 30.0"/>
@@ -167,12 +169,12 @@
                 <t t-set="worked_days_count" t-value="sum(worked.mapped('number_of_days')) if worked else 0.0"/>
                 <t t-set="actual_days" t-value="worked_days_count"/>
                 <t t-set="unpaid_days_from_worked" t-value="sum(unpaid.mapped('number_of_days')) if unpaid else 0.0"/>
-                <t t-set="unpaid_days_count" t-value="unpaid_days_from_worked if unpaid_days_from_worked &gt; 0 else max(0.0, basic_days - worked_days_count)"/>
+                <t t-set="unpaid_days_count" t-value="unpaid_days_from_worked"/>
                 <t t-set="unpaid_days" t-value="unpaid_days_count"/>
                 <t t-set="worked_lines_amount" t-value="sum(worked.mapped('amount')) if worked else 0.0"/>
-                <t t-set="unpaid_lines_amount" t-value="sum(unpaid.mapped('amount')) if unpaid else 0.0"/>
-                <t t-set="actual_amount" t-value="actual.total if actual else (worked_lines_amount if worked_lines_amount &gt; 0 else basic_amount)"/>
-                <t t-set="unpaid_amount" t-value="cfg['deduction_sign'] * sum(time_deductions.mapped('total')) if time_deductions else (unpaid_lines_amount if unpaid_lines_amount &gt; 0 else max(0.0, (basic_amount or 0.0) - (actual_amount or 0.0)))"/>
+                <t t-set="deduction_worked_amount" t-value="sum(deduction_worked_lines.mapped('amount')) if deduction_worked_lines else 0.0"/>
+                <t t-set="actual_amount" t-value="actual.total if actual else (basic_amount - deduction_worked_amount if (basic_amount and deduction_worked_amount) else (worked_lines_amount if worked_lines_amount &gt; 0 else basic_amount))"/>
+                <t t-set="unpaid_amount" t-value="deduction_worked_amount if deduction_worked_amount &gt; 0 else (cfg['deduction_sign'] * sum(time_deductions.mapped('total')) if time_deductions else max(0.0, (basic_amount or 0.0) - (actual_amount or 0.0)))"/>
                 <style>
                     .cpr { font-family: 'DejaVu Sans', Arial, sans-serif; font-size: 10px; color: #151515; }
                     .cpr table { width: 100%; border-collapse: collapse; table-layout: fixed; direction: ltr; }
