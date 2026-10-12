@@ -136,13 +136,16 @@ class HrPayslip(models.Model):
         days_in_month = calendar.monthrange(slip.date_to.year, slip.date_to.month)[1]
         day_rate = slip._pfr_wage() / float(days_in_month)
 
-        # Layout: days close at the calendar days of the period, hours close at days x 8
-        # (lateness lines carry 0 days; their hours are carved out of the attendance hours).
+        # Layout: days close at the calendar days of the period, hours close at days x 8.
+        # The table is derived from the CASH deduction (what is really taken from the salary), so that
+        #     Absent hours + Lateness hours == Attendance Deduction hours.
+        # Everything that Extra Hours / Annual Leave already settled is paid time and sits in Attendance.
         absent_days = float(L.count('ABSENT'))
-        covered_hours = (slip.lateness_covered_by_extra_hours or 0.0) + (slip.lateness_covered_by_annual_leave or 0.0)
-        # hours reconciled from Extra Hours / Annual Leave become paid leave, in whole 8h days only
-        reconciled_days = min(float(int(covered_hours / U.DAILY_HOURS + 1e-9)), absent_days)
-        punch_lateness = max(0.0, (slip.attendance_gross_undertime or 0.0) - L.absent_hours)
+        cash_hours = max(0.0, slip.undertime_cash_deduction_hours or 0.0)
+        # whole 8h days of the cash remain Absent days; the rest (< 8h) stays as lateness hours
+        absent_shown = min(absent_days, float(int(cash_hours / U.DAILY_HOURS + 1e-9)))
+        punch_lateness = max(0.0, cash_hours - absent_shown * U.DAILY_HOURS)
+        reconciled_days = absent_days - absent_shown        # absent days settled by Extra Hours / Annual Leave
 
         # (kind, days, hours)
         rows = []
@@ -155,8 +158,7 @@ class HrPayslip(models.Model):
                              key=lambda b: (LINE_SEQUENCE.get(b, 12), str(b))):
             bucket_days = float(L.count(bucket))
             rows.append((bucket, bucket_days, bucket_days * U.DAILY_HOURS))
-        remaining_absent = absent_days - reconciled_days
-        rows.append(('ABSENT', remaining_absent, remaining_absent * U.DAILY_HOURS))
+        rows.append(('ABSENT', absent_shown, absent_shown * U.DAILY_HOURS))
         rows.append(('OUT', float(L.count('OUT')), L.count('OUT') * U.DAILY_HOURS))
 
         lines = []
@@ -175,7 +177,7 @@ class HrPayslip(models.Model):
                 'number_of_hours': round(hours, 2),
                 'amount': 0.0 if kind == 'OUT' else round(days * wet._pfr_pay_factor() * day_rate, 3),
             })
-        if punch_lateness >= 0.01:                            # punch lateness only; absent hours stay on Absent
+        if punch_lateness >= 0.01:                            # cash hours that do not make a whole absent day
             wet = slip._pfr_line_type(L, 'LATENESS')
             lines.append({
                 'name': 'Lateness / Undertime Deduction', 'sequence': LINE_SEQUENCE['LATENESS'],

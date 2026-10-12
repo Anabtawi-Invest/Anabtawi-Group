@@ -22,7 +22,7 @@ RULES = [
             "# lateness + absent hours NOT covered by Extra Hours / Annual Leave (step 3)\n"
             "hours = round(payslip.undertime_cash_deduction_hours, 2)\n"
             "wage = employee.wage or 0.0\n"
-            "result = min(hours * wage / 240.0, wage) if hours >= 0.01 else 0.0\n"),
+            "result = round(min(hours * wage / 240.0, wage), 3) if hours >= 0.01 else 0.0\n"),
     },
     {
         'code': 'ACTUAL', 'name': 'Actual Salary', 'category': 'hr_payroll.NET',
