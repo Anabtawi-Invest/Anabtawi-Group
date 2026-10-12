@@ -141,10 +141,23 @@ class PfrSettlement(models.AbstractModel):
         total_days = (slip.date_to - slip.date_from).days + 1
         worked = len(L.physical_dates)
         if worked:
-            off = sum(1 for d in U.daterange(slip.date_from, slip.date_to)
-                      if d not in L.physical_dates and (d in L.leave_calendar_dates or d in L.holiday_dates))
-            rest_taken = max(0, total_days - worked - off)
-            rest_total = max(0, U.MONTHLY_REST_ALLOWANCE - rest_taken) * U.REST_DAY_OT_HOURS
+            if emp._pfr_is_fixed_schedule():
+                # fixed schedule (head office): flat monthly allowance, as before
+                off = sum(1 for d in U.daterange(slip.date_from, slip.date_to)
+                          if d not in L.physical_dates and (d in L.leave_calendar_dates or d in L.holiday_dates))
+                rest_taken = max(0, total_days - worked - off)
+                allowance = U.MONTHLY_REST_ALLOWANCE
+            else:
+                # flexible (factory Monday / retail Friday): the weekday only sets HOW MANY rest days were
+                # earned (never more than check-ins // 6); rest days actually taken are the unpunched days
+                # of the contract window that are not leave or public holidays.
+                target = 0 if (emp.employee_work_station or 'factory') == 'factory' else 4
+                cap = sum(1 for d in U.daterange(L.eff_from, L.eff_to) if d.weekday() == target)
+                allowance = min(cap, worked // U.REST_CYCLE_DAYS)
+                rest_taken = sum(1 for d in U.daterange(L.eff_from, L.eff_to)
+                                 if d not in L.physical_dates
+                                 and d not in L.leave_calendar_dates and d not in L.holiday_dates)
+            rest_total = max(0, allowance - rest_taken) * U.REST_DAY_OT_HOURS
             total += rest_total
             return total, float(rest_taken), (ph_total, reg_total, rest_total)
         return total, 0.0, (ph_total, reg_total, rest_total)
