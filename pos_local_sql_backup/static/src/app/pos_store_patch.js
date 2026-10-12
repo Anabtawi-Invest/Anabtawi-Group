@@ -2,15 +2,29 @@
 
 import { patch } from "@web/core/utils/patch";
 import { _t } from "@web/core/l10n/translation";
+import { uuidv4 } from "@point_of_sale/utils";
 import { PosStore } from "@point_of_sale/app/services/pos_store";
+import { PosData } from "@point_of_sale/app/services/data_service";
 
 const { DateTime } = luxon;
 
 const SCAN_INTERVAL_MS = 3000;
+const CASH_MOVES_SYNC_MS = 60000;
 const REQUEST_TIMEOUT_MS = 5000;
 const BATCH_SIZE = 50;
+// Oldest events are dropped beyond this, so a helper that never comes back cannot fill the browser storage.
+const MAX_QUEUED_EVENTS = 1000;
 
-function safe(getter, fallback = null) {
+/**
+ * Functions called after every POS server call (`pos.data.call`), with
+ * { store, model, method, args, result, error }. Bridge modules push their own
+ * observers here to record server-side actions the order scan cannot see.
+ */
+export const localBackupCallObservers = [];
+
+let activeStore = null;
+
+export function safe(getter, fallback = null) {
     try {
         const value = getter();
         return value === undefined ? fallback : value;
@@ -19,13 +33,102 @@ function safe(getter, fallback = null) {
     }
 }
 
-function formatLocalDate(value) {
+export function formatLocalDate(value) {
     if (!value) {
         return "";
     }
     const date =
         typeof value === "string" ? DateTime.fromSQL(value, { zone: "utc" }) : DateTime.fromISO(value.toISO?.());
     return date.isValid ? date.toLocal().toFormat("yyyy-MM-dd HH:mm:ss") : String(value);
+}
+
+export function serverErrorMessage(error) {
+    return error?.data?.arguments?.[0] || error?.data?.message || error?.message || String(error);
+}
+
+/**
+ * Some POS buttons call the server directly and only report errors as red
+ * notifications. Runs `callback` while collecting those messages from
+ * `component.notification`, and returns them with the callback result.
+ */
+export async function captureDangerNotifications(component, callback) {
+    const notification = component.notification;
+    const errors = [];
+    component.notification = {
+        ...notification,
+        add: (message, options = {}) => {
+            if (options.type === "danger") {
+                errors.push(String(message));
+            }
+            return notification.add(message, options);
+        },
+    };
+    try {
+        const result = await callback();
+        return { result, errors };
+    } finally {
+        component.notification = notification;
+    }
+}
+
+function cashMovesObserver({ store, model, method, args, result, error }) {
+    if (model !== "pos.session") {
+        return;
+    }
+    if (method === "try_cash_in_out") {
+        const [, type, amount, reason] = args;
+        if (error) {
+            store.recordLocalBackupEvent("cash_move_failed", {
+                move_type: type,
+                amount,
+                reason,
+                error: serverErrorMessage(error),
+            });
+            return;
+        }
+        // Offline, the POS queues the call for later and resolves it with undefined.
+        store.recordLocalBackupEvent("cash_move", {
+            move_type: type,
+            amount,
+            reason,
+            queued_offline: result === undefined,
+            result: result ?? null,
+        });
+        store.syncLocalBackupCashMoves();
+    } else if (method === "delete_cash_in_out" && !error) {
+        store.recordLocalBackupEvent("cash_move_deleted", { statement_line_id: args[1] });
+        store.syncLocalBackupCashMoves();
+    }
+}
+
+localBackupCallObservers.push(cashMovesObserver);
+
+patch(PosData.prototype, {
+    async call(model, method, args = []) {
+        let result;
+        try {
+            result = await super.call(...arguments);
+        } catch (error) {
+            notifyLocalBackupObservers({ model, method, args, error });
+            throw error;
+        }
+        notifyLocalBackupObservers({ model, method, args, result });
+        return result;
+    },
+});
+
+function notifyLocalBackupObservers(call) {
+    const store = activeStore;
+    if (!store?.localBackup) {
+        return;
+    }
+    for (const observer of localBackupCallObservers) {
+        try {
+            observer({ store, ...call });
+        } catch (error) {
+            console.warn("[LOCAL_BACKUP] Could not record a server action:", error);
+        }
+    }
 }
 
 patch(PosStore.prototype, {
@@ -62,7 +165,11 @@ patch(PosStore.prototype, {
             deletedQueue: [],
             running: false,
             available: true,
+            eventsFlushing: false,
+            cashMovesSignature: null,
+            lastCashMovesSync: 0,
         };
+        activeStore = this;
         this.checkLocalBackupHealth();
         this.localBackup.interval = setInterval(() => this.runLocalBackup(), SCAN_INTERVAL_MS);
     },
@@ -121,11 +228,120 @@ patch(PosStore.prototype, {
         }
     },
 
+    // -- events (actions done on the server: advances, cakes, cash moves...) --
+
+    get localBackupEventsKey() {
+        return `pos_local_backup_events_${odoo.info?.db || ""}_${this.config.id}`;
+    },
+
+    readLocalBackupEvents() {
+        try {
+            const queue = JSON.parse(localStorage.getItem(this.localBackupEventsKey) || "[]");
+            return Array.isArray(queue) ? queue : [];
+        } catch {
+            return [];
+        }
+    },
+
+    writeLocalBackupEvents(queue) {
+        try {
+            localStorage.setItem(this.localBackupEventsKey, JSON.stringify(queue.slice(-MAX_QUEUED_EVENTS)));
+        } catch (error) {
+            console.warn("[LOCAL_BACKUP] Cannot keep the event in the browser storage:", error);
+        }
+    },
+
+    /**
+     * Queue an event for the helper. Events survive a page reload and are sent
+     * in order as soon as the helper answers.
+     */
+    recordLocalBackupEvent(action, data = {}) {
+        if (!this.isLocalBackupEnabled) {
+            return;
+        }
+        const event = {
+            event_uuid: uuidv4(),
+            action,
+            ts: DateTime.now().toFormat("yyyy-MM-dd HH:mm:ss"),
+            config_id: this.config.id,
+            config_name: this.config.name,
+            session_id: this.session?.id || null,
+            session_name: this.session?.name || "",
+            cashier: this.getCashier?.()?.name || this.user?.name || "",
+            ...data,
+        };
+        this.writeLocalBackupEvents([...this.readLocalBackupEvents(), event]);
+        console.info(`[LOCAL_BACKUP] event ${action}`, event);
+        this.flushLocalBackupEvents();
+    },
+
+    async flushLocalBackupEvents() {
+        const state = this.localBackup;
+        if (!state || state.eventsFlushing) {
+            return;
+        }
+        const batch = this.readLocalBackupEvents().slice(0, BATCH_SIZE);
+        if (!batch.length) {
+            return;
+        }
+        state.eventsFlushing = true;
+        try {
+            const result = await this.localBackupRequest("/api/events", "POST", { events: batch });
+            const sent = new Set(batch.map((event) => event.event_uuid));
+            this.writeLocalBackupEvents(this.readLocalBackupEvents().filter((event) => !sent.has(event.event_uuid)));
+            if (result?.errors) {
+                console.warn(`[LOCAL_BACKUP] Helper rejected ${result.errors} event(s), see its logs screen.`);
+            }
+        } catch (error) {
+            if (state.available) {
+                console.warn(`[LOCAL_BACKUP] ${batch.length} event(s) waiting for the helper:`, error);
+            }
+        } finally {
+            state.eventsFlushing = false;
+        }
+    },
+
+    // -- cash moves ------------------------------------------------------------
+
+    /**
+     * The session's cash in/out list also contains moves added from the Odoo
+     * backend, so it is read regularly and sent when it changes.
+     */
+    async syncLocalBackupCashMoves() {
+        const state = this.localBackup;
+        if (!state || !this.session?.id) {
+            return;
+        }
+        state.lastCashMovesSync = Date.now();
+        let moves;
+        try {
+            moves = await this.data.orm.call("pos.session", "get_cash_in_out_list", [this.session.id]);
+        } catch {
+            return;
+        }
+        const normalized = (moves || []).map((move) => ({
+            id: move.id,
+            name: move.name || "",
+            amount: move.amount,
+            date: formatLocalDate(move.date),
+            cashier_name: move.cashier_name || "",
+        }));
+        const signature = JSON.stringify(normalized);
+        if (signature === state.cashMovesSignature) {
+            return;
+        }
+        state.cashMovesSignature = signature;
+        this.recordLocalBackupEvent("cash_moves_snapshot", { moves: normalized });
+    },
+
+    // -- orders ------------------------------------------------------------------
+
     getLocalBackupSignature(order) {
         return [
             order.id,
             order.state,
             order.partner_id?.id || "",
+            order.fiscal_position_id?.id || "",
             order.lines.map((l) => `${l.uuid}:${l.qty}:${l.price_unit}:${l.discount}`).join(","),
             order.payment_ids.map((p) => `${p.uuid}:${p.amount}`).join(","),
         ].join("|");
@@ -146,6 +362,7 @@ patch(PosStore.prototype, {
             partner_name: order.partner_id?.name || "",
             cashier: order.employee_id?.name || order.user_id?.name || "",
             state: order.state,
+            fiscal_position: order.fiscal_position_id?.display_name || order.fiscal_position_id?.name || "",
             amount_total: safe(() => order.priceIncl, order.amount_total),
             amount_tax: safe(() => order.amountTaxes, order.amount_tax),
             amount_paid: safe(() => order.amountPaid, order.amount_paid),
@@ -217,6 +434,10 @@ patch(PosStore.prototype, {
             this.setLocalBackupAvailable(false, error);
         } finally {
             state.running = false;
+        }
+        await this.flushLocalBackupEvents();
+        if (Date.now() - state.lastCashMovesSync >= CASH_MOVES_SYNC_MS) {
+            this.syncLocalBackupCashMoves();
         }
     },
 

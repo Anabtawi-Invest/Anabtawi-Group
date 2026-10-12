@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "POS Local SQL Backup",
-    "version": "19.0.1.0.0",
+    "version": "19.0.1.1.0",
     "category": "Point of Sale",
     "summary": "Copy every POS order to an encrypted SQLite database on the cashier PC",
     "description": """
