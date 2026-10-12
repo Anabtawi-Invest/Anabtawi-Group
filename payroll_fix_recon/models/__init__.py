@@ -9,4 +9,5 @@ from . import pfr_settlement
 from . import hr_payslip
 from . import hr_payslip_sync
 from . import hr_payslip_termination
+from . import hr_payslip_worked_days
 from . import hr_payroll_structure
