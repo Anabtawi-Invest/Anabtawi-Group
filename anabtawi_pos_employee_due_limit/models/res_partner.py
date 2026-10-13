@@ -14,10 +14,12 @@ class ResPartner(models.Model):
         employees = self.env["hr.employee"].sudo().search([("work_contact_id", "in", partners.ids)])
         return employees.filtered(lambda e: e.company_id == company)[:1] or employees[:1]
 
-    def _get_employee_due_limit_status(self, config, amount):
+    def _get_employee_due_limit_status(self, config, amount, exclude_order=None):
         """Check whether adding `amount` on Customer Account keeps the employee under his limit.
 
         Amounts are in the POS currency. Partners that are not employees are never blocked.
+        `exclude_order` is the order being checked when it is already saved as paid, so its
+        Customer Account payments are not counted twice in the current due.
         """
         self.ensure_one()
         status = {"blocked": False, "message": ""}
@@ -41,6 +43,12 @@ class ResPartner(models.Model):
         if employee_currency != currency:
             limit = employee_currency._convert(limit, currency, config.company_id, fields.Date.today())
         due = self.sudo().get_total_due(config.id)["res.partner"][0]["total_due"]
+        if exclude_order and exclude_order.state == "paid" and exclude_order.session_id.state != "closed":
+            due -= sum(
+                exclude_order.payment_ids.filtered(
+                    lambda p: p.payment_method_id.type == "pay_later"
+                ).mapped("amount")
+            )
         remaining = limit - due
 
         if float_compare(due + amount, limit, precision_rounding=currency.rounding) > 0:

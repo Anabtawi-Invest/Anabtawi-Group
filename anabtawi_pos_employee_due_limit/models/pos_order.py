@@ -8,7 +8,7 @@ class PosOrder(models.Model):
     _inherit = "pos.order"
 
     def _process_saved_order(self, draft):
-        if not draft and self.state == "draft":
+        if not draft and self.state != "cancel":
             self._check_employee_due_limit()
         return super()._process_saved_order(draft)
 
@@ -23,6 +23,8 @@ class PosOrder(models.Model):
         )
         if amount <= 0:
             return
-        status = self.partner_id._get_employee_due_limit_status(self.config_id, amount)
+        status = self.partner_id._get_employee_due_limit_status(
+            self.config_id, amount, exclude_order=self
+        )
         if status["blocked"]:
             raise UserError(status["message"])
