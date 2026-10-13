@@ -24,7 +24,7 @@ class ResCompany(models.Model):
     )
     employee_due_max_percent = fields.Float(
         string="Max Due % of Net Wage",
-        default=100.0,
+        default=10.0,
         help="Maximum Customer Account due allowed, as a percentage of the net wage.",
     )
 
