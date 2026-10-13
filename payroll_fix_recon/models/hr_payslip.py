@@ -74,8 +74,8 @@ class HrPayslip(models.Model):
     def _compute_attendance_reconciliation_fields(self):
         ready = getattr(self.env.registry, 'ready', True)
         if not ready or self.env.context.get('install_mode') or self.env.context.get('module_installation'):
-            for slip in self:
-                slip.update(dict.fromkeys(RECON_FIELDS, 0.0))
+            for slip in self:                           # module load / upgrade: keep every stored figure as it is
+                slip.update({f: slip[f] for f in RECON_FIELDS})
             return
         valid = self.filtered(lambda s: s.employee_id and s.date_from and s.date_to
                               and (s.state in ('draft', 'verify') or not s.id))
@@ -231,9 +231,38 @@ class HrPayslip(models.Model):
                 slip.worked_days_line_ids = [(5, 0, 0)] + [(0, 0, v) for v in slip._get_worked_day_lines()]
         res = super().compute_sheet()
         slips.with_context(skip_reconcile_revert=True).write({'is_reconciled': True})
-        slips.mapped('worked_days_line_ids')._pfr_apply_amount()     # daily-wage calendar amounts
+        slips._pfr_apply_worked_day_amounts()                        # daily-wage calendar amounts
         slips._pfr_reset_preview()
         return res
+
+    def _pfr_line_calendar_amount(self, wd):
+        """Amount of one worked-day line by the daily-wage calendar rule (None if the wage is unknown)."""
+        self.ensure_one()
+        if not self.date_to or self.state not in ('draft', 'verify'):
+            return None
+        wage = self._pfr_wage()
+        if wage <= 0:
+            return None
+        daily = wage / float(calendar.monthrange(self.date_to.year, self.date_to.month)[1])
+        wet = wd.work_entry_type_id
+        kind = self.env['pfr.day.ledger'].classify_type(wet) if wet else 'PAID'
+        code = (wet.code or '').upper() if wet else ''
+        days = wd.number_of_days or 0.0
+        if kind in ('OUT', 'IGNORE'):
+            return 0.0
+        if kind in ('ABSENT', 'UNPAID'):            # shown for information: days x daily wage
+            return round(days * daily, 3)
+        if code in ('LATENESS', 'LAT', 'LATE'):
+            return round((wd.number_of_hours or 0.0) * daily / 8.0, 3)
+        return round(days * (wet._pfr_pay_factor() if wet else 1.0) * daily, 3)
+
+    def _pfr_apply_worked_day_amounts(self):
+        """Write the calendar amounts on the worked-day lines (end of Compute Sheet)."""
+        for slip in self:
+            for wd in slip.worked_days_line_ids:
+                amount = slip._pfr_line_calendar_amount(wd)
+                if amount is not None and abs((wd.amount or 0.0) - amount) > 0.0005:
+                    wd.sudo().write({'amount': amount})
 
     def _pfr_reset_preview(self):
         """The side preview (o_attachment_preview) shows the PDF attachment saved on the payslip.
