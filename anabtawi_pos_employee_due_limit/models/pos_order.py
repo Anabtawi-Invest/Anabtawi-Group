@@ -18,7 +18,10 @@ class PosOrder(models.Model):
         )
         if not draft and self.state != "cancel":
             self._check_employee_due_limit()
-        return super()._process_saved_order(draft)
+        res = super()._process_saved_order(draft)
+        if self.partner_id and any(p.payment_method_id.type == "pay_later" for p in self.payment_ids):
+            self.partner_id._refresh_pos_customer_account_due()
+        return res
 
     def _check_employee_due_limit(self):
         self.ensure_one()

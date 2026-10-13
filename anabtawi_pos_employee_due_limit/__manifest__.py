@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "POS Employee Due Limit",
-    "version": "19.0.1.0.2",
+    "version": "19.0.1.0.4",
     "category": "Point of Sale",
     "summary": "Limit employees' Customer Account due in POS to a percentage of their net wage",
     "description": """
@@ -27,6 +27,7 @@ Employees without a wage cannot buy on Customer Account.
     "data": [
         "data/ir_cron_data.xml",
         "views/res_config_settings_views.xml",
+        "views/res_partner_views.xml",
     ],
     "assets": {
         "point_of_sale._assets_pos": [
