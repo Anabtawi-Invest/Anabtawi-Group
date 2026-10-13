@@ -1,8 +1,12 @@
 # -*- coding: utf-8 -*-
 
+import logging
+
 from odoo import _, api, fields, models
 from odoo.tools import float_compare
 from odoo.tools.misc import formatLang
+
+_logger = logging.getLogger(__name__)
 
 
 class ResPartner(models.Model):
@@ -24,11 +28,29 @@ class ResPartner(models.Model):
         self.ensure_one()
         status = {"blocked": False, "message": ""}
         employee = self._get_due_limit_employee(config.company_id)
-        if not employee or not employee.company_id.employee_due_limit_enabled:
+        if not employee:
+            _logger.info(
+                "[EMPLOYEE_DUE_LIMIT] partner %s (%s) / commercial partner %s is not the work contact "
+                "of any employee -> not checked",
+                self.id, self.name, self.commercial_partner_id.id,
+            )
+            return status
+        if not employee.company_id.employee_due_limit_enabled:
+            _logger.info(
+                "[EMPLOYEE_DUE_LIMIT] employee %s (%s) company %s (%s) has the due limit disabled "
+                "-> not checked (POS config company: %s)",
+                employee.id, employee.name, employee.company_id.id, employee.company_id.name,
+                config.company_id.name,
+            )
             return status
 
         currency = config.currency_id
-        if not employee._get_employee_due_wage():
+        wage = employee._get_employee_due_wage()
+        if not wage:
+            _logger.info(
+                "[EMPLOYEE_DUE_LIMIT] employee %s (%s) has no wage (version %s) -> blocked",
+                employee.id, employee.name, employee.sudo().current_version_id.id,
+            )
             status.update(
                 blocked=True,
                 message=_(
@@ -42,16 +64,30 @@ class ResPartner(models.Model):
         limit = employee._get_employee_due_limit()
         if employee_currency != currency:
             limit = employee_currency._convert(limit, currency, config.company_id, fields.Date.today())
-        due = self.sudo().get_total_due(config.id)["res.partner"][0]["total_due"]
+        total_due = self.sudo().get_total_due(config.id)["res.partner"][0]["total_due"]
+        excluded = 0.0
         if exclude_order and exclude_order.state == "paid" and exclude_order.session_id.state != "closed":
-            due -= sum(
+            excluded = sum(
                 exclude_order.payment_ids.filtered(
                     lambda p: p.payment_method_id.type == "pay_later"
                 ).mapped("amount")
             )
+        due = total_due - excluded
         remaining = limit - due
+        blocked = float_compare(due + amount, limit, precision_rounding=currency.rounding) > 0
 
-        if float_compare(due + amount, limit, precision_rounding=currency.rounding) > 0:
+        _logger.info(
+            "[EMPLOYEE_DUE_LIMIT] partner %s (%s) employee %s (%s) company %s: wage=%s deduction=%s%% "
+            "max=%s%% limit=%s | total_due=%s excluded_current_order=%s (order %s) due=%s "
+            "| this_order=%s due+order=%s -> %s",
+            self.id, self.name, employee.id, employee.name, employee.company_id.name, wage,
+            employee.company_id.employee_due_deduction_percent,
+            employee.company_id.employee_due_max_percent, limit, total_due, excluded,
+            exclude_order.id if exclude_order else None, due, amount, due + amount,
+            "BLOCKED" if blocked else "allowed",
+        )
+
+        if blocked:
             status.update(
                 blocked=True,
                 message=_(
@@ -71,8 +107,16 @@ class ResPartner(models.Model):
 
     @api.model
     def pos_check_employee_due_limit(self, partner_id, config_id, amount):
+        _logger.info(
+            "[EMPLOYEE_DUE_LIMIT] POS check called: partner_id=%s config_id=%s amount=%s user=%s",
+            partner_id, config_id, amount, self.env.user.login,
+        )
         partner = self.browse(partner_id).exists()
         config = self.env["pos.config"].browse(config_id).exists()
         if not partner or not config or amount <= 0:
+            _logger.info(
+                "[EMPLOYEE_DUE_LIMIT] POS check skipped: partner found=%s config found=%s amount=%s",
+                bool(partner), bool(config), amount,
+            )
             return {"blocked": False, "message": ""}
         return partner._get_employee_due_limit_status(config, amount)
