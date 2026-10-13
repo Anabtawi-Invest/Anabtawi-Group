@@ -48,6 +48,14 @@ patch(PosStore.prototype, {
         if (order.hasPledge || order.pledgeData) {
             return "pledge / employee service order (pos_pledge_order)";
         }
+        // The customer's due is computed on the server, so it must know this order right away.
+        if (
+            order.payment_ids.some(
+                (line) => line.payment_method_id?.type === "pay_later" && line.amount > 0
+            )
+        ) {
+            return "Customer Account payment (customer due)";
+        }
         for (const line of order.lines) {
             const productName = line.product_id?.display_name || line.product_id?.name || "";
             if (line.refunded_orderline_id) {

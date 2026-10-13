@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "POS Deferred Order Sync",
-    "version": "19.0.1.0.0",
+    "version": "19.0.1.0.1",
     "category": "Point of Sale",
     "summary": "Keep paid POS orders on the device and send them to the server when the register closes",
     "description": """
@@ -15,7 +15,8 @@ working online.
 
 Orders that need the server immediately are still sent right away:
 refunds (with their original order), invoiced orders, custom cake orders,
-pledge / employee service orders, scheduled (fulfillment) orders and orders
+pledge / employee service orders, scheduled (fulfillment) orders, orders paid
+with Customer Account (so the customer's due stays up to date) and orders
 that already exist on the server.
     """,
     "author": "Anabtawi",
