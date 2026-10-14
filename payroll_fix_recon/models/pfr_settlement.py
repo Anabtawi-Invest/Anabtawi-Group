@@ -8,6 +8,7 @@
 
 Pure computation: nothing is written here.
 """
+import math
 from collections import defaultdict
 
 from odoo import api, models
@@ -197,7 +198,7 @@ class PfrSettlement(models.AbstractModel):
         covered_annual = 0.0
         if remaining > 0.01 and emp.allow_annual_leave_lateness_deduction:        # step 2
             annual = max(0.0, sum(bal.get((emp.id, t), 0.0) for t in types['annual'].ids))
-            covered_annual = round(min(remaining, annual), 2)
+            covered_annual = min(remaining, math.floor(annual * 100) / 100.0)   # never above the real balance
             remaining = round(remaining - covered_annual, 2)
         return {
             'attendance_gross_overtime': gross_ot,
