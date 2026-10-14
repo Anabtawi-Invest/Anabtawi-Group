@@ -215,9 +215,16 @@ class HrLeave(models.Model):
         if field is not None and field.store:
             sets.append('number_of_hours = %s')
             params.append(round(hours, 2))
+        # the label shown in the title / "Dates" line is a stored text ("1 days"): keep its unit, new number
+        display = self._fields.get('duration_display')
+        if display is not None and display.store:
+            current = (self.duration_display or '').strip()
+            unit = current.split(' ', 1)[1] if ' ' in current else 'days'
+            sets.append('duration_display = %s')
+            params.append('%g %s' % (round(days, 2), unit))
         self.env.cr.execute("UPDATE hr_leave SET %s WHERE id = %%s" % ', '.join(sets), params + [self.id])
         self.invalidate_recordset(['number_of_days', 'number_of_hours', 'number_of_days_display',
-                                   'duration_display'])
+                                   'duration_display', 'display_name'])
 
     def pfr_fix_settlement_leave_days(self):
         """One-off repair for settlement leaves created before this fix: the hours are in the name
