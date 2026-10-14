@@ -113,7 +113,11 @@ class HrPayslip(models.Model):
             if alloc and 'holiday_allocation_id' in Leave._fields:
                 vals['holiday_allocation_id'] = alloc.id
             try:
-                ctx_leave.create(vals).sudo().write({'state': 'validate'})
+                leave = ctx_leave.create(vals)
+                leave.sudo().write({'state': 'validate'})
+                if chunk < 7.99:
+                    # a day-based leave type counts any leave as a whole day: store the real fraction of a day
+                    leave._pfr_store_fraction(chunk)
             except Exception:
                 _logger.exception("[payroll_fix_recon] annual settlement leave failed slip=%s day=%s", self.id, day)
             remaining -= chunk
@@ -193,3 +197,38 @@ class HrPayslip(models.Model):
                 allocs = Alloc.search([('employee_id', '=', emp.id), ('name', '=', recon_alloc_name(slip))])
                 allocs.write({'state': 'confirm'})
                 allocs.unlink()
+
+
+class HrLeave(models.Model):
+    _inherit = 'hr.leave'
+
+    def _pfr_store_fraction(self, hours):
+        """Store `hours` as a fraction of a working day (8h) on a settlement leave.
+
+        Odoo recomputes a leave of a day-based type as a whole day whatever its hours are. The duration
+        is written directly (SQL) so no other leave / allocation / work entry logic is triggered."""
+        self.ensure_one()
+        days = round(hours / 8.0, 4)
+        self.flush_recordset()
+        sets, params = ['number_of_days = %s'], [days]
+        field = self._fields.get('number_of_hours')
+        if field is not None and field.store:
+            sets.append('number_of_hours = %s')
+            params.append(round(hours, 2))
+        self.env.cr.execute("UPDATE hr_leave SET %s WHERE id = %%s" % ', '.join(sets), params + [self.id])
+        self.invalidate_recordset(['number_of_days', 'number_of_hours', 'number_of_days_display',
+                                   'duration_display'])
+
+    def pfr_fix_settlement_leave_days(self):
+        """One-off repair for settlement leaves created before this fix: the hours are in the name
+        ('Lateness Settlement (Annual Leave) - 01/09/2026 0.27h'); store hours / 8 days instead of 1 day."""
+        import re
+        fixed = 0
+        for leave in self.filtered(lambda l: 'Lateness Settlement' in (l.name or '')):
+            match = re.search(r'([0-9]+(?:\.[0-9]+)?)h\s*$', leave.name or '')
+            if match:
+                hours = float(match.group(1))
+                if 0 < hours < 7.99:
+                    leave._pfr_store_fraction(hours)
+                    fixed += 1
+        return fixed
