@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="pos_expense_upload_page" name="POS Expense Receipt Upload">
+        <html t-att-lang="lang" t-att-dir="direction">
+            <head>
+                <meta charset="utf-8"/>
+                <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+                <title t-esc="labels['title']"/>
+                <style>
+                    body { font-family: Arial, sans-serif; background: #f4f5f7; margin: 0; color: #222; }
+                    .wrap { max-width: 520px; margin: 0 auto; padding: 16px; }
+                    .card { background: #fff; border-radius: 16px; padding: 20px; box-shadow: 0 8px 24px rgba(0,0,0,0.08); }
+                    h1 { font-size: 22px; margin: 0 0 8px; }
+                    .subtitle { color: #666; margin-bottom: 16px; }
+                    .alert { padding: 10px 12px; border-radius: 8px; margin-bottom: 12px; }
+                    .alert-error { background: #fde8e8; color: #9b1c1c; }
+                    .alert-ok { background: #e8f7ee; color: #146c2e; }
+                    .btn { display: block; width: 100%; border: 0; border-radius: 10px; padding: 14px 16px; font-size: 16px;
+                           font-weight: 700; text-align: center; box-sizing: border-box; margin-top: 8px; cursor: pointer; }
+                    .btn-primary { background: #714b67; color: #fff; }
+                    .btn-light { background: #eee; color: #333; }
+                    input[type=file] { display: none; }
+                    .preview { margin-top: 16px; text-align: center; }
+                    .preview img { max-width: 100%; max-height: 360px; border-radius: 12px; border: 1px solid #eee; }
+                    .hint { color: #777; font-size: 13px; margin-top: 8px; text-align: center; }
+                </style>
+            </head>
+            <body>
+                <div class="wrap">
+                    <div class="card">
+                        <h1 t-esc="labels['title']"/>
+                        <t t-if="not is_valid">
+                            <div class="alert alert-error" t-esc="labels['expired']"/>
+                        </t>
+                        <t t-else="">
+                            <p class="subtitle" t-esc="labels['subtitle']"/>
+                            <div t-if="error" class="alert alert-error" t-esc="error"/>
+                            <div t-if="success" class="alert alert-ok" t-esc="success"/>
+                            <form t-att-action="'/pos/expense/upload/%s' % upload.token" method="post" enctype="multipart/form-data">
+                                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                <label class="btn btn-light" for="image" t-esc="labels['choose']"/>
+                                <input id="image" type="file" name="image" accept="image/*"
+                                       onchange="this.form.submit()"/>
+                                <button type="submit" class="btn btn-primary" t-esc="labels['upload']"/>
+                                <div class="hint" t-esc="labels['formats']"/>
+                            </form>
+                            <div t-if="thumbnail" class="preview">
+                                <img t-att-src="'data:image/png;base64,%s' % thumbnail" alt=""/>
+                                <div class="hint" t-esc="labels['replace_hint']"/>
+                            </div>
+                        </t>
+                    </div>
+                </div>
+            </body>
+        </html>
+    </template>
+</odoo>

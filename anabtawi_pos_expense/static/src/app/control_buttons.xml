@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-inherit="point_of_sale.ControlButtons" t-inherit-mode="extension">
+        <xpath expr="//t[@t-if='props.showRemainingButtons']/div/button[contains(@t-on-click, 'onCancelOrder')]" position="before">
+            <button t-if="showPosExpenseButton" t-att-class="buttonClass" t-on-click="() => this.onClickPosExpense()">
+                <i class="fa fa-money me-1" role="img"/> Expense
+            </button>
+        </xpath>
+    </t>
+</templates>

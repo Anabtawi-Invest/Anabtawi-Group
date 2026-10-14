@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="anabtawi_pos_expense.PosExpensePopup">
+        <Dialog title.translate="Expense" size="'lg'">
+            <div t-if="state.loading" class="text-center p-4">
+                <i class="fa fa-spinner fa-spin fa-2x"/>
+            </div>
+            <t t-else="">
+                <div class="d-flex gap-3 mb-3">
+                    <div class="flex-fill border rounded p-2 text-center">
+                        <div class="text-muted small">Limit</div>
+                        <div class="fs-4 fw-bold" t-esc="format(state.limit)"/>
+                    </div>
+                    <div class="flex-fill border rounded p-2 text-center"
+                         t-att-class="state.available > 0 ? 'border-success' : 'border-danger'">
+                        <div class="text-muted small">Available</div>
+                        <div class="fs-4 fw-bold" t-att-class="state.available > 0 ? 'text-success' : 'text-danger'"
+                             t-esc="format(state.available)"/>
+                    </div>
+                </div>
+
+                <div class="row g-3">
+                    <div class="col-md-6 d-flex flex-column gap-3">
+                        <div>
+                            <label class="form-label fw-bold" for="pos_expense_type">Expense Type</label>
+                            <select id="pos_expense_type" class="form-select form-select-lg" t-model="state.typeId">
+                                <option value="">Select an expense type...</option>
+                                <t t-foreach="state.types" t-as="expenseType" t-key="expenseType.id">
+                                    <option t-att-value="expenseType.id" t-esc="expenseType.name"/>
+                                </t>
+                            </select>
+                            <div t-if="!state.types.length" class="text-danger small mt-1">
+                                No expense types are configured for this POS.
+                            </div>
+                        </div>
+                        <div>
+                            <label class="form-label fw-bold" for="pos_expense_amount">Amount</label>
+                            <input id="pos_expense_amount" type="number" inputmode="decimal" min="0" step="any"
+                                   class="form-control form-control-lg"
+                                   t-att-class="exceedsAvailable ? 'is-invalid' : ''"
+                                   t-model="state.amount"/>
+                            <div t-if="exceedsAvailable" class="invalid-feedback d-block">
+                                The amount exceeds the available balance (<t t-esc="format(state.available)"/>).
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Receipt Photo</label>
+                        <div class="d-flex gap-3 align-items-center border rounded p-2">
+                            <div class="text-center">
+                                <img t-if="state.upload?.qr_image"
+                                     t-att-src="'data:image/png;base64,' + state.upload.qr_image"
+                                     style="width: 140px; height: 140px;" alt="QR"/>
+                                <div class="small text-muted">Scan to upload</div>
+                            </div>
+                            <div class="flex-fill text-center">
+                                <img t-if="state.upload?.image_thumbnail"
+                                     t-att-src="'data:image/png;base64,' + state.upload.image_thumbnail"
+                                     class="img-fluid rounded border" style="max-height: 160px;" alt="Receipt"/>
+                                <div t-elif="state.upload and !state.upload.is_valid" class="text-danger small">
+                                    The upload link expired. Close and open the popup again.
+                                </div>
+                                <div t-else="" class="text-muted small">
+                                    <i class="fa fa-spinner fa-spin me-1"/>Waiting for the photo...
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </t>
+            <t t-set-slot="footer">
+                <button class="btn btn-primary btn-lg" t-att-disabled="!isValid" t-on-click="confirm">
+                    Confirm
+                </button>
+                <button class="btn btn-secondary btn-lg" t-on-click="props.close">
+                    Discard
+                </button>
+            </t>
+        </Dialog>
+    </t>
+
+</templates>
