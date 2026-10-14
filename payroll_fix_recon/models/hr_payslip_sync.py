@@ -216,6 +216,26 @@ class HrPayslip(models.Model):
 class HrLeave(models.Model):
     _inherit = 'hr.leave'
 
+    @staticmethod
+    def _pfr_settlement_hours(name):
+        """Hours written in the name of a partial settlement leave ('... - 02/08/2026 0.99h'), else 0."""
+        import re
+        if 'Lateness Settlement' not in (name or ''):
+            return 0.0
+        match = re.search(r'([0-9]+(?:\.[0-9]+)?)h\s*$', name)
+        hours = float(match.group(1)) if match else 0.0
+        return hours if 0 < hours < 7.99 else 0.0
+
+    def _compute_duration(self):
+        """A partial settlement leave keeps its real fraction of a day whenever Odoo recomputes it."""
+        super()._compute_duration()
+        for leave in self:
+            hours = self._pfr_settlement_hours(leave.name)
+            if hours:
+                leave.number_of_days = math.floor(hours / 8.0 * 10000) / 10000.0
+                if 'number_of_hours' in leave._fields:
+                    leave.number_of_hours = round(hours, 2)
+
     def _pfr_store_fraction(self, hours):
         """Store `hours` as a fraction of a working day (8h) on a settlement leave.
 
