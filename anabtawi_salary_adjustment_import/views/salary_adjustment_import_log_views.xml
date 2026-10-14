@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Import logs -->
+    <record id="salary_adjustment_import_log_view_list" model="ir.ui.view">
+        <field name="name">salary.adjustment.import.log.list</field>
+        <field name="model">salary.adjustment.import.log</field>
+        <field name="arch" type="xml">
+            <list create="0" decoration-danger="state == 'failed'" decoration-warning="state == 'partial'"
+                  decoration-info="state in ('queued', 'in_progress')" decoration-muted="state == 'cancelled'">
+                <field name="name"/>
+                <field name="create_date" string="Import Date"/>
+                <field name="user_id" widget="many2one_avatar_user"/>
+                <field name="mode"/>
+                <field name="file_name" string="File"/>
+                <field name="progress" widget="progressbar"/>
+                <field name="total_count" sum="Total"/>
+                <field name="imported_count" sum="Total"/>
+                <field name="failed_count" sum="Total"/>
+                <field name="pending_count" optional="show"/>
+                <field name="state" widget="badge"
+                       decoration-info="state in ('queued', 'in_progress')"
+                       decoration-success="state == 'done'"
+                       decoration-warning="state == 'partial'"
+                       decoration-danger="state == 'failed'"
+                       decoration-muted="state == 'cancelled'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="salary_adjustment_import_log_view_form" model="ir.ui.view">
+        <field name="name">salary.adjustment.import.log.form</field>
+        <field name="model">salary.adjustment.import.log</field>
+        <field name="arch" type="xml">
+            <form create="0" edit="0">
+                <header>
+                    <button name="action_refresh" type="object" string="Refresh" icon="fa-refresh"
+                            class="btn-primary" invisible="state not in ('queued', 'in_progress')"/>
+                    <button name="action_refresh" type="object" string="Refresh" icon="fa-refresh"
+                            invisible="state in ('queued', 'in_progress')"/>
+                    <button name="action_retry_failed" type="object" string="Retry Failed Rows" icon="fa-repeat"
+                            invisible="state in ('queued', 'in_progress', 'done')"
+                            confirm="Failed and cancelled rows will be checked again and imported in the background. Continue?"/>
+                    <button name="action_cancel" type="object" string="Cancel Import"
+                            invisible="state not in ('queued', 'in_progress')"
+                            confirm="Rows not yet processed will be cancelled. Already created adjustments are kept. Continue?"/>
+                    <field name="state" widget="statusbar" statusbar_visible="queued,in_progress,done"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_adjustments" type="object" class="oe_stat_button"
+                                icon="fa-list" invisible="imported_count == 0">
+                            <field name="imported_count" widget="statinfo" string="Adjustments"/>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <h1><field name="name"/></h1>
+                    </div>
+                    <div class="alert alert-info" role="alert" invisible="state not in ('queued', 'in_progress')">
+                        The import is running in the background. You can leave this page; you will be notified
+                        when it finishes. Click "Refresh" to update the progress.
+                    </div>
+                    <group>
+                        <group>
+                            <field name="create_date" string="Import Date"/>
+                            <field name="user_id" widget="many2one_avatar_user"/>
+                            <field name="mode"/>
+                            <field name="one_time"/>
+                            <field name="file" filename="file_name"/>
+                            <field name="file_name" invisible="1"/>
+                        </group>
+                        <group>
+                            <field name="progress" widget="progressbar"/>
+                            <field name="total_count"/>
+                            <field name="imported_count" decoration-success="imported_count &gt; 0"/>
+                            <field name="failed_count" decoration-danger="failed_count &gt; 0"/>
+                            <field name="pending_count" invisible="pending_count == 0"/>
+                            <field name="date_started" invisible="not date_started"/>
+                            <field name="date_finished" invisible="not date_finished"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Rows" name="rows">
+                            <field name="line_ids">
+                                <list decoration-danger="status == 'failed'" decoration-muted="status == 'cancelled'">
+                                    <field name="row_number"/>
+                                    <field name="status" widget="badge"
+                                           decoration-info="status == 'pending'"
+                                           decoration-success="status == 'imported'"
+                                           decoration-danger="status == 'failed'"/>
+                                    <field name="employee_name"/>
+                                    <field name="employee_id" optional="hide"/>
+                                    <field name="input_type_name"/>
+                                    <field name="monthly_amount"/>
+                                    <field name="duration_type" optional="show"/>
+                                    <field name="total_amount" optional="hide"/>
+                                    <field name="date_start"/>
+                                    <field name="note" optional="show"/>
+                                    <field name="adjustment_id" optional="show"/>
+                                    <field name="message"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="salary_adjustment_import_log_view_search" model="ir.ui.view">
+        <field name="name">salary.adjustment.import.log.search</field>
+        <field name="model">salary.adjustment.import.log</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="user_id"/>
+                <field name="file_name"/>
+                <filter name="running" string="Running" domain="[('state', 'in', ('queued', 'in_progress'))]"/>
+                <filter name="with_failures" string="With Problems" domain="[('failed_count', '&gt;', 0)]"/>
+                <filter name="fully_imported" string="Fully Imported" domain="[('state', '=', 'done')]"/>
+                <separator/>
+                <filter name="filter_create_date" string="Import Date" date="create_date"/>
+                <group>
+                    <filter name="group_user" string="Imported By" context="{'group_by': 'user_id'}"/>
+                    <filter name="group_state" string="Status" context="{'group_by': 'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_salary_adjustment_import_log" model="ir.actions.act_window">
+        <field name="name">Salary Adjustment Imports</field>
+        <field name="res_model">salary.adjustment.import.log</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No import yet</p>
+            <p>Use "Import from Excel" on the Salary Adjustments list to create adjustments in bulk.</p>
+        </field>
+    </record>
+
+    <!-- Rows of all imports -->
+    <record id="salary_adjustment_import_log_line_view_list" model="ir.ui.view">
+        <field name="name">salary.adjustment.import.log.line.list</field>
+        <field name="model">salary.adjustment.import.log.line</field>
+        <field name="arch" type="xml">
+            <list create="0" edit="0" decoration-danger="status == 'failed'">
+                <field name="log_id"/>
+                <field name="import_date"/>
+                <field name="user_id" optional="show"/>
+                <field name="row_number"/>
+                <field name="status" widget="badge"
+                       decoration-success="status == 'imported'"
+                       decoration-danger="status == 'failed'"/>
+                <field name="employee_name"/>
+                <field name="input_type_name"/>
+                <field name="monthly_amount"/>
+                <field name="duration_type" optional="hide"/>
+                <field name="date_start"/>
+                <field name="adjustment_id" optional="show"/>
+                <field name="message"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="salary_adjustment_import_log_line_view_search" model="ir.ui.view">
+        <field name="name">salary.adjustment.import.log.line.search</field>
+        <field name="model">salary.adjustment.import.log.line</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="employee_name"/>
+                <field name="employee_id"/>
+                <field name="log_id"/>
+                <filter name="failed" string="Failed" domain="[('status', '=', 'failed')]"/>
+                <filter name="imported" string="Imported" domain="[('status', '=', 'imported')]"/>
+                <group>
+                    <filter name="group_log" string="Import" context="{'group_by': 'log_id'}"/>
+                    <filter name="group_status" string="Status" context="{'group_by': 'status'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_salary_adjustment_import_log_line" model="ir.actions.act_window">
+        <field name="name">Salary Adjustment Import Rows</field>
+        <field name="res_model">salary.adjustment.import.log.line</field>
+        <field name="view_mode">list</field>
+        <field name="context">{'search_default_failed': 1}</field>
+    </record>
+
+    <menuitem id="menu_salary_adjustment_import_log"
+              name="Salary Adjustment Imports"
+              parent="hr_payroll.menu_hr_payroll_employees"
+              action="action_salary_adjustment_import_log"
+              groups="hr_payroll.group_hr_payroll_user"
+              sequence="31"/>
+
+    <menuitem id="menu_salary_adjustment_import_log_line"
+              name="Salary Adjustment Import Problems"
+              parent="hr_payroll.menu_hr_payroll_employees"
+              action="action_salary_adjustment_import_log_line"
+              groups="hr_payroll.group_hr_payroll_user"
+              sequence="32"/>
+</odoo>

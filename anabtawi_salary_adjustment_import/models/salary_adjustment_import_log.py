@@ -123,15 +123,9 @@ class SalaryAdjustmentImportLog(models.Model):
     def _cron_process_imports(self):
         started = time.monotonic()
         for log in self.search([("state", "in", ("queued", "in_progress"))], order="id"):
-            try:
-                if not log._process_pending(started):
-                    self._trigger_processing()
-                    return
-            except Exception as error:  # noqa: BLE001
-                self.env.cr.rollback()
-                _logger.exception("Salary adjustment import %s crashed", log.name)
-                log._abort(error)
-                self.env.cr.commit()
+            if not log._process_pending(started):
+                self._trigger_processing()
+                return
 
     def _process_pending(self, started):
         """Process pending rows in committed batches. Return False when the time budget is exhausted."""
@@ -176,14 +170,6 @@ class SalaryAdjustmentImportLog(models.Model):
                 if name:
                     types_by_name.setdefault(normalize(name), input_type)
         return employees_by_name, types_by_name
-
-    def _abort(self, error):
-        self.ensure_one()
-        self.line_ids.filtered(lambda l: l.status == "pending").write({
-            "status": "failed",
-            "message": _("Import stopped by an unexpected error: %s", error),
-        })
-        self._finish()
 
     def _finish(self):
         self.ensure_one()
