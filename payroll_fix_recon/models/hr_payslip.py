@@ -100,8 +100,14 @@ class HrPayslip(models.Model):
     def _pfr_line_type(self, L, kind):
         """Work entry type used for a worked-day line."""
         WET = self.env['hr.work.entry.type'].sudo()
+        # never attach a line to a type of another company: the multi-company record rule would make the
+        # salary rules fail with an access error when they read the worked days
+        company = self.company_id
+        has_company = 'company_id' in WET._fields
+        mine = lambda t: (not has_company) or (not t.company_id) or t.company_id == company
+        company_domain = [('company_id', 'in', [False, company.id])] if has_company else []
         known = L.kind_types.get('PH' if kind == 'PHD' else kind)
-        if known:
+        if known and mine(known):
             return known
         search = {
             'WORK': (U.ATTENDANCE_CODES, 'attendance'), 'PHD': (U.PUBLIC_HOLIDAY_CODES, 'public holiday'),
@@ -113,8 +119,9 @@ class HrPayslip(models.Model):
         found = WET.browse()
         if search:
             codes, term = search
-            found = WET.search(['|', '|', ('code', 'in', list(codes)), ('display_code', 'in', list(codes)),
-                                ('name', 'ilike', term)], limit=1)
+            found = WET.search(company_domain + ['|', '|', ('code', 'in', list(codes)),
+                                                 ('display_code', 'in', list(codes)),
+                                                 ('name', 'ilike', term)], limit=1)
         if not found and kind == 'PHD':
             return self._pfr_line_type(L, 'WORK')
         if not found and kind == 'ABSENT':
