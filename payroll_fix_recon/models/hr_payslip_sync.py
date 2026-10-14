@@ -237,8 +237,9 @@ class HrLeave(models.Model):
             sets.append('duration_display = %s')
             params.append('%g %s' % (round(days, 2), unit))
         self.env.cr.execute("UPDATE hr_leave SET %s WHERE id = %%s" % ', '.join(sets), params + [self.id])
-        self.invalidate_recordset(['number_of_days', 'number_of_hours', 'number_of_days_display',
-                                   'duration_display', 'display_name'])
+        names = ['number_of_days', 'number_of_hours', 'number_of_days_display', 'duration_display',
+                 'display_name']
+        self.invalidate_recordset([n for n in names if n in self._fields])
 
     def pfr_fix_settlement_leave_days(self):
         """One-off repair for settlement leaves created before this fix: the hours are in the name
