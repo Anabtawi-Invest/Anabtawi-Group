@@ -51,6 +51,8 @@ class PosUnifiedReport(models.TransientModel):
     employee_code = fields.Char(string="Employee ID / Code")
     check_in = fields.Datetime(string="Check In")
     check_out = fields.Datetime(string="Check Out")
+    check_in_location_id = fields.Many2one("hr.work.location", string="Check-In Location")
+    check_in_map_url = fields.Char(string="Check-In GPS")
     monthly_wage = fields.Float(string="Monthly Wage", digits=(16, 3))
     partner_id = fields.Many2one("res.partner", string="Customer")
     company_id = fields.Many2one("res.company", string="Company", default=lambda self: self.env.company)

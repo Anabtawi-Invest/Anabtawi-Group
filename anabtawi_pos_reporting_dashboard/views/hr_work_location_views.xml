@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="hr_work_location_form_view_pos_reporting" model="ir.ui.view">
+        <field name="name">hr.work.location.form.pos.reporting</field>
+        <field name="model">hr.work.location</field>
+        <field name="inherit_id" ref="portal_check_in.hr_work_location_form_view_attendance_geofence"/>
+        <field name="arch" type="xml">
+            <field name="attendance_geo_latitude" position="attributes">
+                <attribute name="invisible">not attendance_geo_enforce and not pos_config_id</attribute>
+            </field>
+            <field name="attendance_geo_longitude" position="attributes">
+                <attribute name="invisible">not attendance_geo_enforce and not pos_config_id</attribute>
+            </field>
+            <field name="attendance_geo_radius_m" position="attributes">
+                <attribute name="invisible">not attendance_geo_enforce and not pos_config_id</attribute>
+            </field>
+            <xpath expr="//group[field[@name='attendance_geo_enforce']]" position="after">
+                <group string="POS Dashboard">
+                    <field name="is_administration"/>
+                    <field name="pos_config_id"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+</odoo>

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import logging
+import math
 from collections import defaultdict
 from datetime import datetime, time, timedelta
 
@@ -9,6 +10,10 @@ from odoo.addons.pos_ameen_daily_operation.models.pos_daily_ops_engine import DE
 _logger = logging.getLogger(__name__)
 
 EXCLUDED_CONFIG_KEYWORDS = ["كافيه", "نجيب", "ذوابي"]
+
+EARTH_RADIUS_M = 6371000.0
+# Mobile check-ins are accepted with up to 100 m GPS accuracy (anabtawi_mobile.max_location_accuracy_m).
+GPS_TOLERANCE_M = 100.0
 
 EXPLICIT_DEPT_TO_POS_MAP = {
     "شفا بدران": "فرع شفا بدران",
@@ -168,6 +173,122 @@ class PosReportingDashboard(models.TransientModel):
             return bucket == "hospitality"
         return False
 
+    def _get_employee_pos_config(self, emp, configs):
+        """Map an employee to a POS branch via department path & work location names."""
+        if hasattr(emp, "pos_config_id") and emp.pos_config_id:
+            return emp.pos_config_id
+        if hasattr(emp, "pos_config_ids") and emp.pos_config_ids:
+            return emp.pos_config_ids[0]
+
+        dept_full_path = ""
+        leaf_dept_name = ""
+        if emp.department_id:
+            dept_full_path = (getattr(emp.department_id, "complete_name", None) or emp.department_id.name or "").strip()
+            path_parts = [p.strip() for p in dept_full_path.split("/") if p.strip()]
+            leaf_dept_name = path_parts[-1] if path_parts else ""
+
+        loc_name = (emp.work_location_id.name or "").strip() if hasattr(emp, "work_location_id") and emp.work_location_id else ""
+
+        # Check explicit mapping dictionary first
+        mapped_target = EXPLICIT_DEPT_TO_POS_MAP.get(leaf_dept_name) or EXPLICIT_DEPT_TO_POS_MAP.get(dept_full_path)
+        if mapped_target:
+            target_clean = mapped_target.strip().lower()
+            for cfg in configs:
+                cfg_name = (cfg.name or "").strip().lower()
+                if cfg_name == target_clean or (len(target_clean) >= 3 and target_clean in cfg_name) or (len(cfg_name) >= 3 and cfg_name in target_clean):
+                    return cfg
+
+        clean_leaf = leaf_dept_name.lower().strip()
+        clean_full = dept_full_path.lower().strip()
+        clean_loc = loc_name.lower().strip()
+
+        def _normalize(s):
+            if not s:
+                return ""
+            for noise in ("فرع ", "فرع", "شارع ", "شارع", "منطقة ", "منطقة", "مول"):
+                s = s.replace(noise, "")
+            return s.strip().lower()
+
+        norm_leaf = _normalize(leaf_dept_name)
+        norm_loc = _normalize(loc_name)
+
+        # Tier 1: Exact match on leaf department name or work location
+        if clean_leaf or clean_loc:
+            for cfg in configs:
+                cfg_name = (cfg.name or "").strip().lower()
+                if (clean_leaf and cfg_name == clean_leaf) or (clean_loc and cfg_name == clean_loc):
+                    return cfg
+
+        # Tier 2: Normalized keyword matching (minimum 3 characters to prevent empty string matching)
+        if (norm_leaf and len(norm_leaf) >= 3) or (norm_loc and len(norm_loc) >= 3):
+            for cfg in configs:
+                norm_cfg = _normalize(cfg.name or "")
+                if norm_cfg and len(norm_cfg) >= 3:
+                    if (norm_leaf and len(norm_leaf) >= 3 and (norm_leaf in norm_cfg or norm_cfg in norm_leaf)) or \
+                       (norm_loc and len(norm_loc) >= 3 and (norm_loc in norm_cfg or norm_cfg in norm_loc)):
+                        return cfg
+
+        # Tier 3: Leaf department name or work location contained in POS config name (minimum 3 chars)
+        if (clean_leaf and len(clean_leaf) >= 3) or (clean_loc and len(clean_loc) >= 3):
+            for cfg in configs:
+                cfg_name = (cfg.name or "").strip().lower()
+                if len(cfg_name) >= 3:
+                    if clean_leaf and (clean_leaf in cfg_name or cfg_name in clean_leaf):
+                        return cfg
+                    if clean_loc and (clean_loc in cfg_name or cfg_name in clean_loc):
+                        return cfg
+
+        # Tier 4: POS config name contained within full department path (minimum 3 chars)
+        if clean_full and len(clean_full) >= 3:
+            for cfg in configs:
+                cfg_name = (cfg.name or "").strip().lower()
+                if cfg_name and len(cfg_name) >= 3 and cfg_name in clean_full:
+                    return cfg
+
+        return False
+
+    def _get_branch_geo_locations(self):
+        """Work locations linked to a POS branch that have GPS coordinates."""
+        return self.env["hr.work.location"].sudo().search([
+            ("pos_config_id", "!=", False),
+            ("attendance_geo_latitude", "!=", 0.0),
+            ("attendance_geo_longitude", "!=", 0.0),
+        ])
+
+    @staticmethod
+    def _distance_m(lat1, lon1, lat2, lon2):
+        """Great-circle distance in meters (haversine)."""
+        phi1, phi2 = math.radians(lat1), math.radians(lat2)
+        d_phi = math.radians(lat2 - lat1)
+        d_lambda = math.radians(lon2 - lon1)
+        a = math.sin(d_phi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(d_lambda / 2) ** 2
+        return 2 * EARTH_RADIUS_M * math.asin(math.sqrt(a))
+
+    def _get_check_in_location(self, att, geo_locations):
+        """Nearest branch work location whose radius (plus GPS tolerance) contains the check-in point."""
+        lat, lon = att.in_latitude, att.in_longitude
+        if not geo_locations or not lat or not lon:
+            return self.env["hr.work.location"]
+        best, best_dist = self.env["hr.work.location"], None
+        for loc in geo_locations:
+            dist = self._distance_m(lat, lon, loc.attendance_geo_latitude, loc.attendance_geo_longitude)
+            if dist > (loc.attendance_geo_radius_m or 0.0) + GPS_TOLERANCE_M:
+                continue
+            if best_dist is None or dist < best_dist:
+                best, best_dist = loc, dist
+        return best
+
+    def _get_attendance_pos_config(self, att, configs, geo_locations):
+        """(POS branch, check-in work location): GPS location first, employee profile as fallback."""
+        location = self._get_check_in_location(att, geo_locations)
+        if location:
+            return location.pos_config_id, location
+        return self._get_employee_pos_config(att.employee_id, configs), location
+
+    @staticmethod
+    def _is_administration_employee(emp):
+        return bool(emp.work_location_id.is_administration)
+
     @api.model
     def get_dashboard_data(self, date_from=None, date_to=None, config_ids=None):
         """
@@ -248,80 +369,6 @@ class PosReportingDashboard(models.TransientModel):
 
 
 
-        # Helper to map employee to POS config / branch via hierarchical department path & branch name
-        def _get_employee_pos_config(emp):
-            if hasattr(emp, "pos_config_id") and emp.pos_config_id:
-                return emp.pos_config_id
-            if hasattr(emp, "pos_config_ids") and emp.pos_config_ids:
-                return emp.pos_config_ids[0]
-
-            dept_full_path = ""
-            leaf_dept_name = ""
-            if emp.department_id:
-                dept_full_path = (getattr(emp.department_id, "complete_name", None) or emp.department_id.name or "").strip()
-                path_parts = [p.strip() for p in dept_full_path.split("/") if p.strip()]
-                leaf_dept_name = path_parts[-1] if path_parts else ""
-
-            loc_name = (emp.work_location_id.name or "").strip() if hasattr(emp, "work_location_id") and emp.work_location_id else ""
-
-            # Check explicit mapping dictionary first
-            mapped_target = EXPLICIT_DEPT_TO_POS_MAP.get(leaf_dept_name) or EXPLICIT_DEPT_TO_POS_MAP.get(dept_full_path)
-            if mapped_target:
-                target_clean = mapped_target.strip().lower()
-                for cfg in configs:
-                    cfg_name = (cfg.name or "").strip().lower()
-                    if cfg_name == target_clean or (len(target_clean) >= 3 and target_clean in cfg_name) or (len(cfg_name) >= 3 and cfg_name in target_clean):
-                        return cfg
-
-            clean_leaf = leaf_dept_name.lower().strip()
-            clean_full = dept_full_path.lower().strip()
-            clean_loc = loc_name.lower().strip()
-
-            def _normalize(s):
-                if not s:
-                    return ""
-                for noise in ("فرع ", "فرع", "شارع ", "شارع", "منطقة ", "منطقة", "مول"):
-                    s = s.replace(noise, "")
-                return s.strip().lower()
-
-            norm_leaf = _normalize(leaf_dept_name)
-            norm_loc = _normalize(loc_name)
-
-            # Tier 1: Exact match on leaf department name or work location
-            if clean_leaf or clean_loc:
-                for cfg in configs:
-                    cfg_name = (cfg.name or "").strip().lower()
-                    if (clean_leaf and cfg_name == clean_leaf) or (clean_loc and cfg_name == clean_loc):
-                        return cfg
-
-            # Tier 2: Normalized keyword matching (minimum 3 characters to prevent empty string matching)
-            if (norm_leaf and len(norm_leaf) >= 3) or (norm_loc and len(norm_loc) >= 3):
-                for cfg in configs:
-                    norm_cfg = _normalize(cfg.name or "")
-                    if norm_cfg and len(norm_cfg) >= 3:
-                        if (norm_leaf and len(norm_leaf) >= 3 and (norm_leaf in norm_cfg or norm_cfg in norm_leaf)) or \
-                           (norm_loc and len(norm_loc) >= 3 and (norm_loc in norm_cfg or norm_cfg in norm_loc)):
-                            return cfg
-
-            # Tier 3: Leaf department name or work location contained in POS config name (minimum 3 chars)
-            if (clean_leaf and len(clean_leaf) >= 3) or (clean_loc and len(clean_loc) >= 3):
-                for cfg in configs:
-                    cfg_name = (cfg.name or "").strip().lower()
-                    if len(cfg_name) >= 3:
-                        if clean_leaf and (clean_leaf in cfg_name or cfg_name in clean_leaf):
-                            return cfg
-                        if clean_loc and (clean_loc in cfg_name or cfg_name in clean_loc):
-                            return cfg
-
-            # Tier 4: POS config name contained within full department path (minimum 3 chars)
-            if clean_full and len(clean_full) >= 3:
-                for cfg in configs:
-                    cfg_name = (cfg.name or "").strip().lower()
-                    if cfg_name and len(cfg_name) >= 3 and cfg_name in clean_full:
-                        return cfg
-
-            return False
-
         # --- F. Collect Attendance & Calculate Daily Employee Labor Cost ---
         if "hr.attendance" in self.env:
             import calendar
@@ -336,17 +383,18 @@ class PosReportingDashboard(models.TransientModel):
             branch_extra_hours_amount = defaultdict(float)
             branch_unapproved_extra_hours = defaultdict(float)
             branch_unapproved_extra_hours_amount = defaultdict(float)
+            geo_locations = self._get_branch_geo_locations()
 
             for att in attendances:
                 emp = att.employee_id
-                if not emp or not att.check_in:
+                if not emp or not att.check_in or self._is_administration_employee(emp):
                     continue
                 c_dt = att.check_in
                 local_c_dt = fields.Datetime.context_timestamp(self, c_dt) if c_dt else False
                 att_date = local_c_dt.date() if local_c_dt else c_dt.date()
                 if not (dt_start <= c_dt <= dt_end):
                     continue
-                cfg = _get_employee_pos_config(emp)
+                cfg, _location = self._get_attendance_pos_config(att, configs, geo_locations)
                 if not cfg or (active_config_ids and cfg.id not in active_config_ids):
                     continue
                 branch_daily_attendants[cfg.id][att_date].add(emp)
@@ -549,79 +597,6 @@ class PosReportingDashboard(models.TransientModel):
             all_config_domain.append(("name", "not ilike", kw))
 
         all_configs = self.env["pos.config"].sudo().search(all_config_domain)
-
-        def _get_employee_pos_config(emp):
-            if hasattr(emp, "pos_config_id") and emp.pos_config_id:
-                return emp.pos_config_id
-            if hasattr(emp, "pos_config_ids") and emp.pos_config_ids:
-                return emp.pos_config_ids[0]
-
-            dept_full_path = ""
-            leaf_dept_name = ""
-            if emp.department_id:
-                dept_full_path = (getattr(emp.department_id, "complete_name", None) or emp.department_id.name or "").strip()
-                path_parts = [p.strip() for p in dept_full_path.split("/") if p.strip()]
-                leaf_dept_name = path_parts[-1] if path_parts else ""
-
-            loc_name = (emp.work_location_id.name or "").strip() if hasattr(emp, "work_location_id") and emp.work_location_id else ""
-
-            # Check explicit mapping dictionary first
-            mapped_target = EXPLICIT_DEPT_TO_POS_MAP.get(leaf_dept_name) or EXPLICIT_DEPT_TO_POS_MAP.get(dept_full_path)
-            if mapped_target:
-                target_clean = mapped_target.strip().lower()
-                for cfg in all_configs:
-                    cfg_name = (cfg.name or "").strip().lower()
-                    if cfg_name == target_clean or (len(target_clean) >= 3 and target_clean in cfg_name) or (len(cfg_name) >= 3 and cfg_name in target_clean):
-                        return cfg
-
-            clean_leaf = leaf_dept_name.lower().strip()
-            clean_full = dept_full_path.lower().strip()
-            clean_loc = loc_name.lower().strip()
-
-            def _normalize(s):
-                if not s:
-                    return ""
-                for noise in ("فرع ", "فرع", "شارع ", "شارع", "منطقة ", "منطقة", "مول"):
-                    s = s.replace(noise, "")
-                return s.strip().lower()
-
-            norm_leaf = _normalize(leaf_dept_name)
-            norm_loc = _normalize(loc_name)
-
-            # Tier 1: Exact match on leaf department name or work location
-            if clean_leaf or clean_loc:
-                for cfg in all_configs:
-                    cfg_name = (cfg.name or "").strip().lower()
-                    if (clean_leaf and cfg_name == clean_leaf) or (clean_loc and cfg_name == clean_loc):
-                        return cfg
-
-            # Tier 2: Normalized keyword matching (minimum 3 characters to prevent empty string matching)
-            if (norm_leaf and len(norm_leaf) >= 3) or (norm_loc and len(norm_loc) >= 3):
-                for cfg in all_configs:
-                    norm_cfg = _normalize(cfg.name or "")
-                    if norm_cfg and len(norm_cfg) >= 3:
-                        if (norm_leaf and len(norm_leaf) >= 3 and (norm_leaf in norm_cfg or norm_cfg in norm_leaf)) or \
-                           (norm_loc and len(norm_loc) >= 3 and (norm_loc in norm_cfg or norm_cfg in norm_loc)):
-                            return cfg
-
-            # Tier 3: Leaf department name or work location contained in POS config name (minimum 3 chars)
-            if (clean_leaf and len(clean_leaf) >= 3) or (clean_loc and len(clean_loc) >= 3):
-                for cfg in all_configs:
-                    cfg_name = (cfg.name or "").strip().lower()
-                    if len(cfg_name) >= 3:
-                        if clean_leaf and (clean_leaf in cfg_name or cfg_name in clean_leaf):
-                            return cfg
-                        if clean_loc and (clean_loc in cfg_name or cfg_name in clean_loc):
-                            return cfg
-
-            # Tier 4: POS config name contained within full department path (minimum 3 chars)
-            if clean_full and len(clean_full) >= 3:
-                for cfg in all_configs:
-                    cfg_name = (cfg.name or "").strip().lower()
-                    if cfg_name and len(cfg_name) >= 3 and cfg_name in clean_full:
-                        return cfg
-
-            return False
 
         # Clear previous transient drill-down records for current user
         self.env["pos.unified.report"].sudo().search([("create_uid", "=", self.env.user.id)]).unlink()
@@ -834,16 +809,17 @@ class PosReportingDashboard(models.TransientModel):
                     ("check_in", ">=", search_start),
                     ("check_in", "<=", search_end),
                 ])
+                geo_locations = self._get_branch_geo_locations()
                 for att in attendances:
                     emp = att.employee_id
-                    if not emp or not att.check_in:
+                    if not emp or not att.check_in or self._is_administration_employee(emp):
                         continue
                     c_dt = att.check_in
                     local_c_dt = fields.Datetime.context_timestamp(self, c_dt) if c_dt else False
                     att_date = local_c_dt.date() if local_c_dt else c_dt.date()
                     if not (dt_start <= c_dt <= dt_end):
                         continue
-                    cfg = _get_employee_pos_config(emp)
+                    cfg, location = self._get_attendance_pos_config(att, all_configs, geo_locations)
                     if not cfg or (active_config_ids and cfg.id not in active_config_ids):
                         continue
 
@@ -906,6 +882,11 @@ class PosReportingDashboard(models.TransientModel):
                         "employee_code": emp_code,
                         "check_in": att.check_in,
                         "check_out": att.check_out,
+                        "check_in_location_id": location.id or False,
+                        "check_in_map_url": (
+                            "https://maps.google.com/?q=%s,%s" % (att.in_latitude, att.in_longitude)
+                            if att.in_latitude and att.in_longitude else False
+                        ),
                         "monthly_wage": wage,
                         "labor_cost_amount": daily_cost,
                         "extra_hours": ot_hrs,

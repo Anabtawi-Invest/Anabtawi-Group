@@ -97,6 +97,8 @@
                 <field name="date" string="Attendance Date"/>
                 <field name="check_in" string="Check In Date &amp; Time"/>
                 <field name="check_out" string="Check Out Date &amp; Time"/>
+                <field name="check_in_location_id"/>
+                <field name="check_in_map_url" widget="url" text="Map"/>
                 <field name="name" string="Status / Description"/>
             </list>
         </field>
@@ -115,6 +117,7 @@
                 <field name="employee_id" string="Employee Name"/>
                 <field name="config_id" string="POS Branch"/>
                 <field name="date" string="Shift Date"/>
+                <field name="check_in_location_id" optional="show"/>
                 <field name="monthly_wage" string="Monthly Salary / Wage (JOD)" sum="Total Monthly Wage"/>
                 <field name="labor_cost_amount" string="Daily Wage Cost (JOD)" sum="Total Daily Wage Cost"/>
                 <field name="name" string="Details"/>
@@ -137,6 +140,7 @@
                 <field name="date" string="Shift Date"/>
                 <field name="check_in" string="Check In"/>
                 <field name="check_out" string="Check Out"/>
+                <field name="check_in_location_id" optional="show"/>
                 <field name="extra_hours" string="Extra Hours (hrs)" sum="Total Extra Hours"/>
                 <field name="amount" string="Extra Hours Amount (JOD)" sum="Total Extra Hours Amount"/>
                 <field name="name" string="Details"/>
