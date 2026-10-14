@@ -2,6 +2,7 @@
 """Confirm / cancel lifecycle: settlements and Extra Hours allocations are only touched here,
 never while a draft payslip is being computed."""
 import logging
+import math
 from collections import defaultdict
 from datetime import datetime, time, timedelta
 
@@ -86,13 +87,20 @@ class HrPayslip(models.Model):
     def _pfr_create_annual_settlement_leaves(self, leave_type):
         """Step 2: consume Annual Leave, one validated leave per settled day."""
         self.ensure_one()
-        hours = self.lateness_covered_by_annual_leave
-        if hours <= 0.01 or not leave_type or 'hr.leave' not in self.env:
+        self._pfr_create_settlement_leaves(leave_type, self.lateness_covered_by_annual_leave, 'Annual Leave')
+
+    def _pfr_create_settlement_leaves(self, leave_type, hours, label):
+        """Consume `hours` of a day-based leave type: one validated leave per day, the last one a real
+        fraction of a day (hours / 8). Existing settlement leaves of this slip and type are replaced."""
+        self.ensure_one()
+        if not leave_type or 'hr.leave' not in self.env:
             return
         Leave = self.env['hr.leave'].sudo()
         Leave.search([('employee_id', '=', self.employee_id.id), ('holiday_status_id', '=', leave_type.id),
                       ('request_date_from', '>=', self.date_from), ('request_date_to', '<=', self.date_to),
                       ('name', 'ilike', 'Lateness Settlement')]).unlink()
+        if hours <= 0.01:
+            return
         alloc = self.env['hr.leave.allocation'].sudo().search([
             ('employee_id', '=', self.employee_id.id), ('holiday_status_id', '=', leave_type.id),
             ('state', '=', 'validate')], order='date_to desc, id desc', limit=1)
@@ -103,12 +111,13 @@ class HrPayslip(models.Model):
             chunk = min(remaining, 8.0)
             start = datetime.combine(day, time(8, 0))
             vals = {
-                'name': f"Lateness Settlement (Annual Leave) - {day.strftime('%d/%m/%Y')}"
+                'name': f"Lateness Settlement ({label}) - {day.strftime('%d/%m/%Y')}"
                         + ('' if chunk >= 7.99 else f" {round(chunk, 2)}h"),
                 'employee_id': self.employee_id.id, 'holiday_status_id': leave_type.id,
                 'request_date_from': day, 'request_date_to': day,
                 'date_from': start, 'date_to': start + timedelta(hours=9.0 if chunk >= 7.99 else chunk),
-                'number_of_days': 1.0 if chunk >= 7.99 else round(chunk / 8.0, 4), 'state': 'validate',
+                'number_of_days': 1.0 if chunk >= 7.99 else math.floor(chunk / 8.0 * 10000) / 10000.0,
+                'state': 'validate',
             }
             if alloc and 'holiday_allocation_id' in Leave._fields:
                 vals['holiday_allocation_id'] = alloc.id
@@ -119,7 +128,8 @@ class HrPayslip(models.Model):
                     # a day-based leave type counts any leave as a whole day: store the real fraction of a day
                     leave._pfr_store_fraction(chunk)
             except Exception:
-                _logger.exception("[payroll_fix_recon] annual settlement leave failed slip=%s day=%s", self.id, day)
+                _logger.exception("[payroll_fix_recon] %s settlement leave failed slip=%s day=%s",
+                                  label, self.id, day)
             remaining -= chunk
             day += timedelta(days=1)
 
@@ -129,6 +139,10 @@ class HrPayslip(models.Model):
         Alloc = self.env['hr.leave.allocation'].sudo()
         settlement = self.env['pfr.settlement']
         name = recon_alloc_name(self)
+        self.env['hr.leave'].sudo().search([
+            ('employee_id', '=', self.employee_id.id), ('holiday_status_id', '=', extra_type.id),
+            ('request_date_from', '>=', self.date_from), ('request_date_to', '<=', self.date_to),
+            ('name', 'ilike', 'Lateness Settlement')]).unlink()
         Alloc.search([('employee_id', '=', self.employee_id.id), ('holiday_status_id', '=', extra_type.id),
                       ('name', '=', name)]).write({'state': 'confirm'})
         Alloc.search([('employee_id', '=', self.employee_id.id), ('name', '=', name)]).unlink()
@@ -148,10 +162,10 @@ class HrPayslip(models.Model):
             self._pfr_set({'extra_hours_allocated_days': vals['number_of_days']})
         else:
             self._pfr_set({'extra_hours_allocated_days': 0.0})
-            if gap < -0.05:
-                _logger.warning("[payroll_fix_recon] slip=%s Extra Hours balance exceeds target by %sh "
-                                "(lateness consumed prior balance); allocations cannot go negative.",
-                                self.id, abs(gap))
+            if gap < -0.01:
+                # Step 1 used banked hours: record them in Time Off (days) as a fractional leave so the
+                # balance (days) equals the slip's remaining Extra Hours balance (hours / 8)
+                self._pfr_create_settlement_leaves(extra_type, -gap, 'Extra Hours')
 
     def _pfr_validate_allocation(self, alloc):
         alloc = alloc.sudo()
@@ -208,7 +222,7 @@ class HrLeave(models.Model):
         Odoo recomputes a leave of a day-based type as a whole day whatever its hours are. The duration
         is written directly (SQL) so no other leave / allocation / work entry logic is triggered."""
         self.ensure_one()
-        days = round(hours / 8.0, 4)
+        days = math.floor(hours / 8.0 * 10000) / 10000.0     # never above the real balance
         self.flush_recordset()
         sets, params = ['number_of_days = %s'], [days]
         field = self._fields.get('number_of_hours')
