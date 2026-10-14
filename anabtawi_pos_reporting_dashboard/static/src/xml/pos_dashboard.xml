@@ -23,9 +23,9 @@
                     </div>
 
                     <div class="d-flex align-items-center gap-2">
-                        <input type="datetime-local" class="form-control filter_input" t-model="state.date_from"/>
+                        <input type="date" class="form-control filter_input" t-model="state.date_from"/>
                         <span class="text-muted">to</span>
-                        <input type="datetime-local" class="form-control filter_input" t-model="state.date_to"/>
+                        <input type="date" class="form-control filter_input" t-model="state.date_to"/>
                         <button class="btn btn-primary" t-on-click="fetchDashboardData" icon="fa-refresh">
                             <i class="fa fa-refresh me-1"/> Apply
                         </button>
@@ -119,6 +119,17 @@
                         <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.discount_amount)"/></div>
                         <div class="kpi_subtext d-flex justify-content-between align-items-center">
                             <span class="badge bg-warning text-dark badge_sub">Discounts</span>
+                            <span class="drill_badge"><i class="fa fa-search-plus me-1"/>Drill Down</span>
+                        </div>
+                    </div>
+
+                    <!-- Gifts (Hospitality) -->
+                    <div class="o_kpi_card card-gift clickable_kpi" t-on-click="() => this.onKpiClick('gift_amount')" title="Click to view detailed transactions &amp; export Excel">
+                        <div class="kpi_icon"><i class="fa fa-gift text-danger"/></div>
+                        <div class="kpi_title">Gifts (Hospitality)</div>
+                        <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.gift_amount)"/></div>
+                        <div class="kpi_subtext d-flex justify-content-between align-items-center">
+                            <span class="badge bg-danger badge_sub"><t t-esc="data.kpis.gift_line_count || 0"/> Gift Lines</span>
                             <span class="drill_badge"><i class="fa fa-search-plus me-1"/>Drill Down</span>
                         </div>
                     </div>
@@ -418,6 +429,12 @@
                                         <i class="fa fa-sort-amount-asc text-primary ms-1" t-if="state.sortKey === 'discount_amount' &amp;&amp; state.sortOrder === 'asc'"/>
                                         <i class="fa fa-sort text-muted ms-1 opacity-50" t-if="state.sortKey !== 'discount_amount'"/>
                                     </th>
+                                    <th class="text-end sortable_th" t-on-click="() => this.sortBy('gift_amount')">
+                                        Gifts
+                                        <i class="fa fa-sort-amount-desc text-primary ms-1" t-if="state.sortKey === 'gift_amount' &amp;&amp; state.sortOrder === 'desc'"/>
+                                        <i class="fa fa-sort-amount-asc text-primary ms-1" t-if="state.sortKey === 'gift_amount' &amp;&amp; state.sortOrder === 'asc'"/>
+                                        <i class="fa fa-sort text-muted ms-1 opacity-50" t-if="state.sortKey !== 'gift_amount'"/>
+                                    </th>
                                     <th class="text-end sortable_th" t-on-click="() => this.sortBy('cash')">
                                         Cash Sales
                                         <i class="fa fa-sort-amount-desc text-primary ms-1" t-if="state.sortKey === 'cash' &amp;&amp; state.sortOrder === 'desc'"/>
@@ -555,6 +572,7 @@
                                         <td class="val_num clickable_cell" t-on-click="() => this.onKpiClick('untaxed_sales', branch.config_id)" title="Click to view branch untaxed sales"><t t-esc="formatCurrency(branch.untaxed_sales)"/></td>
                                         <td class="val_num clickable_cell" t-on-click="() => this.onKpiClick('tax_amount', branch.config_id)" title="Click to view branch tax"><t t-esc="formatCurrency(branch.tax_amount)"/></td>
                                         <td class="val_num text-warning clickable_cell" t-on-click="() => this.onKpiClick('discount_amount', branch.config_id)" title="Click to view branch discounts"><t t-esc="formatCurrency(branch.discount_amount)"/></td>
+                                        <td class="val_num text-danger clickable_cell" t-on-click="() => this.onKpiClick('gift_amount', branch.config_id)" title="Click to view branch gifts"><t t-esc="formatCurrency(branch.gift_amount)"/></td>
                                         <td class="val_num text-success clickable_cell" t-on-click="() => this.onKpiClick('cash_sales', branch.config_id)" title="Click to view branch cash sales"><t t-esc="formatCurrency(branch.cash)"/></td>
                                         <td class="val_num text-info clickable_cell" t-on-click="() => this.onKpiClick('visa_sales', branch.config_id)" title="Click to view branch visa sales"><t t-esc="formatCurrency(branch.visa)"/></td>
                                         <td class="val_num text-warning clickable_cell" t-on-click="() => this.onKpiClick('online_sales', branch.config_id)" title="Click to view branch online sales"><t t-esc="formatCurrency(branch.online_sales)"/></td>
@@ -586,6 +604,7 @@
                                     <td class="val_num clickable_cell" t-on-click="() => this.onKpiClick('untaxed_sales')" title="Click to view total untaxed sales"><t t-esc="formatCurrency(data.global_totals.untaxed_sales)"/></td>
                                     <td class="val_num clickable_cell" t-on-click="() => this.onKpiClick('tax_amount')" title="Click to view total tax"><t t-esc="formatCurrency(data.global_totals.tax_amount)"/></td>
                                     <td class="val_num text-warning clickable_cell" t-on-click="() => this.onKpiClick('discount_amount')" title="Click to view total discounts"><t t-esc="formatCurrency(data.global_totals.discount_amount)"/></td>
+                                    <td class="val_num text-danger clickable_cell" t-on-click="() => this.onKpiClick('gift_amount')" title="Click to view total gifts"><t t-esc="formatCurrency(data.global_totals.gift_amount)"/></td>
                                     <td class="val_num clickable_cell" t-on-click="() => this.onKpiClick('cash_sales')" title="Click to view total cash sales"><t t-esc="formatCurrency(data.global_totals.cash)"/></td>
                                     <td class="val_num clickable_cell" t-on-click="() => this.onKpiClick('visa_sales')" title="Click to view total visa sales"><t t-esc="formatCurrency(data.global_totals.visa)"/></td>
                                     <td class="val_num text-warning clickable_cell" t-on-click="() => this.onKpiClick('online_sales')" title="Click to view total online sales"><t t-esc="formatCurrency(data.global_totals.online_sales)"/></td>

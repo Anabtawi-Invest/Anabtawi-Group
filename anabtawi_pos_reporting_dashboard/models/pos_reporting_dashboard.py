@@ -2,9 +2,9 @@
 import logging
 from collections import defaultdict
 from datetime import datetime, time, timedelta
-import pytz
 
 from odoo import _, api, fields, models
+from odoo.addons.pos_ameen_daily_operation.models.pos_daily_ops_engine import DELIVERY_CHANNELS
 
 _logger = logging.getLogger(__name__)
 
@@ -42,249 +42,74 @@ EXPLICIT_DEPT_TO_POS_MAP = {
     "الإذاعة": "فرع الإذاعة",
 }
 
+DASHBOARD_EXTRA_KEYS = {
+    "untaxed_sales": 0.0,
+    "tax_amount": 0.0,
+    "discount_amount": 0.0,
+    "gift_amount": 0.0,
+    "gift_line_count": 0,
+    "net_cash_moves": 0.0,
+    "net_pledges": 0.0,
+    "pledge_cash_net": 0.0,
+    "pledge_visa_net": 0.0,
+    "advance_deposits": 0.0,
+    "advance_cash": 0.0,
+    "advance_visa": 0.0,
+    "advance_cash_count": 0,
+    "advance_visa_count": 0,
+    "advance_order_count": 0,
+    "advance_order_total": 0.0,
+    "advance_pickup_value": 0.0,
+    "advance_remaining_amount": 0.0,
+    "advance_pending_count": 0,
+    "order_count": 0,
+    "orders_per_min": 0.0,
+    "attendant_employee_count": 0,
+    "total_labor_cost": 0.0,
+    "extra_hours": 0.0,
+    "extra_hours_amount": 0.0,
+    "unapproved_extra_hours": 0.0,
+    "unapproved_extra_hours_amount": 0.0,
+}
+
+PAYMENT_METRICS = ("sales", "cash_sales", "visa_sales", "employee_debt", "online_sales", "hospitality")
+
 
 class PosReportingDashboard(models.TransientModel):
     _name = "pos.reporting.dashboard"
     _description = "POS Executive Reporting & Dashboard Service"
 
-    def _parse_datetime_bounds(self, date_from, date_to):
-        """
-        Parse date/datetime parameters into exact store shift datetime bounds,
-        converted from local user timezone (e.g. Asia/Amman) to UTC for database queries.
-        Default shift window: 06:00 AM on start day to 05:00 AM on following day (local time).
-        """
-        user_tz_name = self.env.user.tz or self.env.context.get("tz") or "Asia/Amman"
-        try:
-            local_tz = pytz.timezone(user_tz_name)
-        except Exception:
-            local_tz = pytz.timezone("Asia/Amman")
-
+    def _parse_period(self, date_from, date_to):
+        """Business-date period from 'YYYY-MM-DD' (or datetime) strings; defaults to today."""
         today = fields.Date.context_today(self)
 
-        def _to_local_dt(val, is_end=False):
+        def _to_date(val):
             if not val:
-                d = today
-                if is_end:
-                    tomorrow = d + timedelta(days=1)
-                    return datetime.combine(tomorrow, time(5, 0, 0))
-                return datetime.combine(d, time(6, 0, 0))
+                return today
+            try:
+                return fields.Date.to_date(str(val).strip()[:10])
+            except ValueError:
+                return today
 
-            if isinstance(val, datetime):
-                return val
-
-            val_str = str(val).strip().replace("T", " ")
-            dt_val = None
-
-            DATETIME_FORMATS = (
-                "%Y-%m-%d %H:%M:%S",
-                "%Y-%m-%d %H:%M",
-                "%m/%d/%Y %H:%M:%S",
-                "%m/%d/%Y %H:%M",
-                "%m/%d/%Y %I:%M:%S %p",
-                "%m/%d/%Y %I:%M %p",
-                "%d/%m/%Y %H:%M:%S",
-                "%d/%m/%Y %H:%M",
-                "%d/%m/%Y %I:%M:%S %p",
-                "%d/%m/%Y %I:%M %p",
-            )
-            for fmt in DATETIME_FORMATS:
-                try:
-                    dt_val = datetime.strptime(val_str.split(".")[0], fmt)
-                    break
-                except Exception:
-                    pass
-
-            if not dt_val:
-                DATE_FORMATS = ("%Y-%m-%d", "%m/%d/%Y", "%d/%m/%Y")
-                for dfmt in DATE_FORMATS:
-                    try:
-                        d = datetime.strptime(val_str[:10], dfmt).date()
-                        if d:
-                            if is_end:
-                                tomorrow = d + timedelta(days=1)
-                                return datetime.combine(tomorrow, time(5, 0, 0))
-                            return datetime.combine(d, time(6, 0, 0))
-                    except Exception:
-                        pass
-
-            if not dt_val:
-                try:
-                    d = fields.Date.from_string(val_str[:10])
-                    if d:
-                        if is_end:
-                            tomorrow = d + timedelta(days=1)
-                            return datetime.combine(tomorrow, time(5, 0, 0))
-                        return datetime.combine(d, time(6, 0, 0))
-                except Exception:
-                    pass
-
-            if not dt_val:
-                d = today
-                if is_end:
-                    tomorrow = d + timedelta(days=1)
-                    return datetime.combine(tomorrow, time(5, 0, 0))
-                return datetime.combine(d, time(6, 0, 0))
-
-            return dt_val
-
-        local_dt_start = _to_local_dt(date_from, is_end=False)
-        local_dt_end = _to_local_dt(date_to, is_end=True)
-
-        # Convert local shift naive datetimes into UTC naive datetimes for PostgreSQL matching
-        try:
-            utc_start = local_tz.localize(local_dt_start).astimezone(pytz.UTC).replace(tzinfo=None)
-        except Exception:
-            utc_start = local_dt_start - timedelta(hours=3)
-
-        try:
-            utc_end = local_tz.localize(local_dt_end).astimezone(pytz.UTC).replace(tzinfo=None)
-        except Exception:
-            utc_end = local_dt_end - timedelta(hours=3)
-
-        return utc_start, utc_end
-
-    def _classify_pm_flags(self, pm):
-        """Return (is_emp, is_hosp, is_online, is_cash, is_visa, pm_name) for a POS payment method."""
-        daily_type = getattr(pm, "daily_ops_report_type", "") or ""
-        pm_type = getattr(pm, "type", "") or ""
-        pm_name = (pm.name or "").lower()
-
-        is_emp = "ذمم" in pm_name or "موظف" in pm_name or "employee" in pm_name or "ذمة" in pm_name or "ذمه" in pm_name or daily_type == "employee_debt"
-        is_hosp = daily_type == "hospitality" or "hospitality" in pm_name or "ضيافة" in pm_name
-
-        online_kw = ("talabat", "careem", "mythings", "kabseh", "طلبات", "كريم", "أشياتي", "توصيل", "delivery", "online")
-        is_online = any(k in pm_name for k in online_kw) or daily_type in ("talabat", "careem", "mythings", "kabseh", "online")
-
-        is_cash = not (is_emp or is_hosp or is_online) and (
-            daily_type == "cash" or pm_type == "cash" or "cash" in pm_name or "نقد" in pm_name or "صندوق" in pm_name
-        )
-
-        is_visa = not (is_emp or is_hosp or is_online or is_cash) and (
-            daily_type == "visa" or pm_type in ("bank", "pay_later") or "visa" in pm_name or "بطاقة" in pm_name or "card" in pm_name
-        )
-
-        return is_emp, is_hosp, is_online, is_cash, is_visa, pm_name
-
-    def _pm_channel(self, pm):
-        """Return 'cash', 'visa' or False for a POS payment method."""
-        if not pm:
-            return False
-        flags = self._classify_pm_flags(pm)
-        if flags[3]:
-            return "cash"
-        if flags[4]:
-            return "visa"
-        return False
-
-    def _split_by_payments(self, payments):
-        """Return (cash_ratio, visa_ratio) from the cash/visa payments of an order, or None."""
-        cash = visa = 0.0
-        for pay in payments:
-            channel = self._pm_channel(pay.payment_method_id)
-            if channel == "cash":
-                cash += pay.amount or 0.0
-            elif channel == "visa":
-                visa += pay.amount or 0.0
-        cash, visa = abs(cash), abs(visa)
-        total = cash + visa
-        if not total:
-            return None
-        return cash / total, visa / total
-
-    def _pledge_receive_split(self, pledge):
-        """(cash_ratio, visa_ratio) for a received pledge; defaults to cash."""
-        split = None
-        if pledge.pos_order_id:
-            split = self._split_by_payments(pledge.pos_order_id.payment_ids)
-        return split or (1.0, 0.0)
-
-    def _pledge_return_split(self, pledge):
-        """(cash_ratio, visa_ratio) for a returned pledge; falls back to the receive split."""
-        split = None
-        channel = self._pm_channel(pledge.return_payment_method_id)
-        if channel:
-            split = (1.0, 0.0) if channel == "cash" else (0.0, 1.0)
-        elif pledge.return_pos_order_id:
-            split = self._split_by_payments(pledge.return_pos_order_id.payment_ids)
-        return split or self._pledge_receive_split(pledge)
+        return self.env["pos.daily.ops.engine"]._get_period(_to_date(date_from), _to_date(date_to))
 
     @staticmethod
-    def _pledge_amount(pledge):
-        return pledge.pledge_subtotal or (pledge.pledge_qty or 0.0) * (pledge.pledge_amount_unit or 0.0)
+    def _period_bounds(period):
+        """Naive UTC business window (06:00 -> 06:00 local) and its string form."""
+        dt_start, dt_end = period["business_start"], period["business_end"]
+        return dt_start, dt_end, fields.Datetime.to_string(dt_start), fields.Datetime.to_string(dt_end)
 
-    @staticmethod
-    def _pledge_receive_branch(pledge):
-        if pledge.pos_order_id:
-            return pledge.pos_order_id.config_id
-        return pledge.order_id.pos_config_id or pledge.order_id.from_pos_config_id
+    def _get_pledge_movements(self, period, configs):
+        return self.env["pos.daily.ops.engine"]._get_pledge_movements(period, configs)
 
-    def _pledge_return_branch(self, pledge):
-        return (
-            pledge.return_pos_session_id.config_id
-            or pledge.return_pos_order_id.config_id
-            or self._pledge_receive_branch(pledge)
-        )
-
-    def _get_pledge_movements(self, dt_start, dt_end, config_ids):
-        """Pledge cash-drawer movements between dt_start and dt_end for the given branch ids.
-
-        Pledge (Rahen) In: Active/Returned pledges received in the period, at the receiving branch.
-        Pledge (Rahen) Out: pledges returned in the period (whenever they were received), at the returning branch.
-        Pledges without a resolvable branch are skipped.
-        """
-        if "pos.advance.order.pledge" not in self.env:
-            return []
-        str_start = fields.Datetime.to_string(dt_start)
-        str_end = fields.Datetime.to_string(dt_end)
-        pledges = self.env["pos.advance.order.pledge"].sudo().search([
-            "|", "|", "|",
-            "&", ("receive_date", ">=", str_start), ("receive_date", "<=", str_end),
-            "&", ("create_date", ">=", str_start), ("create_date", "<=", str_end),
-            "&", ("return_date", ">=", str_start), ("return_date", "<=", str_end),
-            "&", "&", ("state", "=", "returned"), ("return_date", "=", False),
-            "&", ("write_date", ">=", str_start), ("write_date", "<=", str_end),
-        ], order="id desc")
-
-        movements = []
-        for pledge in pledges:
-            amount = self._pledge_amount(pledge)
-            if not amount:
-                continue
-
-            rec_dt = pledge.receive_date or pledge.create_date
-            if pledge.state in ("active", "returned") and rec_dt and dt_start <= rec_dt <= dt_end:
-                cfg = self._pledge_receive_branch(pledge)
-                if cfg and cfg.id in config_ids:
-                    cash_r, visa_r = self._pledge_receive_split(pledge)
-                    movements.append({
-                        "pledge": pledge,
-                        "type": "in",
-                        "date": rec_dt,
-                        "config": cfg,
-                        "amount": amount,
-                        "cash": amount * cash_r,
-                        "visa": amount * visa_r,
-                        "pos_order": pledge.pos_order_id,
-                        "payment_method": self.env["pos.payment.method"],
-                    })
-
-            ret_dt = pledge.return_date or pledge.write_date
-            if pledge.state == "returned" and ret_dt and dt_start <= ret_dt <= dt_end:
-                cfg = self._pledge_return_branch(pledge)
-                if cfg and cfg.id in config_ids:
-                    cash_r, visa_r = self._pledge_return_split(pledge)
-                    movements.append({
-                        "pledge": pledge,
-                        "type": "out",
-                        "date": ret_dt,
-                        "config": cfg,
-                        "amount": amount,
-                        "cash": amount * cash_r,
-                        "visa": amount * visa_r,
-                        "pos_order": pledge.return_pos_order_id or pledge.pos_order_id,
-                        "payment_method": pledge.return_payment_method_id,
-                    })
-        return movements
+    def _get_advance_orders(self, period):
+        start, end = period["business_start"], period["business_end"]
+        return self.env["pos.advance.order"].sudo().search([
+            ("state", "not in", ("draft", "cancel")),
+            "|",
+            "&", ("create_date", ">=", start), ("create_date", "<", end),
+            "&", ("picking_date", ">=", start), ("picking_date", "<", end),
+        ])
 
     def _get_report_configs(self, config_ids=None):
         """Active retail branches of the active companies (cafe/corporate configs excluded)."""
@@ -300,267 +125,94 @@ class PosReportingDashboard(models.TransientModel):
 
     def _advance_channel(self, adv):
         """'cash' or 'visa' for an advance order deposit."""
-        channel = self._pm_channel(adv.pos_payment_method_id)
+        channel = self.env["pos.daily.ops.engine"]._get_channel(adv.pos_payment_method_id)
         if channel:
             return channel
         return "cash" if (adv.payment_method or "cash") == "cash" else "visa"
+
+    @staticmethod
+    def _gift_line_value(line):
+        return (line.price_unit or 0.0) * (line.qty or 0.0)
+
+    @staticmethod
+    def _order_discount(order):
+        """Real discounts only; gift lines are reported separately."""
+        return sum(
+            (line.price_unit or 0.0) * (line.qty or 0.0) * (line.discount / 100.0)
+            for line in order.lines if line.discount and not line.is_gift
+        )
+
+    def _order_gift_lines(self, order):
+        return order.lines.filtered("is_gift")
+
+    @staticmethod
+    def _order_untaxed(order):
+        untaxed = getattr(order, "amount_untaxed", None)
+        if untaxed is None:
+            untaxed = (order.amount_total or 0.0) - (order.amount_tax or 0.0)
+        return untaxed
+
+    def _payment_matches_metric(self, payment_method, metric_type):
+        bucket = self.env["pos.daily.ops.engine"]._get_bucket(payment_method)
+        if metric_type == "sales":
+            return bucket != "hospitality"
+        if metric_type == "cash_sales":
+            return bucket == "cash"
+        if metric_type == "visa_sales":
+            return bucket == "visa"
+        if metric_type == "employee_debt":
+            return bucket == "employee_debt"
+        if metric_type == "online_sales":
+            return bucket in DELIVERY_CHANNELS
+        if metric_type == "hospitality":
+            return bucket == "hospitality"
+        return False
 
     @api.model
     def get_dashboard_data(self, date_from=None, date_to=None, config_ids=None):
         """
         Fetch executive POS metrics across branch configurations for active multi-company context.
-        Includes channel breakdowns, cash moves, pledges, advance orders, and orders per minute (OPM).
+        Sales, payment channels, cash moves and pledges come from the shared Daily Operations
+        engine so they always match the Daily Operations Excel report.
         """
-        dt_start, dt_end = self._parse_datetime_bounds(date_from, date_to)
-        str_start = fields.Datetime.to_string(dt_start)
-        str_end = fields.Datetime.to_string(dt_end)
+        engine = self.env["pos.daily.ops.engine"]
+        period = self._parse_period(date_from, date_to)
+        dt_start, dt_end, str_start, str_end = self._period_bounds(period)
 
         # Operational duration in minutes for OPM calculations
-        total_seconds = max((dt_end - dt_start).total_seconds(), 60.0)
-        total_minutes = max(total_seconds / 60.0, 1.0)
+        total_minutes = max((dt_end - dt_start).total_seconds() / 60.0, 1.0)
 
         configs = self._get_report_configs(config_ids)
         active_config_ids = set(configs.ids)
 
+        sessions = engine._get_sessions(period, configs)
+        figures = engine._compute_branch_figures(period, configs, sessions=sessions)
+
         def _empty_branch_dict():
-            return {
-                "sales": 0.0,
-                "untaxed_sales": 0.0,
-                "tax_amount": 0.0,
-                "discount_amount": 0.0,
-                "cash": 0.0,
-                "visa": 0.0,
-                "online_sales": 0.0,
-                "employee_debt": 0.0,
-                "hospitality": 0.0,
-                "talabat": 0.0,
-                "careem": 0.0,
-                "mythings": 0.0,
-                "kabseh": 0.0,
-                "other_sales": 0.0,
-                "cash_in": 0.0,
-                "cash_out": 0.0,
-                "net_cash_moves": 0.0,
-                "rahen_in": 0.0,
-                "rahen_out": 0.0,
-                "net_pledges": 0.0,
-                "pledge_cash_in": 0.0,
-                "pledge_cash_out": 0.0,
-                "pledge_cash_net": 0.0,
-                "pledge_visa_in": 0.0,
-                "pledge_visa_out": 0.0,
-                "pledge_visa_net": 0.0,
-                "advance_deposits": 0.0,
-                "advance_cash": 0.0,
-                "advance_visa": 0.0,
-                "advance_cash_count": 0,
-                "advance_visa_count": 0,
-                "advance_order_count": 0,
-                "advance_order_total": 0.0,
-                "advance_pickup_value": 0.0,
-                "advance_remaining_amount": 0.0,
-                "advance_pending_count": 0,
-                "delivery_amount": 0.0,
-                "order_count": 0,
-                "orders_per_min": 0.0,
-                "attendant_employee_count": 0,
-                "total_labor_cost": 0.0,
-                "extra_hours": 0.0,
-                "extra_hours_amount": 0.0,
-                "unapproved_extra_hours": 0.0,
-                "unapproved_extra_hours_amount": 0.0,
-            }
+            return {**engine._empty_figures(), **DASHBOARD_EXTRA_KEYS}
 
         branch_data = defaultdict(_empty_branch_dict)
+        for cfg_id, values in figures.items():
+            branch_data[cfg_id].update(values)
 
-        # Helper for classification
-        _classify_pm = self._classify_pm_flags
-
-        # --- A. Collect POS Payments & Channel Breakdown ---
-        payments = self.env["pos.payment"].sudo().search([
-            ("pos_order_id.state", "in", ("paid", "done", "invoiced")),
-            "|",
-            "&", ("payment_date", ">=", str_start), ("payment_date", "<=", str_end),
-            "&", ("payment_date", "=", False),
-                 "&", ("pos_order_id.date_order", ">=", str_start), ("pos_order_id.date_order", "<=", str_end),
-        ])
-
-        # Group payments by POS Order to rebalance non-cash change adjustments
-        order_payments = defaultdict(list)
-        session_only_payments = []
-
-        for pay in payments:
-            if pay.pos_order_id:
-                order_payments[pay.pos_order_id].append(pay)
-            else:
-                session_only_payments.append(pay)
-
-        # Process session-only payments
-        for pay in session_only_payments:
-            cfg = pay.session_id.config_id if pay.session_id else False
-            if not cfg or (active_config_ids and cfg.id not in active_config_ids):
-                continue
-            cfg_id = cfg.id
-            amt = pay.amount or 0.0
-            branch_data[cfg_id]["sales"] += amt
-            is_emp, is_hosp, is_online, is_cash, is_visa, pm_name = _classify_pm(pay.payment_method_id)
-
-            if is_emp:
-                branch_data[cfg_id]["employee_debt"] += amt
-            elif is_hosp:
-                branch_data[cfg_id]["hospitality"] += amt
-            elif is_online:
-                branch_data[cfg_id]["online_sales"] += amt
-            elif is_cash:
-                branch_data[cfg_id]["cash"] += amt
-            elif is_visa:
-                branch_data[cfg_id]["visa"] += amt
-            else:
-                branch_data[cfg_id]["other_sales"] += amt
-
-            if "talabat" in pm_name:
-                branch_data[cfg_id]["talabat"] += amt
-            elif "careem" in pm_name:
-                branch_data[cfg_id]["careem"] += amt
-            elif "mythings" in pm_name:
-                branch_data[cfg_id]["mythings"] += amt
-            elif "kabseh" in pm_name:
-                branch_data[cfg_id]["kabseh"] += amt
-
-        # Process order payments with cross-method change rebalancing
-        for order, pay_list in order_payments.items():
-            cfg = order.config_id
-            if not cfg or (active_config_ids and cfg.id not in active_config_ids):
-                continue
-            cfg_id = cfg.id
-
-            cat_amounts = defaultdict(float)
-            pm_names = {}
-
-            for pay in pay_list:
-                amt = pay.amount or 0.0
-                pm = pay.payment_method_id
-                is_emp, is_hosp, is_online, is_cash, is_visa, pm_name = _classify_pm(pm)
-                pm_names[pay.id] = pm_name
-
-                if is_emp:
-                    cat_amounts["employee_debt"] += amt
-                elif is_hosp:
-                    cat_amounts["hospitality"] += amt
-                elif is_online:
-                    cat_amounts["online_sales"] += amt
-                elif is_cash:
-                    cat_amounts["cash"] += amt
-                elif is_visa:
-                    cat_amounts["visa"] += amt
-                else:
-                    cat_amounts["other_sales"] += amt
-
-                if "talabat" in pm_name:
-                    branch_data[cfg_id]["talabat"] += amt
-                elif "careem" in pm_name:
-                    branch_data[cfg_id]["careem"] += amt
-                elif "mythings" in pm_name:
-                    branch_data[cfg_id]["mythings"] += amt
-                elif "kabseh" in pm_name:
-                    branch_data[cfg_id]["kabseh"] += amt
-
-            # If cash is negative (change given) but non-cash methods cover the order total
-            non_cash_sum = cat_amounts["visa"] + cat_amounts["online_sales"] + cat_amounts["employee_debt"] + cat_amounts["hospitality"] + cat_amounts["other_sales"]
-            if cat_amounts["cash"] < 0 and non_cash_sum > 0:
-                ord_tot = order.amount_total or 0.0
-                if ord_tot >= 0:
-                    excess = max(0.0, non_cash_sum - ord_tot)
-                    if excess > 0:
-                        # Rebalance: cap non-cash to actual order total and remove negative cash drag
-                        scale = ord_tot / non_cash_sum if non_cash_sum > 0 else 1.0
-                        cat_amounts["visa"] *= scale
-                        cat_amounts["online_sales"] *= scale
-                        cat_amounts["employee_debt"] *= scale
-                        cat_amounts["hospitality"] *= scale
-                        cat_amounts["other_sales"] *= scale
-                        cat_amounts["cash"] = max(0.0, cat_amounts["cash"] + excess)
-
-            order_sales = sum(cat_amounts.values())
-            branch_data[cfg_id]["sales"] += order_sales
-            branch_data[cfg_id]["cash"] += cat_amounts["cash"]
-            branch_data[cfg_id]["visa"] += cat_amounts["visa"]
-            branch_data[cfg_id]["online_sales"] += cat_amounts["online_sales"]
-            branch_data[cfg_id]["employee_debt"] += cat_amounts["employee_debt"]
-            branch_data[cfg_id]["hospitality"] += cat_amounts["hospitality"]
-            branch_data[cfg_id]["other_sales"] += cat_amounts["other_sales"]
-
-        # --- B. Collect POS Orders ---
-        pos_orders = self.env["pos.order"].sudo().search([
-            ("state", "in", ("paid", "done", "invoiced")),
-            ("date_order", ">=", str_start),
-            ("date_order", "<=", str_end),
-        ])
-        for order in pos_orders:
-            cfg = order.config_id
-            if not cfg or (active_config_ids and cfg.id not in active_config_ids):
-                continue
-            cfg_id = cfg.id
-
-            tax_amt = getattr(order, "amount_tax", 0.0) or 0.0
-            tot_amt = getattr(order, "amount_total", 0.0) or 0.0
-            untaxed_amt = getattr(order, "amount_untaxed", None)
-            if untaxed_amt is None:
-                untaxed_amt = tot_amt - tax_amt
-
-            order_disc = sum(
-                (line.price_unit or 0.0) * (line.qty or 0.0) * (line.discount / 100.0)
-                for line in order.lines if line.discount
-            )
-
-            branch_data[cfg_id]["untaxed_sales"] += untaxed_amt
-            branch_data[cfg_id]["tax_amount"] += tax_amt
-            branch_data[cfg_id]["discount_amount"] += order_disc
-            branch_data[cfg_id]["delivery_amount"] += getattr(order, "delivery_amount", 0.0) or 0.0
-            branch_data[cfg_id]["order_count"] += 1
-
-        # --- C. Collect Cash In / Out Moves ---
-        st_lines = self.env["account.bank.statement.line"].sudo().search([
-            ("date", ">=", dt_start.date()),
-            ("date", "<=", dt_end.date() + timedelta(days=1)),
-        ])
-        for st in st_lines:
-            cfg = st.pos_session_id.config_id if st.pos_session_id else False
-            if not cfg or (active_config_ids and cfg.id not in active_config_ids):
-                continue
-            cfg_id = cfg.id
-
-            st_dt = st.create_date or (datetime.combine(st.date, time.min) if st.date else False)
-            if st_dt and not (dt_start <= st_dt <= dt_end):
-                continue
-
-            amt = st.amount or 0.0
-            if amt > 0:
-                branch_data[cfg_id]["cash_in"] += amt
-            else:
-                branch_data[cfg_id]["cash_out"] += abs(amt)
-
-        for cfg_id in active_config_ids:
-            branch_data[cfg_id]["net_cash_moves"] = (
-                branch_data[cfg_id]["cash_in"] - branch_data[cfg_id]["cash_out"]
-            )
-            branch_data[cfg_id]["orders_per_min"] = round(
-                branch_data[cfg_id]["order_count"] / total_minutes, 2
-            )
-
-        # --- D. Collect Pledges (Filtered by Date Range) ---
-        for move in self._get_pledge_movements(dt_start, dt_end, active_config_ids):
-            branch = branch_data[move["config"].id]
-            side = move["type"]
-            branch["rahen_%s" % side] += move["amount"]
-            branch["pledge_cash_%s" % side] += move["cash"]
-            branch["pledge_visa_%s" % side] += move["visa"]
+        # --- A-D. POS Orders of the period's sessions (tax, discounts, gifts, order count) ---
+        for order in engine._get_orders(sessions):
+            branch = branch_data[order.config_id.id]
+            branch["untaxed_sales"] += self._order_untaxed(order)
+            branch["tax_amount"] += order.amount_tax or 0.0
+            branch["discount_amount"] += self._order_discount(order)
+            gift_lines = self._order_gift_lines(order)
+            branch["gift_amount"] += sum(self._gift_line_value(line) for line in gift_lines)
+            branch["gift_line_count"] += len(gift_lines)
+            branch["order_count"] += 1
 
         for cfg_id in active_config_ids:
             branch = branch_data[cfg_id]
+            branch["net_cash_moves"] = branch["cash_in"] - branch["cash_out"]
             branch["net_pledges"] = branch["rahen_in"] - branch["rahen_out"]
             branch["pledge_cash_net"] = branch["pledge_cash_in"] - branch["pledge_cash_out"]
             branch["pledge_visa_net"] = branch["pledge_visa_in"] - branch["pledge_visa_out"]
+            branch["orders_per_min"] = round(branch["order_count"] / total_minutes, 2)
 
         # --- E. Collect Advance Orders ---
         if "pos.advance.order" in self.env:
@@ -780,42 +432,33 @@ class PosReportingDashboard(models.TransientModel):
         ]
         channels_filtered = [c for c in channels if c["value"] > 0]
 
-        # Batched daily trend evaluation
-        all_trend_payments = payments
+        # Daily trends (by business date of the session)
+        day_totals = defaultdict(lambda: {"total": 0.0, "cash": 0.0, "visa": 0.0})
+        if sessions:
+            groups = self.env["pos.payment"].sudo()._read_group(
+                [("session_id", "in", sessions.ids)],
+                ["session_id", "payment_method_id"],
+                ["amount:sum"],
+            )
+            for session, payment_method, amount in groups:
+                bucket = engine._get_bucket(payment_method)
+                if bucket == "hospitality":
+                    continue
+                day = day_totals[engine._to_local_date(session.start_at)]
+                day["total"] += amount or 0.0
+                if bucket in ("cash", "visa"):
+                    day[bucket] += amount or 0.0
 
         trend_days = []
-        curr_date = dt_start.date()
-        while curr_date <= dt_end.date():
-            day_dt_start = datetime.combine(curr_date, time(6, 0, 0))
-            day_dt_end = datetime.combine(curr_date + timedelta(days=1), time(5, 0, 0))
-
-            day_total = 0.0
-            day_cash = 0.0
-
-            for p in all_trend_payments:
-                cfg = p.session_id.config_id if p.session_id else (p.pos_order_id.config_id if p.pos_order_id else False)
-                if active_config_ids and (not cfg or cfg.id not in active_config_ids):
-                    continue
-
-                p_date = p.payment_date or (p.pos_order_id.date_order if p.pos_order_id else False)
-                if not p_date or not (day_dt_start <= p_date <= day_dt_end):
-                    continue
-
-                amt = p.amount or 0.0
-                day_total += amt
-
-                is_emp, is_hosp, is_online, is_cash, is_visa, pm_name = _classify_pm(p.payment_method_id)
-                if is_cash:
-                    day_cash += amt
-
-            day_visa = day_total - day_cash
-
+        curr_date = period["date_from"]
+        while curr_date <= period["date_to"]:
+            day = day_totals[curr_date]
             trend_days.append({
                 "date": curr_date.strftime("%Y-%m-%d"),
                 "date_label": curr_date.strftime("%b %d"),
-                "total_sales": day_total,
-                "cash_sales": day_cash,
-                "visa_sales": day_visa,
+                "total_sales": day["total"],
+                "cash_sales": day["cash"],
+                "visa_sales": day["visa"],
             })
             curr_date += timedelta(days=1)
 
@@ -830,8 +473,8 @@ class PosReportingDashboard(models.TransientModel):
         all_branches_list = [{"id": cfg.id, "name": cfg.name} for cfg in all_configs]
 
         return {
-            "date_from": str_start,
-            "date_to": str_end,
+            "date_from": fields.Date.to_string(period["date_from"]),
+            "date_to": fields.Date.to_string(period["date_to"]),
             "active_branches_count": len(configs),
             "all_branches": all_branches_list,
             "kpis": {
@@ -839,6 +482,8 @@ class PosReportingDashboard(models.TransientModel):
                 "untaxed_sales": global_totals["untaxed_sales"],
                 "tax_amount": global_totals["tax_amount"],
                 "discount_amount": global_totals["discount_amount"],
+                "gift_amount": global_totals["gift_amount"],
+                "gift_line_count": global_totals["gift_line_count"],
                 "cash_sales": global_totals["cash"],
                 "visa_sales": global_totals["visa"],
                 "online_sales": global_totals["online_sales"],
@@ -888,12 +533,13 @@ class PosReportingDashboard(models.TransientModel):
         Populate transient records in pos.unified.report for metric_type and return drill-down action.
         Scoped to the active user to prevent concurrent transient data collisions.
         """
-        dt_start, dt_end = self._parse_datetime_bounds(date_from, date_to)
-        str_start = fields.Datetime.to_string(dt_start)
-        str_end = fields.Datetime.to_string(dt_end)
+        engine = self.env["pos.daily.ops.engine"]
+        period = self._parse_period(date_from, date_to)
+        dt_start, dt_end, str_start, str_end = self._period_bounds(period)
 
         configs = self._get_report_configs(config_ids)
         active_config_ids = set(configs.ids)
+        sessions = engine._get_sessions(period, configs)
 
         all_config_domain = [
             ("active", "=", True),
@@ -982,254 +628,121 @@ class PosReportingDashboard(models.TransientModel):
 
         vals_list = []
 
-        # Classification helper
-        def _classify_pm(pm):
-            return self._classify_pm_flags(pm)[:5]
-
-        if metric_type in ("sales", "cash_sales", "visa_sales", "employee_debt", "online_sales", "hospitality"):
-            payments = self.env["pos.payment"].sudo().search([
-                ("pos_order_id.state", "in", ("paid", "done", "invoiced")),
-                "|",
-                "&", ("payment_date", ">=", str_start), ("payment_date", "<=", str_end),
-                "&", ("payment_date", "=", False),
-                     "&", ("pos_order_id.date_order", ">=", str_start), ("pos_order_id.date_order", "<=", str_end),
-            ])
-
-            order_payments = defaultdict(list)
-            session_only_payments = []
-
-            for pay in payments:
-                if pay.pos_order_id:
-                    order_payments[pay.pos_order_id].append(pay)
-                else:
-                    session_only_payments.append(pay)
-
-            # Process session-only payments
-            for pay in session_only_payments:
-                cfg = pay.session_id.config_id if pay.session_id else False
-                if not cfg or cfg.id not in active_config_ids:
-                    continue
-                amt = pay.amount or 0.0
+        if metric_type in PAYMENT_METRICS:
+            for pay in engine._get_payments(sessions):
                 pm = pay.payment_method_id
-                is_emp, is_hosp, is_online, is_cash, is_visa = _classify_pm(pm)
-
-                include = False
-                if metric_type == "sales":
-                    include = True
-                elif metric_type == "employee_debt" and is_emp:
-                    include = True
-                elif metric_type == "online_sales" and is_online:
-                    include = True
-                elif metric_type == "cash_sales" and is_cash:
-                    include = True
-                elif metric_type == "visa_sales" and is_visa:
-                    include = True
-                elif metric_type == "hospitality" and is_hosp:
-                    include = True
-
-                if include:
-                    vals_list.append({
-                        "name": pay.name or _("POS Payment"),
-                        "date": pay.payment_date or dt_start,
-                        "config_id": cfg.id,
-                        "session_id": pay.session_id.id if pay.session_id else False,
-                        "payment_method_id": pm.id,
-                        "report_type": "online_sales" if is_online else "pos_sales",
-                        "amount": amt,
-                        "untaxed_amount": amt,
-                        "tax_amount": 0.0,
-                        "discount_amount": 0.0,
-                        "employee_debt_amount": amt if is_emp else 0.0,
-                        "cash_amount": amt if is_cash else 0.0,
-                        "visa_amount": amt if is_visa else 0.0,
-                        "online_amount": amt if is_online else 0.0,
-                        "company_id": cfg.company_id.id,
-                    })
-
-            # Process order payments with cross-method change rebalancing (matching get_dashboard_data)
-            for po, pay_list in order_payments.items():
-                cfg = po.config_id
-                if not cfg or cfg.id not in active_config_ids:
+                if not self._payment_matches_metric(pm, metric_type):
                     continue
+                bucket = engine._get_bucket(pm)
+                cfg = pay.session_id.config_id
+                po = pay.pos_order_id
+                amt = pay.amount or 0.0
 
-                cat_amounts = defaultdict(float)
-                for pay in pay_list:
-                    amt = pay.amount or 0.0
-                    pm = pay.payment_method_id
-                    is_emp, is_hosp, is_online, is_cash, is_visa = _classify_pm(pm)
+                untaxed_amt = tax_amt = order_disc = 0.0
+                if po:
+                    tot_amt_full = po.amount_total or 0.0
+                    ratio = (amt / tot_amt_full) if tot_amt_full else 1.0
+                    untaxed_amt = self._order_untaxed(po) * ratio
+                    tax_amt = (po.amount_tax or 0.0) * ratio
+                    order_disc = self._order_discount(po) * ratio
 
-                    if is_emp:
-                        cat_amounts["employee_debt"] += amt
-                    elif is_hosp:
-                        cat_amounts["hospitality"] += amt
-                    elif is_online:
-                        cat_amounts["online_sales"] += amt
-                    elif is_cash:
-                        cat_amounts["cash"] += amt
-                    elif is_visa:
-                        cat_amounts["visa"] += amt
-                    else:
-                        cat_amounts["other_sales"] += amt
-
-                non_cash_sum = cat_amounts["visa"] + cat_amounts["online_sales"] + cat_amounts["employee_debt"] + cat_amounts["hospitality"] + cat_amounts["other_sales"]
-                scale = 1.0
-                cash_rebalanced_total = cat_amounts["cash"]
-                if cat_amounts["cash"] < 0 and non_cash_sum > 0:
-                    ord_tot = po.amount_total or 0.0
-                    if ord_tot >= 0:
-                        excess = max(0.0, non_cash_sum - ord_tot)
-                        if excess > 0:
-                            scale = ord_tot / non_cash_sum if non_cash_sum > 0 else 1.0
-                            cash_rebalanced_total = max(0.0, cat_amounts["cash"] + excess)
-
-                tax_amt_full = getattr(po, "amount_tax", 0.0) or 0.0
-                tot_amt_full = getattr(po, "amount_total", 0.0) or 0.0
-                untaxed_amt_full = getattr(po, "amount_untaxed", None)
-                if untaxed_amt_full is None:
-                    untaxed_amt_full = tot_amt_full - tax_amt_full
-                order_disc_full = sum(
-                    (l.price_unit or 0.0) * (l.qty or 0.0) * (l.discount / 100.0)
-                    for l in po.lines if l.discount
-                )
-
-                for pay in pay_list:
-                    amt = pay.amount or 0.0
-                    pm = pay.payment_method_id
-                    is_emp, is_hosp, is_online, is_cash, is_visa = _classify_pm(pm)
-
-                    if is_cash:
-                        if cat_amounts["cash"] < 0 and cash_rebalanced_total >= 0:
-                            effective_amt = max(0.0, amt * (cash_rebalanced_total / cat_amounts["cash"])) if cat_amounts["cash"] != 0 else 0.0
-                        else:
-                            effective_amt = amt
-                    else:
-                        effective_amt = amt * scale
-
-                    include = False
-                    if metric_type == "sales":
-                        include = True
-                    elif metric_type == "employee_debt" and is_emp:
-                        include = True
-                    elif metric_type == "online_sales" and is_online:
-                        include = True
-                    elif metric_type == "cash_sales" and is_cash:
-                        include = True
-                    elif metric_type == "visa_sales" and is_visa:
-                        include = True
-                    elif metric_type == "hospitality" and is_hosp:
-                        include = True
-
-                    if include:
-                        ratio = (effective_amt / tot_amt_full) if (tot_amt_full and tot_amt_full != 0.0) else 1.0
-                        untaxed_amt = untaxed_amt_full * ratio
-                        tax_amt = tax_amt_full * ratio
-                        order_disc = order_disc_full * ratio
-
-                        vals_list.append({
-                            "name": po.name or pay.name or _("POS Payment"),
-                            "date": pay.payment_date or po.date_order or dt_start,
-                            "config_id": cfg.id,
-                            "session_id": pay.session_id.id if pay.session_id else False,
-                            "payment_method_id": pm.id,
-                            "pos_order_id": po.id,
-                            "report_type": "online_sales" if is_online else "pos_sales",
-                            "amount": effective_amt,
-                            "untaxed_amount": untaxed_amt,
-                            "tax_amount": tax_amt,
-                            "discount_amount": order_disc,
-                            "employee_debt_amount": effective_amt if is_emp else 0.0,
-                            "cash_amount": effective_amt if is_cash else 0.0,
-                            "visa_amount": effective_amt if is_visa else 0.0,
-                            "online_amount": effective_amt if is_online else 0.0,
-                            "partner_id": po.partner_id.id if po.partner_id else False,
-                            "company_id": cfg.company_id.id,
-                        })
+                is_online = bucket in DELIVERY_CHANNELS
+                vals_list.append({
+                    "name": po.name or pay.name or _("POS Payment"),
+                    "date": pay.payment_date or (po.date_order if po else False) or pay.session_id.start_at,
+                    "config_id": cfg.id,
+                    "session_id": pay.session_id.id,
+                    "payment_method_id": pm.id,
+                    "pos_order_id": po.id or False,
+                    "report_type": "online_sales" if is_online else "pos_sales",
+                    "amount": amt,
+                    "untaxed_amount": untaxed_amt,
+                    "tax_amount": tax_amt,
+                    "discount_amount": order_disc,
+                    "employee_debt_amount": amt if bucket == "employee_debt" else 0.0,
+                    "cash_amount": amt if bucket == "cash" else 0.0,
+                    "visa_amount": amt if bucket == "visa" else 0.0,
+                    "online_amount": amt if is_online else 0.0,
+                    "partner_id": po.partner_id.id if po else False,
+                    "company_id": cfg.company_id.id,
+                })
 
         elif metric_type in ("untaxed_sales", "tax_amount", "discount_amount"):
-            pos_orders = self.env["pos.order"].sudo().search([
-                ("state", "in", ("paid", "done", "invoiced")),
-                ("date_order", ">=", str_start),
-                ("date_order", "<=", str_end),
-            ])
-            for order in pos_orders:
+            for order in engine._get_orders(sessions):
                 cfg = order.config_id
-                if not cfg or cfg.id not in active_config_ids:
-                    continue
+                untaxed_amt = self._order_untaxed(order)
+                tax_amt = order.amount_tax or 0.0
+                order_disc = self._order_discount(order)
 
-                tax_amt = getattr(order, "amount_tax", 0.0) or 0.0
-                tot_amt = getattr(order, "amount_total", 0.0) or 0.0
-                untaxed_amt = getattr(order, "amount_untaxed", None)
-                if untaxed_amt is None:
-                    untaxed_amt = tot_amt - tax_amt
-
-                order_disc = sum(
-                    (line.price_unit or 0.0) * (line.qty or 0.0) * (line.discount / 100.0)
-                    for line in order.lines if line.discount
-                )
-
-                amt = 0.0
-                if metric_type == "untaxed_sales":
-                    amt = untaxed_amt
-                elif metric_type == "tax_amount":
-                    amt = tax_amt
-                elif metric_type == "discount_amount":
-                    amt = order_disc
+                amt = {
+                    "untaxed_sales": untaxed_amt,
+                    "tax_amount": tax_amt,
+                    "discount_amount": order_disc,
+                }[metric_type]
 
                 if amt != 0.0:
                     vals_list.append({
                         "name": order.name or _("POS Order"),
                         "date": order.date_order,
                         "config_id": cfg.id,
-                        "session_id": order.session_id.id if order.session_id else False,
+                        "session_id": order.session_id.id,
                         "pos_order_id": order.id,
                         "report_type": "pos_sales",
-                        "amount": tot_amt,
+                        "amount": order.amount_total or 0.0,
                         "untaxed_amount": untaxed_amt,
                         "tax_amount": tax_amt,
                         "discount_amount": order_disc,
-                        "partner_id": order.partner_id.id if order.partner_id else False,
+                        "partner_id": order.partner_id.id or False,
+                        "company_id": cfg.company_id.id,
+                    })
+
+        elif metric_type == "gift_amount":
+            for order in engine._get_orders(sessions):
+                cfg = order.config_id
+                for line in self._order_gift_lines(order):
+                    value = self._gift_line_value(line)
+                    label = "%s x %s" % (line.product_id.display_name, line.qty)
+                    if line.gift_reason:
+                        label = "%s (%s)" % (label, line.gift_reason)
+                    vals_list.append({
+                        "name": label,
+                        "date": order.date_order,
+                        "config_id": cfg.id,
+                        "session_id": order.session_id.id,
+                        "pos_order_id": order.id,
+                        "report_type": "gift",
+                        "amount": value,
+                        "gift_amount": value,
+                        "partner_id": order.partner_id.id or False,
                         "company_id": cfg.company_id.id,
                     })
 
         elif metric_type in ("net_cash_moves", "cash_in", "cash_out"):
-            st_lines = self.env["account.bank.statement.line"].sudo().search([
-                ("date", ">=", dt_start.date()),
-                ("date", "<=", dt_end.date() + timedelta(days=1)),
-            ])
-            for st in st_lines:
-                cfg = st.pos_session_id.config_id if st.pos_session_id else False
-                if not cfg or cfg.id not in active_config_ids:
-                    continue
-
-                st_dt = st.create_date or (datetime.combine(st.date, time.min) if st.date else False)
-                if st_dt and not (dt_start <= st_dt <= dt_end):
-                    continue
-
+            for st in engine._get_cash_move_lines(sessions):
+                cfg = st.pos_session_id.config_id
                 amt = st.amount or 0.0
                 is_in = amt > 0
-
                 if metric_type == "cash_in" and not is_in:
                     continue
                 if metric_type == "cash_out" and is_in:
                     continue
-
                 vals_list.append({
                     "name": st.payment_ref or st.ref or st.name or _("Cash Move"),
-                    "date": st_dt or str_start,
+                    "date": st.create_date or st.pos_session_id.start_at,
                     "config_id": cfg.id,
-                    "session_id": st.pos_session_id.id if st.pos_session_id else False,
+                    "session_id": st.pos_session_id.id,
                     "report_type": "cash_in" if is_in else "cash_out",
                     "amount": abs(amt),
                     "cash_in_amount": amt if is_in else 0.0,
                     "cash_out_amount": abs(amt) if not is_in else 0.0,
-                    "partner_id": st.partner_id.id if st.partner_id else False,
+                    "partner_id": st.partner_id.id or False,
                     "company_id": cfg.company_id.id,
                 })
 
         elif metric_type in ("net_pledges", "rahen_in", "rahen_out", "pledge_cash", "pledge_visa"):
             share_key = {"pledge_cash": "cash", "pledge_visa": "visa"}.get(metric_type, "amount")
             only_type = {"rahen_in": "in", "rahen_out": "out"}.get(metric_type)
-            for move in self._get_pledge_movements(dt_start, dt_end, active_config_ids):
+            for move in self._get_pledge_movements(period, configs):
                 if only_type and move["type"] != only_type:
                     continue
                 share = move[share_key]
@@ -1405,7 +918,7 @@ class PosReportingDashboard(models.TransientModel):
         if vals_list:
             created_recs = self.env["pos.unified.report"].sudo().create(vals_list)
 
-        wizard_vals = {"date_from": dt_start, "date_to": dt_end}
+        wizard_vals = {"date_from": period["date_from"], "date_to": period["date_to"]}
         if config_ids:
             wizard_vals["config_ids"] = [(6, 0, list(config_ids))]
         wiz = self.env["pos.unified.report.wizard"].sudo().create(wizard_vals)
@@ -1415,6 +928,7 @@ class PosReportingDashboard(models.TransientModel):
             "untaxed_sales": _("Sales Without Tax Transactions"),
             "tax_amount": _("Sales Tax Transactions"),
             "discount_amount": _("Order Discount Transactions"),
+            "gift_amount": _("Gifts (Hospitality) Lines"),
             "cash_sales": _("Cash Sales Transactions"),
             "visa_sales": _("Visa & Card Sales Transactions"),
             "online_sales": _("Online & Delivery Sales Transactions"),

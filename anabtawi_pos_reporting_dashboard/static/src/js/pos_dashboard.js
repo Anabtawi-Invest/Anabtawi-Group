@@ -12,12 +12,10 @@ export class PosReportingDashboard extends Component {
         this.actionService = useService("action");
 
         const params = this.props.action?.params || {};
-        const now = new Date();
-        const today6am = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        const tomorrow5am = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+        const today = this._formatLocalDate(new Date());
 
-        const initFrom = params.date_from || this._formatLocalDatetimeWithTime(today6am, "06", "00");
-        const initTo = params.date_to || this._formatLocalDatetimeWithTime(tomorrow5am, "05", "00");
+        const initFrom = (params.date_from || today).slice(0, 10);
+        const initTo = (params.date_to || today).slice(0, 10);
         const initConfigs = params.config_ids || [];
 
         this.state = useState({
@@ -47,31 +45,19 @@ export class PosReportingDashboard extends Component {
         });
     }
 
-    _formatLocalDatetimeWithTime(dateObj, hourStr = "06", minStr = "00") {
+    _formatLocalDate(dateObj) {
         if (!dateObj) return "";
         const year = dateObj.getFullYear();
         const month = String(dateObj.getMonth() + 1).padStart(2, "0");
         const day = String(dateObj.getDate()).padStart(2, "0");
-        return `${year}-${month}-${day}T${hourStr}:${minStr}`;
-    }
-
-    _formatDatetimeForRPC(valStr, isEnd = false) {
-        if (!valStr) return "";
-        let s = valStr.replace("T", " ");
-        if (s.length === 10) {
-            return isEnd ? `${s} 05:00:00` : `${s} 06:00:00`;
-        }
-        if (s.length === 16) {
-            return `${s}:00`;
-        }
-        return s;
+        return `${year}-${month}-${day}`;
     }
 
     async fetchDashboardData() {
         this.state.loading = true;
         try {
-            const strFrom = this._formatDatetimeForRPC(this.state.date_from, false);
-            const strTo = this._formatDatetimeForRPC(this.state.date_to, true);
+            const strFrom = this.state.date_from;
+            const strTo = this.state.date_to;
 
             const res = await this.orm.call(
                 "pos.reporting.dashboard",
@@ -152,27 +138,23 @@ export class PosReportingDashboard extends Component {
     setPeriod(period) {
         this.state.period = period;
         const now = new Date();
-        let fromDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        let toDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        let fromDate = today;
+        let toDate = today;
 
-        if (period === "today") {
-            fromDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-            toDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-        } else if (period === "yesterday") {
+        if (period === "yesterday") {
             fromDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-            toDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            toDate = fromDate;
         } else if (period === "this_week") {
             const day = now.getDay();
             const diff = now.getDate() - day + (day === 0 ? -6 : 1);
             fromDate = new Date(now.getFullYear(), now.getMonth(), diff);
-            toDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
         } else if (period === "this_month") {
             fromDate = new Date(now.getFullYear(), now.getMonth(), 1);
-            toDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
         }
 
-        this.state.date_from = this._formatLocalDatetimeWithTime(fromDate, "06", "00");
-        this.state.date_to = this._formatLocalDatetimeWithTime(toDate, "05", "00");
+        this.state.date_from = this._formatLocalDate(fromDate);
+        this.state.date_to = this._formatLocalDate(toDate);
         this.fetchDashboardData();
     }
 
@@ -199,8 +181,8 @@ export class PosReportingDashboard extends Component {
 
     async onKpiClick(metricType, configId = null) {
         try {
-            const strFrom = this._formatDatetimeForRPC(this.state.date_from, false);
-            const strTo = this._formatDatetimeForRPC(this.state.date_to, true);
+            const strFrom = this.state.date_from;
+            const strTo = this.state.date_to;
             const targetConfigs = configId ? [configId] : (this.state.config_ids || []);
 
             const action = await this.orm.call(
@@ -225,8 +207,8 @@ export class PosReportingDashboard extends Component {
 
     async exportExcel() {
         try {
-            const strFrom = this._formatDatetimeForRPC(this.state.date_from, false);
-            const strTo = this._formatDatetimeForRPC(this.state.date_to, true);
+            const strFrom = this.state.date_from;
+            const strTo = this.state.date_to;
 
             const wizardVals = {
                 date_from: strFrom,

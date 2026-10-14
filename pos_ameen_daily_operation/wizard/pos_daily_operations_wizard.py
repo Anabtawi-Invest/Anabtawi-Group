@@ -1,14 +1,4 @@
-from collections import defaultdict
-from datetime import datetime, time
-
-import pytz
-
 from odoo import _, fields, models
-
-PAYMENT_METHOD_TALABAT = 142
-PAYMENT_METHOD_CAREEM = 143
-PAYMENT_METHOD_MYTHINGS = 144
-PAYMENT_METHOD_KABSEH = 145
 
 
 class PosDailyOperationsWizard(models.TransientModel):
@@ -17,145 +7,15 @@ class PosDailyOperationsWizard(models.TransientModel):
 
     business_date = fields.Date(string='Business Date', required=True, default=fields.Date.context_today)
 
-    def _get_report_timezone(self):
-        tz_name = (
-            self.env.context.get('tz')
-            or self.env.user.tz
-            or self.env.company.resource_calendar_id.tz
-            or 'UTC'
-        )
-        return pytz.timezone(tz_name)
-
-    def _get_day_bounds(self):
-        """Return UTC-naive datetimes for the business date in the user/company timezone."""
-        self.ensure_one()
-        tz = self._get_report_timezone()
-        day_start_local = tz.localize(datetime.combine(self.business_date, time.min))
-        day_end_local = tz.localize(datetime.combine(self.business_date, time.max))
-        day_start_utc = day_start_local.astimezone(pytz.UTC).replace(tzinfo=None)
-        day_end_utc = day_end_local.astimezone(pytz.UTC).replace(tzinfo=None)
-        return day_start_utc, day_end_utc
-
     def _get_active_configs(self):
         return self.env['pos.config'].search([('active', '=', True)], order='name')
 
-    def _get_sessions_on_date(self):
-        self.ensure_one()
-        day_start, day_end = self._get_day_bounds()
-        return self.env['pos.session'].search([
-            ('start_at', '>=', fields.Datetime.to_string(day_start)),
-            ('start_at', '<=', fields.Datetime.to_string(day_end)),
-            ('config_id.active', '=', True),
-        ], order='start_at asc')
-
-    def _empty_branch_values(self):
-        return {
-            'sales': 0.0,
-            'rahen_in': 0.0,
-            'rahen_out': 0.0,
-            'cash': 0.0,
-            'visa': 0.0,
-            'hospitality': 0.0,
-            'talabat': 0.0,
-            'careem': 0.0,
-            'mythings': 0.0,
-            'kabseh': 0.0,
-            'delivery_amount': 0.0,
-        }
-
-    def _get_pledge_config_id(self, pledge):
-        if pledge.pos_order_id:
-            return pledge.pos_order_id.config_id.id
-        if pledge.order_id:
-            return pledge.order_id.pos_config_id.id
-        return False
-
-    def _pledge_order_on_date_domain(self, day_start, day_end):
-        return [
-            '|',
-            '&', ('pos_order_id', '!=', False),
-                 ('pos_order_id.date_order', '>=', fields.Datetime.to_string(day_start)),
-                 ('pos_order_id.date_order', '<=', fields.Datetime.to_string(day_end)),
-            '&', ('order_id', '!=', False),
-                 ('order_id.create_date', '>=', fields.Datetime.to_string(day_start)),
-                 ('order_id.create_date', '<=', fields.Datetime.to_string(day_end)),
-        ]
-
-    def _collect_pledge_totals(self, branch_data, active_config_ids):
-        self.ensure_one()
-        day_start, day_end = self._get_day_bounds()
-        base_domain = self._pledge_order_on_date_domain(day_start, day_end)
-
-        for state, field_name in (('active', 'rahen_in'), ('returned', 'rahen_out')):
-            pledges = self.env['pos.advance.order.pledge'].search(
-                base_domain + [('state', '=', state)]
-            )
-            for pledge in pledges:
-                config_id = self._get_pledge_config_id(pledge)
-                if not config_id or config_id not in active_config_ids:
-                    continue
-                branch_data[config_id][field_name] += pledge.pledge_subtotal or 0.0
-
-    def _collect_payment_totals(self, branch_data, sessions):
-        if not sessions:
-            return
-
-        grouped_payments = self.env['pos.payment']._read_group(
-            [('session_id', 'in', sessions.ids)],
-            ['session_id', 'payment_method_id'],
-            ['amount:sum'],
-        )
-        for session, payment_method, total_amount in grouped_payments:
-            config_id = session.config_id.id
-            amount = total_amount or 0.0
-            branch_data[config_id]['sales'] += amount
-            if payment_method.daily_ops_report_type == 'cash':
-                branch_data[config_id]['cash'] += amount
-            elif payment_method.daily_ops_report_type == 'visa':
-                branch_data[config_id]['visa'] += amount
-            elif payment_method.daily_ops_report_type == 'hospitality':
-                branch_data[config_id]['hospitality'] += amount
-            if payment_method.id == PAYMENT_METHOD_TALABAT:
-                branch_data[config_id]['talabat'] += amount
-            elif payment_method.id == PAYMENT_METHOD_CAREEM:
-                branch_data[config_id]['careem'] += amount
-            elif payment_method.id == PAYMENT_METHOD_MYTHINGS:
-                branch_data[config_id]['mythings'] += amount
-            elif payment_method.id == PAYMENT_METHOD_KABSEH:
-                branch_data[config_id]['kabseh'] += amount
-
-    def _collect_session_delivery_amounts(self, branch_data, sessions_by_config):
-        for config_id, config_sessions in sessions_by_config.items():
-            if not config_sessions:
-                continue
-            branch_data[config_id]['delivery_amount'] = sum(
-                session.delivery_amount or 0.0
-                for session in config_sessions
-            )
-
     def _get_report_rows(self):
         self.ensure_one()
-        sessions = self._get_sessions_on_date()
-        sessions_by_config = defaultdict(list)
-        for session in sessions:
-            sessions_by_config[session.config_id.id].append(session)
-
+        engine = self.env['pos.daily.ops.engine']
         configs = self._get_active_configs()
-        active_config_ids = set(configs.ids)
-        branch_data = defaultdict(self._empty_branch_values)
-
-        self._collect_session_delivery_amounts(branch_data, sessions_by_config)
-        self._collect_payment_totals(branch_data, sessions)
-        self._collect_pledge_totals(branch_data, active_config_ids)
-
-        rows = []
-        for config in configs:
-            values = branch_data[config.id]
-            rows.append({
-                'branch_name': config.name,
-                **values,
-            })
-        return rows
+        figures = engine._compute_branch_figures(engine._get_period(self.business_date), configs)
+        return [{'branch_name': config.name, **figures[config.id]} for config in configs]
 
     def _get_total_row(self, rows):
         numeric_fields = (
