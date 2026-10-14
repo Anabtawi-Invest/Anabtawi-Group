@@ -62,6 +62,7 @@
                 <field name="untaxed_amount" string="Amount w/o Tax" sum="Total Untaxed"/>
                 <field name="tax_amount" string="Tax Amount" sum="Total Tax"/>
                 <field name="discount_amount" string="Discount Amount" sum="Total Discount"/>
+                <field name="gift_amount" sum="Total Gifts" optional="show"/>
                 <field name="cash_amount" sum="Total Cash" optional="hide"/>
                 <field name="visa_amount" sum="Total Visa" optional="hide"/>
                 <field name="employee_debt_amount" string="Debt Sales (مبيعات الذمم)" sum="Total Debt Sales" optional="hide"/>

@@ -23,6 +23,7 @@ class PosUnifiedReport(models.TransientModel):
         ("rahen_out", "Pledge (Rahen) Out"),
         ("attendant_employees", "Attendant Employees"),
         ("labor_cost", "Daily Employee Labor Cost"),
+        ("gift", "Gift (Hospitality)"),
     ], string="Report Type", required=True, index=True)
 
     pos_order_id = fields.Many2one("pos.order", string="POS Order", index=True)
@@ -31,6 +32,7 @@ class PosUnifiedReport(models.TransientModel):
     untaxed_amount = fields.Float(string="Amount w/o Tax", digits=(16, 3))
     tax_amount = fields.Float(string="Tax Amount", digits=(16, 3))
     discount_amount = fields.Float(string="Discount Amount", digits=(16, 3))
+    gift_amount = fields.Float(string="Gift Amount", digits=(16, 3))
     cash_amount = fields.Float(string="Cash Amount", digits=(16, 3))
     visa_amount = fields.Float(string="Visa / Card Amount", digits=(16, 3))
     online_amount = fields.Float(string="Online & Delivery Amount", digits=(16, 3))

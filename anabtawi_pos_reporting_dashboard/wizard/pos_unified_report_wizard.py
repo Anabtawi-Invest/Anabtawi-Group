@@ -118,6 +118,7 @@ class PosUnifiedReportWizard(models.TransientModel):
             (_("Sales Without Tax"), "untaxed_sales", False),
             (_("Tax Amount"), "tax_amount", False),
             (_("Total Discounts"), "discount_amount", False),
+            (_("Gifts (Hospitality)"), "gift_amount", False),
             (_("Cash Sales"), "cash", False),
             (_("Visa Sales"), "visa", False),
             (_("Online & Delivery Sales"), "online_sales", False),

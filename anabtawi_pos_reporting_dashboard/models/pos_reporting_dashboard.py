@@ -13,6 +13,8 @@ DASHBOARD_EXTRA_KEYS = {
     "untaxed_sales": 0.0,
     "tax_amount": 0.0,
     "discount_amount": 0.0,
+    "gift_amount": 0.0,
+    "gift_line_count": 0,
     "net_cash_moves": 0.0,
     "net_pledges": 0.0,
     "pledge_cash_net": 0.0,
@@ -148,11 +150,19 @@ class PosReportingDashboard(models.TransientModel):
         return wage / float(num_days) if num_days > 0 else 0.0
 
     @staticmethod
+    def _gift_line_value(line):
+        return (line.price_unit or 0.0) * (line.qty or 0.0)
+
+    @staticmethod
     def _order_discount(order):
+        """Real discounts only; gift lines are reported separately."""
         return sum(
             (line.price_unit or 0.0) * (line.qty or 0.0) * (line.discount / 100.0)
-            for line in order.lines if line.discount
+            for line in order.lines if line.discount and not line.is_gift
         )
+
+    def _order_gift_lines(self, order):
+        return order.lines.filtered("is_gift")
 
     @staticmethod
     def _order_untaxed(order):
@@ -205,6 +215,9 @@ class PosReportingDashboard(models.TransientModel):
             branch["untaxed_sales"] += self._order_untaxed(order)
             branch["tax_amount"] += order.amount_tax or 0.0
             branch["discount_amount"] += self._order_discount(order)
+            gift_lines = self._order_gift_lines(order)
+            branch["gift_amount"] += sum(self._gift_line_value(line) for line in gift_lines)
+            branch["gift_line_count"] += len(gift_lines)
             branch["order_count"] += 1
 
         for cfg_id in active_config_ids:
@@ -330,6 +343,8 @@ class PosReportingDashboard(models.TransientModel):
                 "untaxed_sales": global_totals["untaxed_sales"],
                 "tax_amount": global_totals["tax_amount"],
                 "discount_amount": global_totals["discount_amount"],
+                "gift_amount": global_totals["gift_amount"],
+                "gift_line_count": global_totals["gift_line_count"],
                 "cash_sales": global_totals["cash"],
                 "visa_sales": global_totals["visa"],
                 "online_sales": global_totals["online_sales"],
@@ -454,6 +469,27 @@ class PosReportingDashboard(models.TransientModel):
                         "company_id": cfg.company_id.id,
                     })
 
+        elif metric_type == "gift_amount":
+            for order in engine._get_orders(sessions):
+                cfg = order.config_id
+                for line in self._order_gift_lines(order):
+                    value = self._gift_line_value(line)
+                    label = "%s x %s" % (line.product_id.display_name, line.qty)
+                    if line.gift_reason:
+                        label = "%s (%s)" % (label, line.gift_reason)
+                    vals_list.append({
+                        "name": label,
+                        "date": order.date_order,
+                        "config_id": cfg.id,
+                        "session_id": order.session_id.id,
+                        "pos_order_id": order.id,
+                        "report_type": "gift",
+                        "amount": value,
+                        "gift_amount": value,
+                        "partner_id": order.partner_id.id or False,
+                        "company_id": cfg.company_id.id,
+                    })
+
         elif metric_type == "net_cash_moves":
             for st in engine._get_cash_move_lines(sessions):
                 cfg = st.pos_session_id.config_id
@@ -560,6 +596,7 @@ class PosReportingDashboard(models.TransientModel):
             "untaxed_sales": _("Sales Without Tax Transactions"),
             "tax_amount": _("Sales Tax Transactions"),
             "discount_amount": _("Order Discount Transactions"),
+            "gift_amount": _("Gifts (Hospitality) Lines"),
             "cash_sales": _("Cash Sales Transactions"),
             "visa_sales": _("Visa & Card Sales Transactions"),
             "online_sales": _("Online & Delivery Sales Transactions"),
