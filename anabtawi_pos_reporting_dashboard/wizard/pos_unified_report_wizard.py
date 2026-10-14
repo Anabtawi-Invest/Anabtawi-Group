@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
-from datetime import datetime, time, timedelta
 import io
 import logging
 
-from odoo import _, api, fields, models
+from odoo import _, fields, models
 
 _logger = logging.getLogger(__name__)
 
@@ -12,44 +11,21 @@ class PosUnifiedReportWizard(models.TransientModel):
     _name = "pos.unified.report.wizard"
     _description = "POS Unified Report & Export Wizard"
 
-    def _default_date_from(self):
-        today = fields.Date.context_today(self)
-        return datetime.combine(today, time(6, 0, 0))
-
-    def _default_date_to(self):
-        today = fields.Date.context_today(self)
-        tomorrow = today + timedelta(days=1)
-        return datetime.combine(tomorrow, time(5, 0, 0))
-
-    date_from = fields.Datetime(
-        string="Start Date & Time",
+    date_from = fields.Date(
+        string="From Business Date",
         required=True,
-        default=_default_date_from,
+        default=fields.Date.context_today,
     )
-    date_to = fields.Datetime(
-        string="End Date & Time",
+    date_to = fields.Date(
+        string="To Business Date",
         required=True,
-        default=_default_date_to,
+        default=fields.Date.context_today,
     )
     config_ids = fields.Many2many(
         "pos.config",
         string="POS Branches",
         help="Leave empty to include all active branches.",
     )
-
-    def _to_datetime(self, val):
-        if not val:
-            return None
-        if isinstance(val, datetime):
-            return val
-        val_str = str(val).strip().replace("T", " ")
-        try:
-            return datetime.strptime(val_str.split(".")[0], "%Y-%m-%d %H:%M:%S")
-        except Exception:
-            try:
-                return fields.Datetime.from_string(val_str)
-            except Exception:
-                return None
 
     def action_open_dashboard(self):
         self.ensure_one()
@@ -59,8 +35,8 @@ class PosUnifiedReportWizard(models.TransientModel):
             "tag": "pos_reporting_dashboard_main",
             "name": _("POS Executive Dashboard"),
             "params": {
-                "date_from": fields.Datetime.to_string(self.date_from),
-                "date_to": fields.Datetime.to_string(self.date_to),
+                "date_from": fields.Date.to_string(self.date_from),
+                "date_to": fields.Date.to_string(self.date_to),
                 "config_ids": c_ids,
             },
         }
@@ -70,8 +46,8 @@ class PosUnifiedReportWizard(models.TransientModel):
         c_ids = self.config_ids.ids if self.config_ids else None
         res = self.env["pos.reporting.dashboard"].open_kpi_drilldown(
             metric_type="sales",
-            date_from=fields.Datetime.to_string(self.date_from),
-            date_to=fields.Datetime.to_string(self.date_to),
+            date_from=fields.Date.to_string(self.date_from),
+            date_to=fields.Date.to_string(self.date_to),
             config_ids=c_ids,
         )
         res["view_mode"] = "pivot,graph,list"
@@ -94,13 +70,14 @@ class PosUnifiedReportWizard(models.TransientModel):
         self.ensure_one()
         import xlsxwriter
 
-        dt_start = self._to_datetime(self.date_from) or datetime.combine(fields.Date.context_today(self), time.min)
-        dt_end = self._to_datetime(self.date_to) or datetime.combine(fields.Date.context_today(self), time.max)
-        str_start = fields.Datetime.to_string(dt_start)
-        str_end = fields.Datetime.to_string(dt_end)
+        str_start = fields.Date.to_string(self.date_from)
+        str_end = fields.Date.to_string(self.date_to)
 
         service = self.env["pos.reporting.dashboard"]
+        engine = self.env["pos.daily.ops.engine"]
+        period = service._parse_period(str_start, str_end)
         config_ids = self.config_ids.ids if self.config_ids else None
+        report_configs = service._get_report_configs(config_ids)
         data = service.get_dashboard_data(
             date_from=str_start,
             date_to=str_end,
@@ -233,7 +210,7 @@ class PosUnifiedReportWizard(models.TransientModel):
             for col_idx, h in enumerate(adv_headers):
                 sheet2.write(start_row_adv, col_idx, h, header_fmt)
 
-            adv_recs = self.env["pos.advance.order"].sudo().search([("state", "not in", ("draft", "cancel"))], order="id desc")
+            adv_recs = service._get_advance_orders(period).sorted("id", reverse=True)
 
             c_row = start_row_adv + 1
             tot_grand = 0.0
@@ -251,14 +228,8 @@ class PosUnifiedReportWizard(models.TransientModel):
                     if (orig_cfg_id not in target_config_ids) and (pick_cfg_id not in target_config_ids):
                         continue
 
-                c_dt = self._to_datetime(a.create_date)
-                p_dt = self._to_datetime(a.picking_date)
-
-                c_in_range = c_dt and (dt_start <= c_dt <= dt_end)
-                p_in_range = p_dt and (dt_start <= p_dt <= dt_end)
-
-                if not (c_in_range or p_in_range):
-                    continue
+                c_dt = a.create_date
+                p_dt = a.picking_date
 
                 orig_name = a.from_pos_config_id.name if a.from_pos_config_id else (a.pos_config_id.name if a.pos_config_id else "")
                 pick_name = a.pos_config_id.name if a.pos_config_id else orig_name
@@ -347,8 +318,7 @@ class PosUnifiedReportWizard(models.TransientModel):
             for col_idx, h in enumerate(plg_headers):
                 sheet3.write(start_row_plg, col_idx, h, header_fmt)
 
-            report_config_ids = set(service._get_report_configs(config_ids).ids)
-            movements = service._get_pledge_movements(dt_start, dt_end, report_config_ids)
+            movements = service._get_pledge_movements(period, report_configs)
             movements.sort(key=lambda m: m["date"], reverse=True)
 
             p_row = start_row_plg + 1
@@ -443,25 +413,20 @@ class PosUnifiedReportWizard(models.TransientModel):
         for col_idx, h in enumerate(cash_headers):
             sheet4.write(start_row_cash, col_idx, h, header_fmt)
 
-        st_lines = self.env["account.bank.statement.line"].sudo().search([
-            ("date", ">=", dt_start.date()),
-            ("date", "<=", dt_end.date()),
-        ], order="id desc")
+        sessions = engine._get_sessions(period, report_configs)
+        st_lines = engine._get_cash_move_lines(sessions).sorted("id", reverse=True)
 
         m_row = start_row_cash + 1
         tot_cin = 0.0
         tot_cout = 0.0
 
         for st in st_lines:
-            cfg = st.pos_session_id.config_id if st.pos_session_id else False
-            if target_config_ids and cfg and (cfg.id not in target_config_ids):
-                continue
-
-            branch_name = cfg.name if cfg else ""
+            cfg = st.pos_session_id.config_id
+            branch_name = cfg.name or ""
             amt = st.amount or 0.0
             move_type = _("Cash In") if amt > 0 else _("Cash Out")
 
-            st_dt = st.create_date or (datetime.combine(st.date, time.min) if st.date else self.date_from)
+            st_dt = st.create_date or st.pos_session_id.start_at
             st_dt_str = fields.Datetime.to_string(st_dt) if st_dt else ""
 
             user_name = st.create_uid.name if st.create_uid else ""

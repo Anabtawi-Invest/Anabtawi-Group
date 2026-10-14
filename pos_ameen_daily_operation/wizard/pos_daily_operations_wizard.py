@@ -1,8 +1,6 @@
 from collections import defaultdict
-from datetime import datetime, time
 import logging
 
-import pytz
 from babel.dates import format_date as babel_format_date
 
 from odoo import _, fields, models
@@ -10,30 +8,7 @@ from odoo.tools.misc import babel_locale_parse, format_date, get_lang
 
 _logger = logging.getLogger(__name__)
 
-PAYMENT_METHOD_TALABAT = 142
-PAYMENT_METHOD_CAREEM = 143
-PAYMENT_METHOD_MYTHINGS = 144
-PAYMENT_METHOD_KABSEH = 145
-
-
-def _payment_method_report_columns(payment_method):
-    columns = []
-    report_type = payment_method.daily_ops_report_type
-    if report_type == 'cash':
-        columns.append('Cash')
-    elif report_type == 'visa':
-        columns.append('Visa')
-    elif report_type == 'hospitality':
-        columns.append('Hospitality')
-    if payment_method.id == PAYMENT_METHOD_TALABAT:
-        columns.append('Talabat')
-    elif payment_method.id == PAYMENT_METHOD_CAREEM:
-        columns.append('Careem')
-    elif payment_method.id == PAYMENT_METHOD_MYTHINGS:
-        columns.append('Mythings')
-    elif payment_method.id == PAYMENT_METHOD_KABSEH:
-        columns.append('Kabseh')
-    return ', '.join(columns) if columns else '-'
+COLUMN_REPORT_TYPES = ('cash', 'visa', 'hospitality', 'talabat', 'careem', 'mythings', 'kabseh')
 
 
 class PosDailyOperationsWizard(models.TransientModel):
@@ -41,25 +16,6 @@ class PosDailyOperationsWizard(models.TransientModel):
     _description = 'Daily Operations Summary Report Wizard'
 
     business_date = fields.Date(string='Business Date', required=True, default=fields.Date.context_today)
-
-    def _get_report_timezone(self):
-        tz_name = (
-            self.env.context.get('tz')
-            or self.env.user.tz
-            or self.env.company.resource_calendar_id.tz
-            or 'UTC'
-        )
-        return pytz.timezone(tz_name)
-
-    def _get_day_bounds(self):
-        """Return UTC-naive datetimes for the business date in the user/company timezone."""
-        self.ensure_one()
-        tz = self._get_report_timezone()
-        day_start_local = tz.localize(datetime.combine(self.business_date, time.min))
-        day_end_local = tz.localize(datetime.combine(self.business_date, time.max))
-        day_start_utc = day_start_local.astimezone(pytz.UTC).replace(tzinfo=None)
-        day_end_utc = day_end_local.astimezone(pytz.UTC).replace(tzinfo=None)
-        return day_start_utc, day_end_utc
 
     def _format_date_with_day_name(self, date_value):
         if not date_value:
@@ -73,162 +29,15 @@ class PosDailyOperationsWizard(models.TransientModel):
     def _get_active_configs(self):
         return self.env['pos.config'].search([('active', '=', True)], order='name')
 
-    def _get_sessions_on_date(self):
+    def _get_period(self):
         self.ensure_one()
-        day_start, day_end = self._get_day_bounds()
-        _logger.info(
-            "Daily Operations session search | business_date=%s | tz=%s | start_at UTC [%s .. %s]",
-            self.business_date,
-            self._get_report_timezone().zone,
-            day_start,
-            day_end,
-        )
-        return self.env['pos.session'].search([
-            ('start_at', '>=', fields.Datetime.to_string(day_start)),
-            ('start_at', '<=', fields.Datetime.to_string(day_end)),
-            ('config_id.active', '=', True),
-        ], order='start_at asc')
-
-    def _empty_branch_values(self):
-        return {
-            'sales': 0.0,
-            'rahen_in': 0.0,
-            'rahen_out': 0.0,
-            'cash': 0.0,
-            'visa': 0.0,
-            'hospitality': 0.0,
-            'talabat': 0.0,
-            'careem': 0.0,
-            'mythings': 0.0,
-            'kabseh': 0.0,
-            'delivery_amount': 0.0,
-            'cash_out': 0.0,
-            'delivery_cash': 0.0,
-            'differences': 0.0,
-        }
-
-    def _get_pledge_config_id(self, pledge):
-        if pledge.pos_order_id:
-            return pledge.pos_order_id.config_id.id
-        if pledge.order_id:
-            return pledge.order_id.pos_config_id.id
-        return False
-
-    def _pledge_order_on_date_domain(self, day_start, day_end):
-        return [
-            '|',
-            '&', ('pos_order_id', '!=', False),
-                 ('pos_order_id.date_order', '>=', fields.Datetime.to_string(day_start)),
-                 ('pos_order_id.date_order', '<=', fields.Datetime.to_string(day_end)),
-            '&', ('order_id', '!=', False),
-                 ('order_id.create_date', '>=', fields.Datetime.to_string(day_start)),
-                 ('order_id.create_date', '<=', fields.Datetime.to_string(day_end)),
-        ]
-
-    def _collect_pledge_totals(self, branch_data, active_config_ids):
-        self.ensure_one()
-        day_start, day_end = self._get_day_bounds()
-        base_domain = self._pledge_order_on_date_domain(day_start, day_end)
-
-        for state, field_name in (('active', 'rahen_in'), ('returned', 'rahen_out')):
-            pledges = self.env['pos.advance.order.pledge'].search(
-                base_domain + [('state', '=', state)]
-            )
-            for pledge in pledges:
-                config_id = self._get_pledge_config_id(pledge)
-                if not config_id or config_id not in active_config_ids:
-                    continue
-                branch_data[config_id][field_name] += pledge.pledge_subtotal or 0.0
-
-    def _collect_payment_totals(self, branch_data, sessions):
-        if not sessions:
-            return
-
-        grouped_payments = self.env['pos.payment']._read_group(
-            [('session_id', 'in', sessions.ids)],
-            ['session_id', 'payment_method_id'],
-            ['amount:sum'],
-        )
-        for session, payment_method, total_amount in grouped_payments:
-            config_id = session.config_id.id
-            amount = total_amount or 0.0
-            report_type = payment_method.daily_ops_report_type
-            if report_type != 'hospitality':
-                branch_data[config_id]['sales'] += amount
-            if report_type == 'cash':
-                branch_data[config_id]['cash'] += amount
-            elif report_type == 'visa':
-                branch_data[config_id]['visa'] += amount
-            elif report_type == 'hospitality':
-                branch_data[config_id]['hospitality'] += amount
-            if payment_method.id == PAYMENT_METHOD_TALABAT:
-                branch_data[config_id]['talabat'] += amount
-            elif payment_method.id == PAYMENT_METHOD_CAREEM:
-                branch_data[config_id]['careem'] += amount
-            elif payment_method.id == PAYMENT_METHOD_MYTHINGS:
-                branch_data[config_id]['mythings'] += amount
-            elif payment_method.id == PAYMENT_METHOD_KABSEH:
-                branch_data[config_id]['kabseh'] += amount
-
-    def _collect_session_delivery_amounts(self, branch_data, sessions_by_config):
-        for config_id, config_sessions in sessions_by_config.items():
-            if not config_sessions:
-                continue
-            branch_data[config_id]['delivery_amount'] = sum(
-                session.delivery_amount or 0.0
-                for session in config_sessions
-            )
-
-    def _collect_session_cash_out(self, branch_data, sessions_by_config):
-        for config_id, config_sessions in sessions_by_config.items():
-            if not config_sessions:
-                continue
-            cash_out = 0.0
-            for session in config_sessions:
-                for line in session.statement_line_ids:
-                    amount = line.amount or 0.0
-                    if amount < 0:
-                        cash_out += abs(amount)
-            branch_data[config_id]['cash_out'] = cash_out
-
-    def _apply_delivery_cash_totals(self, branch_data):
-        for config_id in branch_data:
-            branch_data[config_id]['delivery_cash'] = (
-                branch_data[config_id]['cash_out'] + branch_data[config_id]['delivery_amount']
-            )
-
-    def _apply_differences_totals(self, branch_data):
-        for config_id in branch_data:
-            values = branch_data[config_id]
-            all_cash_in = values['cash'] + values['rahen_in']
-            branch_data[config_id]['differences'] = all_cash_in - values['delivery_cash']
+        return self.env['pos.daily.ops.engine']._get_period(self.business_date)
 
     def _get_report_rows(self):
         self.ensure_one()
-        sessions = self._get_sessions_on_date()
-        sessions_by_config = defaultdict(list)
-        for session in sessions:
-            sessions_by_config[session.config_id.id].append(session)
-
         configs = self._get_active_configs()
-        active_config_ids = set(configs.ids)
-        branch_data = defaultdict(self._empty_branch_values)
-
-        self._collect_session_delivery_amounts(branch_data, sessions_by_config)
-        self._collect_session_cash_out(branch_data, sessions_by_config)
-        self._apply_delivery_cash_totals(branch_data)
-        self._collect_payment_totals(branch_data, sessions)
-        self._collect_pledge_totals(branch_data, active_config_ids)
-        self._apply_differences_totals(branch_data)
-
-        rows = []
-        for config in configs:
-            values = branch_data[config.id]
-            rows.append({
-                'branch_name': config.name,
-                **values,
-            })
-        return rows
+        figures = self.env['pos.daily.ops.engine']._compute_branch_figures(self._get_period(), configs)
+        return [{'branch_name': config.name, **figures[config.id]} for config in configs]
 
     def _get_total_row(self, rows):
         numeric_fields = (
@@ -240,25 +49,28 @@ class PosDailyOperationsWizard(models.TransientModel):
         return {'branch_name': _('Total'), **totals}
 
     def _get_report_type_label(self, payment_method):
-        selection = dict(self.env['pos.payment.method']._fields['daily_ops_report_type'].selection)
+        selection = dict(self.env['pos.payment.method']._fields['daily_ops_report_type']._description_selection(self.env))
         report_type = payment_method.daily_ops_report_type or 'none'
         return selection.get(report_type, report_type)
 
+    def _get_report_columns_label(self, payment_method):
+        if payment_method.daily_ops_report_type in COLUMN_REPORT_TYPES:
+            return self._get_report_type_label(payment_method)
+        return '-'
+
     def _get_sales_breakdown_lines(self, summary_rows):
         self.ensure_one()
-        sessions = self._get_sessions_on_date()
+        engine = self.env['pos.daily.ops.engine']
         configs = self._get_active_configs()
+        sessions = engine._get_sessions(self._get_period(), configs)
         summary_by_branch = {row['branch_name']: row for row in summary_rows}
 
         aggregates = defaultdict(lambda: {'amount': 0.0, 'count': 0, 'payment_method': None})
-        payments = self.env['pos.payment'].search([('session_id', 'in', sessions.ids)])
-        for payment in payments:
-            config_id = payment.session_id.config_id.id
-            pm = payment.payment_method_id
-            key = (config_id, pm.id)
+        for payment in engine._get_payments(sessions):
+            key = (payment.session_id.config_id.id, payment.payment_method_id.id)
             aggregates[key]['amount'] += payment.amount or 0.0
             aggregates[key]['count'] += 1
-            aggregates[key]['payment_method'] = pm
+            aggregates[key]['payment_method'] = payment.payment_method_id
 
         lines = []
         for config in configs:
@@ -281,22 +93,21 @@ class PosDailyOperationsWizard(models.TransientModel):
                 for key in branch_keys:
                     data = aggregates[key]
                     pm = data['payment_method']
-                    in_sales = pm.daily_ops_report_type != 'hospitality'
                     lines.append({
                         'row_type': 'detail',
                         'branch_name': config.name,
                         'payment_method': pm.name,
                         'report_type': self._get_report_type_label(pm),
-                        'report_columns': _payment_method_report_columns(pm),
+                        'report_columns': self._get_report_columns_label(pm),
                         'payment_count': data['count'],
                         'amount': data['amount'],
-                        'in_sales': in_sales,
+                        'in_sales': engine._is_in_sales(pm),
                     })
 
             in_sales_total = sum(
                 aggregates[key]['amount']
                 for key in branch_keys
-                if aggregates[key]['payment_method'].daily_ops_report_type != 'hospitality'
+                if engine._is_in_sales(aggregates[key]['payment_method'])
             )
             sheet_sales = summary_by_branch.get(config.name, {}).get('sales', 0.0)
             lines.append({

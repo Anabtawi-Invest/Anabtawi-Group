@@ -1,7 +1,7 @@
 from odoo import _, fields, models
 from odoo.exceptions import UserError
 
-PROTECTED_PAYMENT_METHOD_IDS = {142, 143, 144, 145}
+PROTECTED_REPORT_TYPES = ('talabat', 'careem', 'mythings', 'kabseh')
 
 
 class PosPaymentMethod(models.Model):
@@ -13,11 +13,17 @@ class PosPaymentMethod(models.Model):
             ('cash', 'Cash'),
             ('visa', 'Visa'),
             ('hospitality', 'Hospitality'),
+            ('talabat', 'Talabat'),
+            ('careem', 'Careem'),
+            ('mythings', 'Mythings'),
+            ('kabseh', 'Kabseh'),
+            ('employee_debt', 'Employee Debt'),
         ],
         string='Daily Operations Report Type',
         help=(
-            'Choose None if this payment method should not appear in the '
-            'Cash, Visa, or Hospitality columns of the Daily Operations report.'
+            'Column of the Daily Operations report and POS dashboard that receives the '
+            'payments of this method. Hospitality payments are excluded from Sales; '
+            'None and Employee Debt are included in Sales without a dedicated Excel column.'
         ),
     )
 
@@ -61,7 +67,7 @@ class PosPaymentMethod(models.Model):
         )
 
     def unlink(self):
-        protected = self.filtered(lambda method: method.id in PROTECTED_PAYMENT_METHOD_IDS)
+        protected = self.filtered(lambda method: method.daily_ops_report_type in PROTECTED_REPORT_TYPES)
         if protected:
             names = ', '.join(protected.mapped('name'))
             raise UserError(

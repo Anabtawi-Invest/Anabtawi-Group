@@ -20,8 +20,8 @@ class PosReportingDashboardController(http.Controller):
                 return request.not_found()
 
             content = wizard._generate_xlsx_content()
-            df_str = fields.Datetime.to_string(wizard.date_from).replace(" ", "_").replace(":", "-") if wizard.date_from else "start"
-            dt_str = fields.Datetime.to_string(wizard.date_to).replace(" ", "_").replace(":", "-") if wizard.date_to else "end"
+            df_str = fields.Date.to_string(wizard.date_from) if wizard.date_from else "start"
+            dt_str = fields.Date.to_string(wizard.date_to) if wizard.date_to else "end"
             filename = f"POS_Unified_Operations_Report_{df_str}_{dt_str}.xlsx"
 
             return request.make_response(
