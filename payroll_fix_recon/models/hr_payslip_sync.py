@@ -236,10 +236,29 @@ class HrLeave(models.Model):
             unit = current.split(' ', 1)[1] if ' ' in current else 'days'
             sets.append('duration_display = %s')
             params.append('%g %s' % (round(days, 2), unit))
-        self.env.cr.execute("UPDATE hr_leave SET %s WHERE id = %%s" % ', '.join(sets), params + [self.id])
+        query, args = "UPDATE hr_leave SET %s WHERE id = %%s" % ', '.join(sets), params + [self.id]
+        self.env.cr.execute(query, args)
         names = ['number_of_days', 'number_of_hours', 'number_of_days_display', 'duration_display',
                  'display_name']
         self.invalidate_recordset([n for n in names if n in self._fields])
+        # Odoo may recompute the stored duration again when the transaction is flushed (the leave was just
+        # created / validated): write the fraction once more as the very last step before the commit.
+        cr = self.env.cr
+        pending = cr.precommit.data.setdefault('pfr_leave_fractions', {})
+        pending[self.id] = (query, args)
+        cr.precommit.add(self._pfr_reapply_fractions)
+
+    def _pfr_reapply_fractions(self):
+        cr = self.env.cr
+        pending = cr.precommit.data.get('pfr_leave_fractions') or {}
+        for query, args in pending.values():
+            cr.execute(query, args)
+        funcs = getattr(cr.precommit, '_funcs', None)
+        if funcs:                                       # other pre-commit hooks still queued: go last again
+            cr.precommit.add(self._pfr_reapply_fractions)
+        else:
+            cr.precommit.data.pop('pfr_leave_fractions', None)
+        self.env['hr.leave'].invalidate_model(['number_of_days', 'number_of_hours', 'duration_display'])
 
     def pfr_fix_settlement_leave_days(self):
         """One-off repair for settlement leaves created before this fix: the hours are in the name
