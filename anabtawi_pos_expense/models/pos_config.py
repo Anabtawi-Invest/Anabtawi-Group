@@ -10,7 +10,8 @@ class PosConfig(models.Model):
         string="Expense Limit",
         digits="Account",
         help="Maximum total of open POS expenses. Each expense reduces the available balance "
-             "until it is approved, or, if refused, until the money is returned in the POS. "
+             "until it is approved, or, if refused, until the money is returned or the expense "
+             "is resent (then the resent expense takes its place). "
              "Set to 0 to hide the Expense buttons.",
     )
     expense_pending_amount = fields.Float(

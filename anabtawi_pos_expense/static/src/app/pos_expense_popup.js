@@ -186,7 +186,8 @@ export class PosExpensePopup extends Component {
             return;
         }
         this._stopPoll();
-        let message = _t("Expense %s sent again for approval.", result.name);
+        const names = { name: result.name, original: result.original_name };
+        let message = _t("%(original)s resent for approval as %(name)s.", names);
         if (result.reason) {
             const type = result.difference > 0 ? "out" : "in";
             const formattedDiff = this.format(Math.abs(result.difference));
@@ -197,12 +198,12 @@ export class PosExpensePopup extends Component {
             });
             message =
                 type === "out"
-                    ? _t("Expense %(name)s sent again for approval. Cash out of %(amount)s done.", {
-                          name: result.name,
+                    ? _t("%(original)s resent for approval as %(name)s. Cash out of %(amount)s done.", {
+                          ...names,
                           amount: formattedDiff,
                       })
-                    : _t("Expense %(name)s sent again for approval. Cash in of %(amount)s done.", {
-                          name: result.name,
+                    : _t("%(original)s resent for approval as %(name)s. Cash in of %(amount)s done.", {
+                          ...names,
                           amount: formattedDiff,
                       });
         }

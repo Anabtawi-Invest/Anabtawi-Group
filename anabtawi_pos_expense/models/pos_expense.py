@@ -28,6 +28,7 @@ class PosExpense(models.Model):
             ("to_approve", "To Approve"),
             ("approved", "Approved"),
             ("refused", "Refused"),
+            ("resent", "Resent"),
             ("returned", "Returned"),
         ],
         string="Status",
@@ -69,6 +70,58 @@ class PosExpense(models.Model):
     )
     return_move_id = fields.Many2one(related="return_statement_line_id.move_id", string="Return Journal Entry")
 
+    original_expense_id = fields.Many2one(
+        "pos.expense",
+        string="Original Expense",
+        readonly=True,
+        copy=False,
+        index="btree_not_null",
+        help="The refused expense this one was resent from.",
+    )
+    resent_expense_ids = fields.One2many("pos.expense", "original_expense_id", string="Resent As", readonly=True)
+    resent_expense_count = fields.Integer(compute="_compute_resent_expense_count")
+    chain_move_ids = fields.Many2many(
+        "account.move",
+        string="Journal Entries",
+        compute="_compute_chain_move_ids",
+        help="Cash out, adjustments and return entries of this expense and of all its resent versions.",
+    )
+    chain_move_count = fields.Integer(compute="_compute_chain_move_ids")
+
+    @api.depends("resent_expense_ids")
+    def _compute_resent_expense_count(self):
+        for expense in self:
+            expense.resent_expense_count = len(expense.resent_expense_ids)
+
+    def _get_chain(self):
+        """All expenses linked to ``self`` through resends (originals and resent versions)."""
+        self.ensure_one()
+        root = self
+        while root.original_expense_id:
+            root = root.original_expense_id
+        chain = root
+        current = root
+        while current:
+            current = current.resent_expense_ids
+            chain |= current
+        return chain
+
+    @api.depends(
+        "original_expense_id", "resent_expense_ids",
+        "statement_line_id", "adjustment_statement_line_ids", "return_statement_line_id",
+    )
+    def _compute_chain_move_ids(self):
+        for expense in self:
+            chain = expense.sudo()._get_chain() if expense.id else expense
+            lines = (
+                chain.statement_line_id
+                | chain.adjustment_statement_line_ids
+                | chain.return_statement_line_id
+            )
+            moves = lines.move_id.sorted(lambda m: (m.date, m.id))
+            expense.chain_move_ids = moves
+            expense.chain_move_count = len(moves)
+
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
@@ -106,13 +159,17 @@ class PosExpense(models.Model):
             ))
         self._set_decision("refused")
 
-    def action_open_move(self):
+    def action_open_journal_entries(self):
         self.ensure_one()
-        return self.move_id._get_records_action()
+        return self.chain_move_ids._get_records_action(name=_("Journal Entries of %s", self.name))
 
-    def action_open_return_move(self):
+    def action_open_original_expense(self):
         self.ensure_one()
-        return self.return_move_id._get_records_action()
+        return self.original_expense_id._get_records_action()
+
+    def action_open_resent_expenses(self):
+        self.ensure_one()
+        return self.resent_expense_ids._get_records_action(name=_("Resent As"))
 
     def _get_image_thumbnail(self):
         self.ensure_one()

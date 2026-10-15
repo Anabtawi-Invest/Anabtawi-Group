@@ -1,5 +1,3 @@
-import base64
-
 from markupsafe import Markup
 
 from odoo import _, fields, models
@@ -158,13 +156,14 @@ class PosSession(models.Model):
         }
 
     def resubmit_pos_expense(self, expense_id, type_id, amount, token=False, cashier_name=False, employee_id=False):
+        """Resend a refused expense as a new expense linked to it; the difference is a cash move."""
         self.ensure_one()
         self._check_pos_expense_session()
         self._lock_pos_expense_config()
-        expense = self._get_pos_refused_expense(expense_id)
+        original = self._get_pos_refused_expense(expense_id)
         currency = self.currency_id
-        old_amount = expense.amount
-        old_type = expense.type_id
+        old_amount = original.amount
+        old_type = original.type_id
 
         expense_type = self._get_pos_expense_type(type_id)
         # The refused amount is still counted in the balance, so only an increase needs room.
@@ -172,17 +171,35 @@ class PosSession(models.Model):
 
         upload = self._get_pos_expense_upload(token) if token else self.env["pos.expense.upload"]
         new_image = upload.image if upload else False
+        cashier = cashier_name or self.env.user.name
+
+        # Free the original first so the balance never counts both expenses.
+        original.write({"state": "resent"})
+        expense = self.env["pos.expense"].sudo().create({
+            "config_id": self.config_id.id,
+            "session_id": self.id,
+            "type_id": expense_type.id,
+            "amount": amount,
+            "cashier_name": cashier,
+            "image": new_image or original.image,
+            "original_expense_id": original.id,
+            "resubmit_count": original.resubmit_count + 1,
+        })
 
         difference = currency.round(amount - old_amount)
-        cash_move = self.env["account.bank.statement.line"]
         reason = False
         if not currency.is_zero(difference):
-            reason = _("%(name)s - Adjustment - %(type)s", name=expense.name, type=expense_type.name)
+            reason = _(
+                "%(name)s - Adjustment of %(original)s - %(type)s",
+                name=expense.name,
+                original=original.name,
+                type=expense_type.name,
+            )
             sign = -1 if difference > 0 else 1
             cash_move = self._create_pos_expense_cash_move(sign, abs(difference), reason, employee_id)
+            expense.adjustment_statement_line_ids = [fields.Command.link(cash_move.id)]
 
-        cashier = cashier_name or self.env.user.name
-        changes = [_("Previous refuse reason: %s", expense.refuse_reason or "-")]
+        changes = [_("Refuse reason of %(name)s: %(reason)s", name=original.name, reason=original.refuse_reason or "-")]
         if expense_type != old_type:
             changes.append(_("Type: %(old)s → %(new)s", old=old_type.name, new=expense_type.name))
         if not currency.is_zero(difference):
@@ -194,37 +211,24 @@ class PosSession(models.Model):
                 diff=self._format_pos_expense_amount(abs(difference)),
                 session=self.name,
             ))
-        attachments = []
         if new_image:
-            changes.append(_("New receipt photo uploaded (previous photo attached)."))
-            if expense.image:
-                attachments.append((f"{expense.name}-previous-photo.png", base64.b64decode(expense.image)))
-        body = Markup("<p>%s</p><ul>%s</ul>") % (
-            _("Resubmitted from the POS by %s", cashier),
+            changes.append(_("New receipt photo uploaded."))
+        expense.message_post(body=Markup("<p>%s</p><ul>%s</ul>") % (
+            _("Resent from %(original)s by %(cashier)s", original=original._get_html_link(), cashier=cashier),
             Markup("").join(Markup("<li>%s</li>") % change for change in changes),
-        )
-        expense.message_post(body=body, attachments=attachments)
-
-        vals = {
-            "state": "to_approve",
-            "type_id": expense_type.id,
-            "amount": amount,
-            "refuse_reason": False,
-            "decided_by_id": False,
-            "decision_date": False,
-            "resubmit_count": expense.resubmit_count + 1,
-        }
-        if new_image:
-            vals["image"] = new_image
-        if cash_move:
-            vals["adjustment_statement_line_ids"] = [fields.Command.link(cash_move.id)]
-        expense.write(vals)
+        ))
+        original.message_post(body=Markup("<p>%s</p>") % _(
+            "Resent from the POS by %(cashier)s as %(expense)s",
+            cashier=cashier,
+            expense=expense._get_html_link(),
+        ))
         if upload:
             upload.sudo().unlink()
 
         expense._invalidate_config_balance()
         return {
             "name": expense.name,
+            "original_name": original.name,
             "amount": amount,
             "difference": difference,
             "reason": reason,
