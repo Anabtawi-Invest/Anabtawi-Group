@@ -159,6 +159,16 @@ class PosReportingDashboard(models.TransientModel):
         return untaxed
 
     @staticmethod
+    def _payment_tax_split(payment):
+        """(untaxed, tax) share of a payment in its order; both add up to the payment amount."""
+        amount = payment.amount or 0.0
+        order = payment.pos_order_id
+        if not order or not order.amount_total:
+            return amount, 0.0
+        tax = (order.amount_tax or 0.0) * amount / order.amount_total
+        return amount - tax, tax
+
+    @staticmethod
     def _orders_per_hour(values):
         if values["open_hours"] <= 0:
             return 0.0
@@ -320,11 +330,19 @@ class PosReportingDashboard(models.TransientModel):
         for cfg_id, values in figures.items():
             branch_data[cfg_id].update(values)
 
-        # --- A-D. POS Orders of the period's sessions (tax, discounts, gifts, order count) ---
+        # --- A-D. Untaxed / tax from the income payments, so they add up to Total POS Income
+        # (hospitality, advance applied and cash rounding are left out like in the income).
+        for pay in engine._get_payments(sessions):
+            if not engine._is_in_sales(pay.payment_method_id):
+                continue
+            branch = branch_data[pay.session_id.config_id.id]
+            untaxed_amt, tax_amt = self._payment_tax_split(pay)
+            branch["untaxed_sales"] += untaxed_amt
+            branch["tax_amount"] += tax_amt
+
+        # POS Orders of the period's sessions (discounts, gifts, order count)
         for order in engine._get_orders(sessions):
             branch = branch_data[order.config_id.id]
-            branch["untaxed_sales"] += self._order_untaxed(order)
-            branch["tax_amount"] += order.amount_tax or 0.0
             branch["discount_amount"] += self._order_discount(order)
             gift_lines = self._order_gift_lines(order)
             branch["gift_amount"] += sum(self._gift_line_value(line) for line in gift_lines)
@@ -629,13 +647,10 @@ class PosReportingDashboard(models.TransientModel):
                 po = pay.pos_order_id
                 amt = pay.amount or 0.0
 
-                untaxed_amt = tax_amt = order_disc = 0.0
-                if po:
-                    tot_amt_full = po.amount_total or 0.0
-                    ratio = (amt / tot_amt_full) if tot_amt_full else 1.0
-                    untaxed_amt = self._order_untaxed(po) * ratio
-                    tax_amt = (po.amount_tax or 0.0) * ratio
-                    order_disc = self._order_discount(po) * ratio
+                untaxed_amt, tax_amt = self._payment_tax_split(pay)
+                order_disc = 0.0
+                if po and po.amount_total:
+                    order_disc = self._order_discount(po) * amt / po.amount_total
 
                 is_online = bucket in DELIVERY_CHANNELS
                 vals_list.append({
@@ -658,20 +673,39 @@ class PosReportingDashboard(models.TransientModel):
                     "company_id": cfg.company_id.id,
                 })
 
-        elif metric_type in ("untaxed_sales", "tax_amount", "discount_amount"):
+        elif metric_type in ("untaxed_sales", "tax_amount"):
+            for pay in engine._get_payments(sessions):
+                pm = pay.payment_method_id
+                if not engine._is_in_sales(pm):
+                    continue
+                untaxed_amt, tax_amt = self._payment_tax_split(pay)
+                if (untaxed_amt if metric_type == "untaxed_sales" else tax_amt) == 0.0:
+                    continue
+                po = pay.pos_order_id
+                cfg = pay.session_id.config_id
+                vals_list.append({
+                    "name": po.name or pay.name or _("POS Payment"),
+                    "date": pay.payment_date or (po.date_order if po else False) or pay.session_id.start_at,
+                    "config_id": cfg.id,
+                    "session_id": pay.session_id.id,
+                    "payment_method_id": pm.id,
+                    "pos_order_id": po.id or False,
+                    "report_type": "pos_sales",
+                    "amount": pay.amount or 0.0,
+                    "untaxed_amount": untaxed_amt,
+                    "tax_amount": tax_amt,
+                    "partner_id": po.partner_id.id if po else False,
+                    "company_id": cfg.company_id.id,
+                })
+
+        elif metric_type == "discount_amount":
             for order in engine._get_orders(sessions):
                 cfg = order.config_id
                 untaxed_amt = self._order_untaxed(order)
                 tax_amt = order.amount_tax or 0.0
                 order_disc = self._order_discount(order)
 
-                amt = {
-                    "untaxed_sales": untaxed_amt,
-                    "tax_amount": tax_amt,
-                    "discount_amount": order_disc,
-                }[metric_type]
-
-                if amt != 0.0:
+                if order_disc != 0.0:
                     vals_list.append({
                         "name": order.name or _("POS Order"),
                         "date": order.date_order,
