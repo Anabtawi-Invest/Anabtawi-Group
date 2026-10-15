@@ -68,7 +68,8 @@ DASHBOARD_EXTRA_KEYS = {
     "advance_remaining_amount": 0.0,
     "advance_pending_count": 0,
     "order_count": 0,
-    "orders_per_min": 0.0,
+    "open_hours": 0.0,
+    "orders_per_hour": 0.0,
     "attendant_employee_count": 0,
     "total_labor_cost": 0.0,
     "extra_hours": 0.0,
@@ -156,6 +157,12 @@ class PosReportingDashboard(models.TransientModel):
         if untaxed is None:
             untaxed = (order.amount_total or 0.0) - (order.amount_tax or 0.0)
         return untaxed
+
+    @staticmethod
+    def _orders_per_hour(values):
+        if values["open_hours"] <= 0:
+            return 0.0
+        return round(values["order_count"] / values["open_hours"], 2)
 
     def _payment_matches_metric(self, payment_method, metric_type):
         bucket = self.env["pos.daily.ops.engine"]._get_bucket(payment_method)
@@ -300,9 +307,6 @@ class PosReportingDashboard(models.TransientModel):
         period = self._parse_period(date_from, date_to)
         dt_start, dt_end, str_start, str_end = self._period_bounds(period)
 
-        # Operational duration in minutes for OPM calculations
-        total_minutes = max((dt_end - dt_start).total_seconds() / 60.0, 1.0)
-
         configs = self._get_report_configs(config_ids)
         active_config_ids = set(configs.ids)
 
@@ -327,13 +331,23 @@ class PosReportingDashboard(models.TransientModel):
             branch["gift_line_count"] += len(gift_lines)
             branch["order_count"] += 1
 
+        # Open time of the sessions; a session still open counts until now.
+        now = fields.Datetime.now()
+        for session in sessions:
+            if not session.start_at:
+                continue
+            session_end = session.stop_at or now
+            branch_data[session.config_id.id]["open_hours"] += max(
+                (session_end - session.start_at).total_seconds() / 3600.0, 0.0
+            )
+
         for cfg_id in active_config_ids:
             branch = branch_data[cfg_id]
             branch["net_cash_moves"] = branch["cash_in"] - branch["cash_out"]
             branch["net_pledges"] = branch["rahen_in"] - branch["rahen_out"]
             branch["pledge_cash_net"] = branch["pledge_cash_in"] - branch["pledge_cash_out"]
             branch["pledge_visa_net"] = branch["pledge_visa_in"] - branch["pledge_visa_out"]
-            branch["orders_per_min"] = round(branch["order_count"] / total_minutes, 2)
+            branch["orders_per_hour"] = self._orders_per_hour(branch)
 
         # --- E. Collect Advance Orders ---
         if "pos.advance.order" in self.env:
@@ -463,7 +477,8 @@ class PosReportingDashboard(models.TransientModel):
             for key in global_totals.keys():
                 global_totals[key] += vals[key]
 
-        global_totals["orders_per_min"] = round(global_totals["order_count"] / total_minutes, 2)
+        # Average per branch: all orders over the open hours of all sessions.
+        global_totals["orders_per_hour"] = self._orders_per_hour(global_totals)
 
         # --- G. Build Channel Distribution & Daily Trends ---
         channels = [
@@ -561,7 +576,8 @@ class PosReportingDashboard(models.TransientModel):
                 "advance_pending_count": global_totals["advance_pending_count"],
                 "delivery_amount": global_totals["delivery_amount"],
                 "order_count": global_totals["order_count"],
-                "orders_per_min": global_totals["orders_per_min"],
+                "orders_per_hour": global_totals["orders_per_hour"],
+                "open_hours": global_totals["open_hours"],
                 "attendant_employee_count": global_totals["attendant_employee_count"],
                 "total_labor_cost": global_totals["total_labor_cost"],
                 "total_extra_hours": global_totals["extra_hours"],
@@ -905,7 +921,7 @@ class PosReportingDashboard(models.TransientModel):
         wiz = self.env["pos.unified.report.wizard"].sudo().create(wizard_vals)
 
         metric_titles = {
-            "sales": _("Gross Sales Transactions"),
+            "sales": _("POS Income Transactions"),
             "untaxed_sales": _("Sales Without Tax Transactions"),
             "tax_amount": _("Sales Tax Transactions"),
             "discount_amount": _("Order Discount Transactions"),
