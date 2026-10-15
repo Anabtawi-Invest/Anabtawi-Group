@@ -121,6 +121,7 @@ class PosUnifiedReportWizard(models.TransientModel):
         summary_columns = [
             (_("Total Sales (Gross)"), "sales", False),
             (_("Orders / Hour"), "orders_per_hour", False),
+            (_("Avg Basket"), "avg_basket", False),
             (_("Sales Without Tax"), "untaxed_sales", False),
             (_("Tax Amount"), "tax_amount", False),
             (_("Total Discounts"), "discount_amount", False),

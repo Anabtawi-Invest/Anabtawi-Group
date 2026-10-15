@@ -70,6 +70,8 @@ DASHBOARD_EXTRA_KEYS = {
     "order_count": 0,
     "open_hours": 0.0,
     "orders_per_hour": 0.0,
+    "paying_order_count": 0,
+    "avg_basket": 0.0,
     "attendant_employee_count": 0,
     "total_labor_cost": 0.0,
     "extra_hours": 0.0,
@@ -167,6 +169,22 @@ class PosReportingDashboard(models.TransientModel):
             return amount, 0.0
         tax = (order.amount_tax or 0.0) * amount / order.amount_total
         return amount - tax, tax
+
+    def _get_paying_orders(self, sessions):
+        """{pos.order: income} for orders whose income payments are above zero
+        (hospitality-only, refund and zero-total gift orders excluded)."""
+        engine = self.env["pos.daily.ops.engine"]
+        order_income = defaultdict(float)
+        for pay in engine._get_payments(sessions):
+            if pay.pos_order_id and engine._is_in_sales(pay.payment_method_id):
+                order_income[pay.pos_order_id] += pay.amount or 0.0
+        return {order: income for order, income in order_income.items() if income > 0.0005}
+
+    @staticmethod
+    def _avg_basket(values):
+        if not values["paying_order_count"]:
+            return 0.0
+        return round(values["sales"] / values["paying_order_count"], 3)
 
     @staticmethod
     def _orders_per_hour(values):
@@ -340,6 +358,9 @@ class PosReportingDashboard(models.TransientModel):
             branch["untaxed_sales"] += untaxed_amt
             branch["tax_amount"] += tax_amt
 
+        for order in self._get_paying_orders(sessions):
+            branch_data[order.config_id.id]["paying_order_count"] += 1
+
         # POS Orders of the period's sessions (discounts, gifts, order count)
         for order in engine._get_orders(sessions):
             branch = branch_data[order.config_id.id]
@@ -366,6 +387,7 @@ class PosReportingDashboard(models.TransientModel):
             branch["pledge_cash_net"] = branch["pledge_cash_in"] - branch["pledge_cash_out"]
             branch["pledge_visa_net"] = branch["pledge_visa_in"] - branch["pledge_visa_out"]
             branch["orders_per_hour"] = self._orders_per_hour(branch)
+            branch["avg_basket"] = self._avg_basket(branch)
 
         # --- E. Collect Advance Orders ---
         if "pos.advance.order" in self.env:
@@ -497,6 +519,7 @@ class PosReportingDashboard(models.TransientModel):
 
         # Average per branch: all orders over the open hours of all sessions.
         global_totals["orders_per_hour"] = self._orders_per_hour(global_totals)
+        global_totals["avg_basket"] = self._avg_basket(global_totals)
 
         # --- G. Build Channel Distribution & Daily Trends ---
         channels = [
@@ -595,6 +618,8 @@ class PosReportingDashboard(models.TransientModel):
                 "delivery_amount": global_totals["delivery_amount"],
                 "order_count": global_totals["order_count"],
                 "orders_per_hour": global_totals["orders_per_hour"],
+                "avg_basket": global_totals["avg_basket"],
+                "paying_order_count": global_totals["paying_order_count"],
                 "open_hours": global_totals["open_hours"],
                 "attendant_employee_count": global_totals["attendant_employee_count"],
                 "total_labor_cost": global_totals["total_labor_cost"],
@@ -720,6 +745,21 @@ class PosReportingDashboard(models.TransientModel):
                         "partner_id": order.partner_id.id or False,
                         "company_id": cfg.company_id.id,
                     })
+
+        elif metric_type == "avg_basket":
+            for order, income in self._get_paying_orders(sessions).items():
+                cfg = order.config_id
+                vals_list.append({
+                    "name": order.name or _("POS Order"),
+                    "date": order.date_order,
+                    "config_id": cfg.id,
+                    "session_id": order.session_id.id,
+                    "pos_order_id": order.id,
+                    "report_type": "pos_sales",
+                    "amount": income,
+                    "partner_id": order.partner_id.id or False,
+                    "company_id": cfg.company_id.id,
+                })
 
         elif metric_type == "gift_amount":
             for order in engine._get_orders(sessions):
@@ -956,6 +996,7 @@ class PosReportingDashboard(models.TransientModel):
 
         metric_titles = {
             "sales": _("POS Income Transactions"),
+            "avg_basket": _("Average Basket: Paying Orders"),
             "untaxed_sales": _("Sales Without Tax Transactions"),
             "tax_amount": _("Sales Tax Transactions"),
             "discount_amount": _("Order Discount Transactions"),
