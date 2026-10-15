@@ -6,7 +6,8 @@
         <field name="model">pos.expense</field>
         <field name="arch" type="xml">
             <list string="POS Expenses" create="false" delete="false"
-                  decoration-info="state == 'to_approve'" decoration-muted="state == 'refused'">
+                  decoration-info="state == 'to_approve'" decoration-danger="state == 'refused'"
+                  decoration-muted="state == 'returned'">
                 <field name="name"/>
                 <field name="date"/>
                 <field name="config_id"/>
@@ -19,7 +20,8 @@
                 <field name="state" widget="badge"
                        decoration-info="state == 'to_approve'"
                        decoration-success="state == 'approved'"
-                       decoration-danger="state == 'refused'"/>
+                       decoration-danger="state == 'refused'"
+                       decoration-muted="state == 'returned'"/>
             </list>
         </field>
     </record>
@@ -34,13 +36,19 @@
                             invisible="state != 'to_approve'" groups="point_of_sale.group_pos_manager"/>
                     <button name="action_refuse" type="object" string="Refuse"
                             invisible="state != 'to_approve'" groups="point_of_sale.group_pos_manager"
-                            confirm="Refusing restores the amount to the available balance. Make sure the money is followed up. Continue?"/>
-                    <field name="state" widget="statusbar"/>
+                            confirm="The cashier will have to return this amount in the POS (Cash In) before any session of this POS can be closed. Continue?"/>
+                    <field name="state" widget="statusbar" statusbar_visible="to_approve,approved,refused,returned"/>
                 </header>
                 <sheet>
                     <div class="oe_button_box" name="button_box">
                         <button name="action_open_move" type="object" class="oe_stat_button" icon="fa-book"
-                                invisible="not move_id" string="Journal Entry"/>
+                                invisible="not move_id" string="Cash Out Entry"/>
+                        <button name="action_open_return_move" type="object" class="oe_stat_button" icon="fa-undo"
+                                invisible="not return_move_id" string="Return Entry"/>
+                    </div>
+                    <div class="alert alert-warning" role="alert" invisible="state != 'refused'">
+                        This expense was refused. The cashier must return the amount from the POS
+                        (Actions → Refused Expenses) before the session can be closed.
                     </div>
                     <field name="image" widget="image" class="oe_avatar" options="{'size': [180, 180]}"/>
                     <div class="oe_title">
@@ -65,9 +73,16 @@
                             <field name="decision_date"/>
                         </group>
                         <group>
-                            <field name="refuse_reason" readonly="state == 'approved'"/>
+                            <field name="refuse_reason" readonly="state != 'to_approve'"
+                                   placeholder="Required to refuse"/>
                             <field name="statement_line_id" invisible="1"/>
                             <field name="move_id" invisible="1"/>
+                            <field name="return_move_id" invisible="1"/>
+                        </group>
+                        <group string="Return" invisible="state != 'returned'">
+                            <field name="return_session_id"/>
+                            <field name="return_cashier_name"/>
+                            <field name="return_date"/>
                         </group>
                     </group>
                 </sheet>
@@ -88,7 +103,8 @@
                 <field name="cashier_name"/>
                 <filter name="to_approve" string="To Approve" domain="[('state', '=', 'to_approve')]"/>
                 <filter name="approved" string="Approved" domain="[('state', '=', 'approved')]"/>
-                <filter name="refused" string="Refused" domain="[('state', '=', 'refused')]"/>
+                <filter name="refused" string="Refused (not returned)" domain="[('state', '=', 'refused')]"/>
+                <filter name="returned" string="Returned" domain="[('state', '=', 'returned')]"/>
                 <separator/>
                 <filter name="date" string="Date" date="date"/>
                 <group>

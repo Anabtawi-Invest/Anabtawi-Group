@@ -4,10 +4,7 @@ import { _t } from "@web/core/l10n/translation";
 import { useService } from "@web/core/utils/hooks";
 import { usePos } from "@point_of_sale/app/hooks/pos_hook";
 import { useAsyncLockedMethod } from "@point_of_sale/app/hooks/hooks";
-import { CashMoveReceipt } from "@point_of_sale/app/components/popups/cash_move_popup/cash_move_receipt/cash_move_receipt";
-import { formatDateTime } from "@web/core/l10n/dates";
-
-const { DateTime } = luxon;
+import { getPosExpenseCashierArgs, printPosExpenseReceipt } from "./utils";
 
 export class PosExpensePopup extends Component {
     static template = "anabtawi_pos_expense.PosExpensePopup";
@@ -113,8 +110,6 @@ export class PosExpensePopup extends Component {
         if (!this.isValid) {
             return;
         }
-        const cashier = this.pos.getCashier?.();
-        const employeeId = this.pos.config.module_pos_hr ? cashier?.id : false;
         let result;
         try {
             result = await this.pos.data.call("pos.session", "create_pos_expense", [
@@ -122,8 +117,7 @@ export class PosExpensePopup extends Component {
                 parseInt(this.state.typeId),
                 this.amountValue,
                 this.state.upload.token,
-                cashier?.name || false,
-                employeeId || false,
+                ...getPosExpenseCashierArgs(this.pos),
             ]);
         } catch (error) {
             this.notification.add(error?.data?.message || _t("Could not save the expense."), {
@@ -133,7 +127,11 @@ export class PosExpensePopup extends Component {
         }
         this._stopPoll();
         const formattedAmount = this.format(result.amount);
-        await this._printReceipt(result.reason, formattedAmount);
+        await printPosExpenseReceipt(this.pos, this.printer, {
+            reason: result.reason,
+            formattedAmount,
+            type: "out",
+        });
         this.props.close();
         this.notification.add(
             _t("Expense %(name)s saved. Cash out of %(amount)s done.", {
@@ -142,32 +140,5 @@ export class PosExpensePopup extends Component {
             }),
             { type: "success" }
         );
-    }
-
-    async _printReceipt(reason, formattedAmount) {
-        const order = this.pos.models["pos.order"].create({
-            session_id: this.pos.session,
-            company_id: this.pos.company,
-            config_id: this.pos.config,
-            user_id: this.pos.user,
-            ticket_code: "",
-            tracking_number: "",
-            sequence_number: 0,
-            pos_reference: "",
-            state: "cancel",
-        });
-        try {
-            await this.printer.print(CashMoveReceipt, {
-                reason,
-                translatedType: _t("out"),
-                order,
-                formattedAmount,
-                date: formatDateTime(DateTime.now()),
-            });
-        } catch {
-            // The cash out is already saved; a printer problem must not block the cashier.
-        } finally {
-            this.pos.models["pos.order"].delete(order);
-        }
     }
 }

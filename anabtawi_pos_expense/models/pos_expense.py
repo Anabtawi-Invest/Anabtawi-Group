@@ -1,6 +1,9 @@
 from odoo import _, api, fields, models
 from odoo.exceptions import AccessError, UserError
 
+# Expenses in these states still consume the POS expense limit.
+OPEN_STATES = ("to_approve", "refused")
+
 
 class PosExpense(models.Model):
     _name = "pos.expense"
@@ -24,6 +27,7 @@ class PosExpense(models.Model):
             ("to_approve", "To Approve"),
             ("approved", "Approved"),
             ("refused", "Refused"),
+            ("returned", "Returned"),
         ],
         string="Status",
         required=True,
@@ -43,12 +47,26 @@ class PosExpense(models.Model):
     decision_date = fields.Datetime(string="Approval/Refusal Date", readonly=True, copy=False)
     refuse_reason = fields.Char(tracking=True)
 
+    return_session_id = fields.Many2one("pos.session", string="Returned in Session", readonly=True, copy=False)
+    return_cashier_name = fields.Char(string="Returned By", readonly=True, copy=False)
+    return_date = fields.Datetime(string="Return Date", readonly=True, copy=False)
+    return_statement_line_id = fields.Many2one(
+        "account.bank.statement.line",
+        string="Cash In (Return)",
+        readonly=True,
+        copy=False,
+    )
+    return_move_id = fields.Many2one(related="return_statement_line_id.move_id", string="Return Journal Entry")
+
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
             if vals.get("name", _("New")) == _("New"):
                 vals["name"] = self.env["ir.sequence"].next_by_code("pos.expense") or _("New")
         return super().create(vals_list)
+
+    def _invalidate_config_balance(self):
+        self.config_id.invalidate_recordset(["expense_pending_amount", "expense_available_amount"])
 
     def _check_approver(self):
         if not self.env.user.has_group("point_of_sale.group_pos_manager"):
@@ -63,14 +81,39 @@ class PosExpense(models.Model):
             "decided_by_id": self.env.user.id,
             "decision_date": fields.Datetime.now(),
         })
-        self.config_id.invalidate_recordset(["expense_pending_amount", "expense_available_amount"])
+        self._invalidate_config_balance()
 
     def action_approve(self):
         self._set_decision("approved")
 
     def action_refuse(self):
+        missing_reason = self.filtered(lambda e: not (e.refuse_reason or "").strip())
+        if missing_reason:
+            raise UserError(_(
+                "Please fill the Refuse Reason before refusing: %s",
+                ", ".join(missing_reason.mapped("name")),
+            ))
         self._set_decision("refused")
 
     def action_open_move(self):
         self.ensure_one()
         return self.move_id._get_records_action()
+
+    def action_open_return_move(self):
+        self.ensure_one()
+        return self.return_move_id._get_records_action()
+
+    def _prepare_pos_refused_data(self):
+        return [
+            {
+                "id": expense.id,
+                "name": expense.name,
+                "type": expense.type_id.name,
+                "amount": expense.amount,
+                "date": fields.Datetime.to_string(expense.date),
+                "cashier_name": expense.cashier_name or "",
+                "session_name": expense.session_id.name or "",
+                "refuse_reason": expense.refuse_reason or "",
+            }
+            for expense in self
+        ]

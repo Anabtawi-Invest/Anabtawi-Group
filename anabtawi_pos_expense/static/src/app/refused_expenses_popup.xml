@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="anabtawi_pos_expense.RefusedExpensesPopup">
+        <Dialog title.translate="Refused Expenses" size="'lg'">
+            <div t-if="state.loading" class="text-center p-4">
+                <i class="fa fa-spinner fa-spin fa-2x"/>
+            </div>
+            <div t-elif="!state.expenses.length" class="text-center text-muted p-4">
+                <i class="fa fa-check-circle fa-2x text-success d-block mb-2"/>
+                There are no refused expenses to return.
+            </div>
+            <t t-else="">
+                <div class="alert alert-warning">
+                    These expenses were refused. Return each amount to the cash drawer before closing the session.
+                </div>
+                <table class="table table-sm align-middle">
+                    <thead>
+                        <tr>
+                            <th>Reference</th>
+                            <th>Type</th>
+                            <th>Date</th>
+                            <th>Cashier</th>
+                            <th>Refuse Reason</th>
+                            <th class="text-end">Amount</th>
+                            <th/>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr t-foreach="state.expenses" t-as="expense" t-key="expense.id">
+                            <td class="fw-bold" t-esc="expense.name"/>
+                            <td t-esc="expense.type"/>
+                            <td t-esc="formatDate(expense.date)"/>
+                            <td t-esc="expense.cashier_name"/>
+                            <td class="text-danger" t-esc="expense.refuse_reason"/>
+                            <td class="text-end fw-bold" t-esc="format(expense.amount)"/>
+                            <td class="text-end">
+                                <button class="btn btn-primary" t-on-click="() => this.onClickReturn(expense)">
+                                    <i class="fa fa-undo me-1"/>Return
+                                </button>
+                            </td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="5" class="text-end fw-bold">Total</td>
+                            <td class="text-end fw-bold" t-esc="format(total)"/>
+                            <td/>
+                        </tr>
+                    </tfoot>
+                </table>
+            </t>
+            <t t-set-slot="footer">
+                <button class="btn btn-secondary btn-lg" t-on-click="props.close">Close</button>
+            </t>
+        </Dialog>
+    </t>
+
+</templates>

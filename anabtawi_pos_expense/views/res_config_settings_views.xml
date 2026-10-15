@@ -7,10 +7,10 @@
         <field name="arch" type="xml">
             <xpath expr="//setting[@id='set_maximum_difference']" position="after">
                 <setting id="pos_expense_limit" string="Expense Limit"
-                         help="Maximum total of POS expenses waiting for approval. Each expense reduces the balance until it is approved or refused. 0 hides the Expense button.">
+                         help="Maximum total of open POS expenses. Each expense reduces the balance until it is approved, or until it is returned if refused. 0 hides the Expense buttons.">
                     <field name="pos_expense_limit"/>
                     <div class="text-muted mt-1">
-                        Waiting approval: <field name="pos_expense_pending_amount" class="oe_inline"/>
+                        Open (to approve + refused): <field name="pos_expense_pending_amount" class="oe_inline"/>
                         - Available: <field name="pos_expense_available_amount" class="oe_inline"/>
                     </div>
                 </setting>

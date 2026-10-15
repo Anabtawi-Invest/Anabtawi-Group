@@ -5,6 +5,9 @@
             <button t-if="showPosExpenseButton" t-att-class="buttonClass" t-on-click="() => this.onClickPosExpense()">
                 <i class="fa fa-money me-1" role="img"/> Expense
             </button>
+            <button t-if="showPosExpenseButton" t-att-class="buttonClass" t-on-click="() => this.onClickRefusedExpenses()">
+                <i class="fa fa-undo me-1" role="img"/> Refused Expenses
+            </button>
         </xpath>
     </t>
 </templates>
