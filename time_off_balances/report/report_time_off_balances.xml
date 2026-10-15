@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Report Action -->
+    <record id="action_report_time_off_balances" model="ir.actions.report">
+        <field name="name">TIME OFF BALANCES REPORT</field>
+        <field name="model">time.off.balances.wizard</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">time_off_balances.report_time_off_balances_document</field>
+        <field name="report_file">time_off_balances.report_time_off_balances_document</field>
+        <field name="paperformat_id" ref="time_off_balances.paperformat_time_off_balances_landscape"/>
+        <field name="binding_model_id" eval="False"/>
+    </record>
+
+    <!-- QWeb Template -->
+    <template id="report_time_off_balances_document">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="wizard">
+                <t t-set="data" t-value="wizard._get_balance_report_data()"/>
+                <div class="article" style="font-family: 'Times New Roman', 'Segoe UI', Tahoma, sans-serif; font-size: 11px; color: #111;">
+
+                    <style>
+                        .vacation-table {
+                            width: 100%;
+                            border-collapse: collapse;
+                            margin-top: 8px;
+                            margin-bottom: 8px;
+                            font-size: 11px;
+                        }
+                        .vacation-table th {
+                            background-color: #D9D9D9;
+                            color: #000;
+                            border: 1px solid #777;
+                            padding: 6px 5px;
+                            text-align: center;
+                            font-weight: bold;
+                        }
+                        .vacation-table td {
+                            border: 1px solid #999;
+                            padding: 4px 6px;
+                            vertical-align: middle;
+                        }
+                        .text-center { text-align: center; }
+                        .text-left { text-align: left; }
+                        .text-right { text-align: right; }
+                        .positive-days {
+                            color: #0d6efd;
+                            font-weight: 500;
+                        }
+                        .negative-days {
+                            color: #dc3545;
+                            font-weight: 500;
+                        }
+                        .summary-box {
+                            background-color: #f8f9fa;
+                            border: 1px solid #ced4da;
+                            border-radius: 4px;
+                            padding: 7px 12px;
+                            margin-top: 10px;
+                            margin-bottom: 6px;
+                        }
+                    </style>
+
+                    <!-- Header Section -->
+                    <div class="row" style="margin-bottom: 12px; border-bottom: 2px solid #333; padding-bottom: 6px;">
+                        <div class="col-8" style="text-align: left;">
+                            <h2 style="margin: 0; font-size: 20px; font-weight: bold; color: #1a252f;">
+                                Vacations
+                            </h2>
+                            <div style="font-size: 12px; color: #555; margin-top: 3px;">
+                                <strong>Employee:</strong> <span t-esc="data['employee_name']"/>
+                                <t t-if="data['employee_code']">
+                                    (<span t-esc="data['employee_code']"/>)
+                                </t>
+                            </div>
+                        </div>
+                        <div class="col-4" style="text-align: right;">
+                            <t t-if="data['company'] and data['company'].logo">
+                                <img t-att-src="image_data_uri(data['company'].logo)" style="max-height: 48px; max-width: 160px;" alt="Logo"/>
+                            </t>
+                            <div style="font-size: 10px; color: #777; margin-top: 4px;">
+                                Printed: <span t-esc="context_timestamp(datetime.datetime.now()).strftime('%d/%m/%Y %H:%M')"/>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Date Range Indicator if present -->
+                    <t t-if="data['date_from_str'] or data['date_to_str']">
+                        <div style="font-size: 11px; color: #555; margin-bottom: 6px;">
+                            <strong>Period Filter:</strong>
+                            <t t-if="data['date_from_str']"><span t-esc="data['date_from_str']"/></t>
+                            <t t-else="">Start</t>
+                            &amp;rarr;
+                            <t t-if="data['date_to_str']"><span t-esc="data['date_to_str']"/></t>
+                            <t t-else="">Today</t>
+                        </div>
+                    </t>
+
+                    <!-- Sections per Leave Type -->
+                    <t t-foreach="data['sections']" t-as="sec">
+                        <div style="page-break-inside: avoid; margin-top: 10px;">
+                            <!-- Subheader / Leave Type & Current Balance -->
+                            <div class="summary-box">
+                                <div class="row">
+                                    <div class="col-7">
+                                        <span style="font-size: 12px; font-weight: bold;">
+                                            Type: <span t-esc="sec['leave_type_name']"/>
+                                            &amp;nbsp;&amp;nbsp;(Current Balance: <span t-esc="'%.2f' % sec['current_balance']"/>)
+                                        </span>
+                                    </div>
+                                    <div class="col-5" style="text-align: right;">
+                                        <t t-if="sec['initial_balance'] != 0.0">
+                                            <strong>Initial Balance:</strong> <span t-esc="'%.2f' % sec['initial_balance']"/>
+                                        </t>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Movement Table: 6 clean columns -->
+                            <table class="vacation-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 13%;">Start date</th>
+                                        <th style="width: 13%;">End date</th>
+                                        <th style="width: 14%;">Before Balance</th>
+                                        <th style="width: 12%;">Days</th>
+                                        <th style="width: 14%;">After Balance</th>
+                                        <th style="width: 34%;">Description</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-foreach="sec['lines']" t-as="line">
+                                        <tr>
+                                            <td class="text-center"><span t-esc="line['start_date']"/></td>
+                                            <td class="text-center"><span t-esc="line['end_date']"/></td>
+                                            <td class="text-right"><span t-esc="'%.2f' % line['before_balance']"/></td>
+                                            <td class="text-right">
+                                                <span t-att-class="'positive-days' if line['days'] &gt; 0 else 'negative-days'">
+                                                    <span t-esc="'%.2f' % line['days']"/>
+                                                </span>
+                                            </td>
+                                            <td class="text-right" style="font-weight: bold;">
+                                                <span t-esc="'%.2f' % line['after_balance']"/>
+                                            </td>
+                                            <td class="text-left"><span t-esc="line['description']"/></td>
+                                        </tr>
+                                    </t>
+                                    <t t-if="not sec['lines']">
+                                        <tr>
+                                            <td colspan="6" class="text-center" style="padding: 12px; color: #888;">
+                                                No time off movements recorded for this leave type.
+                                            </td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+
+                            <!-- Footers under Days -->
+                            <div style="margin-top: 6px; font-size: 11px; font-weight: bold; padding-left: 240px; margin-bottom: 15px;">
+                                <div>Total Days: <span t-esc="'%.2f' % sec['total_days']"/></div>
+                                <div style="margin-top: 2px;">Sum:<span t-esc="'%.2f' % sec['sum_days']"/></div>
+                            </div>
+                        </div>
+                    </t>
+
+                </div>
+            </t>
+        </t>
+    </template>
+
+</odoo>
