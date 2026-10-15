@@ -76,12 +76,20 @@ class HrPayslip(models.Model):
         month_days = calendar.monthrange(self.date_to.year, self.date_to.month)[1]
         return wage / float(month_days)
 
+    def _xlsx_is_travel_suspension(self, wd):
+        """Travel Suspension Deduction (code TSD) lines are excluded from Attendance Days."""
+        code = (wd.work_entry_type_id.code or wd.code or "").strip().upper()
+        text = f"{wd.name or ''} {wd.work_entry_type_id.name or ''}".lower()
+        return code == "TSD" or "travel suspension" in text
+
     def _xlsx_attendance_summary(self):
         """Attendance days = every paid line (attendance, public holiday and all paid leaves merged),
         weighted by its pay %, capped at the days of the period. Absent and lateness never count."""
         self.ensure_one()
         att_days = absent_hrs = lateness_hrs = out_days = 0.0
         for wd in self.worked_days_line_ids:
+            if self._xlsx_is_travel_suspension(wd):
+                continue  # travel suspension deduction days are not attendance
             kind = self._xlsx_classify_worked_day(wd)
             if kind == "paid":
                 att_days += (wd.number_of_days or 0.0) * self._xlsx_pay_factor(wd)
