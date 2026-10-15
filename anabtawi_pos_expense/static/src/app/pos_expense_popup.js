@@ -9,19 +9,21 @@ import { getPosExpenseCashierArgs, printPosExpenseReceipt } from "./utils";
 export class PosExpensePopup extends Component {
     static template = "anabtawi_pos_expense.PosExpensePopup";
     static components = { Dialog };
-    static props = ["close"];
+    // ``expense``: a refused expense (from get_pos_refused_expenses) to edit and resend.
+    static props = ["close", "expense?", "onDone?"];
 
     setup() {
         this.pos = usePos();
         this.notification = useService("notification");
         this.printer = useService("printer");
+        const expense = this.props.expense;
         this.state = useState({
             loading: true,
             limit: 0,
             available: 0,
             types: [],
-            typeId: "",
-            amount: "",
+            typeId: expense ? String(expense.type_id) : "",
+            amount: expense ? String(expense.amount) : "",
             upload: null,
         });
         this.confirm = useAsyncLockedMethod(this.confirm);
@@ -92,8 +94,29 @@ export class PosExpensePopup extends Component {
         return Number.isFinite(value) ? value : 0;
     }
 
+    get isEdit() {
+        return Boolean(this.props.expense);
+    }
+
+    get dialogTitle() {
+        return this.isEdit ? _t("Edit & Resend %s", this.props.expense.name) : _t("Expense");
+    }
+
+    get maxAmount() {
+        // A refused expense is still counted in the balance, so its own amount is available again.
+        return this.state.available + (this.props.expense?.amount || 0);
+    }
+
     get exceedsAvailable() {
-        return this.amountValue > this.state.available + 1e-9;
+        return this.amountValue > this.maxAmount + 1e-9;
+    }
+
+    get amountDifference() {
+        return this.isEdit ? this.amountValue - this.props.expense.amount : 0;
+    }
+
+    get hasNewPhoto() {
+        return Boolean(this.state.upload?.has_image);
     }
 
     get isValid() {
@@ -102,13 +125,16 @@ export class PosExpensePopup extends Component {
             this.state.typeId &&
             this.amountValue > 0 &&
             !this.exceedsAvailable &&
-            this.state.upload?.has_image
+            (this.isEdit || this.hasNewPhoto)
         );
     }
 
     async confirm() {
         if (!this.isValid) {
             return;
+        }
+        if (this.isEdit) {
+            return this.resend();
         }
         let result;
         try {
@@ -140,5 +166,48 @@ export class PosExpensePopup extends Component {
             }),
             { type: "success" }
         );
+    }
+
+    async resend() {
+        let result;
+        try {
+            result = await this.pos.data.call("pos.session", "resubmit_pos_expense", [
+                this.sessionIds,
+                this.props.expense.id,
+                parseInt(this.state.typeId),
+                this.amountValue,
+                this.hasNewPhoto ? this.state.upload.token : false,
+                ...getPosExpenseCashierArgs(this.pos),
+            ]);
+        } catch (error) {
+            this.notification.add(error?.data?.message || _t("Could not resend the expense."), {
+                type: "danger",
+            });
+            return;
+        }
+        this._stopPoll();
+        let message = _t("Expense %s sent again for approval.", result.name);
+        if (result.reason) {
+            const type = result.difference > 0 ? "out" : "in";
+            const formattedDiff = this.format(Math.abs(result.difference));
+            await printPosExpenseReceipt(this.pos, this.printer, {
+                reason: result.reason,
+                formattedAmount: formattedDiff,
+                type,
+            });
+            message =
+                type === "out"
+                    ? _t("Expense %(name)s sent again for approval. Cash out of %(amount)s done.", {
+                          name: result.name,
+                          amount: formattedDiff,
+                      })
+                    : _t("Expense %(name)s sent again for approval. Cash in of %(amount)s done.", {
+                          name: result.name,
+                          amount: formattedDiff,
+                      });
+        }
+        this.props.close();
+        this.props.onDone?.();
+        this.notification.add(message, { type: "success" });
     }
 }

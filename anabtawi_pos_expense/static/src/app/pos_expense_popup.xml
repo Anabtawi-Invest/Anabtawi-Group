@@ -2,11 +2,14 @@
 <templates xml:space="preserve">
 
     <t t-name="anabtawi_pos_expense.PosExpensePopup">
-        <Dialog title.translate="Expense" size="'lg'">
+        <Dialog title="dialogTitle" size="'lg'">
             <div t-if="state.loading" class="text-center p-4">
                 <i class="fa fa-spinner fa-spin fa-2x"/>
             </div>
             <t t-else="">
+                <div t-if="isEdit" class="alert alert-danger mb-3">
+                    <strong>Refuse reason:</strong> <t t-esc="props.expense.refuse_reason"/>
+                </div>
                 <div class="d-flex gap-3 mb-3">
                     <div class="flex-fill border rounded p-2 text-center">
                         <div class="text-muted small">Limit</div>
@@ -41,7 +44,13 @@
                                    t-att-class="exceedsAvailable ? 'is-invalid' : ''"
                                    t-model="state.amount"/>
                             <div t-if="exceedsAvailable" class="invalid-feedback d-block">
-                                The amount exceeds the available balance (<t t-esc="format(state.available)"/>).
+                                The amount exceeds the available balance (maximum <t t-esc="format(maxAmount)"/>).
+                            </div>
+                            <div t-elif="isEdit and amountDifference > 0.0001" class="small text-danger mt-1">
+                                <i class="fa fa-arrow-up me-1"/>A Cash Out of <t t-esc="format(amountDifference)"/> will be made.
+                            </div>
+                            <div t-elif="isEdit and amountDifference &lt; -0.0001" class="small text-success mt-1">
+                                <i class="fa fa-arrow-down me-1"/>A Cash In of <t t-esc="format(-amountDifference)"/> will be made.
                             </div>
                         </div>
                     </div>
@@ -56,12 +65,19 @@
                                 <div class="small text-muted">Scan to upload</div>
                             </div>
                             <div class="flex-fill text-center">
-                                <img t-if="state.upload?.image_thumbnail"
-                                     t-att-src="'data:image/png;base64,' + state.upload.image_thumbnail"
-                                     class="img-fluid rounded border" style="max-height: 160px;" alt="Receipt"/>
+                                <t t-if="state.upload?.image_thumbnail">
+                                    <img t-att-src="'data:image/png;base64,' + state.upload.image_thumbnail"
+                                         class="img-fluid rounded border" style="max-height: 160px;" alt="Receipt"/>
+                                    <div t-if="isEdit" class="small text-success">New photo</div>
+                                </t>
                                 <div t-elif="state.upload and !state.upload.is_valid" class="text-danger small">
                                     The upload link expired. Close and open the popup again.
                                 </div>
+                                <t t-elif="isEdit and props.expense.image_thumbnail">
+                                    <img t-att-src="'data:image/png;base64,' + props.expense.image_thumbnail"
+                                         class="img-fluid rounded border" style="max-height: 160px;" alt="Receipt"/>
+                                    <div class="small text-muted">Current photo. Scan the QR to replace it (optional).</div>
+                                </t>
                                 <div t-else="" class="text-muted small">
                                     <i class="fa fa-spinner fa-spin me-1"/>Waiting for the photo...
                                 </div>
@@ -72,7 +88,8 @@
             </t>
             <t t-set-slot="footer">
                 <button class="btn btn-primary btn-lg" t-att-disabled="!isValid" t-on-click="confirm">
-                    Confirm
+                    <t t-if="isEdit">Resend for Approval</t>
+                    <t t-else="">Confirm</t>
                 </button>
                 <button class="btn btn-secondary btn-lg" t-on-click="props.close">
                     Discard

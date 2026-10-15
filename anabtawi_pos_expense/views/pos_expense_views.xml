@@ -15,6 +15,7 @@
                 <field name="cashier_name"/>
                 <field name="type_id"/>
                 <field name="amount" sum="Total"/>
+                <field name="resubmit_count" optional="hide"/>
                 <field name="currency_id" column_invisible="True"/>
                 <field name="company_id" groups="base.group_multi_company" optional="hide"/>
                 <field name="state" widget="badge"
@@ -36,7 +37,7 @@
                             invisible="state != 'to_approve'" groups="point_of_sale.group_pos_manager"/>
                     <button name="action_refuse" type="object" string="Refuse"
                             invisible="state != 'to_approve'" groups="point_of_sale.group_pos_manager"
-                            confirm="The cashier will have to return this amount in the POS (Cash In) before any session of this POS can be closed. Continue?"/>
+                            confirm="The amount stays reserved in the expense balance until the cashier returns it (Cash In) or edits and resends the expense from the POS. Continue?"/>
                     <field name="state" widget="statusbar" statusbar_visible="to_approve,approved,refused,returned"/>
                 </header>
                 <sheet>
@@ -47,8 +48,8 @@
                                 invisible="not return_move_id" string="Return Entry"/>
                     </div>
                     <div class="alert alert-warning" role="alert" invisible="state != 'refused'">
-                        This expense was refused. The cashier must return the amount from the POS
-                        (Actions → Refused Expenses) before the session can be closed.
+                        This expense was refused. The cashier can return the amount or edit and resend it
+                        from the POS (Actions → Refused Expenses). Until then it stays in the expense balance.
                     </div>
                     <field name="image" widget="image" class="oe_avatar" options="{'size': [180, 180]}"/>
                     <div class="oe_title">
@@ -75,6 +76,9 @@
                         <group>
                             <field name="refuse_reason" readonly="state != 'to_approve'"
                                    placeholder="Required to refuse"/>
+                            <field name="resubmit_count" invisible="not resubmit_count"/>
+                            <field name="adjustment_statement_line_ids" widget="many2many_tags"
+                                   invisible="not adjustment_statement_line_ids"/>
                             <field name="statement_line_id" invisible="1"/>
                             <field name="move_id" invisible="1"/>
                             <field name="return_move_id" invisible="1"/>

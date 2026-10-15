@@ -22,6 +22,7 @@ class PosExpense(models.Model):
     user_id = fields.Many2one("res.users", string="User", readonly=True, default=lambda self: self.env.user)
     cashier_name = fields.Char(string="Cashier", readonly=True)
     image = fields.Image(string="Receipt Photo", max_width=1920, max_height=1920, readonly=True)
+    image_256 = fields.Image(string="Receipt Thumbnail", related="image", max_width=256, max_height=256, store=True)
     state = fields.Selection(
         [
             ("to_approve", "To Approve"),
@@ -46,6 +47,16 @@ class PosExpense(models.Model):
     decided_by_id = fields.Many2one("res.users", string="Approved/Refused By", readonly=True, copy=False)
     decision_date = fields.Datetime(string="Approval/Refusal Date", readonly=True, copy=False)
     refuse_reason = fields.Char(tracking=True)
+    resubmit_count = fields.Integer(string="Resubmitted", readonly=True, copy=False)
+    adjustment_statement_line_ids = fields.Many2many(
+        "account.bank.statement.line",
+        "pos_expense_adjustment_statement_line_rel",
+        "expense_id",
+        "statement_line_id",
+        string="Amount Adjustments",
+        readonly=True,
+        copy=False,
+    )
 
     return_session_id = fields.Many2one("pos.session", string="Returned in Session", readonly=True, copy=False)
     return_cashier_name = fields.Char(string="Returned By", readonly=True, copy=False)
@@ -103,13 +114,23 @@ class PosExpense(models.Model):
         self.ensure_one()
         return self.return_move_id._get_records_action()
 
+    def _get_image_thumbnail(self):
+        self.ensure_one()
+        thumbnail = self.image_256
+        if isinstance(thumbnail, bytes):
+            thumbnail = thumbnail.decode()
+        return thumbnail or False
+
     def _prepare_pos_refused_data(self):
         return [
             {
                 "id": expense.id,
                 "name": expense.name,
                 "type": expense.type_id.name,
+                "type_id": expense.type_id.id,
                 "amount": expense.amount,
+                "image_thumbnail": expense._get_image_thumbnail(),
+                "resubmit_count": expense.resubmit_count,
                 "date": fields.Datetime.to_string(expense.date),
                 "cashier_name": expense.cashier_name or "",
                 "session_name": expense.session_id.name or "",

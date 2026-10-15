@@ -2,21 +2,23 @@
 <templates xml:space="preserve">
 
     <t t-name="anabtawi_pos_expense.RefusedExpensesPopup">
-        <Dialog title.translate="Refused Expenses" size="'lg'">
+        <Dialog title.translate="Refused Expenses" size="'xl'">
             <div t-if="state.loading" class="text-center p-4">
                 <i class="fa fa-spinner fa-spin fa-2x"/>
             </div>
             <div t-elif="!state.expenses.length" class="text-center text-muted p-4">
                 <i class="fa fa-check-circle fa-2x text-success d-block mb-2"/>
-                There are no refused expenses to return.
+                There are no refused expenses.
             </div>
             <t t-else="">
                 <div class="alert alert-warning">
-                    These expenses were refused. Return each amount to the cash drawer before closing the session.
+                    These expenses were refused and are still counted in the expense balance.
+                    Return the money (Cash In) or edit the expense and send it again for approval.
                 </div>
                 <table class="table table-sm align-middle">
                     <thead>
                         <tr>
+                            <th/>
                             <th>Reference</th>
                             <th>Type</th>
                             <th>Date</th>
@@ -28,13 +30,26 @@
                     </thead>
                     <tbody>
                         <tr t-foreach="state.expenses" t-as="expense" t-key="expense.id">
-                            <td class="fw-bold" t-esc="expense.name"/>
+                            <td style="width: 64px;">
+                                <img t-if="expense.image_thumbnail"
+                                     t-att-src="'data:image/png;base64,' + expense.image_thumbnail"
+                                     class="rounded border" style="width: 56px; height: 56px; object-fit: cover;" alt=""/>
+                            </td>
+                            <td class="fw-bold">
+                                <t t-esc="expense.name"/>
+                                <div t-if="expense.resubmit_count" class="small text-muted">
+                                    Resent <t t-esc="expense.resubmit_count"/>x
+                                </div>
+                            </td>
                             <td t-esc="expense.type"/>
                             <td t-esc="formatDate(expense.date)"/>
                             <td t-esc="expense.cashier_name"/>
                             <td class="text-danger" t-esc="expense.refuse_reason"/>
                             <td class="text-end fw-bold" t-esc="format(expense.amount)"/>
-                            <td class="text-end">
+                            <td class="text-end text-nowrap">
+                                <button class="btn btn-secondary me-1" t-on-click="() => this.onClickEdit(expense)">
+                                    <i class="fa fa-pencil me-1"/>Edit &amp; Resend
+                                </button>
                                 <button class="btn btn-primary" t-on-click="() => this.onClickReturn(expense)">
                                     <i class="fa fa-undo me-1"/>Return
                                 </button>
@@ -43,7 +58,7 @@
                     </tbody>
                     <tfoot>
                         <tr>
-                            <td colspan="5" class="text-end fw-bold">Total</td>
+                            <td colspan="6" class="text-end fw-bold">Total</td>
                             <td class="text-end fw-bold" t-esc="format(total)"/>
                             <td/>
                         </tr>

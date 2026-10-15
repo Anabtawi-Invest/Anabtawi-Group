@@ -1,3 +1,7 @@
+import base64
+
+from markupsafe import Markup
+
 from odoo import _, fields, models
 from odoo.exceptions import UserError
 from odoo.tools import SQL
@@ -26,11 +30,47 @@ class PosSession(models.Model):
         self.env.cr.execute(SQL("SELECT id FROM pos_config WHERE id = %s FOR UPDATE", self.config_id.id))
         self.config_id.invalidate_recordset(["expense_pending_amount", "expense_available_amount"])
 
+    def _format_pos_expense_amount(self, amount):
+        return formatLang(self.env, amount, currency_obj=self.currency_id)
+
+    def _get_pos_expense_type(self, type_id):
+        ExpenseType = self.env["pos.expense.type"]
+        expense_type = ExpenseType.search(
+            ExpenseType._get_domain_for_config(self.config_id) + [("id", "=", int(type_id or 0))],
+            limit=1,
+        )
+        if not expense_type:
+            raise UserError(_("Please select a valid expense type."))
+        return expense_type
+
+    def _check_pos_expense_amount(self, amount, increase):
+        """Round ``amount`` and make sure ``increase`` (the extra cash leaving the drawer) fits the balance."""
+        currency = self.currency_id
+        amount = currency.round(float(amount or 0.0))
+        if currency.compare_amounts(amount, 0.0) <= 0:
+            raise UserError(_("The expense amount must be greater than zero."))
+        available = self.config_id.expense_available_amount
+        if currency.compare_amounts(increase(amount), available) > 0:
+            max_amount = available + amount - increase(amount)
+            raise UserError(_(
+                "The amount exceeds the available expense balance (maximum %(max)s).",
+                max=self._format_pos_expense_amount(max_amount),
+            ))
+        return amount
+
+    def _get_pos_refused_expense(self, expense_id):
+        expense = self.env["pos.expense"].sudo().browse(int(expense_id or 0)).exists()
+        if not expense or expense.config_id != self.config_id:
+            raise UserError(_("This expense does not belong to this Point of Sale."))
+        if expense.state != "refused":
+            raise UserError(_("Expense %s is not refused anymore. Please reload the list.", expense.name))
+        return expense
+
     def _create_pos_expense_cash_move(self, sign, amount, reason, employee_id=False):
         self.ensure_one()
         extras = {
             "translatedType": _("in") if sign > 0 else _("out"),
-            "formattedAmount": formatLang(self.env, amount, currency_obj=self.currency_id),
+            "formattedAmount": self._format_pos_expense_amount(amount),
         }
         if employee_id:
             extras["employee_id"] = int(employee_id)
@@ -63,33 +103,16 @@ class PosSession(models.Model):
     def create_pos_expense(self, type_id, amount, token, cashier_name=False, employee_id=False):
         self.ensure_one()
         self._check_pos_expense_session()
-        config = self.config_id
-        currency = config.currency_id
         self._lock_pos_expense_config()
-
-        expense_type = self.env["pos.expense.type"].search(
-            self.env["pos.expense.type"]._get_domain_for_config(config) + [("id", "=", int(type_id or 0))],
-            limit=1,
-        )
-        if not expense_type:
-            raise UserError(_("Please select a valid expense type."))
-
-        amount = currency.round(float(amount or 0.0))
-        if currency.compare_amounts(amount, 0.0) <= 0:
-            raise UserError(_("The expense amount must be greater than zero."))
-        available = config.expense_available_amount
-        if currency.compare_amounts(amount, available) > 0:
-            raise UserError(_(
-                "The amount exceeds the available expense balance (%(available)s).",
-                available=formatLang(self.env, available, currency_obj=currency),
-            ))
+        expense_type = self._get_pos_expense_type(type_id)
+        amount = self._check_pos_expense_amount(amount, lambda new_amount: new_amount)
 
         upload = self._get_pos_expense_upload(token)
         if not upload.image:
             raise UserError(_("Please upload the receipt photo first."))
 
         expense = self.env["pos.expense"].sudo().create({
-            "config_id": config.id,
+            "config_id": self.config_id.id,
             "session_id": self.id,
             "type_id": expense_type.id,
             "amount": amount,
@@ -105,7 +128,7 @@ class PosSession(models.Model):
             "name": expense.name,
             "reason": reason,
             "amount": amount,
-            "available": config.expense_available_amount,
+            "available": self.config_id.expense_available_amount,
         }
 
     def get_pos_refused_expenses(self):
@@ -116,11 +139,7 @@ class PosSession(models.Model):
         self.ensure_one()
         self._check_pos_expense_session()
         self._lock_pos_expense_config()
-        expense = self.env["pos.expense"].sudo().browse(int(expense_id or 0)).exists()
-        if not expense or expense.config_id != self.config_id:
-            raise UserError(_("This expense does not belong to this Point of Sale."))
-        if expense.state != "refused":
-            raise UserError(_("Expense %s is not waiting for a return.", expense.name))
+        expense = self._get_pos_refused_expense(expense_id)
 
         reason = _("%(name)s - Return - %(type)s", name=expense.name, type=expense.type_id.name)
         cash_in = self._create_pos_expense_cash_move(1, expense.amount, reason, employee_id)
@@ -138,43 +157,76 @@ class PosSession(models.Model):
             "amount": expense.amount,
         }
 
-    def _get_pos_expense_close_block_message(self):
+    def resubmit_pos_expense(self, expense_id, type_id, amount, token=False, cashier_name=False, employee_id=False):
         self.ensure_one()
-        if self.rescue:
-            return False
-        refused = self.config_id._get_unreturned_refused_expenses()
-        if not refused:
-            return False
-        lines = "\n".join(
-            f"- {expense.name} ({expense.type_id.name}): "
-            f"{formatLang(self.env, expense.amount, currency_obj=expense.currency_id)}"
-            for expense in refused
-        )
-        return _(
-            "You cannot close the session while there are refused expenses that were not returned.\n"
-            "Use the 'Refused Expenses' button in the POS Actions menu to return them first:\n%s",
-            lines,
-        )
+        self._check_pos_expense_session()
+        self._lock_pos_expense_config()
+        expense = self._get_pos_refused_expense(expense_id)
+        currency = self.currency_id
+        old_amount = expense.amount
+        old_type = expense.type_id
 
-    def _cannot_close_session(self, bank_payment_method_diffs=None):
-        result = super()._cannot_close_session(bank_payment_method_diffs)
-        if result:
-            return result
-        message = self._get_pos_expense_close_block_message()
-        if message:
-            return {
-                "successful": False,
-                "type": "alert",
-                "title": _("Refused expenses to return"),
-                "message": message,
-                "redirect": False,
-                "pos_expense_refused": True,
-            }
-        return result
+        expense_type = self._get_pos_expense_type(type_id)
+        # The refused amount is still counted in the balance, so only an increase needs room.
+        amount = self._check_pos_expense_amount(amount, lambda new_amount: new_amount - old_amount)
 
-    def action_pos_session_closing_control(self, balancing_account=False, amount_to_balance=0, bank_payment_method_diffs=None):
-        for session in self:
-            message = session._get_pos_expense_close_block_message()
-            if message:
-                raise UserError(message)
-        return super().action_pos_session_closing_control(balancing_account, amount_to_balance, bank_payment_method_diffs)
+        upload = self._get_pos_expense_upload(token) if token else self.env["pos.expense.upload"]
+        new_image = upload.image if upload else False
+
+        difference = currency.round(amount - old_amount)
+        cash_move = self.env["account.bank.statement.line"]
+        reason = False
+        if not currency.is_zero(difference):
+            reason = _("%(name)s - Adjustment - %(type)s", name=expense.name, type=expense_type.name)
+            sign = -1 if difference > 0 else 1
+            cash_move = self._create_pos_expense_cash_move(sign, abs(difference), reason, employee_id)
+
+        cashier = cashier_name or self.env.user.name
+        changes = [_("Previous refuse reason: %s", expense.refuse_reason or "-")]
+        if expense_type != old_type:
+            changes.append(_("Type: %(old)s → %(new)s", old=old_type.name, new=expense_type.name))
+        if not currency.is_zero(difference):
+            changes.append(_(
+                "Amount: %(old)s → %(new)s (Cash %(direction)s of %(diff)s in %(session)s)",
+                old=self._format_pos_expense_amount(old_amount),
+                new=self._format_pos_expense_amount(amount),
+                direction=_("out") if difference > 0 else _("in"),
+                diff=self._format_pos_expense_amount(abs(difference)),
+                session=self.name,
+            ))
+        attachments = []
+        if new_image:
+            changes.append(_("New receipt photo uploaded (previous photo attached)."))
+            if expense.image:
+                attachments.append((f"{expense.name}-previous-photo.png", base64.b64decode(expense.image)))
+        body = Markup("<p>%s</p><ul>%s</ul>") % (
+            _("Resubmitted from the POS by %s", cashier),
+            Markup("").join(Markup("<li>%s</li>") % change for change in changes),
+        )
+        expense.message_post(body=body, attachments=attachments)
+
+        vals = {
+            "state": "to_approve",
+            "type_id": expense_type.id,
+            "amount": amount,
+            "refuse_reason": False,
+            "decided_by_id": False,
+            "decision_date": False,
+            "resubmit_count": expense.resubmit_count + 1,
+        }
+        if new_image:
+            vals["image"] = new_image
+        if cash_move:
+            vals["adjustment_statement_line_ids"] = [fields.Command.link(cash_move.id)]
+        expense.write(vals)
+        if upload:
+            upload.sudo().unlink()
+
+        expense._invalidate_config_balance()
+        return {
+            "name": expense.name,
+            "amount": amount,
+            "difference": difference,
+            "reason": reason,
+            "available": self.config_id.expense_available_amount,
+        }

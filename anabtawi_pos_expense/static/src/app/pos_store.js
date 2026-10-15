@@ -24,13 +24,13 @@ patch(PosStore.prototype, {
             const total = expenses.reduce((sum, expense) => sum + expense.amount, 0);
             this.notification.add(
                 _t(
-                    "%(count)s refused expense(s) must be returned (%(total)s). Use Actions > Refused Expenses before closing the session.",
+                    "%(count)s refused expense(s) waiting (%(total)s). Use Actions > Refused Expenses to return or resend them.",
                     { count: expenses.length, total: formatCurrency(total, this.currency.id) }
                 ),
                 { type: "warning", sticky: true }
             );
         } catch {
-            // A failed check at startup must not block the POS; closing is still guarded server-side.
+            // A failed check at startup must not block the POS.
         }
     },
 });

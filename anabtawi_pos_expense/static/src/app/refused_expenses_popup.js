@@ -7,6 +7,7 @@ import { usePos } from "@point_of_sale/app/hooks/pos_hook";
 import { useAsyncLockedMethod } from "@point_of_sale/app/hooks/hooks";
 import { formatDateTime, deserializeDateTime } from "@web/core/l10n/dates";
 import { getPosExpenseCashierArgs, printPosExpenseReceipt } from "./utils";
+import { PosExpensePopup } from "./pos_expense_popup";
 
 export class RefusedExpensesPopup extends Component {
     static template = "anabtawi_pos_expense.RefusedExpensesPopup";
@@ -48,6 +49,13 @@ export class RefusedExpensesPopup extends Component {
 
     get total() {
         return this.state.expenses.reduce((sum, expense) => sum + expense.amount, 0);
+    }
+
+    onClickEdit(expense) {
+        this.dialog.add(PosExpensePopup, {
+            expense,
+            onDone: () => this.load(),
+        });
     }
 
     onClickReturn(expense) {
