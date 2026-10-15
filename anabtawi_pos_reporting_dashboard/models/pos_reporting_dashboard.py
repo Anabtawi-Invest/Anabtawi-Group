@@ -160,7 +160,7 @@ class PosReportingDashboard(models.TransientModel):
     def _payment_matches_metric(self, payment_method, metric_type):
         bucket = self.env["pos.daily.ops.engine"]._get_bucket(payment_method)
         if metric_type == "sales":
-            return bucket != "hospitality"
+            return self.env["pos.daily.ops.engine"]._is_in_sales(payment_method)
         if metric_type == "cash_sales":
             return bucket == "cash"
         if metric_type == "visa_sales":
@@ -489,9 +489,9 @@ class PosReportingDashboard(models.TransientModel):
                 ["amount:sum"],
             )
             for session, payment_method, amount in groups:
-                bucket = engine._get_bucket(payment_method)
-                if bucket == "hospitality":
+                if not engine._is_in_sales(payment_method):
                     continue
+                bucket = engine._get_bucket(payment_method)
                 day = day_totals[engine._to_local_date(session.start_at)]
                 day["total"] += amount or 0.0
                 if bucket in ("cash", "visa"):
