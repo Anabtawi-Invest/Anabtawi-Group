@@ -8,6 +8,7 @@
     'license': 'OPL-1',
     'depends': ['hr_payroll', 'hr_attendance', 'hr_work_entry', 'hr_holidays'],
     'data': [
+        'security/ir.model.access.csv',
         'data/ir_cron_data.xml',
         'views/hr_attendance_views.xml',
         'views/hr_employee_views.xml',
