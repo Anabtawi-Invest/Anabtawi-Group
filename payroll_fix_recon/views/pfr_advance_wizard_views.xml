@@ -54,6 +54,5 @@
     </record>
 
     <menuitem id="menu_pfr_advance_wizard" name="Mid-month Advance"
-              parent="hr_payroll.menu_hr_payroll_report" action="action_pfr_advance_wizard" sequence="55"
-              groups="hr_payroll.group_hr_payroll_user"/>
+              parent="hr_payroll.menu_hr_payroll_report" action="action_pfr_advance_wizard" sequence="55"/>
 </odoo>
