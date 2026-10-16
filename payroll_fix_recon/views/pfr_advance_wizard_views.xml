@@ -29,6 +29,9 @@
                         <field name="lateness_hours" widget="float_time"/>
                         <field name="covered_hours" widget="float_time"/>
                         <field name="cash_hours" widget="float_time"/>
+                        <field name="paid_days" optional="hide"/>
+                        <field name="daily_wage" optional="hide"/>
+                        <field name="deduction"/>
                         <field name="earned"/>
                         <field name="advance"/>
                         <field name="note"/>
@@ -40,6 +43,8 @@
                     <button name="action_create_adjustments" type="object" string="Create Salary Adjustments"
                             class="btn-primary" invisible="state != 'calculated'"
                             confirm="Create a One Time Salary Adjustment for every selected employee?"/>
+                    <button name="action_export_xlsx" type="object" string="Export XLSX"
+                            invisible="state == 'draft'"/>
                     <button string="Close" special="cancel"/>
                 </footer>
             </form>
