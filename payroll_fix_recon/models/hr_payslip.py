@@ -74,8 +74,8 @@ class HrPayslip(models.Model):
     def _compute_attendance_reconciliation_fields(self):
         ready = getattr(self.env.registry, 'ready', True)
         if not ready or self.env.context.get('install_mode') or self.env.context.get('module_installation'):
-            for slip in self:
-                slip.update(dict.fromkeys(RECON_FIELDS, 0.0))
+            for slip in self:                           # module load / upgrade: keep every stored figure as it is
+                slip.update({f: slip[f] for f in RECON_FIELDS})
             return
         valid = self.filtered(lambda s: s.employee_id and s.date_from and s.date_to
                               and (s.state in ('draft', 'verify') or not s.id))
@@ -100,8 +100,14 @@ class HrPayslip(models.Model):
     def _pfr_line_type(self, L, kind):
         """Work entry type used for a worked-day line."""
         WET = self.env['hr.work.entry.type'].sudo()
+        # never attach a line to a type of another company: the multi-company record rule would make the
+        # salary rules fail with an access error when they read the worked days
+        company = self.company_id
+        has_company = 'company_id' in WET._fields
+        mine = lambda t: (not has_company) or (not t.company_id) or t.company_id == company
+        company_domain = [('company_id', 'in', [False, company.id])] if has_company else []
         known = L.kind_types.get('PH' if kind == 'PHD' else kind)
-        if known:
+        if known and mine(known):
             return known
         search = {
             'WORK': (U.ATTENDANCE_CODES, 'attendance'), 'PHD': (U.PUBLIC_HOLIDAY_CODES, 'public holiday'),
@@ -113,8 +119,9 @@ class HrPayslip(models.Model):
         found = WET.browse()
         if search:
             codes, term = search
-            found = WET.search(['|', '|', ('code', 'in', list(codes)), ('display_code', 'in', list(codes)),
-                                ('name', 'ilike', term)], limit=1)
+            found = WET.search(company_domain + ['|', '|', ('code', 'in', list(codes)),
+                                                 ('display_code', 'in', list(codes)),
+                                                 ('name', 'ilike', term)], limit=1)
         if not found and kind == 'PHD':
             return self._pfr_line_type(L, 'WORK')
         if not found and kind == 'ABSENT':
@@ -136,13 +143,16 @@ class HrPayslip(models.Model):
         days_in_month = calendar.monthrange(slip.date_to.year, slip.date_to.month)[1]
         day_rate = slip._pfr_wage() / float(days_in_month)
 
-        # Layout: days close at the calendar days of the period, hours close at days x 8
-        # (lateness lines carry 0 days; their hours are carved out of the attendance hours).
+        # Layout: days close at the calendar days of the period, hours close at days x 8.
+        # The table is derived from the CASH deduction (what is really taken from the salary), so that
+        #     Absent hours + Lateness hours == Attendance Deduction hours.
+        # Everything that Extra Hours / Annual Leave already settled is paid time and sits in Attendance.
         absent_days = float(L.count('ABSENT'))
-        covered_hours = (slip.lateness_covered_by_extra_hours or 0.0) + (slip.lateness_covered_by_annual_leave or 0.0)
-        # hours reconciled from Extra Hours / Annual Leave become paid leave, in whole 8h days only
-        reconciled_days = min(float(int(covered_hours / U.DAILY_HOURS + 1e-9)), absent_days)
-        punch_lateness = max(0.0, (slip.attendance_gross_undertime or 0.0) - L.absent_hours)
+        cash_hours = max(0.0, slip.undertime_cash_deduction_hours or 0.0)
+        # whole 8h days of the cash remain Absent days; the rest (< 8h) stays as lateness hours
+        absent_shown = min(absent_days, float(int(cash_hours / U.DAILY_HOURS + 1e-9)))
+        punch_lateness = max(0.0, cash_hours - absent_shown * U.DAILY_HOURS)
+        reconciled_days = absent_days - absent_shown        # absent days settled by Extra Hours / Annual Leave
 
         # (kind, days, hours)
         rows = []
@@ -155,8 +165,7 @@ class HrPayslip(models.Model):
                              key=lambda b: (LINE_SEQUENCE.get(b, 12), str(b))):
             bucket_days = float(L.count(bucket))
             rows.append((bucket, bucket_days, bucket_days * U.DAILY_HOURS))
-        remaining_absent = absent_days - reconciled_days
-        rows.append(('ABSENT', remaining_absent, remaining_absent * U.DAILY_HOURS))
+        rows.append(('ABSENT', absent_shown, absent_shown * U.DAILY_HOURS))
         rows.append(('OUT', float(L.count('OUT')), L.count('OUT') * U.DAILY_HOURS))
 
         lines = []
@@ -167,15 +176,16 @@ class HrPayslip(models.Model):
             if not wet:
                 continue
             seq_key = kind if isinstance(kind, str) else None
+            priced_days = min(days, hours / U.DAILY_HOURS) if kind == 'WORK' else days
             lines.append({
                 'name': wet.name,
                 'sequence': LINE_SEQUENCE.get(seq_key, 12),
                 'work_entry_type_id': wet.id,
                 'number_of_days': days,
                 'number_of_hours': round(hours, 2),
-                'amount': 0.0 if kind == 'OUT' else round(days * wet._pfr_pay_factor() * day_rate, 3),
+                'amount': 0.0 if kind == 'OUT' else round(priced_days * wet._pfr_pay_factor() * day_rate, 3),
             })
-        if punch_lateness >= 0.01:                            # punch lateness only; absent hours stay on Absent
+        if punch_lateness >= 0.01:                            # cash hours that do not make a whole absent day
             wet = slip._pfr_line_type(L, 'LATENESS')
             lines.append({
                 'name': 'Lateness / Undertime Deduction', 'sequence': LINE_SEQUENCE['LATENESS'],
@@ -229,8 +239,43 @@ class HrPayslip(models.Model):
                 slip.worked_days_line_ids = [(5, 0, 0)] + [(0, 0, v) for v in slip._get_worked_day_lines()]
         res = super().compute_sheet()
         slips.with_context(skip_reconcile_revert=True).write({'is_reconciled': True})
+        slips._pfr_apply_worked_day_amounts()                        # daily-wage calendar amounts
         slips._pfr_reset_preview()
         return res
+
+    def _pfr_line_calendar_amount(self, wd):
+        """Amount of one worked-day line by the daily-wage calendar rule (None if the wage is unknown)."""
+        self.ensure_one()
+        if not self.date_to or self.state not in ('draft', 'verify'):
+            return None
+        wage = self._pfr_wage()
+        if wage <= 0:
+            return None
+        daily = wage / float(calendar.monthrange(self.date_to.year, self.date_to.month)[1])
+        wet = wd.work_entry_type_id
+        kind = self.env['pfr.day.ledger'].classify_type(wet) if wet else 'PAID'
+        code = (wet.code or '').upper() if wet else ''
+        days = wd.number_of_days or 0.0
+        if kind in ('OUT', 'IGNORE'):
+            return 0.0
+        if kind in ('ABSENT', 'UNPAID'):            # shown for information: days x daily wage
+            return round(days * daily, 3)
+        if code in ('LATENESS', 'LAT', 'LATE'):
+            return round((wd.number_of_hours or 0.0) * daily / 8.0, 3)
+        factor = wet._pfr_pay_factor() if wet else 1.0
+        if kind == 'ATT' and (wd.number_of_hours or 0.0) > 0:
+            # attendance hours already exclude the lateness hours (priced on their own line): never price
+            # the same hours twice
+            days = min(days, (wd.number_of_hours or 0.0) / U.DAILY_HOURS)
+        return round(days * factor * daily, 3)
+
+    def _pfr_apply_worked_day_amounts(self):
+        """Write the calendar amounts on the worked-day lines (end of Compute Sheet)."""
+        for slip in self:
+            for wd in slip.worked_days_line_ids:
+                amount = slip._pfr_line_calendar_amount(wd)
+                if amount is not None and abs((wd.amount or 0.0) - amount) > 0.0005:
+                    wd.sudo().write({'amount': amount})
 
     def _pfr_reset_preview(self):
         """The side preview (o_attachment_preview) shows the PDF attachment saved on the payslip.

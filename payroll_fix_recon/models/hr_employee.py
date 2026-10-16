@@ -76,8 +76,10 @@ class HrEmployee(models.Model):
 
     def _pfr_get_absent_type(self):
         WET = self.env['hr.work.entry.type'].sudo()
-        absent = WET.search([('code', 'in', list(U.ABSENT_CODES))], limit=1) \
-            or WET.search([('display_code', 'in', list(U.ABSENT_CODES))], limit=1)
+        scope = [('company_id', 'in', [False, self.company_id.id])] \
+            if 'company_id' in WET._fields and len(self) == 1 else []
+        absent = WET.search(scope + [('code', 'in', list(U.ABSENT_CODES))], limit=1) \
+            or WET.search(scope + [('display_code', 'in', list(U.ABSENT_CODES))], limit=1)
         return absent or WET.create({
             'name': 'Absent', 'display_code': 'ABS', 'code': 'ABSENT',
             'color': 1, 'is_leave': False, 'round_days': 'NO', 'round_days_type': 'DOWN'})
