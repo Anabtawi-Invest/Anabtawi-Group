@@ -26,9 +26,9 @@
                         <field name="worked_days"/>
                         <field name="rest_days"/>
                         <field name="absent_days"/>
-                        <field name="lateness_hours" widget="float_time"/>
-                        <field name="covered_hours" widget="float_time"/>
-                        <field name="cash_hours" widget="float_time"/>
+                        
+                        
+                        
                         <field name="paid_days" optional="hide"/>
                         <field name="daily_wage" optional="hide"/>
                         <field name="deduction"/>

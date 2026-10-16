@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
-"""Mid-month advance: what each employee has earned up to a cut-off date, from the same day ledger and
-lateness settlement the payslip uses. Confirming creates a One Time Salary Adjustment per employee that the
-month-end payslip deducts (Company loan input). Nothing is written to payslips or leave balances."""
+"""Mid-month advance: what each employee has earned up to a cut-off date, from the same day ledger the payslip
+uses (rest-day rules included). Only attendance and absent days count: absent days are deducted in full, punch
+lateness and Extra Hours / Annual Leave cover are ignored and settled on the month-end payslip.
+Confirming creates a One Time Salary Adjustment per employee that the month-end payslip deducts
+(Company loan input). Nothing is written to payslips or leave balances."""
 import base64
 import calendar
 import io
@@ -52,21 +54,20 @@ class PfrAdvanceWizard(models.TransientModel):
     def _marker(self):
         return _("Mid-month advance %s", self.date_cutoff.strftime('%Y-%m'))
 
-    def _earned_to_date(self, emp, d_from, d_to, pre, slip):
-        """(ledger, recon values, earned, deduction, paid_days) of one employee for d_from..d_to."""
+    def _earned_to_date(self, emp, d_from, d_to):
+        """(ledger, earned, deduction, paid_days, daily wage) of one employee for d_from..d_to."""
         L = self.env['pfr.day.ledger'].build(emp, d_from, d_to)
-        vals = self.env['pfr.settlement'].compute(slip, L, pre)
         wage = emp.wage or 0.0
         daily = wage / float(calendar.monthrange(d_to.year, d_to.month)[1])
         paid_days = 0.0
         for bucket in L.days.values():
-            if bucket in ('OUT', 'UNPAID'):
-                continue                                 # absent days stay paid: their cost is the cash deduction
+            if bucket in ('OUT', 'UNPAID', 'ABSENT'):
+                continue                                 # absent days are not paid in the advance
             wet = L.kind_types.get('PH' if bucket == 'PHD' else bucket)
             paid_days += wet._pfr_pay_factor() if wet and wet.pfr_pay_percent is not None else 1.0
-        deduction = (vals['undertime_cash_deduction_hours'] or 0.0) * daily / U.DAILY_HOURS
-        earned = max(0.0, paid_days * daily - deduction)
-        return L, vals, earned, deduction, paid_days, daily
+        deduction = L.count('ABSENT') * daily
+        earned = max(0.0, paid_days * daily)
+        return L, earned, deduction, paid_days, daily
 
     def action_calculate(self):
         self.ensure_one()
@@ -82,12 +83,6 @@ class PfrAdvanceWizard(models.TransientModel):
         employees._pfr_create_absent_entries(d_from, d_to)
         self.env.flush_all()
 
-        Slip = self.env['hr.payslip']
-        slips = Slip
-        for e in employees:                              # in-memory payslips, never saved
-            slips |= Slip.new({'employee_id': e.id, 'date_from': d_from, 'date_to': d_to,
-                               'company_id': e.company_id.id or self.env.company.id})
-        pre = self.env['pfr.settlement'].preload(slips)
         marker = self._marker()
         Attachment = self.env['hr.salary.attachment'].sudo()
         done = {}
@@ -97,8 +92,8 @@ class PfrAdvanceWizard(models.TransientModel):
                     done[emp.id] = att.monthly_amount if 'monthly_amount' in att._fields else 0.0
 
         lines = [(5, 0, 0)]
-        for emp, slip in zip(employees, slips):
-            L, vals, earned, deduction, paid_days, daily = self._earned_to_date(emp, d_from, d_to, pre, slip)
+        for emp in employees:
+            L, earned, deduction, paid_days, daily = self._earned_to_date(emp, d_from, d_to)
             advance = round(earned * self.advance_percent / 100.0, 3)
             exists = emp.id in done
             lines.append((0, 0, {
@@ -106,9 +101,6 @@ class PfrAdvanceWizard(models.TransientModel):
                 'worked_days': float(L.count('WORK') + L.count('PHD')),
                 'rest_days': float(L.count('REST')),
                 'absent_days': float(L.count('ABSENT')),
-                'lateness_hours': vals['attendance_gross_undertime'],
-                'covered_hours': vals['lateness_covered_by_extra_hours'] + vals['lateness_covered_by_annual_leave'],
-                'cash_hours': vals['undertime_cash_deduction_hours'],
                 'wage': emp.wage,
                 'daily_wage': round(daily, 3),
                 'paid_days': paid_days,
@@ -259,9 +251,8 @@ class PfrAdvanceWizard(models.TransientModel):
         info = [(_("Employee ID"), 14), (_("Employee Name"), 28), (_("Department"), 22),
                 (_("Job Title / Position"), 22), (_("Monthly Wage"), 14), (_("Daily Wage"), 12)]
         days = [(_("Worked Days"), 12), (_("Rest Days"), 11), (_("Absent Days"), 12), (_("Paid Days"), 11)]
-        earn = [(_("Gross Earned"), 14)]
-        ded = [(_("Lateness + Absent (h)"), 14), (_("Covered by Extra / Annual (h)"), 16),
-               (_("Cash Deducted (h)"), 14), (_("Attendance Deduction"), 16)]
+        earn = [(_("Gross (Paid + Absent Days)"), 16)]
+        ded = [(_("Absent Deduction"), 16)]
         adv = [(_("Earned to Date"), 14), (_("Advance"), 14), (_("Included"), 10), (_("Note"), 34)]
         groups = [(_("EMPLOYEE"), info, head), (_("ATTENDANCE"), days, head), (_("EARNINGS"), earn, head_alw),
                   (_("DEDUCTIONS"), ded, head_ded), (_("ADVANCE"), adv, head_comp)]
@@ -289,13 +280,13 @@ class PfrAdvanceWizard(models.TransientModel):
             emp_id = number or getattr(emp, 'barcode', False) or str(emp.id)
             dept = emp.department_id.name or "N/A"
             name = emp.legal_name or emp.name
-            gross_earned = (line.paid_days or 0.0) * (line.daily_wage or 0.0)
+            gross_earned = ((line.paid_days or 0.0) + (line.absent_days or 0.0)) * (line.daily_wage or 0.0)
             vals = [emp_id, name, dept, emp.job_id.name or "N/A", line.wage, line.daily_wage,
                     line.worked_days, line.rest_days, line.absent_days, line.paid_days, gross_earned,
-                    line.lateness_hours, line.covered_hours, line.cash_hours, line.deduction,
+                    line.deduction,
                     line.earned, line.advance if line.selected else 0.0,
                     _("Yes") if line.selected else _("No"), line.note or ""]
-            fmts = [center, left, left, left, num, num3, num, num, num, num, num, num, num, num, num3,
+            fmts = [center, left, left, left, num, num3, num, num, num, num, num, num3,
                     num, num, center, left]
             for c, (v, f) in enumerate(zip(vals, fmts)):
                 if isinstance(v, (int, float)):
@@ -372,12 +363,9 @@ class PfrAdvanceWizardLine(models.TransientModel):
     worked_days = fields.Float(string="Worked", readonly=True)
     rest_days = fields.Float(string="Rest", readonly=True)
     absent_days = fields.Float(string="Absent", readonly=True)
-    lateness_hours = fields.Float(string="Lateness h", readonly=True, help="Punch lateness plus absent hours.")
-    covered_hours = fields.Float(string="Covered h", readonly=True, help="Covered by Extra Hours / Annual Leave.")
-    cash_hours = fields.Float(string="Cash h", readonly=True, help="Hours deducted from the salary.")
     daily_wage = fields.Float(string="Daily Wage", readonly=True, digits=(16, 3))
     paid_days = fields.Float(string="Paid Days", readonly=True)
-    deduction = fields.Float(string="Attendance Deduction", readonly=True, digits=(16, 3))
+    deduction = fields.Float(string="Absent Deduction", readonly=True, digits=(16, 3))
     earned = fields.Float(string="Earned to Date", readonly=True)
     advance = fields.Float(string="Advance")
     note = fields.Char(readonly=True)
