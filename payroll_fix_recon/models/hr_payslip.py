@@ -176,14 +176,13 @@ class HrPayslip(models.Model):
             if not wet:
                 continue
             seq_key = kind if isinstance(kind, str) else None
-            priced_days = min(days, hours / U.DAILY_HOURS) if kind == 'WORK' else days
             lines.append({
                 'name': wet.name,
                 'sequence': LINE_SEQUENCE.get(seq_key, 12),
                 'work_entry_type_id': wet.id,
                 'number_of_days': days,
                 'number_of_hours': round(hours, 2),
-                'amount': 0.0 if kind == 'OUT' else round(priced_days * wet._pfr_pay_factor() * day_rate, 3),
+                'amount': 0.0 if kind == 'OUT' else round(days * wet._pfr_pay_factor() * day_rate, 3),
             })
         if punch_lateness >= 0.01:                            # cash hours that do not make a whole absent day
             wet = slip._pfr_line_type(L, 'LATENESS')
@@ -262,12 +261,7 @@ class HrPayslip(models.Model):
             return round(days * daily, 3)
         if code in ('LATENESS', 'LAT', 'LATE'):
             return round((wd.number_of_hours or 0.0) * daily / 8.0, 3)
-        factor = wet._pfr_pay_factor() if wet else 1.0
-        if kind == 'ATT' and (wd.number_of_hours or 0.0) > 0:
-            # attendance hours already exclude the lateness hours (priced on their own line): never price
-            # the same hours twice
-            days = min(days, (wd.number_of_hours or 0.0) / U.DAILY_HOURS)
-        return round(days * factor * daily, 3)
+        return round(days * (wet._pfr_pay_factor() if wet else 1.0) * daily, 3)
 
     def _pfr_apply_worked_day_amounts(self):
         """Write the calendar amounts on the worked-day lines (end of Compute Sheet)."""
