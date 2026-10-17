@@ -98,16 +98,10 @@ class TanmyaPurchaseExt(models.Model):
 
 
     def get_stages(self):
-        lst = []
-        seen_codes = set()
-        recset = self.env['tanmya.purchase.stage'].search([], order='stageorder,id')
+        lst=[]
+        recset=self.env['tanmya.purchase.stage'].search([],order = 'stageorder')
         for stg in recset:
-            # Deduplicate stage keys to avoid Owl statusbar crash on duplicate t-key.
-            code = (stg.code or '').strip()
-            if not code or code in seen_codes:
-                continue
-            seen_codes.add(code)
-            lst.append((code, stg.name))
+            lst.append((stg.code,stg.name))
         return lst
 
 
@@ -159,7 +153,7 @@ class TanmyaPurchaseExt(models.Model):
           self.check_stage()
           # print('newstate')
           # print(self.state)
-          current_stage=self.env['tanmya.purchase.stage'].sudo().search([('code','=',self.state)],limit=1)
+          current_stage = self._get_current_stage()
           if current_stage.approvetype=='sequence' and oldstate==self.state:
                 rec_next=self.env['tanmya.purchase.order.pending'].search([('state', '=', self.state)
                                                                , ('purchaseorder', '=', self.id)
@@ -197,7 +191,7 @@ class TanmyaPurchaseExt(models.Model):
         count_approve=self.env['tanmya.purchase.order.pending'].search_count([('state', '=', self.state)
                                                                , ('purchaseorder', '=', self.id)
                                                                , ('status', '=', 'approve')])
-        current_stage = self.env['tanmya.purchase.stage'].sudo().search([('code', '=', self.state)], limit=1)
+        current_stage = self._get_current_stage()
         newlist = sorted(self.purchasetype.stages, key=lambda x: x.stageorder)
 
         if current_stage.approvetype == 'anyone':
@@ -224,8 +218,15 @@ class TanmyaPurchaseExt(models.Model):
 
 
 
+    def _get_current_stage(self):
+        """Resolve stage by code within this PO's purchase type (codes are reused)."""
+        domain = [('code', '=', self.state)]
+        if self.purchasetype:
+            domain.append(('purchase_template', '=', self.purchasetype.id))
+        return self.env['tanmya.purchase.stage'].sudo().search(domain, limit=1)
+
     def process_stages(self):
-        current_stage = self.env['tanmya.purchase.stage'].sudo().search([('code', '=', self.state)], limit=1)
+        current_stage = self._get_current_stage()
         uorder = 0
         rec_id=self.env['ir.model'].sudo().search([('model','=','purchase.order')], limit=1)
        # print(rec_id)
