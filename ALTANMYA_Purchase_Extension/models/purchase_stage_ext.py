@@ -110,7 +110,7 @@ class TanmyaPurchaseExt(models.Model):
         # Then approval stages grouped by purchase type
         for stg in Stage.search(
             [('issystem', '=', False)],
-            order='purchase_template_id, stageorder, id',
+            order='purchase_template, stageorder, id',
         ):
             if stg.code and stg.code not in seen:
                 lst.append((stg.code, stg.name))
