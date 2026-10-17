@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="template_pwts_report">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="doc">
+                <t t-call="web.basic_layout">
+                    <style>
+                        main {
+                            margin-top: 0 !important;
+                            padding-top: 0 !important;
+                        }
+                        td {
+                            text-align: center;
+                            font-weight: bold;
+                            font-size: 12px;
+                            vertical-align: middle;
+                            padding: 4px;
+                        }
+                        th {
+                            text-align: center;
+                            font-weight: bold;
+                            font-size: 12px;
+                            vertical-align: middle;
+                            padding: 4px;
+                        }
+                    </style>
+
+                    <div class="page" style="padding-top: 10px !important;">
+                        <div class="row">
+                            <div class="col-5"/>
+                            <div class="col-2 text-center">
+                                <img t-att-src="'/l10n_jo_ar3_report/static/description/2ChUlT.png'" style="width: 70px; height: auto;"/>
+                            </div>
+                            <div class="col-5 text-end">
+                                <p style="margin: 0;">وزارة المالية</p>
+                                <p style="margin: 0;">دائرة ضريبة الدخل والمبيعات</p>
+                            </div>
+                        </div>
+
+                        <p style="text-align:center;font-weight: bold;">
+                            شهادة مجموع الرواتب والاجور والضريبة المقتطعة
+                        </p>
+                        <p style="text-align: center; direction: rtl;">
+                            صادر بالاستناد لأحكام الفقرة (و) من المادة (12) من قانون ضريبة الدخل رقم (34) لسنة 2014 وتعديلاته.
+                        </p>
+                        <br/>
+
+                        <table class="table table-bordered" style="width:100%; font-size:10px; text-align:center; padding:2px;" dir="rtl">
+                            <tr>
+                                <th colspan="4" style="text-align: center; font-weight: bold; font-size:14px;">
+                                    معلومات الموظف<br/>اسم الموظف
+                                </th>
+                            </tr>
+                            <tr>
+                                <th>الاسم</th>
+                                <th>الاب</th>
+                                <th>الجد</th>
+                                <th>العائلة</th>
+                            </tr>
+                            <tr>
+                                <td><t t-esc="doc.employee_id.legal_first_name or ''"/></td>
+                                <td><t t-esc="doc.employee_id.legal_father_name or ''"/></td>
+                                <td><t t-esc="doc.employee_id.legal_grandfather_name or ''"/></td>
+                                <td><t t-esc="doc.employee_id.legal_family_name or ''"/></td>
+                            </tr>
+                            <tr>
+                                <th>الرقم الضريبي</th>
+                                <th>الرقم الوطني / جواز سفر</th>
+                                <th>صندوق بريد</th>
+                                <th>الرمز البريدي</th>
+                            </tr>
+                            <tr>
+                                <td><t t-esc="doc.employee_id.work_contact_id.vat or ''"/></td>
+                                <td><t t-esc="doc.employee_id.identification_id or doc.employee_id.passport_id or ''"/></td>
+                                <td/>
+                                <td/>
+                            </tr>
+                            <tr>
+                                <th colspan="3">العنوان</th>
+                                <th>الهاتف</th>
+                            </tr>
+                            <tr>
+                                <td colspan="3"><t t-esc="doc.employee_id.work_contact_id.contact_address or ''"/></td>
+                                <td><t t-esc="doc.employee_id.private_phone or ''"/></td>
+                            </tr>
+                            <tr>
+                                <th>الفترة الضريبية</th>
+                                <th>مدة العمل اثناء الفترة الضريبية</th>
+                                <th>تاريخ مباشرة العمل(التعيين)</th>
+                                <th>تاريخ انتهاء العمل(انهاء الخدمة)</th>
+                            </tr>
+                            <tr>
+                                <td><t t-esc="data.get('year')"/></td>
+                                <td><t t-esc="data.get('duration_str')"/></td>
+                                <td><t t-esc="data.get('start_date')"/></td>
+                                <td><t t-esc="data.get('end_date')"/></td>
+                            </tr>
+                        </table>
+
+                        <table class="table table-bordered" style="width:100%; font-size:10px; text-align:center;">
+                            <tr>
+                                <th colspan="2" rowspan="2">الضريبة المقتطعة من اجمالي</th>
+                                <th colspan="2">القيمة</th>
+                                <th colspan="2" rowspan="2">اجمالي الرواتب والاجور</th>
+                                <th colspan="2">القيمة</th>
+                            </tr>
+                            <tr>
+                                <th>دينار</th>
+                                <th>فلس</th>
+                                <th>دينار</th>
+                                <th>فلس</th>
+                            </tr>
+                            <tr>
+                                <td colspan="2">الرواتب والاجور</td>
+                                <td><t t-esc="int(data.get('tax_amount') or 0)"/></td>
+                                <td><t t-esc="int((float(data.get('tax_amount') or 0) - int(data.get('tax_amount') or 0)) * 100)"/></td>
+                                <td colspan="2">الرواتب والاجور</td>
+                                <td><t t-esc="int(data.get('gross_amount') or 0)"/></td>
+                                <td><t t-esc="int((float(data.get('gross_amount') or 0) - int(data.get('gross_amount') or 0)) * 100)"/></td>
+                            </tr>
+                            <tr>
+                                <td colspan="2">الرواتب والاجور غير الشهرية</td>
+                                <td/><td/>
+                                <td colspan="2">الرواتب والاجور غير الشهرية</td>
+                                <td/><td/>
+                            </tr>
+                            <tr>
+                                <td colspan="2">مكافاة اعضاء مجلس الإدارة</td>
+                                <td/><td/>
+                                <td colspan="2">مكافاة أعضاء مجلس الادارة</td>
+                                <td/><td/>
+                            </tr>
+                            <tr>
+                                <td colspan="2">مكافاة نهاية الخدمة عن الخدمات </td>
+                                <td/><td/>
+                                <td colspan="2">مكافاة نهاية الخدمة عن الخدمات</td>
+                                <td/><td/>
+                            </tr>
+                            <tr>
+                                <td colspan="2">مكافاة نهاية الخدمة عن الخدمات</td>
+                                <td/><td/>
+                                <td colspan="2">مكافاة نهاية الخدمة عن الخدمات</td>
+                                <td/><td/>
+                            </tr>
+                            <tr>
+                                <td colspan="2">مكافاة نهاية الخدمة عن الخدمات </td>
+                                <td/><td/>
+                                <td colspan="2">مكافاة نهاية الخدمة عن الخدمات </td>
+                                <td/><td/>
+                            </tr>
+                            <tr>
+                                <td colspan="2">أي مبالغ أخرى</td>
+                                <td/><td/>
+                                <td colspan="2" rowspan="2">أي مبالغ أخرى</td>
+                                <td rowspan="2"/><td rowspan="2"/>
+                            </tr>
+                            <tr>
+                                <td colspan="2">المساهمة الوطنية</td>
+                                <td/><td/>
+                            </tr>
+                            <tr>
+                                <th colspan="2">المجموع</th>
+                                <th/><th/>
+                                <th colspan="2">المجموع</th>
+                                <th/><th/>
+                            </tr>
+                        </table>
+
+                        <p style="font-size:13px; text-align:right; margin-top:20px;">
+                            نشهد أن المعلومات المدرجة أعلاه صحيحة وحقيقية وكاملة وغير منقوصة وأني قمت بدفع ضريبة الدخل
+                            والخدمات المقتطعين والمبينين أعلاه الى دائرة ضريبة الدخل والمبيعات
+                        </p>
+
+                        <table class="table table-bordered" style="width:100%; font-size:10px; text-align:center; margin-top:10px;">
+                            <tr>
+                                <td rowspan="2" style="width:20%;"/>
+                                <td rowspan="2" style="width:20%; vertical-align:middle;">ختم وتوقيع صاحب الشركة</td>
+                                <td style="width:30%;">
+                                    <t t-esc="data.get('employer_name') or doc.employee_id.company_id.name"/>
+                                </td>
+                                <td style="width:30%;">اسم صاحب العمل</td>
+                            </tr>
+                            <tr>
+                                <td><t t-esc="doc.employee_id.company_id.vat"/></td>
+                                <td>الرقم الضريبي</td>
+                            </tr>
+                        </table>
+
+                        <p style="text-align:right; font-size:12px; margin-top:10px;">
+                            <strong>التاريخ:</strong>
+                            <t t-esc="report_date"/>
+                        </p>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>

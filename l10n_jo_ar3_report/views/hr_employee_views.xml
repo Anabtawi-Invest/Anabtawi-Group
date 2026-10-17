@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_employee_form_inherit_legal_name" model="ir.ui.view">
+        <field name="name">hr.employee.form.legal.name.ar3</field>
+        <field name="model">hr.employee</field>
+        <field name="inherit_id" ref="hr.view_employee_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//page[@name='personal_information']/group/group[@name='hr_birth_group']/field[@name='legal_name']" position="after">
+                <label for="legal_first_name" string="Legal Name (AR/3)" invisible="company_country_code != 'JO'"/>
+                <div class="o_row" invisible="company_country_code != 'JO'">
+                    <field name="legal_first_name" placeholder="First" class="oe_inline"/>
+                    <field name="legal_father_name" placeholder="Father" class="oe_inline"/>
+                    <field name="legal_grandfather_name" placeholder="Grandfather" class="oe_inline"/>
+                    <field name="legal_family_name" placeholder="Family" class="oe_inline"/>
+                </div>
+                <field name="tax_id" invisible="company_country_code != 'JO'"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>
