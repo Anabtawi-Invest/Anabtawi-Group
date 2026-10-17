@@ -98,10 +98,23 @@ class TanmyaPurchaseExt(models.Model):
 
 
     def get_stages(self):
-        lst=[]
-        recset=self.env['tanmya.purchase.stage'].search([],order = 'stageorder')
-        for stg in recset:
-            lst.append((stg.code,stg.name))
+        """Selection values for state. Codes must be unique (see migrate_unique_stage_codes)."""
+        Stage = self.env['tanmya.purchase.stage'].sudo()
+        lst = []
+        seen = set()
+        # System stages first (RFQ / Sent / Purchase Order / ...)
+        for stg in Stage.search([('issystem', '=', True)], order='stageorder'):
+            if stg.code and stg.code not in seen:
+                lst.append((stg.code, stg.name))
+                seen.add(stg.code)
+        # Then approval stages grouped by purchase type
+        for stg in Stage.search(
+            [('issystem', '=', False)],
+            order='purchase_template_id, stageorder, id',
+        ):
+            if stg.code and stg.code not in seen:
+                lst.append((stg.code, stg.name))
+                seen.add(stg.code)
         return lst
 
 
