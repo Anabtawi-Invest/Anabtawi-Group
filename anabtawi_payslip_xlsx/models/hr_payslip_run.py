@@ -1,4 +1,6 @@
+import base64
 import io
+import math
 from datetime import datetime, time
 
 from odoo import _, fields, models, exceptions
@@ -23,6 +25,76 @@ class HrPayslipRun(models.Model):
             "url": url,
             "target": "self",
         }
+
+    audit_file = fields.Binary(
+        string="PayRun Audit File",
+        readonly=True,
+        attachment=True,
+        copy=False,
+        help="Immutable Excel snapshot frozen when the pay run was marked as paid or closed.",
+    )
+    audit_filename = fields.Char(string="PayRun Audit Filename", copy=False)
+    audit_file_generated_at = fields.Datetime(string="Audit Snapshot Date", readonly=True, copy=False)
+
+    def _freeze_payrun_audit(self, force=False):
+        for run in self:
+            if not run.slip_ids:
+                continue
+            if force or not run.audit_file:
+                try:
+                    content = run._generate_payrun_xlsx()
+                    period_str = run.date_start.strftime("%Y%m") if run.date_start else ""
+                    fname = f"PayRun_Audit_{period_str or run.name or 'Report'}.xlsx"
+                    run.sudo().write({
+                        "audit_file": base64.b64encode(content),
+                        "audit_filename": fname,
+                        "audit_file_generated_at": fields.Datetime.now(),
+                    })
+                except Exception:
+                    pass
+
+    def write(self, vals):
+        res = super().write(vals)
+        if "state" in vals:
+            target_state = vals.get("state")
+            if target_state in ("paid", "close"):
+                self._freeze_payrun_audit()
+            elif target_state in ("draft", "verify"):
+                try:
+                    self.sudo().write({
+                        "audit_file": False,
+                        "audit_filename": False,
+                        "audit_file_generated_at": False,
+                    })
+                except Exception:
+                    pass
+        return res
+
+    def action_paid(self):
+        res = super().action_paid() if hasattr(super(), "action_paid") else None
+        self._freeze_payrun_audit()
+        return res
+
+    def action_close(self):
+        res = super().action_close() if hasattr(super(), "action_close") else None
+        self._freeze_payrun_audit()
+        return res
+
+    def action_regenerate_audit_snapshot(self):
+        """Action for Payroll Managers to regenerate the frozen audit file if needed."""
+        self.ensure_one()
+        self._freeze_payrun_audit(force=True)
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "title": _("Audit Snapshot Regenerated"),
+                "message": _("The PayRun Audit snapshot has been re-frozen successfully."),
+                "sticky": False,
+                "type": "success",
+            },
+        }
+
 
     def _generate_payrun_xlsx(self, quick_audit=False, payslip_ids=None):
         self.ensure_one()
@@ -83,6 +155,19 @@ class HrPayslipRun(models.Model):
                 "align": "center",
                 "valign": "vcenter",
                 "font_size": 11,
+            }
+        )
+
+        group_header_comp_fmt = workbook.add_format(
+            {
+                "bold": True,
+                "font_color": "#FFFFFF",
+                "bg_color": "#203764",
+                "border": 1,
+                "align": "center",
+                "valign": "vcenter",
+                "text_wrap": True,
+                "font_size": 10,
             }
         )
 
@@ -175,6 +260,9 @@ class HrPayslipRun(models.Model):
         sheet1.write_number(row + 1, 2, total_ssc, card_val_fmt)
         sheet1.write_number(row + 1, 3, total_net_val, card_val_fmt)
         sheet1.write_number(row + 1, 4, avg_net, card_val_fmt)
+        kpi_value_row = row + 1       # Total Gross / Total Tax are rewritten below from the table rows
+        kpi_total_gross = 0.0
+        kpi_total_tax = 0.0
 
         row += 3
 
@@ -187,8 +275,15 @@ class HrPayslipRun(models.Model):
             (_("Department"), 22),
             (_("Job Title / Position"), 22),
             (_("Internal Code"), 16),
+            (_("SSC Subject Wage"), 18),
             (_("Period From"), 14),
             (_("Period To"), 14),
+        ]
+
+        key_cols = [
+            (_("Net Salary"), 18),
+            (_("Attendance Days"), 16),
+            (_("Out of Contract Days"), 20),
         ]
 
         fixed_alw_cols = [
@@ -203,9 +298,11 @@ class HrPayslipRun(models.Model):
             (_("SSC Employee Contrib"), 20),
         ]
 
+        fixed_comp_cols = [
+            (_("SSC Company Contrib"), 20),
+        ]
+
         summary_cols = [
-            (_("Net Salary"), 18),
-            (_("Attendance Days"), 16),
             (_("Worked Hours"), 15),
             (_("Overtime Hours"), 15),
             (_("Note / Description"), 30),
@@ -228,7 +325,11 @@ class HrPayslipRun(models.Model):
             rule = line.salary_rule_id
             rule_key = rule.id if rule else line.code
             rule_name = (rule.name if rule and rule.name else (line.name or line.code or _("Allowance"))).strip()
+            if "copy" in rule_name.lower() or "copy" in (line.code or "").lower():
+                continue
             norm_key = (rule.name.lower().strip() if rule and rule.name else (line.code or rule_name).lower().strip())
+            if "copy" in norm_key:
+                continue
             if norm_key not in alw_map:
                 alw_map[norm_key] = {"name": rule_name, "rule_keys": set(), "input_type_ids": set()}
             alw_map[norm_key]["rule_keys"].add(rule_key)
@@ -244,15 +345,11 @@ class HrPayslipRun(models.Model):
             and not (l.code in ("SSC", "SSCC", "SSC_COMP", "SOC_SEC_COMP") or ("ضمان" in (l.name or "") and "شركة" in (l.name or "")))
         )
 
-        ded_map = {}
-        for line in all_ded_lines:
-            rule = line.salary_rule_id
-            rule_key = rule.id if rule else line.code
-            rule_name = (rule.name if rule and rule.name else (line.name or line.code or _("Deduction"))).strip()
-            norm_key = (rule.name.lower().strip() if rule and rule.name else (line.code or rule_name).lower().strip())
-            if norm_key not in ded_map:
-                ded_map[norm_key] = {"name": rule_name, "rule_keys": set(), "input_type_ids": set()}
-            ded_map[norm_key]["rule_keys"].add(rule_key)
+        def _normalize_key(text_or_rule_name):
+            if not text_or_rule_name:
+                return ""
+            s = text_or_rule_name.lower().strip()
+            return s.replace("advance two", "advance 2").replace("advances two", "advances 2")
 
         # Helper to check if a name or code represents Advance #2
         def _is_adv_2(text_name, code_str):
@@ -260,14 +357,32 @@ class HrPayslipRun(models.Model):
             c = (code_str or "").lower()
             return c in ("sala2", "saladv2") or any(x in t for x in ("advance 2", "advances 2", "advance two", "advances two"))
 
+        ded_map = {}
+        for line in all_ded_lines:
+            rule = line.salary_rule_id
+            rule_key = rule.id if rule else line.code
+            raw_rule_name = (rule.name if rule and rule.name else (line.name or line.code or _("Deduction"))).strip()
+            if "copy" in raw_rule_name.lower() or "copy" in (line.code or "").lower():
+                continue
+            rule_name = raw_rule_name.replace("Advances Two", "Advances 2").replace("Advance Two", "Advance 2")
+            norm_key = _normalize_key(rule.name if rule and rule.name else (line.code or rule_name))
+            if "copy" in norm_key:
+                continue
+            if norm_key not in ded_map:
+                ded_map[norm_key] = {"name": rule_name, "rule_keys": set(), "input_type_ids": set()}
+            ded_map[norm_key]["rule_keys"].add(rule_key)
+
         # --- 3. Process Salary Inputs (Classify & Deduplicate into Allowance vs Deduction) ---
         input_types = payslips.mapped("input_line_ids.input_type_id").sorted(key=lambda t: t.name or "")
         ded_rule_names = set(ded_map.keys())
 
         if input_types:
             for itype in input_types:
-                t_name = (itype.name or _("Salary Input")).strip()
-                t_norm = t_name.lower().strip()
+                raw_t_name = (itype.name or _("Salary Input")).strip()
+                if "copy" in raw_t_name.lower() or "copy" in (getattr(itype, "code", "") or "").lower():
+                    continue
+                t_name = raw_t_name.replace("Advances Two", "Advances 2").replace("Advance Two", "Advance 2")
+                t_norm = _normalize_key(t_name)
                 t_code = (getattr(itype, "code", "") or "").lower()
                 itype_is_adv2 = _is_adv_2(t_norm, t_code)
 
@@ -275,15 +390,14 @@ class HrPayslipRun(models.Model):
                     "deduction" in t_norm
                     or "ded" in t_code
                     or "adv" in t_code
+                    or "advance" in t_norm
+                    or "advances" in t_norm
                     or "saladv" in t_code
                     or "sala2" in t_code
+                    or itype_is_adv2
                     or any(
                         t_norm == d_name
-                        or d_name == t_norm
-                        or (
-                            (t_norm in d_name or d_name in t_norm)
-                            and (_is_adv_2(d_name, d_name) == itype_is_adv2)
-                        )
+                        or (t_code and t_code == d_name)
                         for d_name in ded_rule_names
                     )
                 )
@@ -294,12 +408,6 @@ class HrPayslipRun(models.Model):
                         k_is_adv2 = _is_adv_2(k, k)
                         if k_is_adv2 == itype_is_adv2:
                             if k == t_norm or (t_code and t_code == k):
-                                matched_key = k
-                                break
-                    if not matched_key:
-                        for k in ded_map:
-                            k_is_adv2 = _is_adv_2(k, k)
-                            if k_is_adv2 == itype_is_adv2 and (k in t_norm or t_norm in k):
                                 matched_key = k
                                 break
                     if matched_key:
@@ -315,12 +423,10 @@ class HrPayslipRun(models.Model):
                             if k == clean_input_norm or (t_code and t_code == k):
                                 matched_key = k
                                 break
-                    if not matched_key:
-                        for k in alw_map:
-                            k_is_adv2 = _is_adv_2(k, k)
-                            if k_is_adv2 == itype_is_adv2 and (k in clean_input_norm or clean_input_norm in k):
-                                matched_key = k
-                                break
+                    if not matched_key and "car depreciation" in clean_input_norm:
+                        matched_key = next((k for k in alw_map if "car depreciation" in k), None)
+                        if not matched_key:
+                            continue
                     if matched_key:
                         alw_map[matched_key]["input_type_ids"].add(itype.id)
                     else:
@@ -332,6 +438,8 @@ class HrPayslipRun(models.Model):
         for norm_k in sorted(alw_map.keys(), key=lambda k: alw_map[k]["name"]):
             col_info = alw_map[norm_k]
             c_name = col_info["name"]
+            if "copy" in c_name.lower():
+                continue
             rule_keys = col_info["rule_keys"]
             input_type_ids = col_info["input_type_ids"]
 
@@ -340,12 +448,16 @@ class HrPayslipRun(models.Model):
             for payslip in payslips:
                 lines = payslip.line_ids
                 val = 0.0
-                r_lines = lines.filtered(lambda l: (l.salary_rule_id and l.salary_rule_id.id in rule_keys) or l.code in rule_keys) if rule_keys else False
-                if r_lines:
-                    val = sum(r_lines.mapped("total"))
-                elif input_type_ids:
+                if rule_keys:
+                    r_lines = lines.filtered(lambda l: (l.salary_rule_id and l.salary_rule_id.id in rule_keys) or l.code in rule_keys)
+                    if r_lines:
+                        val = sum(r_lines.mapped("total"))
+                if abs(val) < 0.0001 and input_type_ids:
                     in_lines = payslip.input_line_ids.filtered(lambda l: l.input_type_id and l.input_type_id.id in input_type_ids)
-                    val = sum((l.amount if l.amount != 0.0 else l.quantity) or 0.0 for l in in_lines)
+                    if in_lines:
+                        in_val = sum((l.amount if l.amount != 0.0 else l.quantity) or 0.0 for l in in_lines)
+                        if abs(in_val) > 0.0001:
+                            val = in_val
                 col_total += val
 
             if abs(col_total) > 0.0001:
@@ -355,6 +467,13 @@ class HrPayslipRun(models.Model):
         for norm_k in sorted(ded_map.keys(), key=lambda k: ded_map[k]["name"]):
             col_info = ded_map[norm_k]
             c_name = col_info["name"]
+            if "copy" in c_name.lower():
+                continue
+
+            c_name_lower = c_name.lower().replace(":", "").replace("_", " ").strip()
+            if c_name_lower in ("deduction", "deductions", "خصم", "استقطاع"):
+                continue
+
             rule_keys = col_info["rule_keys"]
             input_type_ids = col_info["input_type_ids"]
 
@@ -363,12 +482,16 @@ class HrPayslipRun(models.Model):
             for payslip in payslips:
                 lines = payslip.line_ids
                 val = 0.0
-                r_lines = lines.filtered(lambda l: (l.salary_rule_id and l.salary_rule_id.id in rule_keys) or l.code in rule_keys) if rule_keys else False
-                if r_lines:
-                    val = sum(r_lines.mapped("total"))
-                elif input_type_ids:
+                if rule_keys:
+                    r_lines = lines.filtered(lambda l: (l.salary_rule_id and l.salary_rule_id.id in rule_keys) or l.code in rule_keys)
+                    if r_lines:
+                        val = sum(r_lines.mapped("total"))
+                if abs(val) < 0.0001 and input_type_ids:
                     in_lines = payslip.input_line_ids.filtered(lambda l: l.input_type_id and l.input_type_id.id in input_type_ids)
-                    val = sum((l.amount if l.amount != 0.0 else l.quantity) or 0.0 for l in in_lines)
+                    if in_lines:
+                        in_val = sum((l.amount if l.amount != 0.0 else l.quantity) or 0.0 for l in in_lines)
+                        if abs(in_val) > 0.0001:
+                            val = in_val
                 col_total += val
 
             if abs(col_total) > 0.0001:
@@ -383,21 +506,30 @@ class HrPayslipRun(models.Model):
         all_ded_headers = [c[0] for c in fixed_ded_cols] + [c[0] for c in dynamic_ded_cols]
         all_ded_widths = [c[1] for c in fixed_ded_cols] + [c[1] for c in dynamic_ded_cols]
 
+        all_comp_headers = [c[0] for c in fixed_comp_cols]
+        all_comp_widths = [c[1] for c in fixed_comp_cols]
+
         info_headers = [c[0] for c in info_cols]
         summary_headers = [c[0] for c in summary_cols]
 
         info_count = len(info_cols)
+        key_count = len(key_cols)
         alw_count = len(all_alw_headers)
         ded_count = len(all_ded_headers)
+        comp_count = len(all_comp_headers)
         sum_count = len(summary_cols)
 
-        alw_start_col = info_count
+        key_start_col = info_count
+        alw_start_col = key_start_col + key_count
         alw_end_col = alw_start_col + alw_count - 1
 
         ded_start_col = alw_end_col + 1
         ded_end_col = ded_start_col + ded_count - 1
 
-        sum_start_col = ded_end_col + 1
+        comp_start_col = ded_end_col + 1
+        comp_end_col = comp_start_col + comp_count - 1
+
+        sum_start_col = comp_end_col + 1
         sum_end_col = sum_start_col + sum_count - 1
 
         total_num_cols = sum_end_col + 1
@@ -405,8 +537,10 @@ class HrPayslipRun(models.Model):
         # Set Column Widths
         all_col_widths = (
             [c[1] for c in info_cols]
+            + [c[1] for c in key_cols]
             + all_alw_widths
             + all_ded_widths
+            + all_comp_widths
             + [c[1] for c in summary_cols]
         )
         for col_idx, width in enumerate(all_col_widths):
@@ -418,6 +552,11 @@ class HrPayslipRun(models.Model):
 
         # Info Columns (Vertically merged across row_super and row_sub)
         for c_idx, name in enumerate(info_headers):
+            sheet1.merge_range(row_super, c_idx, row_sub, c_idx, name, header_fmt)
+
+        # Net Salary / Attendance Days Columns (Vertically merged across row_super and row_sub)
+        for idx, (name, _w) in enumerate(key_cols):
+            c_idx = key_start_col + idx
             sheet1.merge_range(row_super, c_idx, row_sub, c_idx, name, header_fmt)
 
         # ALLOWANCE Group Super-Header & Sub-Headers
@@ -437,6 +576,11 @@ class HrPayslipRun(models.Model):
 
         for idx, name in enumerate(all_ded_headers):
             sheet1.write(row_sub, ded_start_col + idx, name, header_fmt)
+
+        # COMPANY CONTRIBUTIONS Columns (Vertically merged across row_super and row_sub)
+        for idx, name in enumerate(all_comp_headers):
+            c_idx = comp_start_col + idx
+            sheet1.merge_range(row_super, c_idx, row_sub, c_idx, name, group_header_comp_fmt)
 
         # Summary / Attendance Columns (Vertically merged across row_super and row_sub)
         for idx, name in enumerate(summary_headers):
@@ -473,11 +617,24 @@ class HrPayslipRun(models.Model):
                     issues.append(_("Missing Employee Number"))
 
                 emp_name_val = emp.legal_name or emp.name if emp else "N/A"
-                dept_val = emp.department_id.name if emp and emp.department_id else "N/A"
-                if emp and not emp.department_id:
+
+                # Historical department & job resolution:
+                # Prioritize payslip's stored department/job or contract version over live employee profile
+                hist_dept = (
+                    payslip.department_id
+                    or (getattr(payslip, "version_id", False) and payslip.version_id.department_id)
+                    or (emp and emp.department_id)
+                )
+                dept_val = hist_dept.name if hist_dept else "N/A"
+                if not hist_dept:
                     issues.append(_("Missing Department"))
 
-                job_val = emp.job_id.name if emp and emp.job_id else "N/A"
+                hist_job = (
+                    payslip.job_id
+                    or (getattr(payslip, "version_id", False) and payslip.version_id.job_id)
+                    or (emp and emp.job_id)
+                )
+                job_val = hist_job.name if hist_job else "N/A"
                 code_val = emp_id_val
 
                 period_from_val = format_date(self.env, payslip.date_from or self.date_start)
@@ -486,42 +643,58 @@ class HrPayslipRun(models.Model):
                 lines = payslip.line_ids
 
                 # Base Allowances
-                basic_sal = sum(lines.filtered(lambda l: l.code in ("BASIC", "SALARY") or (l.category_id and l.category_id.code in ("BASIC", "Basic")) or (l.category_id and l.category_id.name in ("BASIC", "Basic", "Basic Salary"))).mapped("total"))
+                # Actual Salary may sit in the Basic category: it has its own column, so never count it here
+                basic_sal = sum(lines.filtered(
+                    lambda l: (l.code in ("BASIC", "SALARY") or (l.category_id and l.category_id.code in ("BASIC", "Basic")) or (l.category_id and l.category_id.name in ("BASIC", "Basic", "Basic Salary")))
+                    and not (l.code in ("FULL_WAGE", "ACTUAL_SALARY", "ACTUAL") or "actual salary" in (l.name or "").lower() or "الراتب الفعلي" in (l.name or ""))
+                ).mapped("total"))
                 actual_sal = sum(lines.filtered(lambda l: l.code in ("FULL_WAGE", "ACTUAL_SALARY", "ACTUAL") or "actual salary" in (l.name or "").lower() or "الراتب الفعلي" in (l.name or "")).mapped("total"))
                 rem_leave = sum(lines.filtered(lambda l: l.code in ("vacation_leave", "remain_lev", "REM_LEAVE", "LEAVE_COMP", "ANNUAL_LEAVE")).mapped("total"))
                 gross_att_ot = sum(lines.filtered(lambda l: l.code in ("OT_NET", "ETH_NET", "RD-S", "OVERTIME", "GROSS_ATT", "OT_COMP", "EXTRA_HOURS")).mapped("total"))
 
                 # Dynamic Allowance Values (Prioritize computed rule lines over raw input lines to avoid double counting)
                 dyn_alw_vals = []
+                gross_dyn_alw = 0.0          # only amounts a salary rule really paid count in the gross
                 for _c_name, _w, rule_keys, input_type_ids in dynamic_alw_cols:
                     val = 0.0
-                    r_lines = lines.filtered(lambda l: (l.salary_rule_id and l.salary_rule_id.id in rule_keys) or l.code in rule_keys) if rule_keys else False
-                    if r_lines:
-                        val = sum(r_lines.mapped("total"))
-                    elif input_type_ids:
+                    rule_val = 0.0
+                    if rule_keys:
+                        r_lines = lines.filtered(lambda l: (l.salary_rule_id and l.salary_rule_id.id in rule_keys) or l.code in rule_keys)
+                        if r_lines:
+                            val = rule_val = sum(r_lines.mapped("total"))
+                    if abs(val) < 0.0001 and input_type_ids:
                         in_lines = payslip.input_line_ids.filtered(lambda l: l.input_type_id and l.input_type_id.id in input_type_ids)
-                        val = sum((l.amount if l.amount != 0.0 else l.quantity) or 0.0 for l in in_lines)
+                        if in_lines:
+                            in_val = sum((l.amount if l.amount != 0.0 else l.quantity) or 0.0 for l in in_lines)
+                            if abs(in_val) > 0.0001:
+                                val = in_val      # shown for information (input not paid by a rule)
                     dyn_alw_vals.append(val)
+                    gross_dyn_alw += rule_val
 
-                # Gross Salary
-                gross_sal = payslip.gross_wage if hasattr(payslip, "gross_wage") and payslip.gross_wage else sum(lines.filtered(lambda l: l.code == "GROSS" or (l.category_id and l.category_id.code in ("GROSS", "Gross"))).mapped("total"))
-                if not gross_sal:
-                    gross_sal = basic_sal + rem_leave + gross_att_ot + sum(dyn_alw_vals)
+                # Gross Salary (calculated from Actual Salary + paid allowances; salary inputs are not added again)
+                gross_sal = actual_sal + rem_leave + gross_att_ot + gross_dyn_alw
+                kpi_total_gross += gross_sal
 
                 # Fixed Deductions
                 tax_val = sum(lines.filtered(lambda l: l.code in ("INCOME_TAX", "TAX", "IT") or "ضريبة" in l.name).mapped("total"))
+                kpi_total_tax += tax_val
                 ssce_val = sum(lines.filtered(lambda l: l.code in ("SSE", "SSCE", "SSC_EMP", "SOC_SEC_EMP") or ("ضمان" in l.name and "موظف" in l.name)).mapped("total"))
+                sscc_val = sum(lines.filtered(lambda l: l.code in ("SSC", "SSCC", "SSC_COMP", "SOC_SEC_COMP") or ("ضمان" in l.name and "شركة" in l.name)).mapped("total"))
 
                 # Dynamic Deduction Values (Prioritize computed rule lines over raw input lines to avoid double counting)
                 dyn_ded_vals = []
                 for _c_name, _w, rule_keys, input_type_ids in dynamic_ded_cols:
                     val = 0.0
-                    r_lines = lines.filtered(lambda l: (l.salary_rule_id and l.salary_rule_id.id in rule_keys) or l.code in rule_keys) if rule_keys else False
-                    if r_lines:
-                        val = sum(r_lines.mapped("total"))
-                    elif input_type_ids:
+                    if rule_keys:
+                        r_lines = lines.filtered(lambda l: (l.salary_rule_id and l.salary_rule_id.id in rule_keys) or l.code in rule_keys)
+                        if r_lines:
+                            val = sum(r_lines.mapped("total"))
+                    if abs(val) < 0.0001 and input_type_ids:
                         in_lines = payslip.input_line_ids.filtered(lambda l: l.input_type_id and l.input_type_id.id in input_type_ids)
-                        val = sum((l.amount if l.amount != 0.0 else l.quantity) or 0.0 for l in in_lines)
+                        if in_lines:
+                            in_val = sum((l.amount if l.amount != 0.0 else l.quantity) or 0.0 for l in in_lines)
+                            if abs(in_val) > 0.0001:
+                                val = in_val
                     dyn_ded_vals.append(val)
 
                 # Net Salary
@@ -530,25 +703,14 @@ class HrPayslipRun(models.Model):
                 if net_sal < 0:
                     issues.append(_("Negative Net Salary (%.2f JOD)") % net_sal)
 
-                # Attendance metrics (Total calculated paid days = Attendance + Public Holidays + Paid Leaves)
+                # Attendance Days = every paid line merged (attendance, public holiday, annual, sick,
+                # paid time off, travel, work injury x pay %). Absent / lateness / unpaid never count.
                 worked_days = payslip.worked_days_line_ids
-                absence_codes = ['ABS', 'ABSENT', 'LEAVEUNPAID', 'UN_PAID', 'un_paid', 'SICKLEAVE0', 'LAT', 'OUT', 'UNP', 'OUTCON', 'OUT_OF_CONTRACT']
-                extra_hours_codes = ['EXTRA', 'EXTRA_HOURS', 'OVERTIME', 'OVER_TIME', 'EXTRA100']
-
-                paid_lines = worked_days.filtered(lambda wd: (
-                    (wd.code or '').strip() not in absence_codes and
-                    (wd.code or '').strip() not in extra_hours_codes and
-                    'extra' not in (wd.name or '').lower() and
-                    'overtime' not in (wd.name or '').lower() and
-                    'out of contract' not in (wd.name or '').lower() and
-                    'outcon' not in (wd.name or '').lower() and
-                    'خارج العقد' not in (wd.name or '').lower()
-                ))
-                att_days = sum(paid_lines.mapped("number_of_days"))
-                if payslip.date_from and payslip.date_to:
-                    days_in_period = (payslip.date_to - payslip.date_from).days + 1
-                    if att_days > days_in_period:
-                        att_days = days_in_period
+                summary = payslip._xlsx_attendance_summary()
+                att_days = summary["att_days"]
+                absent_hrs = summary["absent_hrs"]
+                lateness_hrs = summary["lateness_hrs"]
+                out_of_contract_days = summary["out_of_contract_days"]
                 worked_hrs = sum(worked_days.mapped("number_of_hours"))
                 ot_hrs = sum(worked_days.filtered(lambda wd: "overtime" in (wd.code or "").lower() or "ot" in (wd.code or "").lower() or "extra" in (wd.code or "").lower()).mapped("number_of_hours"))
 
@@ -566,14 +728,40 @@ class HrPayslipRun(models.Model):
                 else:
                     note_val = base_note
 
-                # Write Info Columns (0..6)
+                # Retrieve SSC Subject Wage (favor contract version/snapshot active for this payslip first, then employee profile fallback)
+                contract_rec = getattr(payslip, "version_id", False) or getattr(payslip, "contract_id", False)
+                emp_rec = payslip.employee_id
+                ssc_wage_val = 0.0
+
+                for obj in (contract_rec, emp_rec):
+                    if not obj:
+                        continue
+                    for attr in ("x_studio_x_studio_ssc_wage", "x_studio_ssc_wage", "sb_ss_salary", "ssc_wage", "ss_wage", "social_security_wage", "ss_salary"):
+                        val = getattr(obj, attr, 0.0)
+                        if val:
+                            ssc_wage_val = float(val)
+                            break
+                    if ssc_wage_val:
+                        break
+
+                if not ssc_wage_val and contract_rec and hasattr(contract_rec, "_get_contract_wage"):
+                    ssc_wage_val = contract_rec._get_contract_wage()
+
+                # Write Info Columns (0..7)
                 sheet1.write(data_row, 0, emp_id_val, text_center_fmt)
                 sheet1.write(data_row, 1, emp_name_val, text_left_fmt)
                 sheet1.write(data_row, 2, dept_val, text_left_fmt)
                 sheet1.write(data_row, 3, job_val, text_left_fmt)
                 sheet1.write(data_row, 4, code_val, text_center_fmt)
-                sheet1.write(data_row, 5, period_from_val, text_center_fmt)
-                sheet1.write(data_row, 6, period_to_val, text_center_fmt)
+                sheet1.write_number(data_row, 5, ssc_wage_val, number_fmt)
+                sheet1.write(data_row, 6, period_from_val, text_center_fmt)
+                sheet1.write(data_row, 7, period_to_val, text_center_fmt)
+
+                # Write Net Salary / Attendance Days / Out of Contract Days
+                net_style = net_negative_fmt if net_sal < 0 else number_fmt
+                sheet1.write_number(data_row, key_start_col, net_sal, net_style)
+                sheet1.write_number(data_row, key_start_col + 1, att_days, number_fmt)
+                sheet1.write_number(data_row, key_start_col + 2, out_of_contract_days, number_fmt)
 
                 # Write ALLOWANCE Section
                 col_curr = alw_start_col
@@ -596,10 +784,10 @@ class HrPayslipRun(models.Model):
                     sheet1.write_number(data_row, col_curr, ded_val, number_fmt)
                     col_curr += 1
 
-                # Write Summary / Attendance Section
-                net_style = net_negative_fmt if net_sal < 0 else number_fmt
-                sheet1.write_number(data_row, col_curr, net_sal, net_style); col_curr += 1
-                sheet1.write_number(data_row, col_curr, att_days, int_fmt); col_curr += 1
+                # Write COMPANY CONTRIBUTIONS Section
+                sheet1.write_number(data_row, col_curr, sscc_val, number_fmt); col_curr += 1
+
+                # Write Summary Section
                 sheet1.write_number(data_row, col_curr, worked_hrs, number_fmt); col_curr += 1
                 sheet1.write_number(data_row, col_curr, ot_hrs, number_fmt); col_curr += 1
                 sheet1.write(data_row, col_curr, note_val, text_left_fmt)
@@ -620,17 +808,21 @@ class HrPayslipRun(models.Model):
 
                 data_row += 1
 
+        # Top KPI cards: gross and tax are the sums of the rows below, so they always match the table
+        sheet1.write_number(kpi_value_row, 0, kpi_total_gross, card_val_fmt)
+        sheet1.write_number(kpi_value_row, 1, kpi_total_tax, card_val_fmt)
+
         # Write Bottom Summary Total Row
         sheet1.write(data_row, 0, _("Total"), total_label_fmt)
         for c in range(1, info_count):
             sheet1.write(data_row, c, "", total_label_fmt)
 
-        att_days_col_idx = sum_start_col + 1
+        att_days_col_idx = key_start_col + 1
 
         for col_idx in range(info_count, total_num_cols - 1):
             col_letter = xlsxwriter.utility.xl_col_to_name(col_idx)
             formula = f"=SUM({col_letter}{table_start_row + 1}:{col_letter}{data_row})"
-            fmt = total_int_fmt if col_idx == att_days_col_idx else total_num_fmt
+            fmt = total_num_fmt
             sheet1.write_formula(data_row, col_idx, formula, fmt)
 
         sheet1.write(data_row, total_num_cols - 1, "", total_label_fmt)

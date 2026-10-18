@@ -1,3 +1,4 @@
+import calendar
 import io
 
 from odoo import _, models
@@ -21,18 +22,101 @@ class HrPayslip(models.Model):
 
     def action_export_payrun_excel(self):
         payrun = self.mapped("payslip_run_id")[:1]
+        selected_ids = ",".join(str(i) for i in self.ids)
         if payrun:
-            selected_ids = ",".join(str(i) for i in self.ids)
             url = f"/anabtawi_payroll/payrun/xlsx?payrun_id={payrun.id}&payslip_ids={selected_ids}"
-            return {
-                "name": "PayRun Audit",
-                "type": "ir.actions.act_url",
-                "url": url,
-                "target": "self",
-            }
-        raise ValidationError(_("Selected payslips do not belong to a Pay Run."))
+        else:
+            url = f"/anabtawi_payroll/payrun/xlsx?payslip_ids={selected_ids}"
+        return {
+            "name": "PayRun Audit",
+            "type": "ir.actions.act_url",
+            "url": url,
+            "target": "self",
+        }
 
+    # ------------------------------------------------------------------
+    # Worked days helpers (one definition shared by the payslip and pay run exports)
+    # ------------------------------------------------------------------
+    def _xlsx_classify_worked_day(self, wd):
+        """'absent' | 'lateness' | 'out_of_contract' | 'ignore' (unpaid / overtime) | 'paid'.
+        'paid' covers Attendance, Public Holiday, Annual, Sick, Paid Time Off, Travel, Work Injury..."""
+        code = (wd.work_entry_type_id.code or wd.code or "").strip().upper()
+        name = (wd.name or "").strip().lower()
+        type_name = (wd.work_entry_type_id.name or "").strip().lower()
+        text = f"{name} {type_name}"
 
+        if code in ("ABS", "ABSENT") or any(k in text for k in ("absent", "absence", "غياب")):
+            return "absent"
+        if code in ("LAT", "LATE", "LATENESS") or "lateness" in text or "تأخير" in text:
+            return "lateness"
+        if code in ("OUT", "OUTCON", "OUT_OF_CONTRACT") or any(k in text for k in ("out of contract", "خارج العقد")):
+            return "out_of_contract"
+        if (
+            code in ("OVERTIME", "EXTRA", "EXTRA_HOURS", "OT", "OTW", "OTR", "PHO",
+                     "LEAVEUNPAID", "UN_PAID", "UNPAID", "UNP", "LEAVE500", "SICKLEAVE0")
+            or any(k in text for k in ("overtime", "extra", "unpaid", "بدون راتب", "غير مدفوع"))
+        ):
+            return "ignore"
+        return "paid"
+
+    def _xlsx_pay_factor(self, wd):
+        """Share of the day that is paid (e.g. Work Injury = 7.5%), from the work entry type."""
+        pct = getattr(wd.work_entry_type_id, "pfr_pay_percent", None)
+        return 1.0 if pct is None else pct / 100.0
+
+    def _xlsx_daily_wage(self):
+        self.ensure_one()
+        wage = self.employee_id.wage or 0.0
+        if not wage and self.version_id:
+            wage = self.version_id._get_contract_wage() or 0.0
+        if not self.date_to or wage <= 0:
+            return 0.0
+        month_days = calendar.monthrange(self.date_to.year, self.date_to.month)[1]
+        return wage / float(month_days)
+
+    def _xlsx_is_travel_suspension(self, wd):
+        """Travel Suspension Deduction (code TSD) lines are excluded from Attendance Days."""
+        code = (wd.work_entry_type_id.code or wd.code or "").strip().upper()
+        text = f"{wd.name or ''} {wd.work_entry_type_id.name or ''}".lower()
+        return code == "TSD" or "travel suspension" in text
+
+    def _xlsx_attendance_summary(self):
+        """Attendance days = every paid line (attendance, public holiday and all paid leaves merged),
+        weighted by its pay %, capped at the days of the period. Absent and lateness never count."""
+        self.ensure_one()
+        att_days = absent_hrs = lateness_hrs = out_days = 0.0
+        for wd in self.worked_days_line_ids:
+            if self._xlsx_is_travel_suspension(wd):
+                continue  # travel suspension deduction days are not attendance
+            kind = self._xlsx_classify_worked_day(wd)
+            if kind == "paid":
+                att_days += (wd.number_of_days or 0.0) * self._xlsx_pay_factor(wd)
+            elif kind == "absent":
+                absent_hrs += wd.number_of_hours or 0.0
+            elif kind == "lateness":
+                lateness_hrs += wd.number_of_hours or 0.0
+            elif kind == "out_of_contract":
+                out_days += wd.number_of_days if wd.number_of_days else ((wd.number_of_hours or 0.0) / 8.0)
+        if self.date_from and self.date_to:
+            att_days = min(att_days, float((self.date_to - self.date_from).days + 1))
+        return {
+            "att_days": round(att_days, 2),
+            "absent_hrs": absent_hrs,
+            "lateness_hrs": lateness_hrs,
+            "out_of_contract_days": out_days,
+        }
+
+    def _xlsx_worked_day_amount(self, wd, daily_wage):
+        """Money shown next to a worked-day line: days x pay % x daily wage (lateness: hours x hourly)."""
+        kind = self._xlsx_classify_worked_day(wd)
+        if kind == "paid":
+            return round((wd.number_of_days or 0.0) * self._xlsx_pay_factor(wd) * daily_wage, 3)
+        if kind == "absent":
+            days = wd.number_of_days or ((wd.number_of_hours or 0.0) / 8.0)
+            return round(days * daily_wage, 3)
+        if kind == "lateness":
+            return round((wd.number_of_hours or 0.0) * daily_wage / 8.0, 3)
+        return 0.0
 
     def _generate_payslips_xlsx(self):
         import xlsxwriter  # pylint: disable=import-outside-toplevel
@@ -156,17 +240,26 @@ class HrPayslip(models.Model):
                 row += 1
 
                 worked_lines = payslip.worked_days_line_ids.filtered(lambda wd: wd.code != "OUT")
+                daily_wage = payslip._xlsx_daily_wage()
+                paid_amount = 0.0
                 for line in worked_lines:
+                    amount = payslip._xlsx_worked_day_amount(line, daily_wage)
+                    if payslip._xlsx_classify_worked_day(line) == "paid":
+                        paid_amount += amount
                     sheet.write(row, 0, line.name, text_fmt)
                     sheet.write_number(row, 1, line.number_of_hours or 0.0, number_fmt)
                     sheet.write_number(row, 2, line.number_of_days or 0.0, number_fmt)
-                    sheet.write_number(row, 3, line.amount or 0.0, number_fmt)
+                    sheet.write_number(row, 3, amount, number_fmt)
                     row += 1
 
+                # Total amount = paid lines only, so it matches the Actual Salary
                 sheet.write(row, 0, _("Total"), total_fmt)
                 sheet.write_number(row, 1, sum(worked_lines.mapped("number_of_hours")), total_num_fmt)
                 sheet.write_number(row, 2, sum(worked_lines.mapped("number_of_days")), total_num_fmt)
-                sheet.write_number(row, 3, sum(worked_lines.mapped("amount")), total_num_fmt)
+                sheet.write_number(row, 3, paid_amount, total_num_fmt)
+                row += 1
+                sheet.write(row, 0, _("Attendance Days (paid, merged)"), label_fmt)
+                sheet.write_number(row, 2, payslip._xlsx_attendance_summary()["att_days"], total_num_fmt)
                 row += 2
 
             sheet.merge_range(row, 0, row, 4, _("Salary Computation"), section_fmt)

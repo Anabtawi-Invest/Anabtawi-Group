@@ -1,3 +1,4 @@
+import base64
 import re
 
 from odoo import _, http
@@ -48,17 +49,8 @@ class PayslipXlsxController(http.Controller):
     def download_payrun_xlsx(self, payrun_id=None, payslip_ids=None, **kwargs):
         if (
             not request.env.user.has_group("hr_payroll.group_hr_payroll_user")
-            or not payrun_id
+            or (not payrun_id and not payslip_ids)
         ):
-            return request.not_found()
-
-        try:
-            payrun_id = int(payrun_id)
-        except (ValueError, TypeError):
-            return request.not_found()
-
-        payrun = request.env["hr.payslip.run"].browse(payrun_id)
-        if not payrun.exists():
             return request.not_found()
 
         parsed_payslip_ids = None
@@ -68,6 +60,55 @@ class PayslipXlsxController(http.Controller):
             except ValueError:
                 parsed_payslip_ids = None
 
+        payrun = None
+        if payrun_id:
+            try:
+                payrun = request.env["hr.payslip.run"].browse(int(payrun_id))
+                if not payrun.exists():
+                    payrun = None
+            except (ValueError, TypeError):
+                payrun = None
+
+        if not payrun and parsed_payslip_ids:
+            payslips = request.env["hr.payslip"].browse(parsed_payslip_ids)
+            if payslips.exists():
+                payrun = payslips.mapped("payslip_run_id")[:1]
+                if not payrun:
+                    payrun = request.env["hr.payslip.run"].sudo().search([], limit=1)
+
+        if not payrun:
+            return request.not_found()
+
+        # Check if the Pay Run is marked as paid/closed or all slips are paid/done
+        is_paid_or_closed = payrun.state in ("paid", "close") or (
+            payrun.slip_ids and all(s.state in ("paid", "done") for s in payrun.slip_ids)
+        )
+        is_full_run = not parsed_payslip_ids or set(parsed_payslip_ids) >= set(payrun.slip_ids.ids)
+
+        # If paid / closed, ensure audit_file is frozen and serve the stored immutable snapshot
+        if is_paid_or_closed:
+            if not payrun.audit_file:
+                payrun._freeze_payrun_audit()
+
+            if is_full_run and payrun.audit_file:
+                xlsx_content = base64.b64decode(payrun.audit_file)
+                period_str = payrun.date_start.strftime("%Y%m") if payrun.date_start else ""
+                if period_str:
+                    filename = f"PayRun_Audit_{period_str}"
+                else:
+                    filename = f"PayRun_Audit_{payrun.name or 'Report'}"
+                filename = osutil.clean_filename(filename + ".xlsx")
+
+                headers = [
+                    (
+                        "Content-Type",
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    ),
+                    ("Content-Disposition", content_disposition(filename)),
+                ]
+                return request.make_response(xlsx_content, headers=headers)
+
+        # Dynamic generation for draft/verify or custom subset
         xlsx_content = payrun._generate_payrun_xlsx(payslip_ids=parsed_payslip_ids)
         period_str = payrun.date_start.strftime("%Y%m") if payrun.date_start else ""
         if period_str:
