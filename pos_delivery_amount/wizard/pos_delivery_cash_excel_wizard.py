@@ -91,20 +91,36 @@ class PosDeliveryCashExcelWizard(models.TransientModel):
         result = self.env["pos.payment"]._read_group(domain, aggregates=["amount:sum"])
         return result[0][0] or 0.0
 
-    def _get_cash_in_out_amounts(self, session):
-        statement_lines = session.sudo().statement_line_ids
-        if session.state == "closed" and session.cash_real_transaction and not statement_lines:
-            # Fallback if statement lines were cleaned: only net is available.
-            net = session.cash_real_transaction or 0.0
-            return (max(net, 0.0), min(net, 0.0), net)
+    def _get_cash_move_statement_lines(self, session):
+        """Return only real Put Money In / Take Money Out lines.
 
-        cash_in = sum(line.amount for line in statement_lines if line.amount > 0)
-        cash_out = sum(line.amount for line in statement_lines if line.amount < 0)
+        After session closing, Odoo also creates bank statement lines for cash
+        sales posting. Those must not be treated as cash in/out.
+        Real cash moves use payment_ref: "<session>-<in|out>-<reason>".
+        """
+        session_name = session.name or ""
+        prefix = "%s-" % session_name
+        return session.sudo().statement_line_ids.filtered(
+            lambda line: (line.payment_ref or "").startswith(prefix)
+        )
+
+    def _get_cash_in_out_amounts(self, session):
+        cash_moves = self._get_cash_move_statement_lines(session)
+        cash_in = sum(line.amount for line in cash_moves if line.amount > 0)
+        cash_out = sum(line.amount for line in cash_moves if line.amount < 0)
+        moves_net = cash_in + cash_out
+
+        # Closed sessions freeze the official net used by cash register math.
         if session.state == "closed":
-            net = session.cash_real_transaction or (cash_in + cash_out)
-        else:
-            net = cash_in + cash_out
-        return cash_in, cash_out, net
+            net = session.cash_real_transaction if session.cash_real_transaction is not False else moves_net
+            # If statement lines were altered after close, keep official net and
+            # only show split in/out when it still reconciles to that net.
+            if session.currency_id.compare_amounts(moves_net, net) != 0 and not cash_moves:
+                return (max(net, 0.0), min(net, 0.0), net)
+            if session.currency_id.compare_amounts(moves_net, net) != 0:
+                return cash_in, cash_out, net
+            return cash_in, cash_out, net
+        return cash_in, cash_out, moves_net
 
     def _prepare_rows(self):
         self.ensure_one()
