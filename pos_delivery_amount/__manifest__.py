@@ -1,7 +1,7 @@
 {
     "name": "POS Delivery Amount",
     "summary": "Capture and post POS delivery amount at closing",
-    "version": "19.0.3.3.2",
+    "version": "19.0.3.4.2",
     "category": "Point of Sale",
     "author": "Anabtawi Group",
     "license": "LGPL-3",
@@ -9,11 +9,15 @@
         "point_of_sale",
         "account",
     ],
+    "external_dependencies": {
+        "python": ["xlsxwriter"],
+    },
     "data": [
         "security/ir.model.access.csv",
         "views/pos_config_views.xml",
         "views/pos_session_views.xml",
         "views/pos_delivery_report_views.xml",
+        "wizard/pos_delivery_cash_excel_wizard_views.xml",
     ],
     "assets": {
         "point_of_sale._assets_pos": [
