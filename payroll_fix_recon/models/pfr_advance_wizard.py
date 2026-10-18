@@ -218,7 +218,7 @@ class PfrAdvanceWizard(models.TransientModel):
             ann_bal = round(ann_hrs / U.DAILY_HOURS, 2)
             for ltype in annual_types:
                 try:
-                    data, _ = emp._get_consumed_leaves(ltype, target_date=d_to)
+                    data, _alloc = emp._get_consumed_leaves(ltype, target_date=d_to)
                     content = data.get(emp, {}).get(ltype, {})
                     v = content.get('virtual_remaining_leaves') or content.get('remaining_leaves')
                     if v is not None:
@@ -385,7 +385,7 @@ class PfrAdvanceWizard(models.TransientModel):
             ann_bal = round(ann_hrs / U.DAILY_HOURS, 2)
             for ltype in annual_types:
                 try:
-                    data, _ = emp._get_consumed_leaves(ltype, target_date=d_to)
+                    data, _alloc = emp._get_consumed_leaves(ltype, target_date=d_to)
                     content = data.get(emp, {}).get(ltype, {})
                     v = content.get('virtual_remaining_leaves') or content.get('remaining_leaves')
                     if v is not None:

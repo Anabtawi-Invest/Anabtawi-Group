@@ -20,7 +20,7 @@ class HrPayslip(models.Model):
         days = 0.0
         for ltype in leave_types:
             try:
-                data, _ = emp._get_consumed_leaves(ltype, target_date=target)
+                data, _alloc = emp._get_consumed_leaves(ltype, target_date=target)
                 content = data.get(emp, {}).get(ltype, {})
                 val = content.get('virtual_remaining_leaves') or content.get('remaining_leaves') or 0.0
                 days += float(val or sum(v.get('virtual_remaining_leaves', 0.0)
