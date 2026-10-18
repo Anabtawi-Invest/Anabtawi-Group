@@ -740,8 +740,17 @@ class PfrAdvanceWizard(models.TransientModel):
         return buf.getvalue()
 
     def _reopen(self):
-        return {'type': 'ir.actions.act_window', 'res_model': self._name, 'res_id': self.id,
-                'view_mode': 'form', 'target': 'new'}
+        view = self.env.ref('payroll_fix_recon.view_pfr_advance_wizard_form', raise_if_not_found=False)
+        return {
+            'name': _("Mid-month Advance"),
+            'type': 'ir.actions.act_window',
+            'res_model': self._name,
+            'res_id': self.id,
+            'view_mode': 'form',
+            'views': [(view.id if view else False, 'form')],
+            'target': 'new',
+            'context': self.env.context,
+        }
 
 
 class PfrAdvanceWizardLine(models.TransientModel):
