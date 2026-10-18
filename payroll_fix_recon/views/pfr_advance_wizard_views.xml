@@ -6,16 +6,43 @@
         <field name="arch" type="xml">
             <form string="Mid-month Advance">
                 <field name="state" invisible="1"/>
-                <group>
-                    <group string="Advance Parameters">
-                        <field name="date_cutoff" readonly="state == 'done'"/>
-                        <field name="advance_percent" readonly="state == 'done'"/>
-                        <field name="input_type_id" options="{'no_create': True}" readonly="state == 'done'"/>
+                <div class="alert alert-info d-flex align-items-center justify-content-between mb-3" role="alert" invisible="state != 'done'">
+                    <div>
+                        <strong>Salary Adjustments Done / Historical Run Loaded.</strong>
+                        <div>You can re-download the <strong>Audit XLSX</strong> or the <strong>Bank Transfer File</strong> anytime below.</div>
+                    </div>
+                    <button name="action_reset_draft" type="object" string="New Advance Run"
+                            class="btn btn-sm btn-outline-primary" icon="fa-refresh"/>
+                </div>
+                <group string="Previous Advance Runs (Log &amp; Re-export)">
+                    <field name="history_batch" widget="selection" placeholder="Select a past completed run from the log..."/>
+                    <div>
+                        <button name="action_load_history" type="object" string="Load Past Run"
+                                class="btn btn-secondary me-2" invisible="not history_batch" icon="fa-history"/>
+                        <button name="action_view_salary_attachments" type="object" string="View All in Salary Attachments"
+                                class="btn btn-link" icon="fa-external-link"/>
+                    </div>
+                </group>
+                <group string="Advance Parameters" invisible="state == 'done'">
+                    <group>
+                        <field name="date_cutoff"/>
+                        <field name="advance_percent"/>
+                        <field name="batch_name"/>
+                        <field name="input_type_id" options="{'no_create': True}"/>
                     </group>
-                    <group string="Scope &amp; Total">
+                    <group>
                         <field name="month_start"/>
-                        <field name="employee_ids" widget="many2many_tags" readonly="state == 'done'"/>
+                        <field name="employee_ids" widget="many2many_tags"/>
                         <field name="total_advance"/>
+                    </group>
+                </group>
+                <group string="Active Run Summary" invisible="state != 'done'">
+                    <group>
+                        <field name="date_cutoff" readonly="1"/>
+                        <field name="month_start" readonly="1"/>
+                    </group>
+                    <group>
+                        <field name="total_advance" readonly="1"/>
                     </group>
                 </group>
                 <group string="Excel Adjustments (Offline Review)" invisible="state == 'done'">

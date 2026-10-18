@@ -8,6 +8,7 @@ import base64
 import calendar
 from datetime import datetime, time
 import io
+import re
 
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
@@ -42,11 +43,233 @@ class PfrAdvanceWizard(models.TransientModel):
     excel_file = fields.Binary(string="Excel File", help="Upload the updated Excel sheet with adjusted advance amounts.")
     file_name = fields.Char(string="File Name")
 
+    batch_name = fields.Char(string="Batch Label / Note",
+                             help="Optional note or batch name (e.g. Batch 2, Plant Workers).")
+    history_batch = fields.Selection(selection='_get_history_batches', string="Past Advance Run",
+                                     help="Choose a previously completed advance run to view or re-download.")
+
     @api.model
     def _default_input_type(self):
         InputType = self.env['hr.payslip.input.type']
         return InputType.search(['|', '|', ('code', '=', 'com_lon'), ('name', 'ilike', 'company loan'),
                                  ('name', 'ilike', 'advance')], limit=1)
+
+    @api.model
+    def _get_history_batches(self):
+        """Finds all past mid-month advance batches from hr.salary.attachment."""
+        if 'hr.salary.attachment' not in self.env:
+            return []
+        Attachment = self.env['hr.salary.attachment'].sudo()
+        if 'description' not in Attachment._fields:
+            return []
+        try:
+            records = Attachment.search(
+                [('description', 'ilike', 'Mid-month advance')],
+                order='create_date desc, id desc'
+            )
+        except Exception:
+            return []
+        if not records:
+            return []
+        groups = {}
+        order = []
+        for att in records:
+            desc = att.description or _("Mid-month advance")
+            if desc not in groups:
+                groups[desc] = {'count': 0, 'total': 0.0}
+                order.append(desc)
+            groups[desc]['count'] += 1
+            amt = (
+                att.monthly_amount if 'monthly_amount' in att._fields
+                else (att.total_amount if 'total_amount' in att._fields else 0.0)
+            ) or 0.0
+            groups[desc]['total'] += amt
+
+        res = []
+        for desc in order:
+            info = groups[desc]
+            label = f"{desc} ({info['count']} employees — Total: {info['total']:,.3f} JOD)"
+            res.append((desc, label))
+        return res
+
+    def action_reset_draft(self):
+        self.ensure_one()
+        self.line_ids.unlink()
+        self.write({
+            'state': 'draft',
+            'history_batch': False,
+            'excel_file': False,
+            'file_name': False,
+        })
+        return self._reopen()
+
+    def action_view_salary_attachments(self):
+        """Opens native hr.salary.attachment view filtered to mid-month advances or selected batch."""
+        domain = [('description', 'ilike', 'Mid-month advance')]
+        if self.history_batch:
+            domain = [('description', '=', self.history_batch)]
+        return {
+            'name': _("Salary Advance Adjustments"),
+            'type': 'ir.actions.act_window',
+            'res_model': 'hr.salary.attachment',
+            'view_mode': 'tree,form',
+            'views': [(False, 'tree'), (False, 'form')],
+            'domain': domain,
+            'context': dict(self.env.context),
+        }
+
+    def action_load_history(self):
+        self.ensure_one()
+        if not self.history_batch:
+            raise UserError(_("Please select a past advance run from the dropdown first."))
+
+        Attachment = self.env['hr.salary.attachment'].sudo()
+        domain = [('description', '=', self.history_batch)]
+        records = Attachment.search(domain)
+        if not records:
+            raise UserError(_("No salary attachments found for: %s", self.history_batch))
+
+        # Determine cutoff date from records or description
+        sample = records[0]
+        d_from = False
+        d_to = False
+        if sample.date_start:
+            d_from = sample.date_start
+            d_to = d_from.replace(day=min(15, calendar.monthrange(d_from.year, d_from.month)[1]))
+        else:
+            m = re.search(r'(\d{4})-(\d{2})', self.history_batch)
+            if m:
+                year, month = int(m.group(1)), int(m.group(2))
+                d_from = fields.Date.today().replace(year=year, month=month, day=1)
+                d_to = d_from.replace(day=min(15, calendar.monthrange(year, month)[1]))
+            else:
+                d_from = self.month_start or fields.Date.context_today(self).replace(day=1)
+                d_to = self.date_cutoff or d_from.replace(day=15)
+
+        self.date_cutoff = d_to
+
+        emp_adv = {}
+        for att in records:
+            amt = (
+                att.monthly_amount if 'monthly_amount' in att._fields
+                else (att.total_amount if 'total_amount' in att._fields else 0.0)
+            ) or 0.0
+            if 'employee_id' in att._fields and att.employee_id:
+                emp_adv[att.employee_id] = amt
+            elif 'employee_ids' in att._fields:
+                for emp in att.employee_ids:
+                    emp_adv[emp] = amt
+
+        if not emp_adv:
+            raise UserError(_("No employees found in the selected advance run."))
+
+        employees = self.env['hr.employee'].browse([e.id for e in emp_adv.keys()])
+
+        # Preload leave balances in bulk
+        company = self.env.company
+        types = self.env['pfr.settlement'].leave_types(company)
+        annual_types = types.get('annual', self.env['hr.leave.type'])
+        extra_types = types.get('extra', self.env['hr.leave.type'])
+        pto_types = types.get('pto', self.env['hr.leave.type'])
+
+        emp_ids = employees.ids
+        all_type_ids = list((annual_types | extra_types | pto_types).ids)
+        bal_hours = self.env['pfr.settlement'].balance_hours(emp_ids, all_type_ids)
+
+        lines = [(5, 0, 0)]
+        for emp in employees:
+            advance = emp_adv.get(emp, 0.0)
+            L, earned, deduction, paid_days, daily = self._earned_to_date(emp, d_from, d_to)
+
+            # Audit: Leaves taken in period
+            sick_days = float(L.count('SICK'))
+            annual_days = 0.0
+            other_paid_days = 0.0
+            for d, bucket in L.days.items():
+                if bucket == 'TRAVEL':
+                    other_paid_days += 1.0
+                elif isinstance(bucket, tuple) and bucket[0] == 'TYPE':
+                    wet = L.kind_types.get(bucket)
+                    w_name = (wet.name or '').lower() if wet else ''
+                    w_code = (wet.code or '').lower() if wet else ''
+                    if any(n in w_name or n in w_code for n in ('annual', 'سنوي')):
+                        annual_days += 1.0
+                    elif wet and getattr(wet, 'pfr_pay_percent', 100.0) == 0:
+                        pass
+                    else:
+                        other_paid_days += 1.0
+
+            if annual_days == 0 and annual_types and 'hr.leave' in self.env:
+                ann_leaves = self.env['hr.leave'].sudo().search([
+                    ('employee_id', '=', emp.id),
+                    ('state', 'in', ['validate', 'validate1']),
+                    ('holiday_status_id', 'in', annual_types.ids),
+                    ('date_from', '<=', datetime.combine(d_to, time.max)),
+                    ('date_to', '>=', datetime.combine(d_from, time.min)),
+                    '!', ('name', 'ilike', 'Lateness Settlement')
+                ])
+                for al in ann_leaves:
+                    l_from = max(al.request_date_from or U.local_date(al.date_from, emp._pfr_tz()), d_from)
+                    l_to = min(al.request_date_to or U.local_date(al.date_to, emp._pfr_tz()), d_to)
+                    annual_days = max(annual_days, float((l_to - l_from).days + 1))
+
+            # Audit Balances
+            ann_hrs = sum(bal_hours.get((emp.id, t.id), 0.0) for t in annual_types)
+            ann_bal = round(ann_hrs / U.DAILY_HOURS, 2)
+            for ltype in annual_types:
+                try:
+                    data, _ = emp._get_consumed_leaves(ltype, target_date=d_to)
+                    content = data.get(emp, {}).get(ltype, {})
+                    v = content.get('virtual_remaining_leaves') or content.get('remaining_leaves')
+                    if v is not None:
+                        ann_bal = float(v)
+                        break
+                except Exception:
+                    pass
+
+            extra_bal = 0.0
+            for fname in ('extra_hours_balance', 'total_extra_hours', 'total_overtime', 'overtime_balance'):
+                if fname in emp._fields and getattr(emp, fname, False):
+                    extra_bal = float(getattr(emp, fname) or 0.0)
+                    break
+            if not extra_bal and extra_types:
+                extra_bal = sum(bal_hours.get((emp.id, t.id), 0.0) for t in extra_types)
+            if not extra_bal and 'hr.attendance.overtime.line' in self.env:
+                lines_ot = self.env['hr.attendance.overtime.line'].sudo().search([
+                    ('employee_id', '=', emp.id), ('compensable_as_leave', '=', True), ('status', '=', 'approved'),
+                    ('date', '<=', d_to)
+                ])
+                extra_bal = sum(lines_ot.mapped('duration'))
+
+            if 'remaining_leaves' in emp._fields and emp.remaining_leaves:
+                paid_bal = float(emp.remaining_leaves)
+            else:
+                total_paid_hrs = sum(bal_hours.get((emp.id, t_id), 0.0) for t_id in all_type_ids)
+                paid_bal = max(ann_bal, round(total_paid_hrs / U.DAILY_HOURS, 2))
+
+            lines.append((0, 0, {
+                'employee_id': emp.id,
+                'worked_days': float(L.count('WORK') + L.count('PHD')),
+                'rest_days': float(L.count('REST')),
+                'absent_days': float(L.count('ABSENT')),
+                'sick_leave_days': round(sick_days, 2),
+                'annual_leave_days': round(annual_days, 2),
+                'other_paid_leave_days': round(other_paid_days, 2),
+                'annual_leave_balance': round(ann_bal, 2),
+                'extra_hours_balance': round(extra_bal, 2),
+                'paid_leave_balance': round(paid_bal, 2),
+                'wage': emp.wage,
+                'daily_wage': round(daily, 3),
+                'paid_days': paid_days,
+                'deduction': round(deduction, 3),
+                'earned': round(earned, 3),
+                'advance': advance,
+                'selected': True,
+                'note': _("Loaded from: %s", self.history_batch),
+            }))
+
+        self.write({'line_ids': lines, 'state': 'done'})
+        return self._reopen()
 
     @api.depends('date_cutoff')
     def _compute_month_start(self):
@@ -60,7 +283,10 @@ class PfrAdvanceWizard(models.TransientModel):
 
     # ------------------------------------------------------------------
     def _marker(self):
-        return _("Mid-month advance %s", self.date_cutoff.strftime('%Y-%m'))
+        base = _("Mid-month advance %s", self.date_cutoff.strftime('%Y-%m'))
+        if self.batch_name and self.batch_name.strip():
+            return f"{base} - {self.batch_name.strip()}"
+        return base
 
     def _earned_to_date(self, emp, d_from, d_to):
         """(ledger, earned, deduction, paid_days, daily wage) of one employee for d_from..d_to."""
@@ -94,10 +320,14 @@ class PfrAdvanceWizard(models.TransientModel):
         marker = self._marker()
         Attachment = self.env['hr.salary.attachment'].sudo()
         done = {}
-        if 'description' in Attachment._fields and 'employee_ids' in Attachment._fields:
+        if 'description' in Attachment._fields:
             for att in Attachment.search([('description', 'ilike', marker)]):
-                for emp in att.employee_ids:
-                    done[emp.id] = att.monthly_amount if 'monthly_amount' in att._fields else 0.0
+                amt = att.monthly_amount if 'monthly_amount' in att._fields else 0.0
+                if 'employee_id' in att._fields and att.employee_id:
+                    done[att.employee_id.id] = amt
+                elif 'employee_ids' in att._fields:
+                    for emp in att.employee_ids:
+                        done[emp.id] = amt
 
         # Preload leave balances in bulk
         company = self.env.company
@@ -253,14 +483,26 @@ class PfrAdvanceWizard(models.TransientModel):
                         base[fname] = key
                         break
         marker = self._marker()
+        # If no explicit batch_name provided, but an adjustment with this marker already exists,
+        # suffix with run index so historical runs don't get combined
+        if not self.batch_name and 'description' in fields_:
+            existing_count = Attachment.search_count([('description', '=', marker)])
+            if existing_count > 0:
+                all_matching = Attachment.search([('description', 'ilike', marker)])
+                unique_descs = set(all_matching.mapped('description'))
+                marker = f"{marker} (Run {len(unique_descs) + 1})"
+
         for line in lines:
             vals = dict(base)
             vals.update({
-                'employee_ids': [(6, 0, [line.employee_id.id])],
                 'description': marker,
                 'monthly_amount': line.advance,
                 'date_start': self.month_start,
             })
+            if 'employee_id' in fields_:
+                vals['employee_id'] = line.employee_id.id
+            if 'employee_ids' in fields_:
+                vals['employee_ids'] = [(6, 0, [line.employee_id.id])]
             if 'total_amount' in fields_:
                 vals['total_amount'] = line.advance
             if 'has_total_amount' in fields_:
