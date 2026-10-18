@@ -149,9 +149,10 @@
                     <div class="o_kpi_card card-cash clickable_kpi" t-on-click="() => this.onKpiClick('cash_sales')" title="Click to view detailed transactions &amp; export Excel">
                         <div class="kpi_icon"><i class="fa fa-money text-success"/></div>
                         <div class="kpi_title">Cash Sales</div>
-                        <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.cash_sales)"/></div>
+                        <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.cash_sales_untaxed)"/></div>
+                        <div class="kpi_taxed_hint text-muted">Incl. VAT: <t t-esc="formatCurrency(data.kpis.cash_sales)"/></div>
                         <div class="kpi_subtext d-flex justify-content-between align-items-center">
-                            <span class="badge bg-success badge_sub"><t t-esc="getPercent(data.kpis.cash_sales, data.kpis.total_sales)"/>% of Sales</span>
+                            <span class="badge bg-success badge_sub"><t t-esc="getPercent(data.kpis.cash_sales_untaxed, data.kpis.untaxed_sales)"/>% of Net</span>
                             <span class="drill_badge"><i class="fa fa-search-plus me-1"/>Drill Down</span>
                         </div>
                     </div>
@@ -160,9 +161,10 @@
                     <div class="o_kpi_card card-visa clickable_kpi" t-on-click="() => this.onKpiClick('visa_sales')" title="Click to view detailed transactions &amp; export Excel">
                         <div class="kpi_icon"><i class="fa fa-credit-card text-info"/></div>
                         <div class="kpi_title">Visa &amp; Card Sales</div>
-                        <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.visa_sales)"/></div>
+                        <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.visa_sales_untaxed)"/></div>
+                        <div class="kpi_taxed_hint text-muted">Incl. VAT: <t t-esc="formatCurrency(data.kpis.visa_sales)"/></div>
                         <div class="kpi_subtext d-flex justify-content-between align-items-center">
-                            <span class="badge bg-info badge_sub"><t t-esc="getPercent(data.kpis.visa_sales, data.kpis.total_sales)"/>% of Sales</span>
+                            <span class="badge bg-info badge_sub"><t t-esc="getPercent(data.kpis.visa_sales_untaxed, data.kpis.untaxed_sales)"/>% of Net</span>
                             <span class="drill_badge"><i class="fa fa-search-plus me-1"/>Drill Down</span>
                         </div>
                     </div>
@@ -171,9 +173,10 @@
                     <div class="o_kpi_card card-online clickable_kpi" t-on-click="() => this.onKpiClick('online_sales')" title="Click to view detailed transactions &amp; export Excel">
                         <div class="kpi_icon"><i class="fa fa-globe text-warning"/></div>
                         <div class="kpi_title">Online &amp; Delivery Sales</div>
-                        <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.online_sales)"/></div>
+                        <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.online_sales_untaxed)"/></div>
+                        <div class="kpi_taxed_hint text-muted">Incl. VAT: <t t-esc="formatCurrency(data.kpis.online_sales)"/></div>
                         <div class="kpi_subtext d-flex justify-content-between align-items-center">
-                            <span class="badge bg-warning text-dark badge_sub"><t t-esc="getPercent(data.kpis.online_sales, data.kpis.total_sales)"/>% of Sales</span>
+                            <span class="badge bg-warning text-dark badge_sub"><t t-esc="getPercent(data.kpis.online_sales_untaxed, data.kpis.untaxed_sales)"/>% of Net</span>
                             <span class="drill_badge"><i class="fa fa-search-plus me-1"/>Drill Down</span>
                         </div>
                     </div>
@@ -182,9 +185,10 @@
                     <div class="o_kpi_card card-employee-debt clickable_kpi" t-on-click="() => this.onKpiClick('employee_debt')" title="Click to view detailed transactions &amp; export Excel">
                         <div class="kpi_icon"><i class="fa fa-id-card-o text-purple"/></div>
                         <div class="kpi_title">Debt Sales (مبيعات الذمم)</div>
-                        <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.employee_debt)"/></div>
+                        <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.employee_debt_untaxed)"/></div>
+                        <div class="kpi_taxed_hint text-muted">Incl. VAT: <t t-esc="formatCurrency(data.kpis.employee_debt)"/></div>
                         <div class="kpi_subtext d-flex justify-content-between align-items-center">
-                            <span class="badge bg-purple text-white badge_sub">Debt Sales</span>
+                            <span class="badge bg-purple text-white badge_sub"><t t-esc="getPercent(data.kpis.employee_debt_untaxed, data.kpis.untaxed_sales)"/>% of Net</span>
                             <span class="drill_badge"><i class="fa fa-search-plus me-1"/>Drill Down</span>
                         </div>
                     </div>
@@ -591,10 +595,10 @@
                                         <td class="val_num clickable_cell" t-on-click="() => this.onKpiClick('tax_amount', branch.config_id)" title="Click to view branch tax"><t t-esc="formatCurrency(branch.tax_amount)"/></td>
                                         <td class="val_num text-warning clickable_cell" t-on-click="() => this.onKpiClick('discount_amount', branch.config_id)" title="Click to view branch discounts"><t t-esc="formatCurrency(branch.discount_amount)"/></td>
                                         <td class="val_num text-danger clickable_cell" t-on-click="() => this.onKpiClick('gift_amount', branch.config_id)" title="Click to view branch gifts"><t t-esc="formatCurrency(branch.gift_amount)"/></td>
-                                        <td class="val_num text-success clickable_cell" t-on-click="() => this.onKpiClick('cash_sales', branch.config_id)" title="Click to view branch cash sales"><t t-esc="formatCurrency(branch.cash)"/></td>
-                                        <td class="val_num text-info clickable_cell" t-on-click="() => this.onKpiClick('visa_sales', branch.config_id)" title="Click to view branch visa sales"><t t-esc="formatCurrency(branch.visa)"/></td>
-                                        <td class="val_num text-warning clickable_cell" t-on-click="() => this.onKpiClick('online_sales', branch.config_id)" title="Click to view branch online sales"><t t-esc="formatCurrency(branch.online_sales)"/></td>
-                                        <td class="val_num text-purple clickable_cell" t-on-click="() => this.onKpiClick('employee_debt', branch.config_id)" title="Click to view branch debt sales"><t t-esc="formatCurrency(branch.employee_debt)"/></td>
+                                        <td class="val_num text-success clickable_cell" t-on-click="() => this.onKpiClick('cash_sales', branch.config_id)" title="Click to view branch cash sales"><t t-esc="formatCurrency(branch.cash_untaxed)"/></td>
+                                        <td class="val_num text-info clickable_cell" t-on-click="() => this.onKpiClick('visa_sales', branch.config_id)" title="Click to view branch visa sales"><t t-esc="formatCurrency(branch.visa_untaxed)"/></td>
+                                        <td class="val_num text-warning clickable_cell" t-on-click="() => this.onKpiClick('online_sales', branch.config_id)" title="Click to view branch online sales"><t t-esc="formatCurrency(branch.online_sales_untaxed)"/></td>
+                                        <td class="val_num text-purple clickable_cell" t-on-click="() => this.onKpiClick('employee_debt', branch.config_id)" title="Click to view branch debt sales"><t t-esc="formatCurrency(branch.employee_debt_untaxed)"/></td>
                                         <td class="val_num clickable_cell" t-on-click="() => this.onKpiClick('hospitality', branch.config_id)" title="Click to view branch hospitality"><t t-esc="formatCurrency(branch.hospitality)"/></td>
                                         <td class="val_num clickable_cell" t-on-click="() => this.onKpiClick('online_sales', branch.config_id)" title="Click to view branch Talabat sales"><t t-esc="formatCurrency(branch.talabat)"/></td>
                                         <td class="val_num clickable_cell" t-on-click="() => this.onKpiClick('online_sales', branch.config_id)" title="Click to view branch Careem sales"><t t-esc="formatCurrency(branch.careem)"/></td>
@@ -624,10 +628,10 @@
                                     <td class="val_num clickable_cell" t-on-click="() => this.onKpiClick('tax_amount')" title="Click to view total tax"><t t-esc="formatCurrency(data.global_totals.tax_amount)"/></td>
                                     <td class="val_num text-warning clickable_cell" t-on-click="() => this.onKpiClick('discount_amount')" title="Click to view total discounts"><t t-esc="formatCurrency(data.global_totals.discount_amount)"/></td>
                                     <td class="val_num text-danger clickable_cell" t-on-click="() => this.onKpiClick('gift_amount')" title="Click to view total gifts"><t t-esc="formatCurrency(data.global_totals.gift_amount)"/></td>
-                                    <td class="val_num clickable_cell" t-on-click="() => this.onKpiClick('cash_sales')" title="Click to view total cash sales"><t t-esc="formatCurrency(data.global_totals.cash)"/></td>
-                                    <td class="val_num clickable_cell" t-on-click="() => this.onKpiClick('visa_sales')" title="Click to view total visa sales"><t t-esc="formatCurrency(data.global_totals.visa)"/></td>
-                                    <td class="val_num text-warning clickable_cell" t-on-click="() => this.onKpiClick('online_sales')" title="Click to view total online sales"><t t-esc="formatCurrency(data.global_totals.online_sales)"/></td>
-                                    <td class="val_num text-purple clickable_cell" t-on-click="() => this.onKpiClick('employee_debt')" title="Click to view total debt sales"><t t-esc="formatCurrency(data.global_totals.employee_debt)"/></td>
+                                    <td class="val_num clickable_cell" t-on-click="() => this.onKpiClick('cash_sales')" title="Click to view total cash sales"><t t-esc="formatCurrency(data.global_totals.cash_untaxed)"/></td>
+                                    <td class="val_num clickable_cell" t-on-click="() => this.onKpiClick('visa_sales')" title="Click to view total visa sales"><t t-esc="formatCurrency(data.global_totals.visa_untaxed)"/></td>
+                                    <td class="val_num text-warning clickable_cell" t-on-click="() => this.onKpiClick('online_sales')" title="Click to view total online sales"><t t-esc="formatCurrency(data.global_totals.online_sales_untaxed)"/></td>
+                                    <td class="val_num text-purple clickable_cell" t-on-click="() => this.onKpiClick('employee_debt')" title="Click to view total debt sales"><t t-esc="formatCurrency(data.global_totals.employee_debt_untaxed)"/></td>
                                     <td class="val_num clickable_cell" t-on-click="() => this.onKpiClick('hospitality')" title="Click to view total hospitality"><t t-esc="formatCurrency(data.global_totals.hospitality)"/></td>
                                     <td class="val_num clickable_cell" t-on-click="() => this.onKpiClick('online_sales')" title="Click to view total Talabat sales"><t t-esc="formatCurrency(data.global_totals.talabat)"/></td>
                                     <td class="val_num clickable_cell" t-on-click="() => this.onKpiClick('online_sales')" title="Click to view total Careem sales"><t t-esc="formatCurrency(data.global_totals.careem)"/></td>

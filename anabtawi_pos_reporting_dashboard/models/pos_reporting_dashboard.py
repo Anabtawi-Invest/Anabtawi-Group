@@ -50,6 +50,11 @@ EXPLICIT_DEPT_TO_POS_MAP = {
 DASHBOARD_EXTRA_KEYS = {
     "untaxed_sales": 0.0,
     "tax_amount": 0.0,
+    "cash_untaxed": 0.0,
+    "visa_untaxed": 0.0,
+    "online_sales_untaxed": 0.0,
+    "employee_debt_untaxed": 0.0,
+    "other_sales_untaxed": 0.0,
     "discount_amount": 0.0,
     "gift_amount": 0.0,
     "gift_line_count": 0,
@@ -169,6 +174,19 @@ class PosReportingDashboard(models.TransientModel):
             return amount, 0.0
         tax = (order.amount_tax or 0.0) * amount / order.amount_total
         return amount - tax, tax
+
+    def _channel_untaxed_key(self, payment_method):
+        """Branch key that receives the untaxed share of an income payment."""
+        bucket = self.env["pos.daily.ops.engine"]._get_bucket(payment_method)
+        if bucket == "cash":
+            return "cash_untaxed"
+        if bucket == "visa":
+            return "visa_untaxed"
+        if bucket == "employee_debt":
+            return "employee_debt_untaxed"
+        if bucket in DELIVERY_CHANNELS:
+            return "online_sales_untaxed"
+        return "other_sales_untaxed"
 
     def _get_paying_orders(self, sessions):
         """{pos.order: income} for orders whose income payments are above zero
@@ -350,6 +368,7 @@ class PosReportingDashboard(models.TransientModel):
 
         # --- A-D. Untaxed / tax from the income payments, so they add up to Total POS Income
         # (hospitality, advance applied and cash rounding are left out like in the income).
+        # Channel untaxed shares feed the Cash / Visa / Online / Debt cards (excl. VAT).
         for pay in engine._get_payments(sessions):
             if not engine._is_in_sales(pay.payment_method_id):
                 continue
@@ -357,6 +376,7 @@ class PosReportingDashboard(models.TransientModel):
             untaxed_amt, tax_amt = self._payment_tax_split(pay)
             branch["untaxed_sales"] += untaxed_amt
             branch["tax_amount"] += tax_amt
+            branch[self._channel_untaxed_key(pay.payment_method_id)] += untaxed_amt
 
         for order in self._get_paying_orders(sessions):
             branch_data[order.config_id.id]["paying_order_count"] += 1
@@ -523,16 +543,11 @@ class PosReportingDashboard(models.TransientModel):
 
         # --- G. Build Channel Distribution & Daily Trends ---
         channels = [
-            {"name": _("Cash Sales"), "value": global_totals["cash"], "color": "#28a745"},
-            {"name": _("Visa / Card"), "value": global_totals["visa"], "color": "#007bff"},
-            {"name": _("Online & Delivery"), "value": global_totals["online_sales"], "color": "#fd7e14"},
-            {"name": _("Debt Sales (مبيعات الذمم)"), "value": global_totals["employee_debt"], "color": "#6f42c1"},
-            {"name": _("Hospitality"), "value": global_totals["hospitality"], "color": "#ffc107"},
-            {"name": _("Talabat"), "value": global_totals["talabat"], "color": "#fd7e14"},
-            {"name": _("Careem"), "value": global_totals["careem"], "color": "#20c997"},
-            {"name": _("Mythings"), "value": global_totals["mythings"], "color": "#17a2b8"},
-            {"name": _("Kabseh"), "value": global_totals["kabseh"], "color": "#e83e8c"},
-            {"name": _("Other Channels"), "value": global_totals["other_sales"], "color": "#6c757d"},
+            {"name": _("Cash Sales"), "value": global_totals["cash_untaxed"], "color": "#28a745"},
+            {"name": _("Visa / Card"), "value": global_totals["visa_untaxed"], "color": "#007bff"},
+            {"name": _("Online & Delivery"), "value": global_totals["online_sales_untaxed"], "color": "#fd7e14"},
+            {"name": _("Debt Sales (مبيعات الذمم)"), "value": global_totals["employee_debt_untaxed"], "color": "#6f42c1"},
+            {"name": _("Other Channels"), "value": global_totals["other_sales_untaxed"], "color": "#6c757d"},
         ]
         channels_filtered = [c for c in channels if c["value"] > 0]
 
@@ -592,6 +607,10 @@ class PosReportingDashboard(models.TransientModel):
                 "visa_sales": global_totals["visa"],
                 "online_sales": global_totals["online_sales"],
                 "employee_debt": global_totals["employee_debt"],
+                "cash_sales_untaxed": global_totals["cash_untaxed"],
+                "visa_sales_untaxed": global_totals["visa_untaxed"],
+                "online_sales_untaxed": global_totals["online_sales_untaxed"],
+                "employee_debt_untaxed": global_totals["employee_debt_untaxed"],
                 "hospitality_sales": global_totals["hospitality"],
                 "cash_in": global_totals["cash_in"],
                 "cash_out": global_totals["cash_out"],
