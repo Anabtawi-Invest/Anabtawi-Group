@@ -1,36 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- 1. Form View Inheritance for Pay Run: Audit Buttons & Snapshot Fields -->
-    <record id="view_hr_payslip_run_form_inherit_payrun_audit" model="ir.ui.view">
-        <field name="name">hr.payslip.run.form.inherit.payrun.audit</field>
-        <field name="model">hr.payslip.run</field>
-        <field name="inherit_id" ref="hr_payroll.hr_payslip_run_view_form"/>
-        <field name="arch" type="xml">
-            <xpath expr="//header" position="inside">
-                <button name="action_export_payrun_excel"
-                        string="PayRun Audit"
-                        type="object"
-                        class="btn-primary"
-                        groups="hr_payroll.group_hr_payroll_user"
-                        icon="fa-file-excel-o"/>
-                <button name="action_regenerate_audit_snapshot"
-                        string="Re-freeze Audit Snapshot"
-                        type="object"
-                        class="btn-secondary"
-                        groups="hr_payroll.group_hr_payroll_manager"
-                        invisible="state not in ('paid', 'close') or not audit_file"
-                        confirm="Are you sure you want to regenerate and re-freeze the audit report for this pay run?"
-                        icon="fa-refresh"/>
-            </xpath>
-            <xpath expr="//sheet" position="inside">
-                <field name="audit_filename" invisible="1"/>
-                <field name="audit_file" filename="audit_filename" invisible="1"/>
-                <field name="audit_file_generated_at" invisible="1"/>
-            </xpath>
-        </field>
-    </record>
-
-    <!-- 2. Header Button on Payslips List View inside Pay Run -->
+    <!-- 1. Header Button on Payslips List View inside Pay Run -->
     <record id="view_hr_payslip_list_payrun_audit" model="ir.ui.view">
         <field name="name">hr.payslip.list.payrun.audit</field>
         <field name="model">hr.payslip</field>
@@ -41,13 +11,12 @@
                         name="action_export_payrun_excel"
                         type="object"
                         class="btn-primary"
-                        groups="hr_payroll.group_hr_payroll_user"
-                        icon="fa-file-excel-o"/>
+                        groups="hr_payroll.group_hr_payroll_user"/>
             </xpath>
         </field>
     </record>
 
-    <!-- 3. Server Action on Pay Run Action Menu (Form & List View) -->
+    <!-- 2. Server Action on Pay Run Action Menu (Form & List View) -->
     <record id="action_payrun_excel_report_server" model="ir.actions.server">
         <field name="name">PayRun Audit</field>
         <field name="model_id" ref="hr_payroll.model_hr_payslip_run"/>
@@ -59,13 +28,12 @@ action = records.action_export_payrun_excel()
         </field>
     </record>
 
-    <!-- 4. Server Action to Re-freeze Audit Snapshot for Managers -->
+    <!-- 3. Server Action to Re-freeze Audit Snapshot (Action Menu) -->
     <record id="action_payrun_refreeze_audit_server" model="ir.actions.server">
         <field name="name">Re-freeze Audit Snapshot</field>
         <field name="model_id" ref="hr_payroll.model_hr_payslip_run"/>
         <field name="binding_model_id" ref="hr_payroll.model_hr_payslip_run"/>
         <field name="binding_view_types">form</field>
-        <field name="groups_id" eval="[(4, ref('hr_payroll.group_hr_payroll_manager'))]"/>
         <field name="state">code</field>
         <field name="code">
 action = records.action_regenerate_audit_snapshot()

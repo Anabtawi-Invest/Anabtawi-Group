@@ -41,14 +41,17 @@ class HrPayslipRun(models.Model):
             if not run.slip_ids:
                 continue
             if force or not run.audit_file:
-                content = run._generate_payrun_xlsx()
-                period_str = run.date_start.strftime("%Y%m") if run.date_start else ""
-                fname = f"PayRun_Audit_{period_str or run.name or 'Report'}.xlsx"
-                run.sudo().write({
-                    "audit_file": base64.b64encode(content),
-                    "audit_filename": fname,
-                    "audit_file_generated_at": fields.Datetime.now(),
-                })
+                try:
+                    content = run._generate_payrun_xlsx()
+                    period_str = run.date_start.strftime("%Y%m") if run.date_start else ""
+                    fname = f"PayRun_Audit_{period_str or run.name or 'Report'}.xlsx"
+                    run.sudo().write({
+                        "audit_file": base64.b64encode(content),
+                        "audit_filename": fname,
+                        "audit_file_generated_at": fields.Datetime.now(),
+                    })
+                except Exception:
+                    pass
 
     def write(self, vals):
         res = super().write(vals)
@@ -57,11 +60,14 @@ class HrPayslipRun(models.Model):
             if target_state in ("paid", "close"):
                 self._freeze_payrun_audit()
             elif target_state in ("draft", "verify"):
-                self.sudo().write({
-                    "audit_file": False,
-                    "audit_filename": False,
-                    "audit_file_generated_at": False,
-                })
+                try:
+                    self.sudo().write({
+                        "audit_file": False,
+                        "audit_filename": False,
+                        "audit_file_generated_at": False,
+                    })
+                except Exception:
+                    pass
         return res
 
     def action_paid(self):
@@ -619,7 +625,7 @@ class HrPayslipRun(models.Model):
                     or (getattr(payslip, "version_id", False) and payslip.version_id.department_id)
                     or (emp and emp.department_id)
                 )
-                dept_val = hist_dept.name if hist_dept else "N/A"
+                dept_val = (hist_dept.sudo().name if hist_dept else False) or "N/A"
                 if not hist_dept:
                     issues.append(_("Missing Department"))
 
@@ -628,7 +634,7 @@ class HrPayslipRun(models.Model):
                     or (getattr(payslip, "version_id", False) and payslip.version_id.job_id)
                     or (emp and emp.job_id)
                 )
-                job_val = hist_job.name if hist_job else "N/A"
+                job_val = (hist_job.sudo().name if hist_job else False) or "N/A"
                 code_val = emp_id_val
 
                 period_from_val = format_date(self.env, payslip.date_from or self.date_start)
