@@ -8,23 +8,20 @@
             </div>
             <div t-elif="!state.expenses.length" class="text-center text-muted p-4">
                 <i class="fa fa-check-circle fa-2x text-success d-block mb-2"/>
-                There are no refused expenses.
+                <t t-esc="labels.empty"/>
             </div>
             <t t-else="">
-                <div class="alert alert-warning">
-                    These expenses were refused and are still counted in the expense balance.
-                    Return the money (Cash In) or edit the expense and send it again for approval.
-                </div>
+                <div class="alert alert-warning" t-esc="labels.warning"/>
                 <table class="table table-sm align-middle">
                     <thead>
                         <tr>
                             <th/>
-                            <th>Reference</th>
-                            <th>Type</th>
-                            <th>Date</th>
-                            <th>Cashier</th>
-                            <th>Refuse Reason</th>
-                            <th class="text-end">Amount</th>
+                            <th t-esc="labels.reference"/>
+                            <th t-esc="labels.type"/>
+                            <th t-esc="labels.date"/>
+                            <th t-esc="labels.cashier"/>
+                            <th t-esc="labels.refuseReason"/>
+                            <th class="text-end" t-esc="labels.amount"/>
                             <th/>
                         </tr>
                     </thead>
@@ -37,9 +34,8 @@
                             </td>
                             <td class="fw-bold">
                                 <t t-esc="expense.name"/>
-                                <div t-if="expense.resubmit_count" class="small text-muted">
-                                    Resent <t t-esc="expense.resubmit_count"/>x
-                                </div>
+                                <div t-if="expense.resubmit_count" class="small text-muted"
+                                     t-esc="resentLabel(expense.resubmit_count)"/>
                             </td>
                             <td t-esc="expense.type"/>
                             <td t-esc="formatDate(expense.date)"/>
@@ -48,17 +44,17 @@
                             <td class="text-end fw-bold" t-esc="format(expense.amount)"/>
                             <td class="text-end text-nowrap">
                                 <button class="btn btn-secondary me-1" t-on-click="() => this.onClickEdit(expense)">
-                                    <i class="fa fa-pencil me-1"/>Edit &amp; Resend
+                                    <i class="fa fa-pencil me-1"/><t t-esc="labels.editResend"/>
                                 </button>
                                 <button class="btn btn-primary" t-on-click="() => this.onClickReturn(expense)">
-                                    <i class="fa fa-undo me-1"/>Return
+                                    <i class="fa fa-undo me-1"/><t t-esc="labels.return"/>
                                 </button>
                             </td>
                         </tr>
                     </tbody>
                     <tfoot>
                         <tr>
-                            <td colspan="6" class="text-end fw-bold">Total</td>
+                            <td colspan="6" class="text-end fw-bold" t-esc="labels.total"/>
                             <td class="text-end fw-bold" t-esc="format(total)"/>
                             <td/>
                         </tr>
@@ -66,7 +62,7 @@
                 </table>
             </t>
             <t t-set-slot="footer">
-                <button class="btn btn-secondary btn-lg" t-on-click="props.close">Close</button>
+                <button class="btn btn-secondary btn-lg" t-on-click="props.close" t-esc="labels.close"/>
             </t>
         </Dialog>
     </t>

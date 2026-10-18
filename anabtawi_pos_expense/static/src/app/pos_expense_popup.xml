@@ -8,16 +8,16 @@
             </div>
             <t t-else="">
                 <div t-if="isEdit" class="alert alert-danger mb-3">
-                    <strong>Refuse reason:</strong> <t t-esc="props.expense.refuse_reason"/>
+                    <strong t-esc="labels.refuseReason"/> <t t-esc="props.expense.refuse_reason"/>
                 </div>
                 <div class="d-flex gap-3 mb-3">
                     <div class="flex-fill border rounded p-2 text-center">
-                        <div class="text-muted small">Limit</div>
+                        <div class="text-muted small" t-esc="labels.limit"/>
                         <div class="fs-4 fw-bold" t-esc="format(state.limit)"/>
                     </div>
                     <div class="flex-fill border rounded p-2 text-center"
                          t-att-class="state.available > 0 ? 'border-success' : 'border-danger'">
-                        <div class="text-muted small">Available</div>
+                        <div class="text-muted small" t-esc="labels.available"/>
                         <div class="fs-4 fw-bold" t-att-class="state.available > 0 ? 'text-success' : 'text-danger'"
                              t-esc="format(state.available)"/>
                     </div>
@@ -26,60 +26,55 @@
                 <div class="row g-3">
                     <div class="col-md-6 d-flex flex-column gap-3">
                         <div>
-                            <label class="form-label fw-bold" for="pos_expense_type">Expense Type</label>
+                            <label class="form-label fw-bold" for="pos_expense_type" t-esc="labels.expenseType"/>
                             <select id="pos_expense_type" class="form-select form-select-lg" t-model="state.typeId">
-                                <option value="">Select an expense type...</option>
+                                <option value="" t-esc="labels.selectType"/>
                                 <t t-foreach="state.types" t-as="expenseType" t-key="expenseType.id">
                                     <option t-att-value="expenseType.id" t-esc="expenseType.name"/>
                                 </t>
                             </select>
-                            <div t-if="!state.types.length" class="text-danger small mt-1">
-                                No expense types are configured for this POS.
-                            </div>
+                            <div t-if="!state.types.length" class="text-danger small mt-1" t-esc="labels.noTypes"/>
                         </div>
                         <div>
-                            <label class="form-label fw-bold" for="pos_expense_amount">Amount</label>
+                            <label class="form-label fw-bold" for="pos_expense_amount" t-esc="labels.amount"/>
                             <input id="pos_expense_amount" type="number" inputmode="decimal" min="0" step="any"
                                    class="form-control form-control-lg"
                                    t-att-class="exceedsAvailable ? 'is-invalid' : ''"
                                    t-model="state.amount"/>
-                            <div t-if="exceedsAvailable" class="invalid-feedback d-block">
-                                The amount exceeds the available balance (maximum <t t-esc="format(maxAmount)"/>).
-                            </div>
+                            <div t-if="exceedsAvailable" class="invalid-feedback d-block" t-esc="labels.exceeds"/>
                             <div t-elif="isEdit and amountDifference > 0.0001" class="small text-danger mt-1">
-                                <i class="fa fa-arrow-up me-1"/>A Cash Out of <t t-esc="format(amountDifference)"/> will be made.
+                                <i class="fa fa-arrow-up me-1"/><t t-esc="labels.cashOutDiff"/>
                             </div>
                             <div t-elif="isEdit and amountDifference &lt; -0.0001" class="small text-success mt-1">
-                                <i class="fa fa-arrow-down me-1"/>A Cash In of <t t-esc="format(-amountDifference)"/> will be made.
+                                <i class="fa fa-arrow-down me-1"/><t t-esc="labels.cashInDiff"/>
                             </div>
                         </div>
                     </div>
 
                     <div class="col-md-6">
-                        <label class="form-label fw-bold">Receipt Photo</label>
+                        <label class="form-label fw-bold" t-esc="labels.receiptPhoto"/>
                         <div class="d-flex gap-3 align-items-center border rounded p-2">
                             <div class="text-center">
                                 <img t-if="state.upload?.qr_image"
                                      t-att-src="'data:image/png;base64,' + state.upload.qr_image"
                                      style="width: 140px; height: 140px;" alt="QR"/>
-                                <div class="small text-muted">Scan to upload</div>
+                                <div class="small text-muted" t-esc="labels.scanToUpload"/>
                             </div>
                             <div class="flex-fill text-center">
                                 <t t-if="state.upload?.image_thumbnail">
                                     <img t-att-src="'data:image/png;base64,' + state.upload.image_thumbnail"
                                          class="img-fluid rounded border" style="max-height: 160px;" alt="Receipt"/>
-                                    <div t-if="isEdit" class="small text-success">New photo</div>
+                                    <div t-if="isEdit" class="small text-success" t-esc="labels.newPhoto"/>
                                 </t>
-                                <div t-elif="state.upload and !state.upload.is_valid" class="text-danger small">
-                                    The upload link expired. Close and open the popup again.
-                                </div>
+                                <div t-elif="state.upload and !state.upload.is_valid" class="text-danger small"
+                                     t-esc="labels.uploadExpired"/>
                                 <t t-elif="isEdit and props.expense.image_thumbnail">
                                     <img t-att-src="'data:image/png;base64,' + props.expense.image_thumbnail"
                                          class="img-fluid rounded border" style="max-height: 160px;" alt="Receipt"/>
-                                    <div class="small text-muted">Current photo. Scan the QR to replace it (optional).</div>
+                                    <div class="small text-muted" t-esc="labels.currentPhotoHint"/>
                                 </t>
                                 <div t-else="" class="text-muted small">
-                                    <i class="fa fa-spinner fa-spin me-1"/>Waiting for the photo...
+                                    <i class="fa fa-spinner fa-spin me-1"/><t t-esc="labels.waitingPhoto"/>
                                 </div>
                             </div>
                         </div>
@@ -88,12 +83,9 @@
             </t>
             <t t-set-slot="footer">
                 <button class="btn btn-primary btn-lg" t-att-disabled="!isValid" t-on-click="confirm">
-                    <t t-if="isEdit">Resend for Approval</t>
-                    <t t-else="">Confirm</t>
+                    <t t-esc="isEdit ? labels.resend : labels.confirm"/>
                 </button>
-                <button class="btn btn-secondary btn-lg" t-on-click="props.close">
-                    Discard
-                </button>
+                <button class="btn btn-secondary btn-lg" t-on-click="props.close" t-esc="labels.discard"/>
             </t>
         </Dialog>
     </t>

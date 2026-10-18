@@ -102,6 +102,33 @@ export class PosExpensePopup extends Component {
         return this.isEdit ? _t("Edit & Resend %s", this.props.expense.name) : _t("Expense");
     }
 
+    get labels() {
+        return {
+            refuseReason: _t("Refuse reason:"),
+            limit: _t("Limit"),
+            available: _t("Available"),
+            expenseType: _t("Expense Type"),
+            selectType: _t("Select an expense type..."),
+            noTypes: _t("No expense types are configured for this POS."),
+            amount: _t("Amount"),
+            exceeds: _t(
+                "The amount exceeds the available balance (maximum %s).",
+                this.format(this.maxAmount)
+            ),
+            cashOutDiff: _t("A Cash Out of %s will be made.", this.format(this.amountDifference)),
+            cashInDiff: _t("A Cash In of %s will be made.", this.format(-this.amountDifference)),
+            receiptPhoto: _t("Receipt Photo"),
+            scanToUpload: _t("Scan to upload"),
+            newPhoto: _t("New photo"),
+            uploadExpired: _t("The upload link expired. Close and open the popup again."),
+            currentPhotoHint: _t("Current photo. Scan the QR to replace it (optional)."),
+            waitingPhoto: _t("Waiting for the photo..."),
+            resend: _t("Resend for Approval"),
+            confirm: _t("Confirm"),
+            discard: _t("Discard"),
+        };
+    }
+
     get maxAmount() {
         // A refused expense is still counted in the balance, so its own amount is available again.
         return this.state.available + (this.props.expense?.amount || 0);

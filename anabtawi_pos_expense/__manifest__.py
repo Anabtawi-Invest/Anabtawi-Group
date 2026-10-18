@@ -1,7 +1,7 @@
 {
     "name": "Anabtawi POS Expenses",
     "summary": "Petty-cash expenses from the POS with a revolving limit, receipt photo and approval",
-    "version": "19.0.1.3.0",
+    "version": "19.0.1.3.1",
     "category": "Point of Sale",
     "author": "Anabtawi Group",
     "license": "LGPL-3",

@@ -1,0 +1,844 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# 	* anabtawi_pos_expense
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 19.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-18 00:00+0000\n"
+"PO-Revision-Date: 2026-10-18 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: Arabic\n"
+"Language: ar\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=6; plural=n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 ? 4 : 5;\n"
+
+#. module: anabtawi_pos_expense
+#. odoo-javascript
+#: code:addons/anabtawi_pos_expense/static/src/app/control_buttons.js:0
+#: code:addons/anabtawi_pos_expense/static/src/app/pos_expense_popup.js:0
+msgid "Expense"
+msgstr "مصروف"
+
+#. module: anabtawi_pos_expense
+#. odoo-javascript
+#: code:addons/anabtawi_pos_expense/static/src/app/control_buttons.js:0
+#: code:addons/anabtawi_pos_expense/static/src/app/refused_expenses_popup.xml:0
+msgid "Refused Expenses"
+msgstr "المصروفات المرفوضة"
+
+#. module: anabtawi_pos_expense
+#. odoo-javascript
+#: code:addons/anabtawi_pos_expense/static/src/app/pos_expense_popup.js:0
+msgid "Edit & Resend %s"
+msgstr "تعديل وإعادة إرسال %s"
+
+#. module: anabtawi_pos_expense
+#. odoo-javascript
+#: code:addons/anabtawi_pos_expense/static/src/app/pos_expense_popup.js:0
+msgid "Refuse reason:"
+msgstr "سبب الرفض:"
+
+#. module: anabtawi_pos_expense
+#. odoo-javascript
+#: code:addons/anabtawi_pos_expense/static/src/app/pos_expense_popup.js:0
+msgid "Limit"
+msgstr "الحد"
+
+#. module: anabtawi_pos_expense
+#. odoo-javascript
+#: code:addons/anabtawi_pos_expense/static/src/app/pos_expense_popup.js:0
+msgid "Available"
+msgstr "المتاح"
+
+#. module: anabtawi_pos_expense
+#. odoo-javascript
+#: code:addons/anabtawi_pos_expense/static/src/app/pos_expense_popup.js:0
+#: model:ir.model.fields,field_description:anabtawi_pos_expense.field_pos_expense__type_id
+#: model:ir.model.fields,field_description:anabtawi_pos_expense.field_pos_expense_type__name
+msgid "Expense Type"
+msgstr "نوع المصروف"
+
+#. module: anabtawi_pos_expense
+#. odoo-javascript
+#: code:addons/anabtawi_pos_expense/static/src/app/pos_expense_popup.js:0
+msgid "Select an expense type..."
+msgstr "اختر نوع المصروف..."
+
+#. module: anabtawi_pos_expense
+#. odoo-javascript
+#: code:addons/anabtawi_pos_expense/static/src/app/pos_expense_popup.js:0
+msgid "No expense types are configured for this POS."
+msgstr "لا توجد أنواع مصروفات مُعدّة لنقطة البيع هذه."
+
+#. module: anabtawi_pos_expense
+#. odoo-javascript
+#: code:addons/anabtawi_pos_expense/static/src/app/pos_expense_popup.js:0
+#: code:addons/anabtawi_pos_expense/static/src/app/refused_expenses_popup.js:0
+#: model:ir.model.fields,field_description:anabtawi_pos_expense.field_pos_expense__amount
+msgid "Amount"
+msgstr "المبلغ"
+
+#. module: anabtawi_pos_expense
+#. odoo-javascript
+#: code:addons/anabtawi_pos_expense/static/src/app/pos_expense_popup.js:0
+msgid "The amount exceeds the available balance (maximum %s)."
+msgstr "المبلغ يتجاوز الرصيد المتاح (الحد الأقصى %s)."
+
+#. module: anabtawi_pos_expense
+#. odoo-javascript
+#: code:addons/anabtawi_pos_expense/static/src/app/pos_expense_popup.js:0
+msgid "A Cash Out of %s will be made."
+msgstr "سيتم عمل إخراج نقدي بمبلغ %s."
+
+#. module: anabtawi_pos_expense
+#. odoo-javascript
+#: code:addons/anabtawi_pos_expense/static/src/app/pos_expense_popup.js:0
+msgid "A Cash In of %s will be made."
+msgstr "سيتم عمل إدخال نقدي بمبلغ %s."
+
+#. module: anabtawi_pos_expense
+#. odoo-javascript
+#: code:addons/anabtawi_pos_expense/static/src/app/pos_expense_popup.js:0
+#: model:ir.model.fields,field_description:anabtawi_pos_expense.field_pos_expense__image
+msgid "Receipt Photo"
+msgstr "صورة الإيصال"
+
+#. module: anabtawi_pos_expense
+#. odoo-javascript
+#: code:addons/anabtawi_pos_expense/static/src/app/pos_expense_popup.js:0
+msgid "Scan to upload"
+msgstr "امسح للرفع"
+
+#. module: anabtawi_pos_expense
+#. odoo-javascript
+#: code:addons/anabtawi_pos_expense/static/src/app/pos_expense_popup.js:0
+msgid "New photo"
+msgstr "صورة جديدة"
+
+#. module: anabtawi_pos_expense
+#. odoo-javascript
+#: code:addons/anabtawi_pos_expense/static/src/app/pos_expense_popup.js:0
+msgid "The upload link expired. Close and open the popup again."
+msgstr "انتهت صلاحية رابط الرفع. أغلق النافذة وافتحها مرة أخرى."
+
+#. module: anabtawi_pos_expense
+#. odoo-javascript
+#: code:addons/anabtawi_pos_expense/static/src/app/pos_expense_popup.js:0
+msgid "Current photo. Scan the QR to replace it (optional)."
+msgstr "الصورة الحالية. امسح رمز QR لاستبدالها (اختياري)."
+
+#. module: anabtawi_pos_expense
+#. odoo-javascript
+#: code:addons/anabtawi_pos_expense/static/src/app/pos_expense_popup.js:0
+msgid "Waiting for the photo..."
+msgstr "بانتظار الصورة..."
+
+#. module: anabtawi_pos_expense
+#. odoo-javascript
+#: code:addons/anabtawi_pos_expense/static/src/app/pos_expense_popup.js:0
+msgid "Resend for Approval"
+msgstr "إعادة الإرسال للموافقة"
+
+#. module: anabtawi_pos_expense
+#. odoo-javascript
+#: code:addons/anabtawi_pos_expense/static/src/app/pos_expense_popup.js:0
+msgid "Confirm"
+msgstr "تأكيد"
+
+#. module: anabtawi_pos_expense
+#. odoo-javascript
+#: code:addons/anabtawi_pos_expense/static/src/app/pos_expense_popup.js:0
+msgid "Discard"
+msgstr "تجاهل"
+
+#. module: anabtawi_pos_expense
+#. odoo-javascript
+#: code:addons/anabtawi_pos_expense/static/src/app/pos_expense_popup.js:0
+msgid "Could not load expense data."
+msgstr "تعذّر تحميل بيانات المصروف."
+
+#. module: anabtawi_pos_expense
+#. odoo-javascript
+#: code:addons/anabtawi_pos_expense/static/src/app/pos_expense_popup.js:0
+msgid "Could not save the expense."
+msgstr "تعذّر حفظ المصروف."
+
+#. module: anabtawi_pos_expense
+#. odoo-javascript
+#: code:addons/anabtawi_pos_expense/static/src/app/pos_expense_popup.js:0
+msgid "Could not resend the expense."
+msgstr "تعذّر إعادة إرسال المصروف."
+
+#. module: anabtawi_pos_expense
+#. odoo-javascript
+#: code:addons/anabtawi_pos_expense/static/src/app/pos_expense_popup.js:0
+msgid "Expense %(name)s saved. Cash out of %(amount)s done."
+msgstr "تم حفظ المصروف %(name)s. تم إخراج نقدي بمبلغ %(amount)s."
+
+#. module: anabtawi_pos_expense
+#. odoo-javascript
+#: code:addons/anabtawi_pos_expense/static/src/app/pos_expense_popup.js:0
+msgid "%(original)s resent for approval as %(name)s."
+msgstr "تمت إعادة إرسال %(original)s للموافقة باسم %(name)s."
+
+#. module: anabtawi_pos_expense
+#. odoo-javascript
+#: code:addons/anabtawi_pos_expense/static/src/app/pos_expense_popup.js:0
+msgid "%(original)s resent for approval as %(name)s. Cash out of %(amount)s done."
+msgstr "تمت إعادة إرسال %(original)s للموافقة باسم %(name)s. تم إخراج نقدي بمبلغ %(amount)s."
+
+#. module: anabtawi_pos_expense
+#. odoo-javascript
+#: code:addons/anabtawi_pos_expense/static/src/app/pos_expense_popup.js:0
+msgid "%(original)s resent for approval as %(name)s. Cash in of %(amount)s done."
+msgstr "تمت إعادة إرسال %(original)s للموافقة باسم %(name)s. تم إدخال نقدي بمبلغ %(amount)s."
+
+#. module: anabtawi_pos_expense
+#. odoo-javascript
+#: code:addons/anabtawi_pos_expense/static/src/app/refused_expenses_popup.js:0
+msgid "There are no refused expenses."
+msgstr "لا توجد مصروفات مرفوضة."
+
+#. module: anabtawi_pos_expense
+#. odoo-javascript
+#: code:addons/anabtawi_pos_expense/static/src/app/refused_expenses_popup.js:0
+msgid "These expenses were refused and are still counted in the expense balance. Return the money (Cash In) or edit the expense and send it again for approval."
+msgstr "هذه المصروفات مرفوضة وما زالت محسوبة ضمن رصيد المصروفات. أعد المبلغ (إدخال نقدي) أو عدّل المصروف وأعد إرساله للموافقة."
+
+#. module: anabtawi_pos_expense
+#. odoo-javascript
+#: code:addons/anabtawi_pos_expense/static/src/app/refused_expenses_popup.js:0
+#: model:ir.model.fields,field_description:anabtawi_pos_expense.field_pos_expense__name
+msgid "Reference"
+msgstr "المرجع"
+
+#. module: anabtawi_pos_expense
+#. odoo-javascript
+#: code:addons/anabtawi_pos_expense/static/src/app/refused_expenses_popup.js:0
+msgid "Type"
+msgstr "النوع"
+
+#. module: anabtawi_pos_expense
+#. odoo-javascript
+#: code:addons/anabtawi_pos_expense/static/src/app/refused_expenses_popup.js:0
+#: model:ir.model.fields,field_description:anabtawi_pos_expense.field_pos_expense__date
+msgid "Date"
+msgstr "التاريخ"
+
+#. module: anabtawi_pos_expense
+#. odoo-javascript
+#: code:addons/anabtawi_pos_expense/static/src/app/refused_expenses_popup.js:0
+#: model:ir.model.fields,field_description:anabtawi_pos_expense.field_pos_expense__cashier_name
+msgid "Cashier"
+msgstr "أمين الصندوق"
+
+#. module: anabtawi_pos_expense
+#. odoo-javascript
+#: code:addons/anabtawi_pos_expense/static/src/app/refused_expenses_popup.js:0
+#: model:ir.model.fields,field_description:anabtawi_pos_expense.field_pos_expense__refuse_reason
+msgid "Refuse Reason"
+msgstr "سبب الرفض"
+
+#. module: anabtawi_pos_expense
+#. odoo-javascript
+#: code:addons/anabtawi_pos_expense/static/src/app/refused_expenses_popup.js:0
+msgid "Edit & Resend"
+msgstr "تعديل وإعادة إرسال"
+
+#. module: anabtawi_pos_expense
+#. odoo-javascript
+#: code:addons/anabtawi_pos_expense/static/src/app/refused_expenses_popup.js:0
+msgid "Return"
+msgstr "إرجاع"
+
+#. module: anabtawi_pos_expense
+#. odoo-javascript
+#: code:addons/anabtawi_pos_expense/static/src/app/refused_expenses_popup.js:0
+msgid "Total"
+msgstr "المجموع"
+
+#. module: anabtawi_pos_expense
+#. odoo-javascript
+#: code:addons/anabtawi_pos_expense/static/src/app/refused_expenses_popup.js:0
+msgid "Close"
+msgstr "إغلاق"
+
+#. module: anabtawi_pos_expense
+#. odoo-javascript
+#: code:addons/anabtawi_pos_expense/static/src/app/refused_expenses_popup.js:0
+msgid "Resent %sx"
+msgstr "أُعيد إرساله %s×"
+
+#. module: anabtawi_pos_expense
+#. odoo-javascript
+#: code:addons/anabtawi_pos_expense/static/src/app/refused_expenses_popup.js:0
+msgid "Could not load refused expenses."
+msgstr "تعذّر تحميل المصروفات المرفوضة."
+
+#. module: anabtawi_pos_expense
+#. odoo-javascript
+#: code:addons/anabtawi_pos_expense/static/src/app/refused_expenses_popup.js:0
+msgid "Return expense %s"
+msgstr "إرجاع المصروف %s"
+
+#. module: anabtawi_pos_expense
+#. odoo-javascript
+#: code:addons/anabtawi_pos_expense/static/src/app/refused_expenses_popup.js:0
+msgid "Put %s back in the cash drawer? A Cash In will be registered in this session."
+msgstr "إعادة %s إلى درج النقد؟ سيتم تسجيل إدخال نقدي في هذه الجلسة."
+
+#. module: anabtawi_pos_expense
+#. odoo-javascript
+#: code:addons/anabtawi_pos_expense/static/src/app/refused_expenses_popup.js:0
+msgid "Could not return the expense."
+msgstr "تعذّر إرجاع المصروف."
+
+#. module: anabtawi_pos_expense
+#. odoo-javascript
+#: code:addons/anabtawi_pos_expense/static/src/app/refused_expenses_popup.js:0
+msgid "Expense %(name)s returned. Cash in of %(amount)s done."
+msgstr "تم إرجاع المصروف %(name)s. تم إدخال نقدي بمبلغ %(amount)s."
+
+#. module: anabtawi_pos_expense
+#. odoo-javascript
+#: code:addons/anabtawi_pos_expense/static/src/app/pos_store.js:0
+msgid "%(count)s refused expense(s) waiting (%(total)s). Use Actions > Refused Expenses to return or resend them."
+msgstr "%(count)s مصروف/مصروفات مرفوضة بانتظار المعالجة (%(total)s). استخدم الإجراءات ← المصروفات المرفوضة لإرجاعها أو إعادة إرسالها."
+
+#. module: anabtawi_pos_expense
+#. odoo-javascript
+#: code:addons/anabtawi_pos_expense/static/src/app/utils.js:0
+#: code:addons/anabtawi_pos_expense/models/pos_session.py:0
+msgid "in"
+msgstr "إدخال"
+
+#. module: anabtawi_pos_expense
+#. odoo-javascript
+#: code:addons/anabtawi_pos_expense/static/src/app/utils.js:0
+#: code:addons/anabtawi_pos_expense/models/pos_session.py:0
+msgid "out"
+msgstr "إخراج"
+
+#. module: anabtawi_pos_expense
+#: model:ir.model,name:anabtawi_pos_expense.model_pos_expense
+#: model_terms:ir.ui.view,arch_db:anabtawi_pos_expense.view_pos_expense_form
+msgid "POS Expense"
+msgstr "مصروف نقطة البيع"
+
+#. module: anabtawi_pos_expense
+#: model:ir.actions.act_window,name:anabtawi_pos_expense.action_pos_expense
+#: model:ir.ui.menu,name:anabtawi_pos_expense.menu_pos_expense
+#: model_terms:ir.ui.view,arch_db:anabtawi_pos_expense.view_pos_expense_list
+msgid "POS Expenses"
+msgstr "مصروفات نقطة البيع"
+
+#. module: anabtawi_pos_expense
+#: model:ir.model,name:anabtawi_pos_expense.model_pos_expense_type
+msgid "POS Expense Type"
+msgstr "نوع مصروف نقطة البيع"
+
+#. module: anabtawi_pos_expense
+#: model:ir.actions.act_window,name:anabtawi_pos_expense.action_pos_expense_type
+#: model:ir.ui.menu,name:anabtawi_pos_expense.menu_pos_expense_type
+#: model_terms:ir.ui.view,arch_db:anabtawi_pos_expense.view_pos_expense_type_list
+msgid "Expense Types"
+msgstr "أنواع المصروفات"
+
+#. module: anabtawi_pos_expense
+#: model:ir.model,name:anabtawi_pos_expense.model_pos_expense_upload
+msgid "POS Expense Receipt Upload"
+msgstr "رفع إيصال مصروف نقطة البيع"
+
+#. module: anabtawi_pos_expense
+#: model:ir.model.fields,field_description:anabtawi_pos_expense.field_pos_config__expense_limit
+#: model:ir.model.fields,field_description:anabtawi_pos_expense.field_res_config_settings__pos_expense_limit
+#: model_terms:ir.ui.view,arch_db:anabtawi_pos_expense.res_config_settings_view_form_pos_expense
+msgid "Expense Limit"
+msgstr "حد المصروفات"
+
+#. module: anabtawi_pos_expense
+#: model:ir.model.fields,help:anabtawi_pos_expense.field_pos_config__expense_limit
+msgid "Maximum total of open POS expenses. Each expense reduces the available balance until it is approved, or, if refused, until the money is returned or the expense is resent (then the resent expense takes its place). Set to 0 to hide the Expense buttons."
+msgstr "الحد الأقصى لمجموع مصروفات نقطة البيع المفتوحة. كل مصروف يقلّل الرصيد المتاح حتى تتم الموافقة عليه، أو عند الرفض حتى يُعاد المبلغ أو يُعاد إرسال المصروف (فيحلّ المصروف الجديد محله). اضبطه على 0 لإخفاء أزرار المصروف."
+
+#. module: anabtawi_pos_expense
+#: model_terms:ir.ui.view,arch_db:anabtawi_pos_expense.res_config_settings_view_form_pos_expense
+msgid "Maximum total of open POS expenses. Each expense reduces the balance until it is approved, or until it is returned if refused. 0 hides the Expense buttons."
+msgstr "الحد الأقصى لمجموع مصروفات نقطة البيع المفتوحة. كل مصروف يقلّل الرصيد حتى تتم الموافقة عليه، أو حتى إرجاعه إذا رُفض. 0 يخفي أزرار المصروف."
+
+#. module: anabtawi_pos_expense
+#: model_terms:ir.ui.view,arch_db:anabtawi_pos_expense.res_config_settings_view_form_pos_expense
+msgid "Open (to approve + refused):"
+msgstr "المفتوح (بانتظار الموافقة + مرفوض):"
+
+#. module: anabtawi_pos_expense
+#: model_terms:ir.ui.view,arch_db:anabtawi_pos_expense.res_config_settings_view_form_pos_expense
+msgid "- Available:"
+msgstr "- المتاح:"
+
+#. module: anabtawi_pos_expense
+#: model:ir.model.fields,field_description:anabtawi_pos_expense.field_pos_config__expense_pending_amount
+#: model:ir.model.fields,field_description:anabtawi_pos_expense.field_res_config_settings__pos_expense_pending_amount
+msgid "Open Expenses (To Approve + Refused)"
+msgstr "المصروفات المفتوحة (بانتظار الموافقة + مرفوضة)"
+
+#. module: anabtawi_pos_expense
+#: model:ir.model.fields,field_description:anabtawi_pos_expense.field_pos_config__expense_available_amount
+#: model:ir.model.fields,field_description:anabtawi_pos_expense.field_res_config_settings__pos_expense_available_amount
+msgid "Available Expense Balance"
+msgstr "رصيد المصروفات المتاح"
+
+#. module: anabtawi_pos_expense
+#: model:ir.model.fields,field_description:anabtawi_pos_expense.field_pos_expense__config_id
+#: model:ir.model.fields,field_description:anabtawi_pos_expense.field_pos_expense_type__pos_config_ids
+#: model_terms:ir.ui.view,arch_db:anabtawi_pos_expense.view_pos_expense_search
+msgid "Point of Sale"
+msgstr "نقطة البيع"
+
+#. module: anabtawi_pos_expense
+#: model:ir.model.fields,field_description:anabtawi_pos_expense.field_pos_expense__session_id
+msgid "Session"
+msgstr "الجلسة"
+
+#. module: anabtawi_pos_expense
+#: model:ir.model.fields,field_description:anabtawi_pos_expense.field_pos_expense__user_id
+msgid "User"
+msgstr "المستخدم"
+
+#. module: anabtawi_pos_expense
+#: model:ir.model.fields,field_description:anabtawi_pos_expense.field_pos_expense__image_256
+msgid "Receipt Thumbnail"
+msgstr "مصغّر الإيصال"
+
+#. module: anabtawi_pos_expense
+#: model:ir.model.fields,field_description:anabtawi_pos_expense.field_pos_expense__state
+#: model_terms:ir.ui.view,arch_db:anabtawi_pos_expense.view_pos_expense_search
+msgid "Status"
+msgstr "الحالة"
+
+#. module: anabtawi_pos_expense
+#: model:ir.model.fields.selection,name:anabtawi_pos_expense.selection__pos_expense__state__to_approve
+#: model_terms:ir.ui.view,arch_db:anabtawi_pos_expense.view_pos_expense_search
+msgid "To Approve"
+msgstr "بانتظار الموافقة"
+
+#. module: anabtawi_pos_expense
+#: model:ir.model.fields.selection,name:anabtawi_pos_expense.selection__pos_expense__state__approved
+#: model_terms:ir.ui.view,arch_db:anabtawi_pos_expense.view_pos_expense_search
+msgid "Approved"
+msgstr "موافق عليه"
+
+#. module: anabtawi_pos_expense
+#: model:ir.model.fields.selection,name:anabtawi_pos_expense.selection__pos_expense__state__refused
+#: model_terms:ir.ui.view,arch_db:anabtawi_pos_expense.view_pos_expense_form
+msgid "Refused"
+msgstr "مرفوض"
+
+#. module: anabtawi_pos_expense
+#: model:ir.model.fields.selection,name:anabtawi_pos_expense.selection__pos_expense__state__resent
+#: model_terms:ir.ui.view,arch_db:anabtawi_pos_expense.view_pos_expense_search
+msgid "Resent"
+msgstr "أُعيد إرساله"
+
+#. module: anabtawi_pos_expense
+#: model:ir.model.fields.selection,name:anabtawi_pos_expense.selection__pos_expense__state__returned
+#: model_terms:ir.ui.view,arch_db:anabtawi_pos_expense.view_pos_expense_form
+#: model_terms:ir.ui.view,arch_db:anabtawi_pos_expense.view_pos_expense_search
+msgid "Returned"
+msgstr "مُرجع"
+
+#. module: anabtawi_pos_expense
+#: model_terms:ir.ui.view,arch_db:anabtawi_pos_expense.view_pos_expense_search
+msgid "Refused (not returned)"
+msgstr "مرفوض (غير مُرجع)"
+
+#. module: anabtawi_pos_expense
+#: model:ir.model.fields,field_description:anabtawi_pos_expense.field_pos_expense__statement_line_id
+msgid "Cash Out"
+msgstr "إخراج نقدي"
+
+#. module: anabtawi_pos_expense
+#: model:ir.model.fields,field_description:anabtawi_pos_expense.field_pos_expense__move_id
+msgid "Journal Entry"
+msgstr "قيد يومية"
+
+#. module: anabtawi_pos_expense
+#: model:ir.model.fields,field_description:anabtawi_pos_expense.field_pos_expense__chain_move_ids
+#: model_terms:ir.ui.view,arch_db:anabtawi_pos_expense.view_pos_expense_form
+msgid "Journal Entries"
+msgstr "قيود اليومية"
+
+#. module: anabtawi_pos_expense
+#: model:ir.model.fields,field_description:anabtawi_pos_expense.field_pos_expense__decided_by_id
+msgid "Approved/Refused By"
+msgstr "وافق/رفض بواسطة"
+
+#. module: anabtawi_pos_expense
+#: model:ir.model.fields,field_description:anabtawi_pos_expense.field_pos_expense__decision_date
+msgid "Approval/Refusal Date"
+msgstr "تاريخ الموافقة/الرفض"
+
+#. module: anabtawi_pos_expense
+#: model:ir.model.fields,field_description:anabtawi_pos_expense.field_pos_expense__resubmit_count
+msgid "Resubmitted"
+msgstr "أُعيد تقديمه"
+
+#. module: anabtawi_pos_expense
+#: model:ir.model.fields,field_description:anabtawi_pos_expense.field_pos_expense__adjustment_statement_line_ids
+msgid "Amount Adjustments"
+msgstr "تعديلات المبلغ"
+
+#. module: anabtawi_pos_expense
+#: model:ir.model.fields,field_description:anabtawi_pos_expense.field_pos_expense__return_session_id
+msgid "Returned in Session"
+msgstr "أُرجع في الجلسة"
+
+#. module: anabtawi_pos_expense
+#: model:ir.model.fields,field_description:anabtawi_pos_expense.field_pos_expense__return_cashier_name
+msgid "Returned By"
+msgstr "أُرجع بواسطة"
+
+#. module: anabtawi_pos_expense
+#: model:ir.model.fields,field_description:anabtawi_pos_expense.field_pos_expense__return_date
+msgid "Return Date"
+msgstr "تاريخ الإرجاع"
+
+#. module: anabtawi_pos_expense
+#: model:ir.model.fields,field_description:anabtawi_pos_expense.field_pos_expense__return_statement_line_id
+msgid "Cash In (Return)"
+msgstr "إدخال نقدي (إرجاع)"
+
+#. module: anabtawi_pos_expense
+#: model:ir.model.fields,field_description:anabtawi_pos_expense.field_pos_expense__return_move_id
+msgid "Return Journal Entry"
+msgstr "قيد إرجاع اليومية"
+
+#. module: anabtawi_pos_expense
+#: model:ir.model.fields,field_description:anabtawi_pos_expense.field_pos_expense__original_expense_id
+#: model_terms:ir.ui.view,arch_db:anabtawi_pos_expense.view_pos_expense_form
+msgid "Original Expense"
+msgstr "المصروف الأصلي"
+
+#. module: anabtawi_pos_expense
+#: model:ir.model.fields,field_description:anabtawi_pos_expense.field_pos_expense__resent_expense_ids
+#: code:addons/anabtawi_pos_expense/models/pos_expense.py:0
+#: model_terms:ir.ui.view,arch_db:anabtawi_pos_expense.view_pos_expense_form
+msgid "Resent As"
+msgstr "أُعيد كـ"
+
+#. module: anabtawi_pos_expense
+#: model:ir.model.fields,help:anabtawi_pos_expense.field_pos_expense__original_expense_id
+msgid "The refused expense this one was resent from."
+msgstr "المصروف المرفوض الذي أُعيد إرسال هذا منه."
+
+#. module: anabtawi_pos_expense
+#: model:ir.model.fields,help:anabtawi_pos_expense.field_pos_expense__chain_move_ids
+msgid "Cash out, adjustments and return entries of this expense and of all its resent versions."
+msgstr "قيود الإخراج النقدي والتعديلات والإرجاع لهذا المصروف وجميع نسخه المعاد إرسالها."
+
+#. module: anabtawi_pos_expense
+#: model:ir.model.fields,field_description:anabtawi_pos_expense.field_pos_expense_upload__image_256
+msgid "Thumbnail"
+msgstr "مصغّر"
+
+#. module: anabtawi_pos_expense
+#: model:ir.model.fields,help:anabtawi_pos_expense.field_pos_expense_type__pos_config_ids
+msgid "Leave empty to make this expense type available in all Points of Sale."
+msgstr "اتركه فارغاً ليكون نوع المصروف متاحاً في جميع نقاط البيع."
+
+#. module: anabtawi_pos_expense
+#: model_terms:ir.ui.view,arch_db:anabtawi_pos_expense.view_pos_expense_form
+msgid "Approve"
+msgstr "موافقة"
+
+#. module: anabtawi_pos_expense
+#: model_terms:ir.ui.view,arch_db:anabtawi_pos_expense.view_pos_expense_form
+msgid "Refuse"
+msgstr "رفض"
+
+#. module: anabtawi_pos_expense
+#: model_terms:ir.ui.view,arch_db:anabtawi_pos_expense.view_pos_expense_form
+msgid "The amount stays reserved in the expense balance until the cashier returns it (Cash In) or edits and resends the expense from the POS. Continue?"
+msgstr "سيبقى المبلغ محجوزاً في رصيد المصروفات حتى يعيده أمين الصندوق (إدخال نقدي) أو يعدّل المصروف ويعيد إرساله من نقطة البيع. متابعة؟"
+
+#. module: anabtawi_pos_expense
+#: model_terms:ir.ui.view,arch_db:anabtawi_pos_expense.view_pos_expense_form
+msgid "This expense was refused. The cashier can return the amount or edit and resend it from the POS (Actions → Refused Expenses). Until then it stays in the expense balance."
+msgstr "تم رفض هذا المصروف. يمكن لأمين الصندوق إرجاع المبلغ أو تعديله وإعادة إرساله من نقطة البيع (الإجراءات ← المصروفات المرفوضة). حتى ذلك الحين يبقى ضمن رصيد المصروفات."
+
+#. module: anabtawi_pos_expense
+#: model_terms:ir.ui.view,arch_db:anabtawi_pos_expense.view_pos_expense_form
+msgid "This expense was refused and resent from the POS as a new expense (see Resent As)."
+msgstr "تم رفض هذا المصروف وإعادة إرساله من نقطة البيع كمصروف جديد (انظر أُعيد كـ)."
+
+#. module: anabtawi_pos_expense
+#: model_terms:ir.ui.view,arch_db:anabtawi_pos_expense.view_pos_expense_form
+msgid "Required to refuse"
+msgstr "مطلوب للرفض"
+
+#. module: anabtawi_pos_expense
+#: model_terms:ir.ui.view,arch_db:anabtawi_pos_expense.view_pos_expense_type_list
+msgid "All"
+msgstr "الكل"
+
+#. module: anabtawi_pos_expense
+#: model_terms:ir.ui.view,arch_db:anabtawi_pos_expense.view_pos_expense_type_search
+msgid "Archived"
+msgstr "مؤرشف"
+
+#. module: anabtawi_pos_expense
+#: model_terms:ir.actions.act_window,help:anabtawi_pos_expense.action_pos_expense_type
+msgid "Create an expense type"
+msgstr "إنشاء نوع مصروف"
+
+#. module: anabtawi_pos_expense
+#: model_terms:ir.actions.act_window,help:anabtawi_pos_expense.action_pos_expense_type
+msgid "Expense types are selected by the cashier in the POS Expense popup."
+msgstr "يختار أمين الصندوق أنواع المصروفات من نافذة المصروف في نقطة البيع."
+
+#. module: anabtawi_pos_expense
+#: model_terms:ir.actions.act_window,help:anabtawi_pos_expense.action_pos_expense
+msgid "No POS expenses yet"
+msgstr "لا توجد مصروفات نقطة بيع بعد"
+
+#. module: anabtawi_pos_expense
+#: model_terms:ir.actions.act_window,help:anabtawi_pos_expense.action_pos_expense
+msgid "Expenses are created by cashiers from the Expense button in the POS."
+msgstr "يُنشئ أمناء الصندوق المصروفات من زر المصروف في نقطة البيع."
+
+#. module: anabtawi_pos_expense
+#. odoo-python
+#: code:addons/anabtawi_pos_expense/models/pos_expense.py:0
+msgid "New"
+msgstr "جديد"
+
+#. module: anabtawi_pos_expense
+#. odoo-python
+#: code:addons/anabtawi_pos_expense/models/pos_expense.py:0
+msgid "Only Point of Sale managers can approve or refuse expenses."
+msgstr "يمكن لمديري نقطة البيع فقط الموافقة على المصروفات أو رفضها."
+
+#. module: anabtawi_pos_expense
+#. odoo-python
+#: code:addons/anabtawi_pos_expense/models/pos_expense.py:0
+msgid "Only expenses waiting for approval can be approved or refused."
+msgstr "يمكن الموافقة أو الرفض فقط للمصروفات بانتظار الموافقة."
+
+#. module: anabtawi_pos_expense
+#. odoo-python
+#: code:addons/anabtawi_pos_expense/models/pos_expense.py:0
+msgid "Please fill the Refuse Reason before refusing: %s"
+msgstr "يرجى تعبئة سبب الرفض قبل الرفض: %s"
+
+#. module: anabtawi_pos_expense
+#. odoo-python
+#: code:addons/anabtawi_pos_expense/models/pos_expense.py:0
+msgid "Journal Entries of %s"
+msgstr "قيود اليومية لـ %s"
+
+#. module: anabtawi_pos_expense
+#. odoo-python
+#: code:addons/anabtawi_pos_expense/models/pos_session.py:0
+msgid "The receipt photo upload was not found. Please close the popup and try again."
+msgstr "لم يتم العثور على رفع صورة الإيصال. أغلق النافذة وحاول مرة أخرى."
+
+#. module: anabtawi_pos_expense
+#. odoo-python
+#: code:addons/anabtawi_pos_expense/models/pos_session.py:0
+msgid "The POS session must be open to register an expense."
+msgstr "يجب أن تكون جلسة نقطة البيع مفتوحة لتسجيل مصروف."
+
+#. module: anabtawi_pos_expense
+#. odoo-python
+#: code:addons/anabtawi_pos_expense/models/pos_session.py:0
+msgid "There is no cash payment method for this POS session."
+msgstr "لا توجد طريقة دفع نقدي لهذه الجلسة."
+
+#. module: anabtawi_pos_expense
+#. odoo-python
+#: code:addons/anabtawi_pos_expense/models/pos_session.py:0
+msgid "Please select a valid expense type."
+msgstr "يرجى اختيار نوع مصروف صالح."
+
+#. module: anabtawi_pos_expense
+#. odoo-python
+#: code:addons/anabtawi_pos_expense/models/pos_session.py:0
+msgid "The expense amount must be greater than zero."
+msgstr "يجب أن يكون مبلغ المصروف أكبر من صفر."
+
+#. module: anabtawi_pos_expense
+#. odoo-python
+#: code:addons/anabtawi_pos_expense/models/pos_session.py:0
+msgid "The amount exceeds the available expense balance (maximum %(max)s)."
+msgstr "المبلغ يتجاوز رصيد المصروفات المتاح (الحد الأقصى %(max)s)."
+
+#. module: anabtawi_pos_expense
+#. odoo-python
+#: code:addons/anabtawi_pos_expense/models/pos_session.py:0
+msgid "This expense does not belong to this Point of Sale."
+msgstr "هذا المصروف لا ينتمي إلى نقطة البيع هذه."
+
+#. module: anabtawi_pos_expense
+#. odoo-python
+#: code:addons/anabtawi_pos_expense/models/pos_session.py:0
+msgid "Expense %s is not refused anymore. Please reload the list."
+msgstr "المصروف %s لم يعد مرفوضاً. يرجى إعادة تحميل القائمة."
+
+#. module: anabtawi_pos_expense
+#. odoo-python
+#: code:addons/anabtawi_pos_expense/models/pos_session.py:0
+msgid "Please upload the receipt photo first."
+msgstr "يرجى رفع صورة الإيصال أولاً."
+
+#. module: anabtawi_pos_expense
+#. odoo-python
+#: code:addons/anabtawi_pos_expense/models/pos_session.py:0
+msgid "%(name)s - Return - %(type)s"
+msgstr "%(name)s - إرجاع - %(type)s"
+
+#. module: anabtawi_pos_expense
+#. odoo-python
+#: code:addons/anabtawi_pos_expense/models/pos_session.py:0
+msgid "%(name)s - Adjustment of %(original)s - %(type)s"
+msgstr "%(name)s - تعديل لـ %(original)s - %(type)s"
+
+#. module: anabtawi_pos_expense
+#. odoo-python
+#: code:addons/anabtawi_pos_expense/models/pos_session.py:0
+msgid "Refuse reason of %(name)s: %(reason)s"
+msgstr "سبب رفض %(name)s: %(reason)s"
+
+#. module: anabtawi_pos_expense
+#. odoo-python
+#: code:addons/anabtawi_pos_expense/models/pos_session.py:0
+msgid "Type: %(old)s → %(new)s"
+msgstr "النوع: %(old)s ← %(new)s"
+
+#. module: anabtawi_pos_expense
+#. odoo-python
+#: code:addons/anabtawi_pos_expense/models/pos_session.py:0
+msgid "Amount: %(old)s → %(new)s (Cash %(direction)s of %(diff)s in %(session)s)"
+msgstr "المبلغ: %(old)s ← %(new)s (نقد %(direction)s بمبلغ %(diff)s في %(session)s)"
+
+#. module: anabtawi_pos_expense
+#. odoo-python
+#: code:addons/anabtawi_pos_expense/models/pos_session.py:0
+msgid "New receipt photo uploaded."
+msgstr "تم رفع صورة إيصال جديدة."
+
+#. module: anabtawi_pos_expense
+#. odoo-python
+#: code:addons/anabtawi_pos_expense/models/pos_session.py:0
+msgid "Resent from %(original)s by %(cashier)s"
+msgstr "أُعيد إرساله من %(original)s بواسطة %(cashier)s"
+
+#. module: anabtawi_pos_expense
+#. odoo-python
+#: code:addons/anabtawi_pos_expense/models/pos_session.py:0
+msgid "Resent from the POS by %(cashier)s as %(expense)s"
+msgstr "أُعيد إرساله من نقطة البيع بواسطة %(cashier)s باسم %(expense)s"
+
+#. module: anabtawi_pos_expense
+#. odoo-python
+#: code:addons/anabtawi_pos_expense/models/pos_expense_upload.py:0
+msgid "This upload link has expired."
+msgstr "انتهت صلاحية رابط الرفع."
+
+#. module: anabtawi_pos_expense
+#. odoo-python
+#: code:addons/anabtawi_pos_expense/models/pos_expense_upload.py:0
+#: code:addons/anabtawi_pos_expense/controllers/main.py:0
+msgid "Please select a photo."
+msgstr "يرجى اختيار صورة."
+
+#. module: anabtawi_pos_expense
+#. odoo-python
+#: code:addons/anabtawi_pos_expense/models/pos_expense_upload.py:0
+msgid "The selected file is empty."
+msgstr "الملف المحدد فارغ."
+
+#. module: anabtawi_pos_expense
+#. odoo-python
+#: code:addons/anabtawi_pos_expense/models/pos_expense_upload.py:0
+msgid "The photo is too large. Maximum size is 8 MB."
+msgstr "الصورة كبيرة جداً. الحجم الأقصى 8 ميغابايت."
+
+#. module: anabtawi_pos_expense
+#. odoo-python
+#: code:addons/anabtawi_pos_expense/models/pos_expense_upload.py:0
+msgid "Please upload a JPG, PNG, WEBP or GIF photo."
+msgstr "يرجى رفع صورة بصيغة JPG أو PNG أو WEBP أو GIF."
+
+#. module: anabtawi_pos_expense
+#. odoo-python
+#: code:addons/anabtawi_pos_expense/models/pos_expense_upload.py:0
+msgid "The selected file is not a valid image."
+msgstr "الملف المحدد ليس صورة صالحة."
+
+#. module: anabtawi_pos_expense
+#. odoo-python
+#: code:addons/anabtawi_pos_expense/models/pos_expense_upload.py:0
+msgid "The upload token must be unique."
+msgstr "يجب أن يكون رمز الرفع فريداً."
+
+#. module: anabtawi_pos_expense
+#. odoo-python
+#: code:addons/anabtawi_pos_expense/controllers/main.py:0
+msgid "Expense Receipt Photo"
+msgstr "صورة إيصال المصروف"
+
+#. module: anabtawi_pos_expense
+#. odoo-python
+#: code:addons/anabtawi_pos_expense/controllers/main.py:0
+msgid "Take a photo of the expense receipt and upload it. It will appear on the cashier screen."
+msgstr "التقط صورة لإيصال المصروف وارفعها. ستظهر على شاشة أمين الصندوق."
+
+#. module: anabtawi_pos_expense
+#. odoo-python
+#: code:addons/anabtawi_pos_expense/controllers/main.py:0
+msgid "Take / choose photo"
+msgstr "التقاط / اختيار صورة"
+
+#. module: anabtawi_pos_expense
+#. odoo-python
+#: code:addons/anabtawi_pos_expense/controllers/main.py:0
+msgid "Upload"
+msgstr "رفع"
+
+#. module: anabtawi_pos_expense
+#. odoo-python
+#: code:addons/anabtawi_pos_expense/controllers/main.py:0
+msgid "Uploading again replaces the current photo."
+msgstr "الرفع مرة أخرى يستبدل الصورة الحالية."
+
+#. module: anabtawi_pos_expense
+#. odoo-python
+#: code:addons/anabtawi_pos_expense/controllers/main.py:0
+msgid "Photo uploaded. You can go back to the cashier screen."
+msgstr "تم رفع الصورة. يمكنك العودة إلى شاشة أمين الصندوق."
+
+#. module: anabtawi_pos_expense
+#. odoo-python
+#: code:addons/anabtawi_pos_expense/controllers/main.py:0
+msgid "This upload link has expired or is not valid. Open the Expense popup again on the POS."
+msgstr "انتهت صلاحية رابط الرفع أو أنه غير صالح. افتح نافذة المصروف مرة أخرى في نقطة البيع."
+
+#. module: anabtawi_pos_expense
+#. odoo-python
+#: code:addons/anabtawi_pos_expense/controllers/main.py:0
+msgid "JPG, PNG, WEBP or GIF. Maximum 8 MB."
+msgstr "JPG أو PNG أو WEBP أو GIF. الحد الأقصى 8 ميغابايت."
+
+#. module: anabtawi_pos_expense
+#: model:ir.module.module,shortdesc:anabtawi_pos_expense.module_meta_information
+msgid "Anabtawi POS Expenses"
+msgstr "مصروفات نقطة البيع - عنبتاوي"
+
+#. module: anabtawi_pos_expense
+#: model:ir.module.module,summary:anabtawi_pos_expense.module_meta_information
+msgid "Petty-cash expenses from the POS with a revolving limit, receipt photo and approval"
+msgstr "مصروفات الصندوق الصغير من نقطة البيع بحدّ متجدد وصورة إيصال وموافقة"

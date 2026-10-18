@@ -51,6 +51,29 @@ export class RefusedExpensesPopup extends Component {
         return this.state.expenses.reduce((sum, expense) => sum + expense.amount, 0);
     }
 
+    get labels() {
+        return {
+            empty: _t("There are no refused expenses."),
+            warning: _t(
+                "These expenses were refused and are still counted in the expense balance. Return the money (Cash In) or edit the expense and send it again for approval."
+            ),
+            reference: _t("Reference"),
+            type: _t("Type"),
+            date: _t("Date"),
+            cashier: _t("Cashier"),
+            refuseReason: _t("Refuse Reason"),
+            amount: _t("Amount"),
+            editResend: _t("Edit & Resend"),
+            return: _t("Return"),
+            total: _t("Total"),
+            close: _t("Close"),
+        };
+    }
+
+    resentLabel(count) {
+        return _t("Resent %sx", count);
+    }
+
     onClickEdit(expense) {
         this.dialog.add(PosExpensePopup, {
             expense,
