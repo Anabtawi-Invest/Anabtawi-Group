@@ -20,37 +20,39 @@ class HrPayslipRun(models.Model):
     @api.model
     def _get_employee_bank_account(self, emp):
         """Safely finds the employee's bank account across all standard Odoo configurations."""
+        emp_sudo = emp.sudo()
         # 1. Direct field on hr.employee
         for b_field in ('bank_account_id', 'bank_account_ids', 'partner_bank_id'):
-            if b_field in emp._fields:
-                val = getattr(emp, b_field, False)
+            if b_field in emp_sudo._fields:
+                val = getattr(emp_sudo, b_field, False)
                 if val:
-                    return val[0] if hasattr(val, '__getitem__') else val
+                    res = val[0] if hasattr(val, '__getitem__') else val
+                    return res.sudo() if res else False
 
         # 2. Related partner / home address / private address / work contact
         for p_field in ('address_home_id', 'work_contact_id', 'user_partner_id', 'partner_id'):
-            if p_field in emp._fields:
-                partner = getattr(emp, p_field, False)
+            if p_field in emp_sudo._fields:
+                partner = getattr(emp_sudo, p_field, False)
                 if partner and getattr(partner, 'bank_ids', False):
-                    return partner.bank_ids[0]
+                    return partner.sudo().bank_ids[0].sudo()
 
         # 3. Direct search on res.partner.bank
         if 'res.partner.bank' in self.env:
             BankModel = self.env['res.partner.bank'].sudo()
-            partner_ids = [getattr(emp, f).id for f in ('address_home_id', 'work_contact_id', 'partner_id')
-                           if f in emp._fields and getattr(emp, f, False)]
+            partner_ids = [getattr(emp_sudo, f).id for f in ('address_home_id', 'work_contact_id', 'partner_id')
+                           if f in emp_sudo._fields and getattr(emp_sudo, f, False)]
             if partner_ids:
                 found = BankModel.search([('partner_id', 'in', partner_ids)], limit=1)
                 if found:
-                    return found
+                    return found.sudo()
             if 'employee_id' in BankModel._fields:
-                found = BankModel.search([('employee_id', '=', emp.id)], limit=1)
+                found = BankModel.search([('employee_id', '=', emp_sudo.id)], limit=1)
                 if found:
-                    return found
+                    return found.sudo()
             elif 'employee_ids' in BankModel._fields:
-                found = BankModel.search([('employee_ids', 'in', [emp.id])], limit=1)
+                found = BankModel.search([('employee_ids', 'in', [emp_sudo.id])], limit=1)
                 if found:
-                    return found
+                    return found.sudo()
         return False
 
     def action_export_bank_xlsx(self):
@@ -122,7 +124,7 @@ class HrPayslipRun(models.Model):
 
         # Exact 11 columns matching 'Banks Payroll List' format WITHOUT header row
         for r, (slip, net_amount) in enumerate(exportable):
-            emp = slip.employee_id
+            emp = slip.sudo().employee_id
             bank = self._get_employee_bank_account(emp)
 
             # Col 0: Internal Transfer (LBT / BT)

@@ -26,6 +26,7 @@ class PfrAdvanceWizard(models.TransientModel):
     _name = 'pfr.advance.wizard'
     _description = 'Payroll Fix Recon - Mid-month Advance'
 
+    company_id = fields.Many2one('res.company', string="Company", default=lambda self: self.env.company, required=True)
     date_cutoff = fields.Date(string="Cut-off Date", required=True,
                               default=lambda self: fields.Date.context_today(self).replace(day=15))
     month_start = fields.Date(string="Month Start", compute='_compute_month_start')
@@ -312,8 +313,16 @@ class PfrAdvanceWizard(models.TransientModel):
         if not self.date_cutoff:
             raise UserError(_("Choose a cut-off date."))
         d_from, d_to = self.date_cutoff.replace(day=1), self.date_cutoff
-        domain = [('active', '=', True)]
-        employees = self.employee_ids or self.env['hr.employee'].search(domain)
+        company = self.company_id or self.env.company
+        if self.employee_ids:
+            employees = self.employee_ids
+            if company:
+                employees = employees.filtered(lambda e: not e.company_id or e.company_id == company)
+        else:
+            domain = [('active', '=', True)]
+            if company:
+                domain.append(('company_id', '=', company.id))
+            employees = self.env['hr.employee'].search(domain)
         employees = employees.filtered(lambda e: (e.wage or 0.0) > 0)
         if not employees:
             raise UserError(_("No employee with a wage found."))
@@ -624,13 +633,14 @@ class PfrAdvanceWizard(models.TransientModel):
         audit = []
         row = r0
         for line in lines:
-            emp = line.employee_id
+            emp = line.sudo().employee_id
             number = getattr(emp, 'employee_number', False) or getattr(emp, 'registration_number', False)
             emp_id = number or getattr(emp, 'barcode', False) or str(emp.id)
-            dept = emp.department_id.name or "N/A"
-            name = emp.legal_name or emp.name
+            dept = (emp.department_id.sudo().name if emp.department_id else False) or "N/A"
+            name = emp.sudo().legal_name or emp.sudo().name or "N/A"
+            job_title = (emp.job_id.sudo().name if emp.job_id else False) or "N/A"
             gross_earned = ((line.paid_days or 0.0) + (line.absent_days or 0.0)) * (line.daily_wage or 0.0)
-            vals = [emp_id, name, dept, emp.job_id.name or "N/A", line.wage, line.daily_wage,
+            vals = [emp_id, name, dept, job_title, line.wage, line.daily_wage,
                     line.worked_days, line.rest_days, line.absent_days,
                     line.sick_leave_days, line.annual_leave_days, line.other_paid_leave_days,
                     line.annual_leave_balance, line.extra_hours_balance, line.paid_leave_balance,
@@ -883,37 +893,39 @@ class PfrAdvanceWizard(models.TransientModel):
     @api.model
     def _get_employee_bank_account(self, emp):
         """Safely finds the employee's bank account across all standard Odoo configurations."""
+        emp_sudo = emp.sudo()
         # 1. Direct field on hr.employee
         for b_field in ('bank_account_id', 'bank_account_ids', 'partner_bank_id'):
-            if b_field in emp._fields:
-                val = getattr(emp, b_field, False)
+            if b_field in emp_sudo._fields:
+                val = getattr(emp_sudo, b_field, False)
                 if val:
-                    return val[0] if hasattr(val, '__getitem__') else val
+                    res = val[0] if hasattr(val, '__getitem__') else val
+                    return res.sudo() if res else False
 
         # 2. Related partner / home address / private address / work contact
         for p_field in ('address_home_id', 'work_contact_id', 'user_partner_id', 'partner_id'):
-            if p_field in emp._fields:
-                partner = getattr(emp, p_field, False)
+            if p_field in emp_sudo._fields:
+                partner = getattr(emp_sudo, p_field, False)
                 if partner and getattr(partner, 'bank_ids', False):
-                    return partner.bank_ids[0]
+                    return partner.sudo().bank_ids[0].sudo()
 
         # 3. Direct search on res.partner.bank
         if 'res.partner.bank' in self.env:
             BankModel = self.env['res.partner.bank'].sudo()
-            partner_ids = [getattr(emp, f).id for f in ('address_home_id', 'work_contact_id', 'partner_id')
-                           if f in emp._fields and getattr(emp, f, False)]
+            partner_ids = [getattr(emp_sudo, f).id for f in ('address_home_id', 'work_contact_id', 'partner_id')
+                           if f in emp_sudo._fields and getattr(emp_sudo, f, False)]
             if partner_ids:
                 found = BankModel.search([('partner_id', 'in', partner_ids)], limit=1)
                 if found:
-                    return found
+                    return found.sudo()
             if 'employee_id' in BankModel._fields:
-                found = BankModel.search([('employee_id', '=', emp.id)], limit=1)
+                found = BankModel.search([('employee_id', '=', emp_sudo.id)], limit=1)
                 if found:
-                    return found
+                    return found.sudo()
             elif 'employee_ids' in BankModel._fields:
-                found = BankModel.search([('employee_ids', 'in', [emp.id])], limit=1)
+                found = BankModel.search([('employee_ids', 'in', [emp_sudo.id])], limit=1)
                 if found:
-                    return found
+                    return found.sudo()
         return False
 
     def action_export_bank_xlsx(self):
@@ -940,24 +952,25 @@ class PfrAdvanceWizard(models.TransientModel):
             sh.set_column(c, c, w)
 
         # Company Arab Bank Account Number (defaults to 0126046919500 as in the example sheet)
+        company = self.company_id or self.env.company
         company_bank_acc = '0126046919500'
         f_account_no = self._employee_field_by_label('Bank Account Number')
-        if self.env.company.partner_id.bank_ids:
-            for b in self.env.company.partner_id.bank_ids:
+        if company.partner_id.sudo().bank_ids:
+            for b in company.partner_id.sudo().bank_ids:
                 if b.acc_number:
                     company_bank_acc = str(b.acc_number).replace(' ', '')
                     break
 
         transfer_date_str = (self.date_cutoff or fields.Date.today()).strftime('%d/%m/%Y')
         desc_str = f"SALARY ADVANCE {self.date_cutoff.strftime('%m %Y')}" if self.date_cutoff else "SALARY ADVANCE"
-        company_currency = self.env.company.currency_id.name or 'JOD'
+        company_currency = company.currency_id.name or 'JOD'
 
         # Text format for preserving codes and amounts accurately
         text_fmt = wb.add_format({'num_format': '@'})
 
         # Exact 11 columns matching 'Banks Payroll List' format WITHOUT header row
         for r, line in enumerate(lines):
-            emp = line.employee_id
+            emp = line.sudo().employee_id
             bank = self._get_employee_bank_account(emp)
 
             # Col 0: Internal Transfer (LBT / BT)
