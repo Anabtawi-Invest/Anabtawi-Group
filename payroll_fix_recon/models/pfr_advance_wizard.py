@@ -6,6 +6,7 @@ Confirming creates a One Time Salary Adjustment per employee that the month-end 
 (Company loan input). Nothing is written to payslips or leave balances."""
 import base64
 import calendar
+from datetime import datetime, time
 import io
 
 from odoo import _, api, fields, models
@@ -13,6 +14,11 @@ from odoo.exceptions import UserError
 from odoo.tools.misc import format_date
 
 from . import pfr_utils as U
+
+try:
+    import openpyxl
+except ImportError:
+    openpyxl = None
 
 
 class PfrAdvanceWizard(models.TransientModel):
@@ -33,6 +39,8 @@ class PfrAdvanceWizard(models.TransientModel):
     line_ids = fields.One2many('pfr.advance.wizard.line', 'wizard_id', string="Preview")
     state = fields.Selection([('draft', 'Draft'), ('calculated', 'Calculated'), ('done', 'Done')], default='draft')
     total_advance = fields.Float(string="Total Advance", compute='_compute_total')
+    excel_file = fields.Binary(string="Excel File", help="Upload the updated Excel sheet with adjusted advance amounts.")
+    file_name = fields.Char(string="File Name")
 
     @api.model
     def _default_input_type(self):
@@ -91,16 +99,104 @@ class PfrAdvanceWizard(models.TransientModel):
                 for emp in att.employee_ids:
                     done[emp.id] = att.monthly_amount if 'monthly_amount' in att._fields else 0.0
 
+        # Preload leave balances in bulk
+        company = self.env.company
+        types = self.env['pfr.settlement'].leave_types(company)
+        annual_types = types.get('annual', self.env['hr.leave.type'])
+        extra_types = types.get('extra', self.env['hr.leave.type'])
+        pto_types = types.get('pto', self.env['hr.leave.type'])
+
+        emp_ids = employees.ids
+        all_type_ids = list((annual_types | extra_types | pto_types).ids)
+        bal_hours = self.env['pfr.settlement'].balance_hours(emp_ids, all_type_ids)
+
         lines = [(5, 0, 0)]
         for emp in employees:
             L, earned, deduction, paid_days, daily = self._earned_to_date(emp, d_from, d_to)
             advance = round(earned * self.advance_percent / 100.0, 3)
             exists = emp.id in done
+
+            # Audit: Leaves taken in period (up to cut-off)
+            sick_days = float(L.count('SICK'))
+            annual_days = 0.0
+            other_paid_days = 0.0
+            for d, bucket in L.days.items():
+                if bucket == 'TRAVEL':
+                    other_paid_days += 1.0
+                elif isinstance(bucket, tuple) and bucket[0] == 'TYPE':
+                    wet = L.kind_types.get(bucket)
+                    w_name = (wet.name or '').lower() if wet else ''
+                    w_code = (wet.code or '').lower() if wet else ''
+                    if any(n in w_name or n in w_code for n in ('annual', 'سنوي')):
+                        annual_days += 1.0
+                    elif wet and getattr(wet, 'pfr_pay_percent', 100.0) == 0:
+                        pass
+                    else:
+                        other_paid_days += 1.0
+
+            # Cross-check with hr.leave for annual leaves taken in period
+            if annual_days == 0 and annual_types and 'hr.leave' in self.env:
+                ann_leaves = self.env['hr.leave'].sudo().search([
+                    ('employee_id', '=', emp.id),
+                    ('state', 'in', ['validate', 'validate1']),
+                    ('holiday_status_id', 'in', annual_types.ids),
+                    ('date_from', '<=', datetime.combine(d_to, time.max)),
+                    ('date_to', '>=', datetime.combine(d_from, time.min)),
+                    '!', ('name', 'ilike', 'Lateness Settlement')
+                ])
+                for al in ann_leaves:
+                    l_from = max(al.request_date_from or U.local_date(al.date_from, emp._pfr_tz()), d_from)
+                    l_to = min(al.request_date_to or U.local_date(al.date_to, emp._pfr_tz()), d_to)
+                    annual_days = max(annual_days, float((l_to - l_from).days + 1))
+
+            # Audit: Current Balances
+            # 1. Annual Leave balance (days)
+            ann_hrs = sum(bal_hours.get((emp.id, t.id), 0.0) for t in annual_types)
+            ann_bal = round(ann_hrs / U.DAILY_HOURS, 2)
+            for ltype in annual_types:
+                try:
+                    data, _ = emp._get_consumed_leaves(ltype, target_date=d_to)
+                    content = data.get(emp, {}).get(ltype, {})
+                    v = content.get('virtual_remaining_leaves') or content.get('remaining_leaves')
+                    if v is not None:
+                        ann_bal = float(v)
+                        break
+                except Exception:
+                    pass
+
+            # 2. Extra Hours balance (hours)
+            extra_bal = 0.0
+            for fname in ('extra_hours_balance', 'total_extra_hours', 'total_overtime', 'overtime_balance'):
+                if fname in emp._fields and getattr(emp, fname, False):
+                    extra_bal = float(getattr(emp, fname) or 0.0)
+                    break
+            if not extra_bal and extra_types:
+                extra_bal = sum(bal_hours.get((emp.id, t.id), 0.0) for t in extra_types)
+            if not extra_bal and 'hr.attendance.overtime.line' in self.env:
+                lines_ot = self.env['hr.attendance.overtime.line'].sudo().search([
+                    ('employee_id', '=', emp.id), ('compensable_as_leave', '=', True), ('status', '=', 'approved'),
+                    ('date', '<=', d_to)
+                ])
+                extra_bal = sum(lines_ot.mapped('duration'))
+
+            # 3. Paid Leave balance (days)
+            if 'remaining_leaves' in emp._fields and emp.remaining_leaves:
+                paid_bal = float(emp.remaining_leaves)
+            else:
+                total_paid_hrs = sum(bal_hours.get((emp.id, t_id), 0.0) for t_id in all_type_ids)
+                paid_bal = max(ann_bal, round(total_paid_hrs / U.DAILY_HOURS, 2))
+
             lines.append((0, 0, {
                 'employee_id': emp.id,
                 'worked_days': float(L.count('WORK') + L.count('PHD')),
                 'rest_days': float(L.count('REST')),
                 'absent_days': float(L.count('ABSENT')),
+                'sick_leave_days': round(sick_days, 2),
+                'annual_leave_days': round(annual_days, 2),
+                'other_paid_leave_days': round(other_paid_days, 2),
+                'annual_leave_balance': round(ann_bal, 2),
+                'extra_hours_balance': round(extra_bal, 2),
+                'paid_leave_balance': round(paid_bal, 2),
                 'wage': emp.wage,
                 'daily_wage': round(daily, 3),
                 'paid_days': paid_days,
@@ -203,6 +299,8 @@ class PfrAdvanceWizard(models.TransientModel):
                               'align': 'center', 'valign': 'vcenter', 'text_wrap': True, 'font_size': 10})
         head_alw = wb.add_format({'bold': True, 'font_color': '#375623', 'bg_color': '#E2EFDA', 'border': 1,
                                   'align': 'center', 'valign': 'vcenter', 'font_size': 11})
+        head_bal = wb.add_format({'bold': True, 'font_color': '#203764', 'bg_color': '#D9E1F2', 'border': 1,
+                                  'align': 'center', 'valign': 'vcenter', 'font_size': 11})
         head_ded = wb.add_format({'bold': True, 'font_color': '#FFFFFF', 'bg_color': '#C00000', 'border': 1,
                                   'align': 'center', 'valign': 'vcenter', 'font_size': 11})
         head_comp = wb.add_format({'bold': True, 'font_color': '#FFFFFF', 'bg_color': '#203764', 'border': 1,
@@ -250,12 +348,17 @@ class PfrAdvanceWizard(models.TransientModel):
 
         info = [(_("Employee ID"), 14), (_("Employee Name"), 28), (_("Department"), 22),
                 (_("Job Title / Position"), 22), (_("Monthly Wage"), 14), (_("Daily Wage"), 12)]
-        days = [(_("Worked Days"), 12), (_("Rest Days"), 11), (_("Absent Days"), 12), (_("Paid Days"), 11)]
-        earn = [(_("Gross (Paid + Absent Days)"), 16)]
-        ded = [(_("Absent Deduction"), 16)]
+        att = [(_("Attendance Days"), 15), (_("Rest Days"), 11), (_("Absent Days"), 12)]
+        lves = [(_("Sick Leave (Days)"), 15), (_("Annual Leave (Days)"), 16), (_("Other Paid Leaves"), 16)]
+        bals = [(_("Annual Leave Bal (Days)"), 20), (_("Extra Hours Bal (Hrs)"), 20), (_("Paid Leave Bal (Days)"), 20)]
+        earn = [(_("Paid Days"), 11), (_("Gross (Paid + Absent)"), 18), (_("Absent Deduction"), 16)]
         adv = [(_("Earned to Date"), 14), (_("Advance"), 14), (_("Included"), 10), (_("Note"), 34)]
-        groups = [(_("EMPLOYEE"), info, head), (_("ATTENDANCE"), days, head), (_("EARNINGS"), earn, head_alw),
-                  (_("DEDUCTIONS"), ded, head_ded), (_("ADVANCE"), adv, head_comp)]
+        groups = [(_("EMPLOYEE"), info, head),
+                  (_("ATTENDANCE & ABSENCE"), att, head),
+                  (_("LEAVES IN PERIOD"), lves, head_alw),
+                  (_("BALANCES"), bals, head_bal),
+                  (_("EARNINGS & DEDUCTIONS"), earn, head_ded),
+                  (_("ADVANCE"), adv, head_comp)]
 
         r_group, r_head, r0 = 11, 12, 13
         col = 0
@@ -282,11 +385,17 @@ class PfrAdvanceWizard(models.TransientModel):
             name = emp.legal_name or emp.name
             gross_earned = ((line.paid_days or 0.0) + (line.absent_days or 0.0)) * (line.daily_wage or 0.0)
             vals = [emp_id, name, dept, emp.job_id.name or "N/A", line.wage, line.daily_wage,
-                    line.worked_days, line.rest_days, line.absent_days, line.paid_days, gross_earned,
-                    line.deduction,
+                    line.worked_days, line.rest_days, line.absent_days,
+                    line.sick_leave_days, line.annual_leave_days, line.other_paid_leave_days,
+                    line.annual_leave_balance, line.extra_hours_balance, line.paid_leave_balance,
+                    line.paid_days, gross_earned, line.deduction,
                     line.earned, line.advance if line.selected else 0.0,
                     _("Yes") if line.selected else _("No"), line.note or ""]
-            fmts = [center, left, left, left, num, num3, num, num, num, num, num, num3,
+            fmts = [center, left, left, left, num, num3,
+                    num, num, num,
+                    num, num, num,
+                    num, num, num,
+                    num, num, num3,
                     num, num, center, left]
             for c, (v, f) in enumerate(zip(vals, fmts)):
                 if isinstance(v, (int, float)):
@@ -314,8 +423,11 @@ class PfrAdvanceWizard(models.TransientModel):
             row += 1
 
         sh.write(row, 0, _("Total"), tot_l)
-        for c in range(1, 6):
+        for c in range(1, 4):
             sh.write(row, c, "", tot_l)
+        letter_wage = xlsxwriter.utility.xl_col_to_name(4)
+        sh.write_formula(row, 4, "=SUM(%s%d:%s%d)" % (letter_wage, r0 + 1, letter_wage, row), tot_n)
+        sh.write(row, 5, "", tot_l)
         sum_to = total_cols - 2                          # numeric columns up to Advance (Included / Note are text)
         for c in range(6, total_cols):
             if c < sum_to:
@@ -348,6 +460,170 @@ class PfrAdvanceWizard(models.TransientModel):
         return buf.getvalue()
 
     # ------------------------------------------------------------------
+    # Excel Import (Offline Review & Advance Adjustment)
+    # ------------------------------------------------------------------
+    def action_import_xlsx(self):
+        """Reads uploaded Excel file, matches employees, and updates the advance amount for each."""
+        self.ensure_one()
+        if not openpyxl:
+            raise UserError(_("The 'openpyxl' Python library is required to read Excel files."))
+        if not self.excel_file:
+            raise UserError(_("Please upload an Excel file to import."))
+
+        if not self.line_ids:
+            self.action_calculate()
+
+        if not self.line_ids:
+            raise UserError(_("No employee lines available to update."))
+
+        file_content = base64.b64decode(self.excel_file)
+        try:
+            wb = openpyxl.load_workbook(io.BytesIO(file_content), data_only=True)
+        except Exception as e:
+            raise UserError(_("Failed to read Excel file: %s") % str(e))
+
+        ws = wb["Advance Audit"] if "Advance Audit" in wb.sheetnames else wb.active
+        rows = list(ws.iter_rows(values_only=True))
+        if not rows or len(rows) < 2:
+            raise UserError(_("The uploaded Excel sheet contains no data rows."))
+
+        header_row_idx = None
+        col_id_idx = None
+        col_adv_idx = None
+        col_inc_idx = None
+
+        for r_idx, r_vals in enumerate(rows[:25]):
+            if not r_vals:
+                continue
+            r_str = [str(c).strip().lower() if c is not None else '' for c in r_vals]
+            has_id = any(any(k in cell for k in ('employee id', 'employee number', 'emp id', 'code', 'badge', 'رقم الموظف', 'الرقم')) for cell in r_str)
+            has_adv = any(any(k in cell for k in ('advance', 'سلفة', 'قيمة السلفة', 'advance amount')) for cell in r_str)
+            if has_id and has_adv:
+                header_row_idx = r_idx
+                for c_idx, cell in enumerate(r_str):
+                    if any(k in cell for k in ('employee id', 'employee number', 'emp id', 'code', 'badge', 'رقم الموظف', 'الرقم')):
+                        if col_id_idx is None:
+                            col_id_idx = c_idx
+                    elif any(k in cell for k in ('advance', 'سلفة', 'قيمة السلفة', 'advance amount')):
+                        if 'earned' not in cell and 'total' not in cell:
+                            col_adv_idx = c_idx
+                    elif any(k in cell for k in ('included', 'مشمول', 'pay', 'صرف')):
+                        col_inc_idx = c_idx
+                break
+
+        if col_id_idx is None or col_adv_idx is None:
+            col_id_idx = 0
+            for r_idx in [12, 11, 10, 1, 0]:
+                if r_idx < len(rows):
+                    r_str = [str(c).strip().lower() if c is not None else '' for c in rows[r_idx]]
+                    for c_idx, cell in enumerate(r_str):
+                        if any(k in cell for k in ('advance', 'سلفة')) and 'earned' not in cell:
+                            col_adv_idx = c_idx
+                            header_row_idx = r_idx
+                            break
+                    if col_adv_idx is not None:
+                        break
+
+        if col_id_idx is None or col_adv_idx is None:
+            raise UserError(_("Could not locate 'Employee ID' and 'Advance' columns in the uploaded Excel file."))
+
+        lines_by_emp_code = {}
+        for line in self.line_ids:
+            emp = line.employee_id
+            for attr in ('employee_number', 'sb_employee_number', 'registration_number', 'barcode', 'identification_id'):
+                v = getattr(emp, attr, False)
+                if v:
+                    s = str(v).strip()
+                    lines_by_emp_code[s] = line
+                    lines_by_emp_code[s.lstrip('0')] = line
+            lines_by_emp_code[str(emp.id)] = line
+            if emp.name:
+                lines_by_emp_code[emp.name.strip().lower()] = line
+            if getattr(emp, 'legal_name', False):
+                lines_by_emp_code[emp.legal_name.strip().lower()] = line
+
+        updated_count = 0
+        unmatched_rows = []
+        data_rows = rows[(header_row_idx + 1):] if header_row_idx is not None else rows[1:]
+
+        for r_num, row in enumerate(data_rows, start=(header_row_idx + 2 if header_row_idx is not None else 2)):
+            if not row or not any(row):
+                continue
+            if col_id_idx >= len(row):
+                continue
+
+            raw_id = row[col_id_idx]
+            if raw_id is None:
+                continue
+
+            id_str = str(raw_id).strip()
+            if not id_str or id_str.lower() in ('total', 'المجموع', 'sum'):
+                continue
+            if id_str.endswith('.0'):
+                id_str = id_str[:-2]
+
+            line = lines_by_emp_code.get(id_str) or lines_by_emp_code.get(id_str.lstrip('0'))
+            if not line:
+                unmatched_rows.append(f"Row {r_num}: ID '{id_str}'")
+                continue
+
+            raw_adv = row[col_adv_idx] if col_adv_idx < len(row) else 0.0
+            try:
+                if isinstance(raw_adv, (int, float)):
+                    adv_val = float(raw_adv)
+                elif isinstance(raw_adv, str):
+                    clean_str = raw_adv.replace(',', '').replace('JOD', '').replace('JD', '').replace('$', '').strip()
+                    adv_val = float(clean_str) if clean_str else 0.0
+                else:
+                    adv_val = 0.0
+            except (ValueError, TypeError):
+                adv_val = 0.0
+
+            adv_val = max(0.0, round(adv_val, 3))
+            old_adv = line.advance
+            line.advance = adv_val
+
+            if col_inc_idx is not None and col_inc_idx < len(row):
+                inc_val = row[col_inc_idx]
+                if inc_val is not None:
+                    s_inc = str(inc_val).strip().lower()
+                    if s_inc in ('no', 'false', '0', 'لا', 'n'):
+                        line.selected = False
+                    elif s_inc in ('yes', 'true', '1', 'نعم', 'y'):
+                        line.selected = (adv_val > 0)
+                    else:
+                        line.selected = (adv_val > 0)
+                else:
+                    line.selected = (adv_val > 0)
+            else:
+                line.selected = (adv_val > 0)
+
+            if abs(old_adv - adv_val) > 0.001:
+                line.note = _("Adjusted via Excel: was %.3f -> now %.3f", old_adv, adv_val)
+
+            updated_count += 1
+
+        self._compute_total()
+
+        msg = _("Successfully updated %d employee advance records from Excel (Total Advance: %.3f JOD).") % (
+            updated_count, self.total_advance
+        )
+        if unmatched_rows:
+            msg += "\n\n" + _("Unmatched rows (%d): %s") % (len(unmatched_rows), ", ".join(unmatched_rows[:5]))
+
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _("Excel Import Completed"),
+                'message': msg,
+                'type': 'success' if updated_count > 0 else 'warning',
+                'sticky': False,
+                'next': self._reopen(),
+            },
+        }
+
+    # ------------------------------------------------------------------
     # Bank transfer file (same columns as the "Pay Slip (hr.payslip)" export)
     # ------------------------------------------------------------------
     @api.model
@@ -365,7 +641,7 @@ class PfrAdvanceWizard(models.TransientModel):
             raise UserError(_("Nothing selected."))
         data = self._build_bank_xlsx(lines)
         att = self.env['ir.attachment'].create({
-            'name': "Advance Bank Transfer %s.xlsx" % self.date_cutoff.strftime('%Y-%m-%d'),
+            'name': "Banks Advance List %s.xlsx" % self.date_cutoff.strftime('%m_%Y'),
             'datas': base64.b64encode(data), 'res_model': self._name, 'res_id': self.id,
             'mimetype': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})
         return {'type': 'ir.actions.act_url', 'url': '/web/content/%s?download=true' % att.id, 'target': 'self'}
@@ -374,38 +650,92 @@ class PfrAdvanceWizard(models.TransientModel):
         import xlsxwriter  # pylint: disable=import-outside-toplevel
         buf = io.BytesIO()
         wb = xlsxwriter.Workbook(buf, {'in_memory': True})
-        sh = wb.add_worksheet("Sheet1")
-        date_fmt = wb.add_format({'num_format': 'yyyy-mm-dd'})
-        headers = ["Employee/Primary Bank Account/Internal Transfer", "Employee/Bank Account Number",
-                   "Employee/Bank Accounts/Account Number", "Employee/Bank Accounts/Employee",
-                   "Employee/Bank Accounts/Bank Identifier Code", "From", "Employee/Bank Form Number",
-                   "Employee/Primary Bank Account/Currency", "Net Wage", "Employee/Empty_1", "Employee/Empty_2",
-                   "Pay Run", "Employee/Employee Number"]
-        for c, h in enumerate(headers):
-            sh.write(0, c, h)
-            sh.set_column(c, c, 24)
+        sh = wb.add_worksheet("Page 1")
+
+        # Column widths matching the example bank list format
+        col_widths = [8, 20, 34, 38, 16, 8, 12, 8, 12, 28, 16]
+        for c, w in enumerate(col_widths):
+            sh.set_column(c, c, w)
+
+        # Company Arab Bank Account Number (defaults to 0126046919500 as in the example sheet)
+        company_bank_acc = '0126046919500'
         f_account_no = self._employee_field_by_label('Bank Account Number')
-        f_form_no = self._employee_field_by_label('Bank Form Number')
-        f_empty1 = self._employee_field_by_label('Empty_1')
-        f_empty2 = self._employee_field_by_label('Empty_2')
-        company_currency = self.env.company.currency_id.name
-        for r, line in enumerate(lines, start=1):
+        if self.env.company.partner_id.bank_ids:
+            for b in self.env.company.partner_id.bank_ids:
+                if b.acc_number:
+                    company_bank_acc = str(b.acc_number).replace(' ', '')
+                    break
+
+        transfer_date_str = (self.date_cutoff or fields.Date.today()).strftime('%d/%m/%Y')
+        desc_str = f"SALARY ADVANCE {self.date_cutoff.strftime('%m %Y')}" if self.date_cutoff else "SALARY ADVANCE"
+        company_currency = self.env.company.currency_id.name or 'JOD'
+
+        # Text format for preserving codes and amounts accurately
+        text_fmt = wb.add_format({'num_format': '@'})
+
+        # Exact 11 columns matching 'Banks Payroll List' format WITHOUT header row
+        for r, line in enumerate(lines):
             emp = line.employee_id
-            bank = emp.bank_account_id
-            sh.write(r, 0, getattr(bank, 'internal_transfer', '') or '')
-            sh.write(r, 1, (emp[f_account_no] if f_account_no else '') or '')
-            sh.write(r, 2, bank.acc_number or '')
-            holder = (getattr(bank, 'acc_holder_name', '') or emp.legal_name or emp.name or '') if bank else ''
-            sh.write(r, 3, holder)
-            sh.write(r, 4, (bank.bank_bic if bank and 'bank_bic' in bank._fields else '') or '')
-            sh.write_datetime(r, 5, fields.Date.to_date(self.month_start), date_fmt)
-            sh.write(r, 6, (emp[f_form_no] if f_form_no else '') or '')
-            sh.write(r, 7, (bank.currency_id.name if bank and bank.currency_id else company_currency) or '')
-            sh.write_number(r, 8, line.advance)
-            sh.write(r, 9, (emp[f_empty1] if f_empty1 else '') or '')
-            sh.write(r, 10, (emp[f_empty2] if f_empty2 else '') or '')
-            sh.write(r, 11, self._marker())
-            sh.write(r, 12, getattr(emp, 'employee_number', '') or '')
+            bank = emp.bank_account_id or (emp.bank_account_ids[:1] if 'bank_account_ids' in emp._fields else False)
+
+            # Col 0: Internal Transfer (LBT / BT)
+            transfer_type = getattr(bank, 'internal_transfer', False) or ''
+            if not transfer_type:
+                bic_code = (bank.bank_bic if bank and 'bank_bic' in bank._fields else '') or ''
+                transfer_type = 'BT' if 'ARAB' in bic_code.upper() else 'LBT'
+
+            # Col 1: Company Account Number
+            comp_acc = (emp[f_account_no] if f_account_no and emp[f_account_no] else '') or company_bank_acc
+
+            # Col 2: Beneficiary Account / IBAN
+            acc_number = (bank.acc_number or '').replace(' ', '') if bank else ''
+
+            # Col 3: Beneficiary Name
+            holder = (getattr(bank, 'acc_holder_name', '') or emp.legal_name or emp.name or '').strip()
+
+            # Col 4: Bank Identifier Code (BIC)
+            bic = (bank.bank_bic if bank and 'bank_bic' in bank._fields else '') or ''
+            if not bic and bank and getattr(bank, 'bank_id', False):
+                bic = getattr(bank.bank_id, 'bic', '') or ''
+
+            # Col 5: From code (e.g. '13')
+            code_13 = '13'
+
+            # Col 6: Bank Form Number / Date (DD/MM/YYYY)
+            f_form_no = self._employee_field_by_label('Bank Form Number')
+            date_val = (emp[f_form_no] if f_form_no and emp[f_form_no] else '') or transfer_date_str
+
+            # Col 7: Currency
+            curr = (bank.currency_id.name if bank and bank.currency_id else company_currency) or 'JOD'
+
+            # Col 8: Net Wage (Advance Amount formatted with 3 decimal places e.g. 784.750)
+            adv_amount = round(line.advance or 0.0, 3)
+            amount_str = f"{adv_amount:.3f}"
+
+            # Col 9: Payrun Description
+            payrun_name = desc_str
+
+            # Col 10: Employee Number
+            emp_number = (
+                getattr(emp, 'employee_number', False)
+                or getattr(emp, 'sb_employee_number', False)
+                or getattr(emp, 'registration_number', False)
+                or getattr(emp, 'barcode', False)
+                or str(emp.id)
+            )
+
+            sh.write_string(r, 0, str(transfer_type), text_fmt)
+            sh.write_string(r, 1, str(comp_acc), text_fmt)
+            sh.write_string(r, 2, str(acc_number), text_fmt)
+            sh.write_string(r, 3, str(holder), text_fmt)
+            sh.write_string(r, 4, str(bic), text_fmt)
+            sh.write_string(r, 5, str(code_13), text_fmt)
+            sh.write_string(r, 6, str(date_val), text_fmt)
+            sh.write_string(r, 7, str(curr), text_fmt)
+            sh.write_string(r, 8, str(amount_str), text_fmt)
+            sh.write_string(r, 9, str(payrun_name), text_fmt)
+            sh.write_string(r, 10, str(emp_number), text_fmt)
+
         wb.close()
         return buf.getvalue()
 
@@ -422,12 +752,23 @@ class PfrAdvanceWizardLine(models.TransientModel):
     selected = fields.Boolean(string="Pay", default=True)
     employee_id = fields.Many2one('hr.employee', string="Employee", readonly=True)
     wage = fields.Float(string="Wage", readonly=True)
-    worked_days = fields.Float(string="Worked", readonly=True)
-    rest_days = fields.Float(string="Rest", readonly=True)
-    absent_days = fields.Float(string="Absent", readonly=True)
+    worked_days = fields.Float(string="Attendance Days", readonly=True)
+    rest_days = fields.Float(string="Rest Days", readonly=True)
+    absent_days = fields.Float(string="Absent Days", readonly=True)
     daily_wage = fields.Float(string="Daily Wage", readonly=True, digits=(16, 3))
     paid_days = fields.Float(string="Paid Days", readonly=True)
     deduction = fields.Float(string="Absent Deduction", readonly=True, digits=(16, 3))
     earned = fields.Float(string="Earned to Date", readonly=True)
     advance = fields.Float(string="Advance")
     note = fields.Char(readonly=True)
+
+    # Leaves taken in the period (up to cut-off)
+    sick_leave_days = fields.Float(string="Sick Leave (Days)", readonly=True, digits=(16, 2))
+    annual_leave_days = fields.Float(string="Annual Leave (Days)", readonly=True, digits=(16, 2))
+    other_paid_leave_days = fields.Float(string="Other Paid Leaves (Days)", readonly=True, digits=(16, 2))
+
+    # Balances
+    annual_leave_balance = fields.Float(string="Annual Leave Balance (Days)", readonly=True, digits=(16, 2))
+    extra_hours_balance = fields.Float(string="Extra Hours Balance (Hrs)", readonly=True, digits=(16, 2))
+    paid_leave_balance = fields.Float(string="Paid Leave Balance (Days)", readonly=True, digits=(16, 2))
+
