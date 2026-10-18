@@ -151,19 +151,23 @@ class PfrAdvanceWizard(models.TransientModel):
         emp_adv = {}
         for att in records:
             amt = (
-                att.monthly_amount if 'monthly_amount' in att._fields
-                else (att.total_amount if 'total_amount' in att._fields else 0.0)
+                att.monthly_amount if 'monthly_amount' in att._fields and att.monthly_amount
+                else (att.total_amount if 'total_amount' in att._fields and att.total_amount else 0.0)
             ) or 0.0
+            emp_ids = []
             if 'employee_id' in att._fields and att.employee_id:
-                emp_adv[att.employee_id] = amt
-            elif 'employee_ids' in att._fields:
-                for emp in att.employee_ids:
-                    emp_adv[emp] = amt
+                emp_ids.append(att.employee_id.id)
+            if 'employee_ids' in att._fields and att.employee_ids:
+                emp_ids.extend(att.employee_ids.ids)
+            for eid in set(emp_ids):
+                emp_adv[eid] = emp_adv.get(eid, 0.0) + amt
 
         if not emp_adv:
             raise UserError(_("No employees found in the selected advance run."))
 
-        employees = self.env['hr.employee'].browse([e.id for e in emp_adv.keys()])
+        employees = self.env['hr.employee'].browse(list(emp_adv.keys()))
+        employees._pfr_create_absent_entries(d_from, d_to)
+        self.env.flush_all()
 
         # Preload leave balances in bulk
         company = self.env.company
@@ -172,13 +176,13 @@ class PfrAdvanceWizard(models.TransientModel):
         extra_types = types.get('extra', self.env['hr.leave.type'])
         pto_types = types.get('pto', self.env['hr.leave.type'])
 
-        emp_ids = employees.ids
         all_type_ids = list((annual_types | extra_types | pto_types).ids)
-        bal_hours = self.env['pfr.settlement'].balance_hours(emp_ids, all_type_ids)
+        bal_hours = self.env['pfr.settlement'].balance_hours(employees.ids, all_type_ids)
 
-        lines = [(5, 0, 0)]
+        self.line_ids.unlink()
+        lines = []
         for emp in employees:
-            advance = emp_adv.get(emp, 0.0)
+            advance = emp_adv.get(emp.id, 0.0)
             L, earned, deduction, paid_days, daily = self._earned_to_date(emp, d_from, d_to)
 
             # Audit: Leaves taken in period
