@@ -873,7 +873,7 @@ class AnabtawiMobileAPI(http.Controller):
         records = request.env["hr.payslip"].sudo().search(
             [
                 ("employee_id", "=", employee.id),
-                ("state", "in", ["done", "paid"]),
+                ("state", "in", ["validated", "paid"]),
             ],
             order="date_to desc, id desc",
             limit=50,
@@ -884,7 +884,7 @@ class AnabtawiMobileAPI(http.Controller):
             "records": [
                 {
                     "id": payslip.id,
-                    "number": payslip.number or f"PAY/{payslip.id}",
+                    "number": payslip.name or f"PAY/{payslip.id}",
                     "name": payslip.name or _("Payslip"),
                     "date_from": fields.Date.to_string(payslip.date_from) if payslip.date_from else None,
                     "date_to": fields.Date.to_string(payslip.date_to) if payslip.date_to else None,
@@ -918,7 +918,7 @@ class AnabtawiMobileAPI(http.Controller):
             [
                 ("id", "=", payslip_id),
                 ("employee_id", "=", employee.id),
-                ("state", "in", ["done", "paid"]),
+                ("state", "in", ["validated", "paid"]),
             ],
             limit=1,
         )
@@ -935,7 +935,7 @@ class AnabtawiMobileAPI(http.Controller):
             _logger.exception("Failed to render PDF for payslip_id=%s", payslip.id)
             return _error("pdf_failed", _("Could not generate payslip PDF."), 500)
 
-        filename = f"Payslip_{payslip.number or payslip.id}.pdf"
+        filename = f"Payslip_{payslip.name or payslip.id}.pdf"
         headers = [
             ("Content-Type", "application/pdf"),
             ("Content-Disposition", f'attachment; filename="{filename}"'),
