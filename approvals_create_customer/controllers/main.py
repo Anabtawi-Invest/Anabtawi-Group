@@ -27,20 +27,24 @@ class PortalCustomerRequest(http.Controller):
         category = Category.search(
             [
                 ("approval_type", "=", "create_customer"),
-                ("company_id", "=", company.id),
+                ("company_id", "in", [False, company.id]),
                 ("active", "=", True),
             ],
+            order="company_id desc, id",
             limit=1,
         )
         if not category:
+            # env.ref uses the portal user env (no ACL on approval.category) — always sudo.
             category = request.env.ref(CATEGORY_XMLID, raise_if_not_found=False)
+            if category:
+                category = Category.browse(category.id)
         if not category or not category.exists() or not category.active:
             raise UserError(
                 _("Create Customer approval category is not configured. Please contact an administrator.")
             )
         # Portal create-customer must NOT use approval_contact mandatory VAT/attachment rules
         if "x_create_contact_on_approve" in category._fields and category.x_create_contact_on_approve:
-            category.x_create_contact_on_approve = False
+            category.sudo().write({"x_create_contact_on_approve": False})
         return category
 
     def _get_my_request(self, request_id):
