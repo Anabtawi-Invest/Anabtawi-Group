@@ -74,6 +74,14 @@ class TimeOffBalancesWizard(models.TransientModel):
         combined = f"{name_val} {priv_val} {note_val}".lower()
         return any(k in combined for k in ['settlement', 'reconciliation', 'reconcil', 'balance sync'])
 
+    def _get_added_by(self, record):
+        """Return dynamic 'Added by <User>' string based on who created the record."""
+        creator = record.create_uid
+        if not creator or creator.id == 1 or creator.name == 'OdooBot':
+            return 'Added by System'
+        user_name = creator.name or creator.login or 'User'
+        return f"Added by {user_name}"
+
     def _get_balance_report_data(self):
         self.ensure_one()
         employee = self.employee_id
@@ -154,13 +162,15 @@ class TimeOffBalancesWizard(models.TransientModel):
                     desc = 'reconciled from system'
                 elif a.accrual_plan_id:
                     desc = 'Monthly Auto Credit'
-                elif a.name:
-                    desc = a.name
+                elif a.notes and a.notes.strip() and 'added by tk' not in a.notes.lower():
+                    desc = f"{a.notes.strip()} ({self._get_added_by(a)})"
+                elif a.name and not a.name.startswith(f"{leave_type.name} (") and 'added by tk' not in a.name.lower():
+                    desc = f"{a.name} ({self._get_added_by(a)})"
                 else:
-                    desc = 'Monthly Auto Credit'
+                    desc = self._get_added_by(a)
 
                 is_system = bool(a.accrual_plan_id or (a.create_uid and a.create_uid.id == 1))
-                is_tk = False
+                is_tk = not is_system
                 is_posted = a.state == 'validate'
 
                 events.append({
@@ -195,12 +205,12 @@ class TimeOffBalancesWizard(models.TransientModel):
                     desc = 'reconciled from system'
                 elif getattr(l, 'request_unit_hours', False) or (l.number_of_days < 1.0 and l_start == l_end):
                     desc = 'Subtractive Hours'
-                elif l.private_name:
-                    desc = l.private_name
-                elif l.notes:
-                    desc = l.notes
+                elif l.private_name and l.private_name.strip() and 'added by tk' not in l.private_name.lower():
+                    desc = f"{l.private_name.strip()} ({self._get_added_by(l)})"
+                elif l.notes and l.notes.strip() and 'added by tk' not in l.notes.lower():
+                    desc = f"{l.notes.strip()} ({self._get_added_by(l)})"
                 else:
-                    desc = 'Added by TK'
+                    desc = self._get_added_by(l)
 
                 is_subtractive = (desc == 'Subtractive Hours')
                 is_system = is_subtractive
