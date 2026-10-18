@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Product Last Bill Price Export',
-    'version': '19.0.1.0.2',
+    'version': '19.0.1.0.3',
     'summary': 'Export all products with their last vendor bill (purchase) price to Excel',
     'category': 'Purchases',
     'author': 'Anabtawi Group',
