@@ -1,3 +1,4 @@
+import base64
 import io
 import math
 from datetime import datetime, time
@@ -24,6 +25,70 @@ class HrPayslipRun(models.Model):
             "url": url,
             "target": "self",
         }
+
+    audit_file = fields.Binary(
+        string="PayRun Audit File",
+        readonly=True,
+        attachment=True,
+        copy=False,
+        help="Immutable Excel snapshot frozen when the pay run was marked as paid or closed.",
+    )
+    audit_filename = fields.Char(string="PayRun Audit Filename", copy=False)
+    audit_file_generated_at = fields.Datetime(string="Audit Snapshot Date", readonly=True, copy=False)
+
+    def _freeze_payrun_audit(self, force=False):
+        for run in self:
+            if not run.slip_ids:
+                continue
+            if force or not run.audit_file:
+                content = run._generate_payrun_xlsx()
+                period_str = run.date_start.strftime("%Y%m") if run.date_start else ""
+                fname = f"PayRun_Audit_{period_str or run.name or 'Report'}.xlsx"
+                run.sudo().write({
+                    "audit_file": base64.b64encode(content),
+                    "audit_filename": fname,
+                    "audit_file_generated_at": fields.Datetime.now(),
+                })
+
+    def write(self, vals):
+        res = super().write(vals)
+        if "state" in vals:
+            target_state = vals.get("state")
+            if target_state in ("paid", "close"):
+                self._freeze_payrun_audit()
+            elif target_state in ("draft", "verify"):
+                self.sudo().write({
+                    "audit_file": False,
+                    "audit_filename": False,
+                    "audit_file_generated_at": False,
+                })
+        return res
+
+    def action_paid(self):
+        res = super().action_paid() if hasattr(super(), "action_paid") else None
+        self._freeze_payrun_audit()
+        return res
+
+    def action_close(self):
+        res = super().action_close() if hasattr(super(), "action_close") else None
+        self._freeze_payrun_audit()
+        return res
+
+    def action_regenerate_audit_snapshot(self):
+        """Action for Payroll Managers to regenerate the frozen audit file if needed."""
+        self.ensure_one()
+        self._freeze_payrun_audit(force=True)
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "title": _("Audit Snapshot Regenerated"),
+                "message": _("The PayRun Audit snapshot has been re-frozen successfully."),
+                "sticky": False,
+                "type": "success",
+            },
+        }
+
 
     def _generate_payrun_xlsx(self, quick_audit=False, payslip_ids=None):
         self.ensure_one()
@@ -189,6 +254,9 @@ class HrPayslipRun(models.Model):
         sheet1.write_number(row + 1, 2, total_ssc, card_val_fmt)
         sheet1.write_number(row + 1, 3, total_net_val, card_val_fmt)
         sheet1.write_number(row + 1, 4, avg_net, card_val_fmt)
+        kpi_value_row = row + 1       # Total Gross / Total Tax are rewritten below from the table rows
+        kpi_total_gross = 0.0
+        kpi_total_tax = 0.0
 
         row += 3
 
@@ -543,11 +611,24 @@ class HrPayslipRun(models.Model):
                     issues.append(_("Missing Employee Number"))
 
                 emp_name_val = emp.legal_name or emp.name if emp else "N/A"
-                dept_val = emp.department_id.name if emp and emp.department_id else "N/A"
-                if emp and not emp.department_id:
+
+                # Historical department & job resolution:
+                # Prioritize payslip's stored department/job or contract version over live employee profile
+                hist_dept = (
+                    payslip.department_id
+                    or (getattr(payslip, "version_id", False) and payslip.version_id.department_id)
+                    or (emp and emp.department_id)
+                )
+                dept_val = hist_dept.name if hist_dept else "N/A"
+                if not hist_dept:
                     issues.append(_("Missing Department"))
 
-                job_val = emp.job_id.name if emp and emp.job_id else "N/A"
+                hist_job = (
+                    payslip.job_id
+                    or (getattr(payslip, "version_id", False) and payslip.version_id.job_id)
+                    or (emp and emp.job_id)
+                )
+                job_val = hist_job.name if hist_job else "N/A"
                 code_val = emp_id_val
 
                 period_from_val = format_date(self.env, payslip.date_from or self.date_start)
@@ -586,9 +667,11 @@ class HrPayslipRun(models.Model):
 
                 # Gross Salary (calculated from Actual Salary + paid allowances; salary inputs are not added again)
                 gross_sal = actual_sal + rem_leave + gross_att_ot + gross_dyn_alw
+                kpi_total_gross += gross_sal
 
                 # Fixed Deductions
                 tax_val = sum(lines.filtered(lambda l: l.code in ("INCOME_TAX", "TAX", "IT") or "ضريبة" in l.name).mapped("total"))
+                kpi_total_tax += tax_val
                 ssce_val = sum(lines.filtered(lambda l: l.code in ("SSE", "SSCE", "SSC_EMP", "SOC_SEC_EMP") or ("ضمان" in l.name and "موظف" in l.name)).mapped("total"))
                 sscc_val = sum(lines.filtered(lambda l: l.code in ("SSC", "SSCC", "SSC_COMP", "SOC_SEC_COMP") or ("ضمان" in l.name and "شركة" in l.name)).mapped("total"))
 
@@ -639,17 +722,24 @@ class HrPayslipRun(models.Model):
                 else:
                     note_val = base_note
 
-                # Retrieve SSC Subject Wage (from studio field x_studio_x_studio_ssc_wage, employee profile or contract fallback)
+                # Retrieve SSC Subject Wage (favor contract version/snapshot active for this payslip first, then employee profile fallback)
+                contract_rec = getattr(payslip, "version_id", False) or getattr(payslip, "contract_id", False)
                 emp_rec = payslip.employee_id
                 ssc_wage_val = 0.0
-                if emp_rec:
+
+                for obj in (contract_rec, emp_rec):
+                    if not obj:
+                        continue
                     for attr in ("x_studio_x_studio_ssc_wage", "x_studio_ssc_wage", "sb_ss_salary", "ssc_wage", "ss_wage", "social_security_wage", "ss_salary"):
-                        val = getattr(emp_rec, attr, 0.0)
+                        val = getattr(obj, attr, 0.0)
                         if val:
                             ssc_wage_val = float(val)
                             break
-                if not ssc_wage_val and hasattr(payslip, "version_id") and payslip.version_id:
-                    ssc_wage_val = payslip.version_id._get_contract_wage()
+                    if ssc_wage_val:
+                        break
+
+                if not ssc_wage_val and contract_rec and hasattr(contract_rec, "_get_contract_wage"):
+                    ssc_wage_val = contract_rec._get_contract_wage()
 
                 # Write Info Columns (0..7)
                 sheet1.write(data_row, 0, emp_id_val, text_center_fmt)
@@ -711,6 +801,10 @@ class HrPayslipRun(models.Model):
                 })
 
                 data_row += 1
+
+        # Top KPI cards: gross and tax are the sums of the rows below, so they always match the table
+        sheet1.write_number(kpi_value_row, 0, kpi_total_gross, card_val_fmt)
+        sheet1.write_number(kpi_value_row, 1, kpi_total_tax, card_val_fmt)
 
         # Write Bottom Summary Total Row
         sheet1.write(data_row, 0, _("Total"), total_label_fmt)

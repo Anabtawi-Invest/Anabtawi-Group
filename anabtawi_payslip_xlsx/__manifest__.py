@@ -1,9 +1,9 @@
 {
     "name": "Anabtawi Payslip XLSX Export",
     "summary": "Download payroll payslips as XLSX files",
-    "version": "19.0.2.0.0",
+    "version": "19.0.2.1.0",
     "category": "Human Resources/Payroll",
-    "author":"Anabtawi",
+    "author": "Anabtawi",
     "license": "LGPL-3",
     "depends": [
         "hr_payroll",

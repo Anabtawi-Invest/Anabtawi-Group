@@ -34,6 +34,24 @@ class HrPayslip(models.Model):
             "target": "self",
         }
 
+    def action_payslip_paid(self):
+        res = super().action_payslip_paid() if hasattr(super(), "action_payslip_paid") else None
+        self._check_freeze_parent_run()
+        return res
+
+    def _check_freeze_parent_run(self):
+        runs = self.mapped("payslip_run_id")
+        for run in runs:
+            if run.state in ("paid", "close") or (run.slip_ids and all(s.state in ("paid", "done") for s in run.slip_ids)):
+                run._freeze_payrun_audit()
+
+    def write(self, vals):
+        res = super().write(vals)
+        if vals.get("state") in ("paid", "done"):
+            self._check_freeze_parent_run()
+        return res
+
+
 
 
     # ------------------------------------------------------------------
