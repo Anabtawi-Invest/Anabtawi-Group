@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Inherit Employee Form View to add button and tab -->
+    <record id="view_employee_form_income_tax_inherit" model="ir.ui.view">
+        <field name="name">hr.employee.form.income.tax.inherit</field>
+        <field name="model">hr.employee</field>
+        <field name="inherit_id" ref="hr.view_employee_form"/>
+        <field name="priority">50</field>
+        <field name="arch" type="xml">
+            <!-- Add Button in Header -->
+            <xpath expr="//header" position="inside">
+                <button name="action_open_income_tax_wizard"
+                        string="Income TAX report (AR/3)"
+                        type="object"
+                        class="btn btn-secondary"
+                        icon="fa-file-pdf-o"/>
+            </xpath>
+
+            <!-- Add Dedicated Tab inside Notebook -->
+            <xpath expr="//notebook" position="inside">
+                <page string="Income TAX report (AR/3)" name="income_tax_report_tab">
+                    <group>
+                        <group string="شهادة ضريبة الدخل والرواتب (AR/3)">
+                            <field name="tax_id"/>
+                            <field name="national_id" readonly="1"/>
+                            <field name="name_arabic" readonly="1"/>
+                        </group>
+                    </group>
+                    <div class="mt-3">
+                        <button name="action_open_income_tax_wizard"
+                                string="إصدار وتحميل شهادة ضريبة الدخل (AR/3) بصيغة PDF"
+                                type="object"
+                                class="btn btn-primary"
+                                icon="fa-print"/>
+                    </div>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>
