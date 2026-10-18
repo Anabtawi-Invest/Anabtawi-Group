@@ -137,6 +137,9 @@ class ProductLastBillPriceWizard(models.TransientModel):
         sheet = workbook.add_worksheet(_('Last Bill Price'))
         sheet.freeze_panes(1, 0)
 
+        price_digits = self.env['decimal.precision'].precision_get('Product Price')
+        price_num_format = '#,##0' if price_digits <= 0 else f'#,##0.{"0" * price_digits}'
+
         header_style = workbook.add_format({
             'bold': True,
             'bg_color': '#D9E1F2',
@@ -145,7 +148,7 @@ class ProductLastBillPriceWizard(models.TransientModel):
         })
         text_style = workbook.add_format({'border': 1})
         date_style = workbook.add_format({'border': 1, 'num_format': 'yyyy-mm-dd'})
-        number_style = workbook.add_format({'border': 1, 'num_format': '#,##0.00'})
+        number_style = workbook.add_format({'border': 1, 'num_format': price_num_format})
 
         headers = [
             _('Internal Reference'),
