@@ -36,8 +36,9 @@ class PurchaseOrderLine(models.Model):
             WHERE am.move_type = 'in_invoice'
               AND am.state = 'posted'
               AND am.company_id = %s
-              AND aml.display_type = 'product'
               AND aml.product_id = %s
+              AND aml.display_type IS DISTINCT FROM 'line_section'
+              AND aml.display_type IS DISTINCT FROM 'line_note'
             ORDER BY
                 am.invoice_date DESC NULLS LAST,
                 am.id DESC,
