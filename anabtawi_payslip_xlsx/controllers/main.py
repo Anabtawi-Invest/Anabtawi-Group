@@ -79,16 +79,20 @@ class PayslipXlsxController(http.Controller):
         if not payrun:
             return request.not_found()
 
-        # First download: generate full-run Excel and save once on audit_file.
-        # Later downloads: always return that copy — never overwrite.
-        # (Explicit "Re-freeze Audit Snapshot" can still replace it on purpose.)
-        if not payrun.audit_file:
-            payrun._freeze_payrun_audit()
+        # Paid only: first download after paid saves audit_file once; later downloads reuse it.
+        # Before paid: always live generate — do not save to audit_file.
+        is_paid = payrun.state in ("03_paid", "paid") or (
+            payrun.slip_ids and all(s.state in ("paid", "done") for s in payrun.slip_ids)
+        )
 
-        if payrun.audit_file:
-            xlsx_content = base64.b64decode(payrun.audit_file)
+        if is_paid:
+            if not payrun.audit_file:
+                payrun._freeze_payrun_audit()
+            if payrun.audit_file:
+                xlsx_content = base64.b64decode(payrun.audit_file)
+            else:
+                xlsx_content = payrun._generate_payrun_xlsx()
         else:
-            # Fallback if freeze failed (e.g. no slips): live generate, still not stored
             xlsx_content = payrun._generate_payrun_xlsx(payslip_ids=parsed_payslip_ids)
 
         period_str = payrun.date_start.strftime("%Y%m") if payrun.date_start else ""

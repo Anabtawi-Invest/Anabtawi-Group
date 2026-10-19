@@ -32,7 +32,7 @@ class HrPayslipRun(models.Model):
         attachment=True,
         copy=False,
         help="Immutable Excel snapshot saved on the first PayRun Audit download "
-             "(or when the pay run is marked paid/closed if not downloaded yet). "
+             "after the pay run is marked as paid. Downloads before paid are not stored. "
              "Later downloads reuse this file and do not overwrite it.",
     )
     audit_filename = fields.Char(string="PayRun Audit Filename", copy=False)
@@ -57,29 +57,16 @@ class HrPayslipRun(models.Model):
 
     def write(self, vals):
         res = super().write(vals)
-        if "state" in vals:
-            target_state = vals.get("state")
-            if target_state in ("paid", "close"):
-                self._freeze_payrun_audit()
-            elif target_state in ("draft", "verify"):
-                try:
-                    self.sudo().write({
-                        "audit_file": False,
-                        "audit_filename": False,
-                        "audit_file_generated_at": False,
-                    })
-                except Exception:
-                    pass
-        return res
-
-    def action_paid(self):
-        res = super().action_paid() if hasattr(super(), "action_paid") else None
-        self._freeze_payrun_audit()
-        return res
-
-    def action_close(self):
-        res = super().action_close() if hasattr(super(), "action_close") else None
-        self._freeze_payrun_audit()
+        # Clear snapshot if pay run is reverted to Ready (so a new paid cycle can freeze again)
+        if "state" in vals and vals.get("state") in ("01_ready", "draft", "verify"):
+            try:
+                self.sudo().write({
+                    "audit_file": False,
+                    "audit_filename": False,
+                    "audit_file_generated_at": False,
+                })
+            except Exception:
+                pass
         return res
 
     def action_regenerate_audit_snapshot(self):
