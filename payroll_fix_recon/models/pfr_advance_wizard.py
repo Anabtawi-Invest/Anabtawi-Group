@@ -114,12 +114,14 @@ class PfrAdvanceWizard(models.TransientModel):
         domain = [('description', 'ilike', 'Mid-month advance')]
         if self.history_batch:
             domain = [('description', '=', self.history_batch)]
+        if self.company_id:
+            domain.append(('company_id', '=', self.company_id.id))
         return {
             'name': _("Salary Advance Adjustments"),
             'type': 'ir.actions.act_window',
             'res_model': 'hr.salary.attachment',
-            'view_mode': 'tree,form',
-            'views': [(False, 'tree'), (False, 'form')],
+            'view_mode': 'list,form',
+            'views': [(False, 'list'), (False, 'form')],
             'domain': domain,
             'context': dict(self.env.context),
         }
