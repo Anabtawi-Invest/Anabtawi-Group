@@ -7,11 +7,12 @@ class PurchaseOrderLine(models.Model):
     _inherit = 'purchase.order.line'
 
     def _get_po_line_uom(self):
-        """Return the PO line UoM (Odoo 19: uom_id, older: product_uom)."""
+        """Return the PO line UoM across Odoo field renames."""
         self.ensure_one()
-        if 'uom_id' in self._fields:
-            return self.uom_id or self.product_id.uom_id
-        return self.product_uom or self.product_id.uom_id
+        for fname in ('uom_id', 'product_uom', 'product_uom_id'):
+            if fname in self._fields:
+                return self[fname] or self.product_id.uom_id
+        return self.product_id.uom_id
 
     def _get_last_bill_price_unit(self):
         """Return the unit price from the latest posted vendor bill for this product.
