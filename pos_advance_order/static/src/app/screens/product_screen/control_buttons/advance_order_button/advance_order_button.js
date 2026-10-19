@@ -130,6 +130,10 @@ patch(ControlButtons.prototype, {
             return lines;
         }
         const serviceType = options.serviceType || "on_site";
+        // Pledge / none must never add خدمة موقع on advance lines.
+        if (serviceType === "none") {
+            return lines;
+        }
         const result = appendSiteServiceLineIfNeeded(lines, this.pos, siteServiceConfig, {
             serviceType,
             unitPrice: options.unitPrice,

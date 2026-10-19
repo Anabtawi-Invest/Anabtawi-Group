@@ -162,7 +162,3 @@ msgstr "المبلغ"
 #. module: pos_delivery_amount
 msgid "CASHIER"
 msgstr "أمين الصندوق"
-
-#. module: pos_delivery_amount
-msgid "JOURNAL"
-msgstr "القيد"

@@ -1,9 +1,9 @@
-const CACHE = "anabtawi-employee-app-v1.3.0";
+const CACHE = "anabtawi-employee-app-v1.3.2";
 const SHELL = [
   "/employee-portal",
   "/employee-portal/manifest.webmanifest",
   "/anabtawi_employee_app_pwa/static/employee_app/app.js",
-  "/anabtawi_employee_app_pwa/static/employee_app/app.js?v=1.3.0",
+  "/anabtawi_employee_app_pwa/static/employee_app/app.js?v=1.3.2",
   "/anabtawi_employee_app_pwa/static/employee_app/favicon.ico",
   "/anabtawi_employee_app_pwa/static/employee_app/brand/logo.png",
   "/anabtawi_employee_app_pwa/static/employee_app/brand/symbol.png",
@@ -11,6 +11,7 @@ const SHELL = [
   "/anabtawi_employee_app_pwa/static/employee_app/icons/icon-512.png"
 ];
 const API_CACHE_PATHS = [
+  "/anabtawi/mobile/employee/profile",
   "/anabtawi/mobile/attendance/status",
   "/anabtawi/mobile/attendance/history",
   "/anabtawi/mobile/leaves/balances",
@@ -27,9 +28,6 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
   if (event.request.method !== "GET" || url.pathname.startsWith("/odoo-proxy")) return;
-  // Network only for every other API call (profile/OTP, payslips, notifications, manager approvals):
-  // sensitive or time-limited data must never be served from the cache.
-  if (url.pathname.startsWith("/anabtawi/mobile/") && !API_CACHE_PATHS.includes(url.pathname)) return;
   if (API_CACHE_PATHS.includes(url.pathname)) {
     event.respondWith(fetch(event.request).then((response) => {
       if (response.ok) {

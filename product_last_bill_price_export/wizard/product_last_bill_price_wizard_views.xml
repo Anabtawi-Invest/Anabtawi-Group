@@ -30,7 +30,7 @@
 
     <menuitem id="menu_product_last_bill_price_export"
               name="Last Vendor Bill Price (Excel)"
-              parent="purchase.purchase_report_main"
+              parent="purchase.menu_procurement_management"
               action="action_product_last_bill_price_wizard"
               sequence="90"
               groups="purchase.group_purchase_user"/>

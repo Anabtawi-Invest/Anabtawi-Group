@@ -16,11 +16,6 @@
         "views/menu.xml",
     ],
     "assets": {
-        "web.assets_backend": [
-            "online_campaigns_discount/static/src/scss/online_campaign_dashboard.scss",
-            "online_campaigns_discount/static/src/js/online_campaign_dashboard.js",
-            "online_campaigns_discount/static/src/xml/online_campaign_dashboard.xml",
-        ],
         "point_of_sale._assets_pos": [
             "online_campaigns_discount/static/src/js/online_campaign_loader.js",
             "online_campaigns_discount/static/src/js/online_discount_logic.js",

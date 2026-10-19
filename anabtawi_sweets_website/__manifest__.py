@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Anabtawi Sweets Website Theme',
-    'version': '19.0.1.0.0',
+    'version': '19.0.1.0.1',
     'summary': 'Premium website theme for Anabtawi Sweets with Arabic RTL support',
     'description': """
         Anabtawi Sweets corporate website theme for Odoo 19.

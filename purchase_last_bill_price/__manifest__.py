@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Purchase Last Bill Price',
-    'version': '19.0.1.0.2',
+    'version': '19.0.1.0.4',
     'summary': 'Set PO line unit price from the product last posted vendor bill',
     'category': 'Purchases',
     'author': 'Anabtawi Group',

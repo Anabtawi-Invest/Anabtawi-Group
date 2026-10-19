@@ -178,6 +178,7 @@ export function resolveServiceLineTarget(menuConfig, options = {}) {
                 : Number(menuConfig?.servicePrice || 0);
         return { serviceType, productId, unitPrice };
     }
+    // Pledge / none — no service product line.
     return { serviceType: "none", productId: null, unitPrice: 0 };
 }
 
@@ -187,11 +188,11 @@ export function appendSiteServiceLineIfNeeded(lines, pos, menuConfig = null, opt
         return { lines: lines || [], added: false, score: 0, menuConfig: null };
     }
     const serviceType = options.serviceType || "on_site";
-    if (serviceType === "none") {
-        const productLines = (lines || []).filter((line) => !line.is_site_service_auto);
-        return { lines: productLines, added: false, score: 0, menuConfig: config };
-    }
     const productLines = (lines || []).filter((line) => !line.is_site_service_auto);
+    // Pledge / none: never add خدمة موقع / cutting.
+    if (serviceType === "none") {
+        return { lines: productLines, added: false, score: 0, menuConfig: config, serviceType };
+    }
     // Price comes from the matching On-Site Prices range (qty × multiple + popup choice).
     // No threshold: always add when Site Service or Cutting is selected.
     const score = computeSiteServiceScoreFromLines(productLines, config);
@@ -259,6 +260,8 @@ export function removeAutoSiteServiceLines(order) {
  * Add or remove the service/cutting line on a live POS cart.
  * Third argument may be a boolean (legacy isOnSite) or options:
  *   { serviceType, unitPrice, productId, menuConfig }
+ *
+ * Pledge / none → remove any auto service line, do NOT add خدمة موقع.
  */
 export async function applySiteServiceToPosOrder(pos, order, isOnSiteOrOptions, menuConfig = null) {
     removeAutoSiteServiceLines(order);
@@ -271,6 +274,7 @@ export async function applySiteServiceToPosOrder(pos, order, isOnSiteOrOptions, 
         options = { serviceType: "none" };
     }
     const serviceType = options.serviceType || "none";
+    // Pledge / none: only clean up — never add خدمة موقع.
     if (serviceType === "none" || !order) {
         return { added: false, score: 0, serviceType };
     }

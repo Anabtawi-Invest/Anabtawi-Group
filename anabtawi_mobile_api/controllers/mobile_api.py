@@ -1,7 +1,5 @@
-import base64
 import logging
-import os
-from datetime import datetime, time, timedelta
+from datetime import datetime, time
 
 import pytz
 
@@ -12,14 +10,9 @@ from odoo.http import request
 
 _logger = logging.getLogger(__name__)
 
-# Employee OTP lifetime ceiling, kept in sync with employee_request.OTP_TTL_MINUTES.
-OTP_MAX_SECONDS = 300
-
 
 def _json(data, status=200):
-    response = request.make_json_response(data, status=status)
-    response.headers["Cache-Control"] = "no-store"
-    return response
+    return request.make_json_response(data, status=status)
 
 
 def _error(code, message, status=400):
@@ -331,17 +324,18 @@ class AnabtawiMobileAPI(http.Controller):
         otp_expires_at = None
         otp_expires_in_seconds = 0
         now = fields.Datetime.now()
-        # The OTP is shown only while it is valid, for at most OTP_MAX_SECONDS from
-        # generation, and never without an expiry (no stale / immortal OTP).
         if "employee_password" in employee._fields and employee.employee_password:
-            expires_at = employee.employee_password_expires_at
-            generated_at = employee.employee_password_generated_at
-            if expires_at and generated_at:
-                expires_at = min(expires_at, generated_at + timedelta(seconds=OTP_MAX_SECONDS))
-                if expires_at > now:
-                    otp_number = str(employee.employee_password)
-                    otp_expires_at = fields.Datetime.to_string(expires_at)
-                    otp_expires_in_seconds = int((expires_at - now).total_seconds())
+            expires_at = employee.employee_password_expires_at if "employee_password_expires_at" in employee._fields else False
+            if not expires_at or expires_at > now:
+                otp_number = str(employee.employee_password)
+                otp_expires_at = fields.Datetime.to_string(expires_at) if expires_at else None
+                if expires_at:
+                    otp_expires_in_seconds = max(0, int((expires_at - now).total_seconds()))
+        if not otp_number:
+            for field_name in ("otp_number", "employee_otp", "otp", "pin"):
+                if field_name in employee._fields and employee[field_name]:
+                    otp_number = str(employee[field_name])
+                    break
         job_title = (employee.job_title or "").strip()
         emp_num = ""
         for fn in ("employee_number", "registration_number", "barcode"):
@@ -369,9 +363,6 @@ class AnabtawiMobileAPI(http.Controller):
             "company_name": employee.company_id.name,
             "geo_required": employee._is_portal_geo_tracking_required(),
             "allow_remote": bool(employee.allow_remote_attendance),
-            "is_leave_approver": self._is_leave_approver(user),
-            "pending_approvals": self._pending_leaves(user, count_only=True),
-            "unread_notifications": request.env["anabtawi.mobile.notification"].sudo().search_count([("user_id", "=", user.id), ("is_read", "=", False)]),
             "device": {
                 "device_uid": employee.employee_app_device_uid or "",
                 "device_name": employee.employee_app_device_name or "",
@@ -510,32 +501,19 @@ class AnabtawiMobileAPI(http.Controller):
                 return _error("invalid_location", _("Invalid GPS coordinates."), 422)
             geo_information = {"latitude": latitude, "longitude": longitude}
 
-        if employee._is_portal_geo_tracking_required():
-            params = request.env["ir.config_parameter"].sudo()
-            max_accuracy = _as_float(params.get_param("anabtawi_mobile.max_location_accuracy_m", "100")) or 100.0
-            max_age_s = _as_float(params.get_param("anabtawi_mobile.max_location_age_s", "60")) or 60.0
-            # Same rules for check-in and check-out: the fix must be precise,
-            # fresh (taken right now, not replayed) and not from a mock provider.
+        if employee.attendance_state != "checked_in" and employee._is_portal_geo_tracking_required():
+            max_accuracy = _as_float(
+                request.env["ir.config_parameter"].sudo().get_param(
+                    "anabtawi_mobile.max_location_accuracy_m", "100"
+                )
+            ) or 100.0
             if accuracy is None or accuracy < 0 or accuracy > max_accuracy:
                 return _error(
                     "location_accuracy",
                     _("A more accurate GPS location is required. Move outdoors and try again."),
                     422,
                 )
-            if data.get("mocked") in (True, "true", "True", 1, "1"):
-                return _error("mock_location", _("Mock or simulated locations are not allowed."), 422)
-            # fix_age_ms is measured on the phone (now - fix time), so a wrong phone
-            # clock cannot make an old fix look fresh or a fresh one look old.
-            fix_age_ms = _as_float(data.get("fix_age_ms"))
-            if fix_age_ms is None:
-                if params.get_param("anabtawi_mobile.require_location_timestamp", "False").lower() in ("true", "1", "yes"):
-                    return _error("location_stale", _("Location time is missing. Please update the app."), 422)
-            elif fix_age_ms > max_age_s * 1000.0 or fix_age_ms < -30000.0:
-                return _error(
-                    "location_stale",
-                    _("Your location is out of date. Please try again to get a fresh GPS fix."),
-                    422,
-                )
+
         lock_acquired = False
         try:
             employee._acquire_portal_attendance_action_lock(lock_minutes=10)
@@ -623,8 +601,6 @@ class AnabtawiMobileAPI(http.Controller):
             "remaining": round(allocation_by_id.get(leave_type.id, {}).get("virtual_remaining_leaves", 0.0), 2),
             "request_unit": leave_type.request_unit,
             "requires_allocation": bool(leave_type.requires_allocation),
-            "support_document": bool(leave_type.support_document),
-            "validation": leave_type.leave_validation_type,
         } for leave_type in leave_types]})
 
     @http.route(
@@ -632,7 +608,7 @@ class AnabtawiMobileAPI(http.Controller):
         type="http", auth="public", methods=["POST"], csrf=False,
     )
     def leave_create(self, **kwargs):
-        employee, user, _token, error = self._require_employee()
+        employee, _user, _token, error = self._require_employee()
         if error:
             return error
         data = _payload()
@@ -687,84 +663,15 @@ class AnabtawiMobileAPI(http.Controller):
                 "request_unit_half": True,
                 "request_date_from_period": data.get("request_date_from_period") if data.get("request_date_from_period") in ("am", "pm") else "am",
             })
-        attachment_b64 = data.get("attachment") or data.get("attachment_base64") or ""
-        if attachment_b64:
-            try:
-                raw = base64.b64decode(attachment_b64, validate=True)
-            except (ValueError, TypeError):
-                return _error("invalid_attachment", _("The attachment is not valid."), 422)
-            if len(raw) > 5 * 1024 * 1024:
-                return _error("attachment_too_large", _("The attachment must be smaller than 5 MB."), 422)
         try:
             with request.env.cr.savepoint():
-                # Run as the employee's user (so the request, its followers and
-                # the audit trail belong to them) with record rules bypassed;
-                # eligibility was already checked above.
-                leave = request.env["hr.leave"].with_user(user).sudo().with_company(employee.company_id).create(vals)
-                if attachment_b64 and "supported_attachment_ids" in leave._fields:
-                    attachment = request.env["ir.attachment"].with_user(user).sudo().create({
-                        "name": (data.get("attachment_name") or "supporting_document")[:128],
-                        "datas": attachment_b64,
-                        "res_model": "hr.leave",
-                        "res_id": leave.id,
-                    })
-                    leave.supported_attachment_ids = [(4, attachment.id)]
+                leave = request.env["hr.leave"].sudo().with_company(employee.company_id).create(vals)
         except (UserError, ValidationError) as exc:
             return _error("validation_error", exc.args[0] if exc.args else str(exc), 422)
         except Exception:
             _logger.exception("Mobile leave creation failed for employee_id=%s", employee.id)
             return _error("server_error", _("The time off request could not be saved."), 500)
-        return _json({
-            "status": "ok",
-            "leave_id": leave.id,
-            "state": leave.state,
-            "stage": self._leave_stage(leave),
-        }, 201)
-
-    @staticmethod
-    def _leave_stage(leave):
-        """Human-readable position in the approval chain for the app."""
-        vtype = leave.holiday_status_id.leave_validation_type
-        return {
-            "confirm": "waiting_manager" if vtype in ("manager", "both") else "waiting_hr",
-            "validate1": "waiting_hr",
-            "validate": "approved",
-            "refuse": "refused",
-            "cancel": "cancelled",
-        }.get(leave.state, leave.state)
-
-    @http.route(
-        "/anabtawi/mobile/leaves/cancel",
-        type="http", auth="public", methods=["POST"], csrf=False,
-    )
-    def leave_cancel(self, **kwargs):
-        employee, user, _token, error = self._require_employee()
-        if error:
-            return error
-        try:
-            leave_id = int(_payload().get("id") or 0)
-        except (TypeError, ValueError):
-            return _error("invalid_request", _("Valid request ID is required."), 400)
-        leave = request.env["hr.leave"].sudo().search([
-            ("id", "=", leave_id),
-            ("employee_id", "=", employee.id),
-        ], limit=1)
-        if not leave:
-            return _error("not_found", _("Request not found."), 404)
-        if leave.state not in ("confirm", "validate1"):
-            return _error("not_cancellable", _("This request can no longer be cancelled from the app."), 422)
-        try:
-            with request.env.cr.savepoint():
-                # real Odoo checks (can_cancel) run as the employee: no sudo here
-                leave.with_user(user)._action_user_cancel(_("Cancelled by the employee from the Employee App."))
-                request.env["anabtawi.mobile.notification"].push(
-                    leave.sudo()._mobile_stage_one_users(), "info",
-                    _("%(employee)s cancelled a time off request", employee=employee.name),
-                    leave.sudo()._mobile_summary(), record=leave,
-                )
-        except (UserError, ValidationError) as exc:
-            return _error("validation_error", exc.args[0] if exc.args else str(exc), 422)
-        return _json({"status": "ok", "leave_id": leave.id, "state": leave.state})
+        return _json({"status": "ok", "leave_id": leave.id, "state": leave.state}, 201)
 
     @http.route(
         "/anabtawi/mobile/leaves/list",
@@ -787,186 +694,7 @@ class AnabtawiMobileAPI(http.Controller):
             "hour_to": round(leave.request_hour_to, 4) if leave.request_unit_hours else None,
             "days": round(leave.number_of_days or 0.0, 2),
             "state": leave.state,
-            "stage": self._leave_stage(leave),
-            "can_cancel": leave.state in ("confirm", "validate1"),
-            "approver": leave.employee_id.leave_manager_id.name or "",
         } for leave in leaves]})
-
-    # ------------------------------------------------------------------
-    # Manager approvals
-    # ------------------------------------------------------------------
-    def _is_leave_approver(self, user):
-        """True when the user is the leave approver of at least one active employee."""
-        return bool(request.env["hr.employee"].sudo().search_count([
-            ("leave_manager_id", "=", user.id),
-            ("active", "=", True),
-        ]))
-
-    def _pending_leaves(self, user, count_only=False):
-        """Leaves waiting for THIS user's approval (stage one, state 'confirm').
-
-        Stage two (HR confirmation, state 'validate1') stays in the Odoo backend:
-        HR officers confirm there after the manager approved in the app.
-        """
-        Leave = request.env["hr.leave"].sudo()
-        domain = [
-            ("state", "=", "confirm"),
-            ("employee_id.leave_manager_id", "=", user.id),
-            ("employee_id.user_id", "!=", user.id),
-            ("holiday_status_id.leave_validation_type", "in", ["manager", "both"]),
-        ]
-        if count_only:
-            return Leave.search_count(domain)
-        return Leave.search(domain, order="request_date_from, id", limit=100)
-
-    def _manager_leave_row(self, leave):
-        return {
-            "id": leave.id,
-            "employee_id": leave.employee_id.id,
-            "employee": leave.employee_id.name,
-            "department": leave.employee_id.department_id.name or "",
-            "type": leave.holiday_status_id.name,
-            "name": leave.name or "",
-            "date_from": fields.Date.to_string(leave.request_date_from) if leave.request_date_from else None,
-            "date_to": fields.Date.to_string(leave.request_date_to) if leave.request_date_to else None,
-            "hour_from": round(leave.request_hour_from, 4) if leave.request_unit_hours else None,
-            "hour_to": round(leave.request_hour_to, 4) if leave.request_unit_hours else None,
-            "days": round(leave.number_of_days or 0.0, 2),
-            "state": leave.state,
-            "stage": self._leave_stage(leave),
-            "next_step": "hr" if leave.holiday_status_id.leave_validation_type == "both" else "done",
-            "attachments": len(leave.supported_attachment_ids) if "supported_attachment_ids" in leave._fields else 0,
-        }
-
-    @http.route(
-        "/anabtawi/mobile/manager/leaves/pending",
-        type="http", auth="public", methods=["GET"], csrf=False,
-    )
-    def manager_leaves_pending(self, **kwargs):
-        _employee, user, _token, error = self._require_employee()
-        if error:
-            return error
-        leaves = self._pending_leaves(user)
-        return _json({
-            "status": "ok",
-            "count": len(leaves),
-            "records": [self._manager_leave_row(leave) for leave in leaves],
-        })
-
-    def _manager_decide(self, approve):
-        _employee, user, _token, error = self._require_employee()
-        if error:
-            return error
-        data = _payload()
-        try:
-            leave_id = int(data.get("id") or 0)
-        except (TypeError, ValueError):
-            return _error("invalid_request", _("Valid request ID is required."), 400)
-        # Authorization is explicit: only the employee's own approver, only while
-        # the request waits for the manager. Never trust the id alone.
-        leave = self._pending_leaves(user).filtered(lambda item: item.id == leave_id)
-        if not leave:
-            return _error("forbidden", _("This request is not waiting for your approval."), 403)
-        reason = (data.get("reason") or "").strip()
-        if not approve and not reason:
-            return _error("reason_required", _("A reason is required to refuse a request."), 422)
-        try:
-            with request.env.cr.savepoint():
-                # env.user stays the manager (approver is recorded correctly);
-                # sudo only bypasses record rules after the check above.
-                acting = leave.with_user(user).sudo()
-                if approve:
-                    acting.action_approve(check_state=False)
-                    if reason:
-                        acting.message_post(body=_("Approved: %s", reason))
-                else:
-                    acting.action_refuse()
-                    acting.message_post(body=_("Refused: %s", reason))
-        except (UserError, ValidationError) as exc:
-            return _error("validation_error", exc.args[0] if exc.args else str(exc), 422)
-        except Exception:
-            _logger.exception("Manager leave decision failed leave_id=%s user_id=%s", leave_id, user.id)
-            return _error("server_error", _("The decision could not be saved."), 500)
-        return _json({
-            "status": "ok",
-            "leave_id": leave.id,
-            "state": leave.state,
-            "stage": self._leave_stage(leave),
-        })
-
-    @http.route(
-        "/anabtawi/mobile/manager/leaves/approve",
-        type="http", auth="public", methods=["POST"], csrf=False,
-    )
-    def manager_leave_approve(self, **kwargs):
-        return self._manager_decide(approve=True)
-
-    @http.route(
-        "/anabtawi/mobile/manager/leaves/refuse",
-        type="http", auth="public", methods=["POST"], csrf=False,
-    )
-    def manager_leave_refuse(self, **kwargs):
-        return self._manager_decide(approve=False)
-
-    # ------------------------------------------------------------------
-    # Notification inbox
-    # ------------------------------------------------------------------
-    @http.route(
-        "/anabtawi/mobile/notifications/list",
-        type="http", auth="public", methods=["GET"], csrf=False,
-    )
-    def notifications_list(self, **kwargs):
-        _employee, user, _token, error = self._require_employee()
-        if error:
-            return error
-        domain = [("user_id", "=", user.id)]
-        if str(kwargs.get("unread_only", "")).lower() in ("1", "true", "yes"):
-            domain.append(("is_read", "=", False))
-        try:
-            limit = max(1, min(int(kwargs.get("limit") or 50), 100))
-        except (TypeError, ValueError):
-            limit = 50
-        rows = request.env["anabtawi.mobile.notification"].sudo().search(domain, limit=limit)
-        return _json({"status": "ok", "records": [{
-            "id": row.id,
-            "kind": row.kind,
-            "title": row.title,
-            "body": row.body or "",
-            "res_model": row.res_model or "",
-            "res_id": row.res_id,
-            "is_read": row.is_read,
-            "created_at": fields.Datetime.to_string(row.create_date) if row.create_date else None,
-        } for row in rows]})
-
-    @http.route(
-        "/anabtawi/mobile/notifications/count",
-        type="http", auth="public", methods=["GET"], csrf=False,
-    )
-    def notifications_count(self, **kwargs):
-        _employee, user, _token, error = self._require_employee()
-        if error:
-            return error
-        return _json({
-            "status": "ok",
-            "unread": request.env["anabtawi.mobile.notification"].sudo().search_count(
-                [("user_id", "=", user.id), ("is_read", "=", False)]
-            ),
-            "pending_approvals": self._pending_leaves(user, count_only=True),
-        })
-
-    @http.route(
-        "/anabtawi/mobile/notifications/read",
-        type="http", auth="public", methods=["POST"], csrf=False,
-    )
-    def notifications_read(self, **kwargs):
-        _employee, user, _token, error = self._require_employee()
-        if error:
-            return error
-        ids = _payload().get("ids")
-        if ids is not None and (not isinstance(ids, list) or not all(isinstance(i, int) for i in ids)):
-            return _error("invalid_request", _("ids must be a list of integers."), 400)
-        done = request.env["anabtawi.mobile.notification"].mark_read(user, ids or None)
-        return _json({"status": "ok", "marked": done})
 
     def _ensure_default_overtime_categories(self, employee):
         """Create/read the standard Employee App overtime categories.
@@ -1145,7 +873,7 @@ class AnabtawiMobileAPI(http.Controller):
         records = request.env["hr.payslip"].sudo().search(
             [
                 ("employee_id", "=", employee.id),
-                ("state", "in", ["done", "paid"]),
+                ("state", "in", ["validated", "paid"]),
             ],
             order="date_to desc, id desc",
             limit=50,
@@ -1156,7 +884,7 @@ class AnabtawiMobileAPI(http.Controller):
             "records": [
                 {
                     "id": payslip.id,
-                    "number": payslip.number or f"PAY/{payslip.id}",
+                    "number": payslip.name or f"PAY/{payslip.id}",
                     "name": payslip.name or _("Payslip"),
                     "date_from": fields.Date.to_string(payslip.date_from) if payslip.date_from else None,
                     "date_to": fields.Date.to_string(payslip.date_to) if payslip.date_to else None,
@@ -1190,7 +918,7 @@ class AnabtawiMobileAPI(http.Controller):
             [
                 ("id", "=", payslip_id),
                 ("employee_id", "=", employee.id),
-                ("state", "in", ["done", "paid"]),
+                ("state", "in", ["validated", "paid"]),
             ],
             limit=1,
         )
@@ -1207,12 +935,11 @@ class AnabtawiMobileAPI(http.Controller):
             _logger.exception("Failed to render PDF for payslip_id=%s", payslip.id)
             return _error("pdf_failed", _("Could not generate payslip PDF."), 500)
 
-        filename = f"Payslip_{payslip.number or payslip.id}.pdf"
+        filename = f"Payslip_{payslip.name or payslip.id}.pdf"
         headers = [
             ("Content-Type", "application/pdf"),
             ("Content-Disposition", f'attachment; filename="{filename}"'),
             ("Content-Length", str(len(pdf_content))),
-            ("Cache-Control", "no-store"),
         ]
         return request.make_response(pdf_content, headers=headers)
 
@@ -1224,13 +951,13 @@ class AnabtawiMobileAPI(http.Controller):
         config = request.env["ir.config_parameter"].sudo()
         latest_version = config.get_param("anabtawi_mobile.latest_version")
         if not latest_version:
-            config.set_param("anabtawi_mobile.latest_version", "1.3.0")
-            latest_version = "1.3.0"
+            config.set_param("anabtawi_mobile.latest_version", "1.2.0")
+            latest_version = "1.2.0"
 
         min_version = config.get_param("anabtawi_mobile.min_version", "1.0.0")
         update_message = config.get_param(
             "anabtawi_mobile.update_message",
-            _("A new version of the Anabtawi Employee App (v1.3.0) is available: manager approvals, notifications and precise GPS check-in. Please update.")
+            _("A new version of the Anabtawi Employee App (v1.2.0) with Payslip support is available. Please update to continue.")
         )
         download_url = config.get_param(
             "anabtawi_mobile.download_url",
@@ -1260,7 +987,7 @@ class AnabtawiMobileAPI(http.Controller):
         with open(apk_path, "rb") as file:
             apk_bytes = file.read()
 
-        filename = "Employee-App-v1.3.0.apk"
+        filename = "Employee-App-v1.2.0-with-payslip.apk"
         headers = [
             ("Content-Type", "application/vnd.android.package-archive"),
             ("Content-Disposition", f'attachment; filename="{filename}"'),
@@ -1268,3 +995,12 @@ class AnabtawiMobileAPI(http.Controller):
             ("Cache-Control", "no-cache"),
         ]
         return request.make_response(apk_bytes, headers=headers)
+
+    @http.route(["/pwa", "/mobile/app"], type="http", auth="public", csrf=False)
+    def pwa_index(self, **kwargs):
+        pwa_path = os.path.join(os.path.dirname(__file__), "../static/pwa/index.html")
+        if os.path.exists(pwa_path):
+            with open(pwa_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            return request.make_response(content, [("Content-Type", "text/html; charset=utf-8")])
+        return _error("not_found", _("PWA application files not found."), 404)

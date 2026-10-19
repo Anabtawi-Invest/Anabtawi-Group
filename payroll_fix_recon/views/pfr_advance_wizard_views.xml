@@ -25,6 +25,7 @@
                 </group>
                 <group string="Advance Parameters" invisible="state == 'done'">
                     <group>
+                        <field name="company_id" options="{'no_create': True, 'no_open': True}"/>
                         <field name="date_cutoff"/>
                         <field name="advance_percent"/>
                         <field name="batch_name"/>
@@ -32,12 +33,13 @@
                     </group>
                     <group>
                         <field name="month_start"/>
-                        <field name="employee_ids" widget="many2many_tags"/>
+                        <field name="employee_ids" widget="many2many_tags" domain="[('company_id', '=', company_id)]" options="{'no_create': True}"/>
                         <field name="total_advance"/>
                     </group>
                 </group>
                 <group string="Active Run Summary" invisible="state != 'done'">
                     <group>
+                        <field name="company_id" readonly="1" options="{'no_create': True, 'no_open': True}"/>
                         <field name="date_cutoff" readonly="1"/>
                         <field name="month_start" readonly="1"/>
                     </group>

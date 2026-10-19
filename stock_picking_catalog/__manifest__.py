@@ -3,7 +3,7 @@
     "name": "Stock Picking Product Catalog",
     "version": "19.0.1.0.0",
     "category": "Inventory",
-    "summary": "Add Catalog button to stock pickings sOperations (like Sales)",
+    "summary": "Add Catalog button to stock pickings Operations (like Sales)",
     "author":"Anabtawi",
     "license": "LGPL-3",
     "depends": ["stock", "product"],

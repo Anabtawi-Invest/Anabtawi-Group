@@ -105,4 +105,19 @@ action = {
               action="action_pos_delivery_amount_report_generate"
               groups="account.group_account_readonly,account.group_account_invoice,account.group_account_manager"
               sequence="91"/>
+
+    <!-- Point of Sale > Reporting -->
+    <menuitem id="menu_pos_delivery_amount_report_pos"
+              name="Delivery Amount Report"
+              parent="point_of_sale.menu_point_rep"
+              action="action_pos_delivery_amount_report"
+              groups="point_of_sale.group_pos_manager,account.group_account_readonly,account.group_account_invoice,account.group_account_manager"
+              sequence="48"/>
+
+    <menuitem id="menu_pos_delivery_amount_report_generate_pos"
+              name="Generate Delivery Amount Reports"
+              parent="point_of_sale.menu_point_rep"
+              action="action_pos_delivery_amount_report_generate"
+              groups="point_of_sale.group_pos_manager,account.group_account_readonly,account.group_account_invoice,account.group_account_manager"
+              sequence="49"/>
 </odoo>

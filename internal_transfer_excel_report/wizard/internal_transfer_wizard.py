@@ -98,25 +98,6 @@ class InternalTransferReportWizard(models.TransientModel):
         category = product.product_tmpl_id.factory_plan_category
         return category if category else self.env._('Non')
 
-    def _get_picking_created_by_display(self, picking):
-        """Return acting employee name, branch name, or Odoo user."""
-        if 'created_by_display' in picking._fields:
-            return picking.created_by_display or self.env._('Undefined')
-        if picking.create_uid:
-            return picking.create_uid.display_name
-        return self.env._('Undefined')
-
-    def _get_receipt_created_by_display(self, move):
-        """Return the purchase order creator, falling back to the receipt creator."""
-        purchase_order = (
-            move.purchase_line_id.order_id if 'purchase_line_id' in move._fields else False
-        ) or (
-            move.picking_id.purchase_id if 'purchase_id' in move.picking_id._fields else False
-        )
-        if purchase_order and purchase_order.create_uid:
-            return purchase_order.create_uid.display_name
-        return self._get_picking_created_by_display(move.picking_id)
-
     def _get_move_uom_name(self, move):
         return move.product_uom.display_name or move.product_id.uom_id.display_name or ''
 
@@ -170,14 +151,14 @@ class InternalTransferReportWizard(models.TransientModel):
             ('create_date', '<=', date_to_dt),
         ]
 
-    def _get_internal_transfer_moves(self):
+    def _get_sheet1_data(self):
         self.ensure_one()
 
         picking_domain = self._get_base_picking_domain()
         picking_domain.append(('state', 'not in', ('done', 'cancel')))
         picking_ids = self.env['stock.picking'].search(picking_domain).ids
         if not picking_ids:
-            return self.env['stock.move']
+            return []
 
         move_domain = [
             ('picking_id.picking_type_id', '=', self.picking_type_id.id),
@@ -187,75 +168,49 @@ class InternalTransferReportWizard(models.TransientModel):
             ('move_dest_ids', '=', False),
         ]
         move_domain = self._append_factory_plan_category_domain(move_domain)
-        return self.env['stock.move'].search(move_domain, order='picking_id, product_id')
 
-    def _get_receipt_settings(self):
-        """Return (company, vendor, location) from settings, or None if any is missing."""
-        params = self.env['ir.config_parameter'].sudo()
-        company = self.env['res.company'].sudo().browse(
-            int(params.get_param('internal_transfer_excel_report.receipt_company_id') or 0)
-        ).exists()
-        vendor = self.env['res.partner'].sudo().browse(
-            int(params.get_param('internal_transfer_excel_report.receipt_vendor_id') or 0)
-        ).exists()
-        location = self.env['stock.location'].sudo().browse(
-            int(params.get_param('internal_transfer_excel_report.receipt_location_id') or 0)
-        ).exists()
-        if not (company and vendor and location):
-            return None
-        return company, vendor, location
-
-    def _get_receipt_moves(self):
-        self.ensure_one()
-        receipt_settings = self._get_receipt_settings()
-        if not receipt_settings:
-            return self.env['stock.move']
-        company, vendor, location = receipt_settings
-
-        date_from_dt, date_to_dt = self._compute_dates()
-        move_domain = [
-            ('picking_id.picking_type_id.code', '=', 'incoming'),
-            ('picking_id.company_id', '=', company.id),
-            ('picking_id.partner_id', 'child_of', vendor.id),
-            ('picking_id.create_date', '>=', date_from_dt),
-            ('picking_id.create_date', '<=', date_to_dt),
-            ('picking_id.state', 'not in', ('done', 'cancel')),
-            ('state', 'not in', ('done', 'cancel')),
-            ('location_id', 'child_of', location.id),
-        ]
-        move_domain = self._append_factory_plan_category_domain(move_domain)
-        # The configured company may be outside the user's allowed companies.
-        return self.env['stock.move'].sudo().search(move_domain, order='picking_id, product_id')
-
-    def _get_sheet1_data(self):
-        self.ensure_one()
+        moves = self.env['stock.move'].search(
+            move_domain,
+            order='picking_id, product_id',
+        )
         rows = []
-        for moves, get_created_by in (
-            (self._get_internal_transfer_moves(), lambda move: self._get_picking_created_by_display(move.picking_id)),
-            (self._get_receipt_moves(), self._get_receipt_created_by_display),
-        ):
-            for move in moves:
-                picking = move.picking_id
-                rows.append({
-                    'transfer_reference': picking.name or '',
-                    'product_name': move.product_id.display_name,
-                    'factory_plan_category': self._get_factory_plan_category_display(move.product_id),
-                    'created_by': get_created_by(move),
-                    'creating_date': picking.create_date,
-                    'demand': move.product_uom_qty,
-                    'product_uom': self._get_move_uom_name(move),
-                })
+        for move in moves:
+            picking = move.picking_id
+            rows.append({
+                'transfer_reference': picking.name or '',
+                'product_name': move.product_id.display_name,
+                'factory_plan_category': self._get_factory_plan_category_display(move.product_id),
+                'created_by': picking.create_uid.display_name or self.env._('Undefined'),
+                'creating_date': picking.create_date,
+                'demand': move.product_uom_qty,
+                'product_uom': self._get_move_uom_name(move),
+            })
         return rows
 
     def _get_sheet2_data(self):
         self.ensure_one()
-        moves = list(self._get_internal_transfer_moves()) + list(self._get_receipt_moves())
+
+        picking_domain = self._get_base_picking_domain()
+        picking_domain.append(('state', 'not in', ('done', 'cancel')))
+        picking_ids = self.env['stock.picking'].search(picking_domain).ids
+        if not picking_ids:
+            return []
+
+        move_domain = [
+            ('picking_id.picking_type_id', '=', self.picking_type_id.id),
+            ('picking_id', 'in', picking_ids),
+            ('picking_id.state', 'not in', ('done', 'cancel')),
+            ('state', 'not in', ('done', 'cancel')),
+            ('move_dest_ids', '=', False),
+        ]
+        move_domain = self._append_factory_plan_category_domain(move_domain)
+        moves = self.env['stock.move'].search(move_domain)
         if not moves:
             return []
 
         aggregated = {}
         for move in moves:
-            key = (move.product_id.id, move.product_uom.id)
+            key = move.product_id.id
             row = aggregated.setdefault(key, {
                 'factory_plan_category': self._get_factory_plan_category_display(move.product_id),
                 'product_name': move.product_id.display_name,

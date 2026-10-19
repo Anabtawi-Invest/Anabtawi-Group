@@ -7,6 +7,10 @@
         <field name="arch" type="xml">
             <xpath expr="//field[@name='usage']" position="after">
                 <field name="restrict_negative"/>
+                <field name="allowed_negative_user_ids"
+                         widget="many2many_tags"
+                         invisible="not restrict_negative"
+                         options="{'no_create': True}"/>
             </xpath>
         </field>
     </record>

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+
+    <!-- Add custom receipt buttons -->
+    <t t-name="pos_pledge.ReceiptScreen"
+       t-inherit="point_of_sale.ReceiptScreen"
+       t-inherit-mode="extension">
+
+        <!-- Hide the standard Print button -->
+        <xpath expr="//button[hasclass('print')][1]" position="attributes">
+            <attribute name="style">display: none;</attribute>
+        </xpath>
+        
+        <!-- Add custom Full Receipt button -->
+        <xpath expr="//button[hasclass('print')][1]" position="after">
+            <button class="button print-full btn btn-lg btn-primary w-100 py-3 mb-2" 
+                    t-on-click="() => this.printFullReceipt()">
+                <i class="fa fa-print me-1"/>
+                Print Full Receipt
+            </button>
+            
+            <button class="button print-customer btn btn-lg btn-success w-100 py-3" 
+                    t-on-click="() => this.printCustomerReceipt()">
+                <i class="fa fa-print me-1"/>
+                Print Customer Receipt
+            </button>
+        </xpath>
+    </t>
+
+</templates>

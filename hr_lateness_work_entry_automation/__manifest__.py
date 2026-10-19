@@ -6,11 +6,9 @@
     "author": "Anabtawi",
     "license": "LGPL-3",
     "depends": [
-        "anabtawi_web_frontend_fix",
         "hr_attendance",
         "hr_work_entry",
         "planning",
-        "hr_holidays",
     ],
     "data": [],
     "installable": True,

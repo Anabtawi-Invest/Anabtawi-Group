@@ -1,2 +1,0 @@
-sqlcipher3-wheels
-pyinstaller

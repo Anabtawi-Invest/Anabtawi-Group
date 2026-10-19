@@ -41,6 +41,3 @@ class ResConfigSettings(models.TransientModel):
     direct_sales_price_override_approval = fields.Boolean(
         related="company_id.direct_sales_price_override_approval", readonly=False
     )
-    direct_sales_max_discount_percent = fields.Float(
-        related="company_id.direct_sales_max_discount_percent", readonly=False
-    )

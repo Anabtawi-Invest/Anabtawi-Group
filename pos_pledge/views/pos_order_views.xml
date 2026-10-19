@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    
+    <!-- Extend POS Order Form View -->
+    <record id="view_pos_order_form_pledge" model="ir.ui.view">
+        <field name="name">pos.order.form.pledge</field>
+        <field name="model">pos.order</field>
+        <field name="inherit_id" ref="point_of_sale.view_pos_pos_form"/>
+        <field name="arch" type="xml">
+            
+            <!-- Add new Pledge Info tab -->
+            <xpath expr="//page[@name='extra']" position="after">
+                <page string="Pledge Info" name="pledge_info">
+                    <group string="Pledge (Rahn) Information">
+                        <group>
+                            <field name="has_employee_service"/>
+                            <field name="employee_id"/>
+                        </group>
+                        <group>
+                            <field name="pledge_product_qty"/>
+                            <field name="total_pledge_amount"/>
+                        </group>
+                    </group>
+                </page>
+            </xpath>
+            
+        </field>
+    </record>
+
+</odoo>

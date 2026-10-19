@@ -110,15 +110,14 @@ class PosDeliveryCashExcelWizard(models.TransientModel):
         cash_out = sum(line.amount for line in cash_moves if line.amount < 0)
         moves_net = cash_in + cash_out
 
-        # Closed sessions freeze the official net used by cash register math.
         if session.state == "closed":
-            net = session.cash_real_transaction if session.cash_real_transaction is not False else moves_net
-            # If statement lines were altered after close, keep official net and
-            # only show split in/out when it still reconciles to that net.
+            net = (
+                session.cash_real_transaction
+                if session.cash_real_transaction is not False
+                else moves_net
+            )
             if session.currency_id.compare_amounts(moves_net, net) != 0 and not cash_moves:
                 return (max(net, 0.0), min(net, 0.0), net)
-            if session.currency_id.compare_amounts(moves_net, net) != 0:
-                return cash_in, cash_out, net
             return cash_in, cash_out, net
         return cash_in, cash_out, moves_net
 
@@ -139,6 +138,9 @@ class PosDeliveryCashExcelWizard(models.TransientModel):
             cash_in_out = currency.round(cash_in_out)
             session_delivery = currency.round(session._get_session_delivered_total())
             cash_on_system = currency.round(session.cash_register_balance_end or 0.0)
+            counted_closing_cash = currency.round(
+                session.cash_register_balance_end_real or 0.0
+            )
             closing_delivery = currency.round(session._get_closing_delivered_total())
             rows.append(
                 {
@@ -152,6 +154,10 @@ class PosDeliveryCashExcelWizard(models.TransientModel):
                     "cash_in_out": cash_in_out,
                     "session_delivery": session_delivery,
                     "cash_on_system": cash_on_system,
+                    "counted_closing_cash": counted_closing_cash,
+                    "counted_difference": currency.round(
+                        cash_on_system - counted_closing_cash
+                    ),
                     "closing_delivery": closing_delivery,
                     "difference": currency.round(cash_on_system - closing_delivery),
                     "currency": currency.name or "",
@@ -185,6 +191,16 @@ class PosDeliveryCashExcelWizard(models.TransientModel):
             ),
             note_fmt,
         )
+        sheet.write(
+            4,
+            0,
+            _(
+                "Counted Cash at Closing = amount entered when closing the session. "
+                "Diff vs Counted = Cash on System − Counted Cash. "
+                "Diff vs Closing Delivery = Cash on System − Closing Delivery."
+            ),
+            note_fmt,
+        )
 
         headers = [
             _("Date"),
@@ -197,8 +213,10 @@ class PosDeliveryCashExcelWizard(models.TransientModel):
             _("Cash In/Out"),
             _("Delivery During Session"),
             _("Cash on System"),
+            _("Counted Cash at Closing"),
+            _("Diff vs Counted"),
             _("Closing Delivery Amount"),
-            _("Difference"),
+            _("Diff vs Closing Delivery"),
             _("Currency"),
         ]
         money_keys = [
@@ -209,16 +227,19 @@ class PosDeliveryCashExcelWizard(models.TransientModel):
             "cash_in_out",
             "session_delivery",
             "cash_on_system",
+            "counted_closing_cash",
+            "counted_difference",
             "closing_delivery",
             "difference",
         ]
 
+        header_row = 6
         for col, header in enumerate(headers):
-            sheet.write(5, col, header, header_fmt)
+            sheet.write(header_row, col, header, header_fmt)
 
         totals = {key: 0.0 for key in money_keys}
         for index, row in enumerate(rows):
-            line = 6 + index
+            line = header_row + 1 + index
             sheet.write(line, 0, row["date"] or "", date_fmt)
             sheet.write(line, 1, row["session"], text_fmt)
             sheet.write(line, 2, row["pos"], text_fmt)
@@ -227,7 +248,7 @@ class PosDeliveryCashExcelWizard(models.TransientModel):
                 totals[key] += row[key]
             sheet.write(line, 3 + len(money_keys), row["currency"], text_fmt)
 
-        total_row = 6 + len(rows)
+        total_row = header_row + 1 + len(rows)
         sheet.write(total_row, 0, _("Total"), total_label_fmt)
         sheet.write(total_row, 1, "", total_label_fmt)
         sheet.write(total_row, 2, "", total_label_fmt)
@@ -237,8 +258,8 @@ class PosDeliveryCashExcelWizard(models.TransientModel):
 
         sheet.set_column(0, 0, 14)
         sheet.set_column(1, 2, 22)
-        sheet.set_column(3, 11, 20)
-        sheet.set_column(12, 12, 12)
+        sheet.set_column(3, 13, 20)
+        sheet.set_column(14, 14, 12)
 
         workbook.close()
         return buffer.getvalue()

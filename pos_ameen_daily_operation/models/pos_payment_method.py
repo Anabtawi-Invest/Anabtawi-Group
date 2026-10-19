@@ -18,12 +18,14 @@ class PosPaymentMethod(models.Model):
             ('mythings', 'Mythings'),
             ('kabseh', 'Kabseh'),
             ('employee_debt', 'Employee Debt'),
+            ('advance_applied', 'Advance Applied'),
         ],
         string='Daily Operations Report Type',
         help=(
             'Column of the Daily Operations report and POS dashboard that receives the '
-            'payments of this method. Hospitality payments are excluded from Sales; '
-            'None and Employee Debt are included in Sales without a dedicated Excel column.'
+            'payments of this method. Hospitality and Advance Applied (advance order deposits '
+            'used at pickup) payments are excluded from Sales; None and Employee Debt are '
+            'included in Sales without a dedicated Excel column.'
         ),
     )
 

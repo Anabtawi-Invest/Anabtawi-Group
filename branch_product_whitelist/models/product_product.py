@@ -18,4 +18,4 @@ class ProductProduct(models.Model):
     @api.model
     def name_search(self, name="", domain=None, operator="ilike", limit=100):
         domain = list(domain or []) + self._get_branch_whitelist_extra_domain()
-        return super().name_search(name, domain=domain, operator=operator, limit=limit)
+        return super().name_search(name, domain, operator, limit)

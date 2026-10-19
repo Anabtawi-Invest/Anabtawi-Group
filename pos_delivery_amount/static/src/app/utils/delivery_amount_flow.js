@@ -153,7 +153,7 @@ export function getDeliveryCashierName(pos) {
 
 /**
  * Print a cash delivery receipt via the POS printer (browser fallback).
- * Does not include session name or reason. Failures do not block the flow.
+ * Does not include session name, reason, or journal. Failures do not block the flow.
  */
 export async function printDeliveryAmountReceipt(pos, receipt, { isClosing = false } = {}) {
     if (!receipt || !pos?.printer) {

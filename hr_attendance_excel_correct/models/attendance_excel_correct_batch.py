@@ -269,21 +269,13 @@ class HrAttendanceExcelCorrectBatch(models.Model):
         if line.action == "update":
             if not line.attendance_id:
                 raise UserError(_("Missing attendance to update."))
-            same_day = self._find_attendances_for_day(line.employee_id, line.date)
-            if len(same_day) > 1:
-                raise UserError(_(
-                    "Multiple attendances now exist on %s (IDs: %s)."
-                ) % (line.date, ", ".join(str(a.id) for a in same_day)))
             line.attendance_id.write(vals)
             note = _("Updated attendance #%s. Worked hours / overtime recomputed.") % line.attendance_id.id
             return line.attendance_id, note
 
         if line.action == "create":
-            existing = self._find_attendances_for_day(line.employee_id, line.date)
-            if existing:
-                raise UserError(_(
-                    "Attendance already exists on %s (IDs: %s)."
-                ) % (line.date, ", ".join(str(a.id) for a in existing)))
+            # Multi-session days are allowed: create an extra interval.
+            # Overlap constraints on hr.attendance will still block invalid times.
             attendance = Attendance.create({
                 "employee_id": line.employee_id.id,
                 "check_in": line.new_check_in,

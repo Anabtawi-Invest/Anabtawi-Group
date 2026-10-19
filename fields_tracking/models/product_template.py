@@ -15,7 +15,6 @@ class ProductTemplate(models.Model):
     standard_price = fields.Float(tracking=True)
     uom_id = fields.Many2one(tracking=True)
     uom_ids = fields.Many2many(tracking=True)
-    seller_ids = fields.One2many(tracking=True)
 
     @classmethod
     def _setup_complete(cls):
@@ -23,6 +22,7 @@ class ProductTemplate(models.Model):
         # Optional fields coming from extra apps.
         for field_name in (
             "available_in_pos",
+            "has_pledge",
             "branch_allowed",
         ):
             field = cls._fields.get(field_name)

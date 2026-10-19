@@ -73,6 +73,16 @@ def load_rules():
         "dept_override": [normalize(p) for p in analytic.get("department_override", [])],
         "factory_re": [re.compile(normalize_regex(p)) for p in analytic.get("factory_patterns", [])],
         "ignore_re": [re.compile(normalize_regex(p)) for p in analytic.get("ignore_patterns", [])],
+        "subs": {
+            bucket: [
+                {"key": r["key"], "subs": _compile_words(r["words"])[0], "whole": _compile_words(r["words"])[1]}
+                for r in rules
+            ]
+            for bucket, rules in raw.get("subcategories", {}).items()
+        },
+        "aliases": [
+            {"subs": _compile_words(a["words"])[0], "alias": a["alias"]} for a in raw.get("aliases", [])
+        ],
         "platforms": [
             {"key": p["key"], "name": p["name"], "subs": _compile_words(p["words"])[0]}
             for p in raw.get("platforms", [])
@@ -138,6 +148,23 @@ def classify_analytic(name):
     if any(r.search(norm) for r in rules["factory_re"]):
         return "factory", short, ""
     return "department", short, ""
+
+
+def classify_sub(bucket, name):
+    """Sub-category key (SSC, HEALTH, ELECTRICITY, ...) of an account inside a bucket, or 'OTHER'."""
+    clean = re.sub(r"(^| )تشغيل( |$)", " ", normalize(name))
+    padded = " %s " % clean
+    for rule in load_rules()["subs"].get(bucket, []):
+        if any(w in padded for w in rule["subs"]) or any(" %s " % w in padded for w in rule["whole"]):
+            return rule["key"]
+    return "OTHER"
+
+
+def search_aliases(name):
+    """English search terms for an (Arabic) account name, so 'internet' finds 'مصروف انترنت'."""
+    padded = " %s " % re.sub(r"(^| )تشغيل( |$)", " ", normalize(name))
+    found = [a["alias"] for a in load_rules()["aliases"] if any(w in padded for w in a["subs"])]
+    return " ".join(found)
 
 
 def platform_of(name):

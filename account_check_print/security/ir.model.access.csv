@@ -1,8 +1,0 @@
-id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_check_layout_user,account.check.layout user,model_account_check_layout,account.group_account_user,1,0,0,0
-access_check_layout_manager,account.check.layout manager,model_account_check_layout,account.group_account_manager,1,1,1,1
-access_check_history_user,account.check.print.history user,model_account_check_print_history,account.group_account_user,1,0,0,0
-access_check_history_manager,account.check.print.history manager,model_account_check_print_history,account.group_account_manager,1,0,1,0
-access_check_void_wizard_manager,account.check.void.wizard manager,model_account_check_void_wizard,account.group_account_manager,1,1,1,1
-access_check_reprint_wizard_manager,account.check.reprint.wizard manager,model_account_check_reprint_wizard,account.group_account_manager,1,1,1,1
-

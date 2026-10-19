@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError
-from datetime import date, datetime
 
 
 class PosOrder(models.Model):
@@ -43,39 +42,6 @@ class PosOrder(models.Model):
     is_catering = fields.Boolean(string="Is Catering", default=False, copy=False)
     delivery_fee = fields.Float(string="Delivery Fee", digits=0, default=0.0)
     catering_fee = fields.Float(string="Catering Fee", digits=0, default=0.0)
-
-    @api.model
-    def _order_fields(self, ui_order):
-        order_fields = super()._order_fields(ui_order)
-        if "fulfillment_type" in ui_order:
-            order_fields["fulfillment_type"] = ui_order.get("fulfillment_type")
-        if "scheduled_datetime" in ui_order:
-            order_fields["scheduled_datetime"] = ui_order.get("scheduled_datetime")
-        if "is_advance_deposit" in ui_order:
-            order_fields["is_advance_deposit"] = ui_order.get("is_advance_deposit")
-        if "jofotara_status" in ui_order:
-            order_fields["jofotara_status"] = ui_order.get("jofotara_status")
-        if "delivery_address_id" in ui_order:
-            order_fields["delivery_address_id"] = ui_order.get("delivery_address_id")
-        if "delivery_address_name" in ui_order:
-            order_fields["delivery_address_name"] = ui_order.get("delivery_address_name")
-        if "delivery_address_phone" in ui_order:
-            order_fields["delivery_address_phone"] = ui_order.get("delivery_address_phone")
-        if "delivery_street" in ui_order:
-            order_fields["delivery_street"] = ui_order.get("delivery_street")
-        if "delivery_city" in ui_order:
-            order_fields["delivery_city"] = ui_order.get("delivery_city")
-        if "delivery_building_apt" in ui_order:
-            order_fields["delivery_building_apt"] = ui_order.get("delivery_building_apt")
-        if "delivery_zip" in ui_order:
-            order_fields["delivery_zip"] = ui_order.get("delivery_zip")
-        if "is_catering" in ui_order:
-            order_fields["is_catering"] = ui_order.get("is_catering")
-        if "delivery_fee" in ui_order:
-            order_fields["delivery_fee"] = ui_order.get("delivery_fee")
-        if "catering_fee" in ui_order:
-            order_fields["catering_fee"] = ui_order.get("catering_fee")
-        return order_fields
 
     @api.model
     def _load_pos_data_fields(self, config):
@@ -130,7 +96,7 @@ class PosOrder(models.Model):
                     picking.action_assign()
                     if picking.state == "assigned":
                         picking.button_validate()
-            order.write({"is_advance_deposit": False, "jofotara_status": "submitted", "state": "done"})
+            order.write({"is_advance_deposit": False, "jofotara_status": "submitted"})
             if not order.account_move:
                 try:
                     order.action_pos_order_invoice()
@@ -139,50 +105,42 @@ class PosOrder(models.Model):
         return True
 
     @api.model
-    def search_open_scheduled_orders(self, pos_config_id=False, search_query="", partner_id=False, filter_type="all"):
-        try:
-            domain = [("state", "not in", ["cancel"])]
+    def search_open_scheduled_orders(self, pos_config_id=False, search_query=""):
+        config_ids = []
+        if pos_config_id:
+            try:
+                cfg_id = int(pos_config_id)
+                config_ids.append(cfg_id)
+                config = self.env["pos.config"].browse(cfg_id)
+                if config and config.allowed_fulfillment_branch_ids:
+                    config_ids.extend(config.allowed_fulfillment_branch_ids.ids)
+            except Exception:
+                pass
 
-            if partner_id:
-                try:
-                    domain.append(("partner_id", "=", int(partner_id)))
-                except Exception:
-                    pass
+        domain = [
+            ("fulfillment_type", "in", ["pickup", "delivery"]),
+            ("state", "not in", ["cancel"]),
+        ]
+        if config_ids:
+            domain.append(("pos_config_id", "in", config_ids))
 
-            if search_query and str(search_query).strip():
-                q = str(search_query).strip()
-                domain.extend([
-                    "|", "|", "|", "|", "|", "|",
-                    ("delivery_address_name", "ilike", q),
-                    ("delivery_address_phone", "ilike", q),
-                    ("partner_id.name", "ilike", q),
-                    ("partner_id.mobile", "ilike", q),
-                    ("partner_id.phone", "ilike", q),
-                    ("name", "ilike", q),
-                    ("pos_reference", "ilike", q),
-                ])
+        if search_query and str(search_query).strip():
+            q = str(search_query).strip()
+            domain.append("|")
+            domain.append("|")
+            domain.append("|")
+            domain.append(("delivery_address_name", "ilike", q))
+            domain.append(("delivery_address_phone", "ilike", q))
+            domain.append(("name", "ilike", q))
+            domain.append(("pos_reference", "ilike", q))
 
-            today_str = date.today().strftime("%Y-%m-%d")
-
-            orders = self.search(domain, order="id desc, date_order desc", limit=150)
-            res = []
-            for o in orders:
-                paid = sum(o.payment_ids.mapped("amount"))
-                total = o.amount_total
-                due = total - paid
-                if not (due > 0.001 or o.is_advance_deposit or o.fulfillment_type):
-                    continue
-
-                dt_str = o.scheduled_datetime or (str(o.date_order) if o.date_order else "")
-                is_today = today_str in str(dt_str) or (o.date_order and str(o.date_order)[:10] == today_str)
-
-                if filter_type == "today" and not is_today:
-                    continue
-                elif filter_type == "pickup" and o.fulfillment_type != "pickup":
-                    continue
-                elif filter_type == "delivery" and o.fulfillment_type != "delivery":
-                    continue
-
+        orders = self.search(domain, order="date_order desc", limit=50)
+        res = []
+        for o in orders:
+            paid = sum(o.payment_ids.mapped("amount"))
+            total = o.amount_total
+            due = total - paid
+            if due > 0.001 or o.is_advance_deposit:
                 res.append({
                     "id": o.id,
                     "name": o.name or o.pos_reference or f"Order #{o.id}",
@@ -190,20 +148,15 @@ class PosOrder(models.Model):
                     "date_order": str(o.date_order) if o.date_order else "",
                     "scheduled_datetime": o.scheduled_datetime or "",
                     "fulfillment_type": o.fulfillment_type or "pickup",
-                    "customer_name": o.delivery_address_name or (o.partner_id.name if o.partner_id else "عميل سفري"),
+                    "customer_name": o.delivery_address_name or (o.partner_id.name if o.partner_id else ""),
                     "customer_phone": o.delivery_address_phone or (o.partner_id.mobile if o.partner_id else ""),
-                    "partner_id": o.partner_id.id if o.partner_id else False,
                     "street": o.delivery_street or "",
                     "city": o.delivery_city or "",
                     "amount_total": total,
                     "amount_paid": paid,
                     "amount_due": due if due > 0 else 0.0,
-                    "is_today": is_today,
-                    "status_label": "تسليم اليوم" if is_today else "طلبيات قادمة",
                 })
-            return res
-        except Exception as e:
-            return []
+        return res
 
     @api.model
     def action_complete_scheduled_order_from_pos(self, order_id, payment_method_id, amount_tendered):
@@ -226,28 +179,7 @@ class PosOrder(models.Model):
                 "payment_date": fields.Datetime.now(),
             })
 
-        for picking in order.picking_ids:
-            if picking.state not in ["done", "cancel"]:
-                picking.action_assign()
-                if picking.state == "assigned":
-                    picking.button_validate()
-
-        order.write({
-            "is_advance_deposit": False,
-            "jofotara_status": "submitted",
-            "state": "done",
-        })
-
-        account_move = False
-        try:
-            res = order.action_pos_order_invoice()
-            if isinstance(res, dict) and res.get("res_id"):
-                account_move = self.env["account.move"].browse(res["res_id"])
-            elif order.account_move:
-                account_move = order.account_move
-        except Exception:
-            pass
-
+        order.action_finalize_deposit_and_validate_stock()
         return {
             "success": True,
             "order_id": order.id,
@@ -255,6 +187,4 @@ class PosOrder(models.Model):
             "amount_total": order.amount_total,
             "amount_paid": order.amount_total,
             "amount_due": 0.0,
-            "invoice_id": account_move.id if account_move else False,
-            "invoice_name": account_move.name if account_move else "",
         }

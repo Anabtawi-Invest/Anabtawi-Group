@@ -128,28 +128,14 @@ class HrAttendance(models.Model):
     # ------------------------------------------------------------------
     # Core overtime fields follow the daily metrics
     # ------------------------------------------------------------------
-    def _pfr_loading(self):
-        """True while the registry loads / a module is installed or upgraded."""
-        return (not getattr(self.env.registry, 'ready', True)
-                or bool(self.env.context.get('install_mode'))
-                or bool(self.env.context.get('module_installation')))
-
     @api.depends('daily_overtime_hours', 'employee_id')
     def _compute_overtime_hours(self):
-        if self._pfr_loading():                         # never rewrite stored overtime during an upgrade
-            for att in self:
-                att.overtime_hours = att.overtime_hours
-            return
         for att in self:
             exempt = att.employee_id and att.employee_id.is_manager_exempt()
             att.overtime_hours = 0.0 if exempt else (att.daily_overtime_hours or 0.0)
 
     @api.depends('daily_overtime_hours')
     def _compute_eligible_overtime(self):
-        if self._pfr_loading():
-            for att in self:
-                att.eligible_overtime = att.eligible_overtime
-            return
         for att in self:
             att.eligible_overtime = att.daily_overtime_hours >= U.OT_MIN_HOURS
 

@@ -83,6 +83,7 @@ class ProductLastBillPriceWizard(models.TransientModel):
                 'currency': info.get('currency') or '',
                 'bill_date': info.get('bill_date') or '',
                 'bill_number': info.get('bill_number') or '',
+                'po_number': info.get('po_number') or '',
                 'vendor': info.get('vendor') or '',
             })
         return rows
@@ -97,10 +98,13 @@ class ProductLastBillPriceWizard(models.TransientModel):
                 aml.price_unit,
                 am.invoice_date,
                 am.name AS bill_number,
+                po.name AS po_number,
                 rp.name AS vendor_name,
                 rc.name AS currency_name
             FROM account_move_line aml
             JOIN account_move am ON am.id = aml.move_id
+            LEFT JOIN purchase_order_line pol ON pol.id = aml.purchase_line_id
+            LEFT JOIN purchase_order po ON po.id = pol.order_id
             LEFT JOIN res_partner rp ON rp.id = am.partner_id
             LEFT JOIN res_currency rc ON rc.id = am.currency_id
             WHERE am.move_type = 'in_invoice'
@@ -121,6 +125,7 @@ class ProductLastBillPriceWizard(models.TransientModel):
                 'price_unit': row['price_unit'],
                 'bill_date': row['invoice_date'] or '',
                 'bill_number': row['bill_number'] or '',
+                'po_number': row['po_number'] or '',
                 'vendor': row['vendor_name'] or '',
                 'currency': row['currency_name'] or '',
             }
@@ -132,6 +137,9 @@ class ProductLastBillPriceWizard(models.TransientModel):
         sheet = workbook.add_worksheet(_('Last Bill Price'))
         sheet.freeze_panes(1, 0)
 
+        price_digits = self.env['decimal.precision'].precision_get('Product Price')
+        price_num_format = '#,##0' if price_digits <= 0 else f'#,##0.{"0" * price_digits}'
+
         header_style = workbook.add_format({
             'bold': True,
             'bg_color': '#D9E1F2',
@@ -140,7 +148,7 @@ class ProductLastBillPriceWizard(models.TransientModel):
         })
         text_style = workbook.add_format({'border': 1})
         date_style = workbook.add_format({'border': 1, 'num_format': 'yyyy-mm-dd'})
-        number_style = workbook.add_format({'border': 1, 'num_format': '#,##0.00'})
+        number_style = workbook.add_format({'border': 1, 'num_format': price_num_format})
 
         headers = [
             _('Internal Reference'),
@@ -151,6 +159,7 @@ class ProductLastBillPriceWizard(models.TransientModel):
             _('Currency'),
             _('Bill Date'),
             _('Bill Number'),
+            _('PO Number'),
             _('Vendor'),
         ]
         for col, header in enumerate(headers):
@@ -171,7 +180,8 @@ class ProductLastBillPriceWizard(models.TransientModel):
             else:
                 sheet.write(row_idx, 6, '', text_style)
             sheet.write(row_idx, 7, row['bill_number'], text_style)
-            sheet.write(row_idx, 8, row['vendor'], text_style)
+            sheet.write(row_idx, 8, row['po_number'], text_style)
+            sheet.write(row_idx, 9, row['vendor'], text_style)
 
         sheet.set_column(0, 0, 18)
         sheet.set_column(1, 1, 40)
@@ -181,7 +191,8 @@ class ProductLastBillPriceWizard(models.TransientModel):
         sheet.set_column(5, 5, 10)
         sheet.set_column(6, 6, 14)
         sheet.set_column(7, 7, 18)
-        sheet.set_column(8, 8, 30)
+        sheet.set_column(8, 8, 18)
+        sheet.set_column(9, 9, 30)
 
         workbook.close()
         return output.getvalue()

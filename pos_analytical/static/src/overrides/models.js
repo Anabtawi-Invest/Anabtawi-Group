@@ -1,28 +1,21 @@
 import {patch} from "@web/core/utils/patch";
+import { Orderline } from "@point_of_sale/app/components/orderline/orderline";
 import {PosOrder} from "@point_of_sale/app/models/pos_order";
 import {PosPayment} from "@point_of_sale/app/models/pos_payment";
 
 patch(PosOrder.prototype,{
-    setup(_defaultObj, options){
+    setup(_defaultObj,options){
         super.setup(...arguments);
-        const account = this.config?.sh_analytic_account;
-        if (!account) {
-            return;
-        }
-        this.update(
-            {sh_pos_order_analytic_account: account},
-            {omitUnknownField: true}
-        );
+        this.update({sh_pos_order_analytic_account : this.config.sh_analytic_account})
     },
+
 });
 
 patch(PosPayment.prototype,{
     setup(){
         super.setup(...arguments);
-        const account = this.models?.["pos.config"]?.getFirst?.()?.sh_analytic_account;
-        if (!account) {
-            return;
-        }
-        this.update({sh_analytic_account: account}, {omitUnknownField: true});
-    },
-});
+        console.log("POs is here");
+        this.sh_analytic_account = this.models["pos.config"].getFirst().sh_analytic_account
+        this.update({sh_analytic_account : this.sh_analytic_account})
+    }
+})

@@ -28,9 +28,11 @@ from .classifier import (
     SECTION_OF_TYPE,
     classify_account,
     classify_analytic,
+    classify_sub,
     load_rules,
     normalize,
     platform_of,
+    search_aliases,
 )
 
 GROUP_VIEWER = "executive_company_cost_dashboard.group_ceo_cost_dashboard_viewer"
@@ -52,6 +54,7 @@ DEFAULTS = {
     "ecd.loss_warn_pct": 1.0,  # waste & shrinkage / revenue %
     "ecd.cost_jump_pct": 20.0,  # bucket growth vs previous period that raises an alert
 }
+TOPICS = (("hr", "PAYROLL"), ("utilities", "UTILITIES"), ("rent", "RENT"))
 SEVERITY = {"danger": 0, "warning": 1, "info": 2, "success": 3}
 
 
@@ -119,8 +122,16 @@ class CeoCostDashboardReport(models.AbstractModel):
         platforms = self._platforms(cur["account"], resolver, summary["revenue"])
         companies_rows = self._companies(companies, cube_cur, cube_prev, bucket_of, resolver, decimals)
 
-        branches, departments = self._analytic_views(
-            sel_ids, period, bucket_of, resolver, summary, cur["section"], decimals
+        acube = self._fetch_analytic_cube(sel_ids, period["date_from"], period["date_to"])
+        pcube = self._fetch_analytic_cube(sel_ids, period["prev_from"], period["prev_to"])
+        tcube = self._fetch_analytic_trend(sel_ids, trend_from, trend_to)
+        roles = self._analytic_roles({r[0] for r in acube} | {r[0] for r in pcube} | {r[0] for r in tcube})
+        branches, departments, matrix = self._analytic_views(
+            sel_ids, period, bucket_of, resolver, summary, cur["section"], decimals,
+            account_totals=cur["account"], cube=acube, roles=roles,
+        )
+        entities = self._entities(
+            roles, acube, pcube, tcube, bucket_of, resolver, monthly["months"], branches["rows"], summary, decimals
         )
 
         thresholds = {k.split(".", 1)[1]: self._param(k) for k in DEFAULTS}
@@ -160,6 +171,11 @@ class CeoCostDashboardReport(models.AbstractModel):
             "companies": companies_rows,
             "branches": branches,
             "departments": departments,
+            "matrix": matrix,
+            "entities": entities,
+            "expenses": self._expense_accounts(
+                cube_cur, cube_prev, cube_trend, acube, roles, sel_set, monthly["months"], resolver, summary, decimals
+            ),
             "platforms": platforms,
             "alerts": alerts,
             "thresholds": thresholds,
@@ -302,14 +318,13 @@ class CeoCostDashboardReport(models.AbstractModel):
         )
         return [(r[0], r[1], r[2], float(r[3]), float(r[4]), r[5]) for r in self.env.cr.fetchall()]
 
-    def _fetch_analytic_cube(self, company_ids, date_from, date_to):
-        """Rows (analytic_id, account_id, account_type, net) where net = credit - debit
-        distributed with the analytic percentages of each posted journal item."""
+    def _fetch_analytic_trend(self, company_ids, date_from, date_to):
+        """Rows (analytic_id, account_type, month 'YYYY-MM', net) for the entity monthly trend."""
         if not company_ids:
             return []
         self.env.cr.execute(
             """
-            SELECT aid.id::int AS analytic_id, aml.account_id, acc.account_type,
+            SELECT aid.id::int AS analytic_id, acc.account_type, TO_CHAR(aml.date, 'YYYY-MM'),
                    SUM((aml.credit - aml.debit) * d.pct::numeric / 100.0) AS net
               FROM account_move_line aml
               JOIN account_account acc ON acc.id = aml.account_id
@@ -320,11 +335,35 @@ class CeoCostDashboardReport(models.AbstractModel):
                AND aml.company_id IN %s
                AND aml.date BETWEEN %s AND %s
                AND acc.account_type IN %s
-             GROUP BY aid.id::int, aml.account_id, acc.account_type
+             GROUP BY aid.id::int, acc.account_type, TO_CHAR(aml.date, 'YYYY-MM')
             """,
             (tuple(company_ids), date_from, date_to, PL_TYPES),
         )
         return [(r[0], r[1], r[2], float(r[3] or 0.0)) for r in self.env.cr.fetchall()]
+
+    def _fetch_analytic_cube(self, company_ids, date_from, date_to):
+        """Rows (analytic_id, account_id, account_type, company_id, net) where net = credit - debit
+        distributed with the analytic percentages of each posted journal item."""
+        if not company_ids:
+            return []
+        self.env.cr.execute(
+            """
+            SELECT aid.id::int AS analytic_id, aml.account_id, acc.account_type, aml.company_id,
+                   SUM((aml.credit - aml.debit) * d.pct::numeric / 100.0) AS net
+              FROM account_move_line aml
+              JOIN account_account acc ON acc.id = aml.account_id
+             CROSS JOIN LATERAL jsonb_each_text(aml.analytic_distribution) AS d(k, pct)
+             CROSS JOIN LATERAL regexp_split_to_table(d.k, ',') AS aid(id)
+             WHERE aml.parent_state = 'posted'
+               AND aml.analytic_distribution IS NOT NULL
+               AND aml.company_id IN %s
+               AND aml.date BETWEEN %s AND %s
+               AND acc.account_type IN %s
+             GROUP BY aid.id::int, aml.account_id, acc.account_type, aml.company_id
+            """,
+            (tuple(company_ids), date_from, date_to, PL_TYPES),
+        )
+        return [(r[0], r[1], r[2], r[3], float(r[4] or 0.0)) for r in self.env.cr.fetchall()]
 
     # ------------------------------------------------------------------
     # Classification of accounts into buckets
@@ -592,12 +631,18 @@ class CeoCostDashboardReport(models.AbstractModel):
                 }
         return roles
 
-    def _analytic_views(self, company_ids, period, bucket_of, resolver, summary, section, decimals):
-        cube = self._fetch_analytic_cube(company_ids, period["date_from"], period["date_to"])
-        roles = self._analytic_roles({r[0] for r in cube})
+    def _analytic_views(self, company_ids, period, bucket_of, resolver, summary, section, decimals,
+                        account_totals=None, cube=None, roles=None):
+        if cube is None:
+            cube = self._fetch_analytic_cube(company_ids, period["date_from"], period["date_to"])
+        if roles is None:
+            roles = self._analytic_roles({r[0] for r in cube})
 
         stats = defaultdict(lambda: {"revenue": 0.0, "other_income": 0.0, "cost": defaultdict(float)})
-        for analytic_id, acc_id, acc_type, net in cube:
+        topic_codes = {code: key for key, code in TOPICS}
+        topic_stats = {key: defaultdict(lambda: defaultdict(float)) for key, _code in TOPICS}
+        info = resolver.get("info", {})
+        for analytic_id, acc_id, acc_type, _company, net in cube:
             if analytic_id not in roles:
                 continue
             s = stats[analytic_id]
@@ -607,7 +652,11 @@ class CeoCostDashboardReport(models.AbstractModel):
             elif section_name == "other_income":
                 s["other_income"] += net
             else:
-                s["cost"][bucket_of(acc_id, acc_type)] += -net
+                code = bucket_of(acc_id, acc_type)
+                s["cost"][code] += -net
+                if code in topic_codes:
+                    sub = classify_sub(code, info.get(acc_id, ("", ""))[1])
+                    topic_stats[topic_codes[code]][analytic_id][sub] += -net
 
         threshold = self._param("ecd.branch_healthy_margin")
         pos_sales = self._pos_sales_by_config(company_ids, period)
@@ -728,7 +777,258 @@ class CeoCostDashboardReport(models.AbstractModel):
                 for kind in ("factory", "department")
             },
         }
-        return branches, departments
+        matrix = self._matrix(topic_stats, roles, rows, account_totals or {}, resolver, decimals)
+        return branches, departments, matrix
+
+    def _entities(self, roles, cube, prev_cube, trend_cube, bucket_of, resolver, months, branch_rows, summary,
+                  decimals):
+        """Everything the Explorer needs about each branch / factory unit / department:
+        cost by bucket (now and previous period), HR / utilities / rent detail, monthly trend, per company."""
+        info = resolver.get("info", {})
+        topic_codes = {code: key for key, code in TOPICS}
+        data = {}
+
+        def entry(analytic_id):
+            return data.setdefault(analytic_id, {
+                "revenue": 0.0,
+                "prev_revenue": 0.0,
+                "cost": defaultdict(float),
+                "prev_cost": defaultdict(float),
+                "subs": {key: defaultdict(float) for key, _code in TOPICS},
+                "companies": defaultdict(float),
+                "trend": defaultdict(lambda: [0.0, 0.0]),  # month -> [cost, revenue]
+            })
+
+        for analytic_id, acc_id, acc_type, company_id, net in cube:
+            role = roles.get(analytic_id)
+            if not role or role["kind"] == "other":
+                continue
+            e = entry(analytic_id)
+            section = SECTION_OF_TYPE[acc_type]
+            if section == "revenue":
+                e["revenue"] += net
+            elif section != "other_income":
+                code = bucket_of(acc_id, acc_type)
+                e["cost"][code] += -net
+                e["companies"][company_id] += -net
+                if code in topic_codes:
+                    sub = classify_sub(code, info.get(acc_id, ("", ""))[1])
+                    e["subs"][topic_codes[code]][sub] += -net
+        for analytic_id, acc_id, acc_type, _company, net in prev_cube:
+            role = roles.get(analytic_id)
+            if not role or role["kind"] == "other":
+                continue
+            e = entry(analytic_id)
+            section = SECTION_OF_TYPE[acc_type]
+            if section == "revenue":
+                e["prev_revenue"] += net
+            elif section != "other_income":
+                e["prev_cost"][bucket_of(acc_id, acc_type)] += -net
+        for analytic_id, acc_type, month, net in trend_cube:
+            role = roles.get(analytic_id)
+            if not role or role["kind"] == "other":
+                continue
+            section = SECTION_OF_TYPE[acc_type]
+            if section == "revenue":
+                entry(analytic_id)["trend"][month][1] += net
+            elif section != "other_income":
+                entry(analytic_id)["trend"][month][0] += -net
+
+        branch_by_id = {r["id"]: r for r in branch_rows}
+        company_ids = {c for e in data.values() for c in e["companies"]}
+        company_names = {c.id: c.name for c in self.env["res.company"].sudo().browse(sorted(company_ids))}
+        group_cost = summary["total_cost"]
+        out = []
+        for analytic_id, role in roles.items():
+            if role["kind"] == "other":
+                continue
+            e = data.get(analytic_id)
+            if not e and role["kind"] != "branch":
+                continue
+            e = e or entry(analytic_id)
+            cost = sum(e["cost"].values())
+            prev_cost = sum(e["prev_cost"].values())
+            branch = branch_by_id.get(analytic_id)
+            revenue = branch["revenue"] if branch else e["revenue"]
+            out.append({
+                "id": analytic_id,
+                "name": role["short"],
+                "full_name": role["name"],
+                "kind": role["kind"],
+                "region": role["region"],
+                "cost": round(cost, decimals),
+                "prev_cost": round(prev_cost, decimals),
+                "delta_pct": _delta(cost, prev_cost),
+                "pct_group_cost": _pct(cost, group_cost),
+                "revenue": round(revenue, decimals),
+                "net_profit": branch["net_profit"] if branch else None,
+                "net_margin": branch["net_margin"] if branch else None,
+                "pct_revenue": _pct(cost, revenue) if revenue and role["kind"] == "branch" else None,
+                "status": branch["status"] if branch else None,
+                "source": branch["source"] if branch else "ledger",
+                "buckets": {k: round(v, decimals) for k, v in e["cost"].items() if v},
+                "prev_buckets": {k: round(v, decimals) for k, v in e["prev_cost"].items() if v},
+                "subs": {
+                    key: {k: round(v, decimals) for k, v in subs.items() if v} for key, subs in e["subs"].items()
+                },
+                "trend": [
+                    {
+                        "month": m,
+                        "cost": round(e["trend"][m][0], decimals) if m in e["trend"] else 0.0,
+                        "revenue": round(e["trend"][m][1], decimals) if m in e["trend"] else 0.0,
+                    }
+                    for m in months
+                ],
+                "companies": sorted(
+                    ({"id": c, "name": company_names.get(c, str(c)), "cost": round(v, decimals)}
+                     for c, v in e["companies"].items() if v),
+                    key=lambda r: -r["cost"],
+                ),
+            })
+        return sorted(out, key=lambda r: (-r["cost"], r["name"]))
+
+    def _expense_accounts(self, cube_cur, cube_prev, cube_trend, acube, roles, sel_set, months, resolver,
+                          summary, decimals):
+        """Every cost account with activity: amount, previous period, monthly trend, split by
+        company and by branch / department. Feeds the Expense Finder (internet, Odoo, rent...)."""
+        cost_types = ("expense_direct_cost", "expense", "expense_depreciation")
+        cur, prev = defaultdict(float), defaultdict(float)
+        companies, trend = defaultdict(lambda: defaultdict(float)), defaultdict(lambda: defaultdict(float))
+        for acc_id, acc_type, comp_id, debit, credit, *_rest in cube_cur:
+            if comp_id in sel_set and acc_type in cost_types:
+                cur[acc_id] += debit - credit
+                companies[acc_id][comp_id] += debit - credit
+        for acc_id, acc_type, comp_id, debit, credit, *_rest in cube_prev:
+            if comp_id in sel_set and acc_type in cost_types:
+                prev[acc_id] += debit - credit
+        for acc_id, acc_type, comp_id, debit, credit, month in cube_trend:
+            if comp_id in sel_set and acc_type in cost_types:
+                trend[acc_id][month] += debit - credit
+        entities = defaultdict(lambda: defaultdict(float))
+        for analytic_id, acc_id, acc_type, _company, net in acube:
+            role = roles.get(analytic_id)
+            if acc_type in cost_types and role and role["kind"] != "other":
+                entities[acc_id][analytic_id] += -net
+
+        company_ids = {c for per in companies.values() for c in per}
+        company_names = {c.id: c.name for c in self.env["res.company"].sudo().browse(sorted(company_ids))}
+        by_code = resolver.get("by_code", {})
+        info, resolved = resolver.get("info", {}), resolver.get("resolved", {})
+        revenue = summary["revenue"]
+        out = []
+        for acc_id in set(cur) | set(prev):
+            amount, before = cur.get(acc_id, 0.0), prev.get(acc_id, 0.0)
+            if not amount and not before:
+                continue
+            code, name = info.get(acc_id, ("", ""))
+            bucket = by_code.get(resolved.get(acc_id))
+            split = sorted(
+                ({"id": a, "name": roles[a]["short"], "kind": roles[a]["kind"], "amount": round(v, decimals)}
+                 for a, v in entities.get(acc_id, {}).items() if v > 0),
+                key=lambda r: -r["amount"],
+            )
+            tagged = sum(r["amount"] for r in split)
+            out.append({
+                "id": acc_id,
+                "code": code,
+                "name": name,
+                "bucket": bucket.code if bucket else "",
+                "bucket_name": bucket.name if bucket else "",
+                "color": (bucket.color if bucket else "") or "#64748b",
+                "amount": round(amount, decimals),
+                "prev": round(before, decimals),
+                "delta_pct": _delta(amount, before),
+                "pct_revenue": _pct(amount, revenue),
+                "trend": [round(trend[acc_id].get(m, 0.0), decimals) for m in months],
+                "companies": sorted(
+                    ({"id": c, "name": company_names.get(c, str(c)), "amount": round(v, decimals)}
+                     for c, v in companies[acc_id].items() if v),
+                    key=lambda r: -r["amount"],
+                ),
+                "entities": split[:40],
+                "unallocated": round(max(amount - tagged, 0.0), decimals),
+                "search": " ".join(filter(None, (
+                    code, name, normalize(name), search_aliases(name), bucket.name if bucket else "",
+                ))).lower(),
+            })
+        return sorted(out, key=lambda r: -r["amount"])
+
+    def _sub_labels(self):
+        return {
+            "SALARY": _("Salaries & wages"),
+            "SSC": _("Social security (SSC)"),
+            "HEALTH": _("Health insurance & treatment"),
+            "OVERTIME": _("Overtime"),
+            "ALLOWANCES": _("Allowances (housing, meals, transport)"),
+            "BONUS": _("Bonuses & gratuities"),
+            "EOS_LEAVE": _("End of service & leave"),
+            "PERMITS": _("Work permits & residency"),
+            "TRAINING": _("Training & uniforms"),
+            "ELECTRICITY": _("Electricity"),
+            "WATER": _("Water"),
+            "FUEL_GAS": _("Fuel & gas"),
+            "RENT": _("Rent"),
+            "PROPERTY_TAX": _("Property & education tax"),
+            "OTHER": _("Other"),
+        }
+
+    def _matrix(self, topic_stats, roles, branch_rows, account_totals, resolver, decimals):
+        """HR / utilities / rent split per branch and department, with the part that is
+        not tagged to any analytic account shown as 'unallocated'."""
+        labels = self._sub_labels()
+        rules = load_rules()["subs"]
+        revenue_of = {r["id"]: r["revenue"] for r in branch_rows}
+        titles = {"hr": _("People cost (HR)"), "utilities": _("Utilities"), "rent": _("Rent & occupancy")}
+        resolved, info = resolver.get("resolved", {}), resolver.get("info", {})
+        out = {}
+        for key, code in TOPICS:
+            order = [r["key"] for r in rules.get(code, [])] + ["OTHER"]
+            if key == "hr":  # most important first for the Chairman
+                order = ["SALARY", "SSC", "HEALTH", "OVERTIME", "ALLOWANCES", "BONUS", "EOS_LEAVE", "PERMITS", "TRAINING", "OTHER"]
+            group = defaultdict(float)
+            account_ids = []
+            for acc_id, amount in account_totals.items():
+                if resolved.get(acc_id) == code:
+                    group[classify_sub(code, info.get(acc_id, ("", ""))[1])] += amount
+                    account_ids.append(acc_id)
+            rows, allocated = [], defaultdict(float)
+            for analytic_id, subs in topic_stats[key].items():
+                role = roles.get(analytic_id)
+                total = sum(subs.values())
+                if not role or role["kind"] == "other" or not total:
+                    continue
+                for sub, value in subs.items():
+                    allocated[sub] += value
+                revenue = revenue_of.get(analytic_id, 0.0)
+                rows.append({
+                    "id": analytic_id,
+                    "name": role["short"],
+                    "full_name": role["name"],
+                    "kind": role["kind"],
+                    "region": role["region"],
+                    "values": {k: round(v, decimals) for k, v in subs.items() if v},
+                    "total": round(total, decimals),
+                    "pct_revenue": _pct(total, revenue) if role["kind"] == "branch" and revenue else None,
+                })
+            rows.sort(key=lambda r: -r["total"])
+            unallocated = {k: max(group.get(k, 0.0) - allocated.get(k, 0.0), 0.0) for k in set(group) | set(allocated)}
+            used = [k for k in order if group.get(k) or allocated.get(k)]
+            out[key] = {
+                "title": titles[key],
+                "bucket": code,
+                "columns": [{"key": k, "name": labels.get(k, k)} for k in used],
+                "rows": rows,
+                "unallocated": {
+                    "values": {k: round(v, decimals) for k, v in unallocated.items() if v},
+                    "total": round(sum(unallocated.values()), decimals),
+                },
+                "totals": {
+                    "values": {k: round(v, decimals) for k, v in group.items() if v},
+                    "total": round(sum(group.values()), decimals),
+                },
+                "account_ids": account_ids,
+            }
+        return out
 
     def _utc_bounds(self, date_from, date_to):
         try:

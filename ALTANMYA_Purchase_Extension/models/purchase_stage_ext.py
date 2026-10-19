@@ -73,60 +73,48 @@ class TanmyaPurchaseExt(models.Model):
             })
         self.process_stages()
 
-    def _get_stage_by_code(self, code):
-        """Resolve stage for this PO: prefer current template, then system stages."""
-        self.ensure_one()
-        if self.purchasetype:
-            stage = self.purchasetype.stages.filtered(lambda s: s.code == code)[:1]
-            if stage:
-                return stage
-        return self.env['tanmya.purchase.stage'].sudo().search([
-            ('code', '=', code),
-            ('issystem', '=', True),
-        ], limit=1)
-
-    @api.depends('amount_total', 'currency_id', 'company_id')
+    @api.depends('amount_total', 'currency_id')
     def _calc_stage(self):
-        StageType = self.env['tanmya.purchase.stage.type']
-        for rec in self:
-            company = rec.company_id
-            tot = rec.amount_total
-            currid = rec.currency_id.id
-            domain_company = [('company_id', '=', company.id)] if company else []
-            ret_type = StageType.search(
-                domain_company + [
-                    ('currency', '=', currid),
-                    ('minrange', '<=', tot),
-                    ('maxrange', '>=', tot),
-                ],
-                limit=1,
-            )
+        # aux=self.purchasetype
+        # if self.state in ('draft','sent') and aux:
+        #     self.purchasetype=aux
+        # else:
+            tot =0
+            currid=0
+            for rec in self:
+                tot +=rec.amount_total
+                currid=rec.currency_id.id
+
+            ret_type= self.env['tanmya.purchase.stage.type'].search([('currency','=',currid),
+                                                           ('minrange','<=',tot),
+                                                           ('maxrange','>=',tot)],limit=1)
             if not ret_type:
-                ret_type = StageType.search(
-                    domain_company + [
-                        ('currency', '=', False),
-                        ('minrange', '<=', tot),
-                        ('maxrange', '>=', tot),
-                    ],
-                    limit=1,
-                )
-            rec.purchasetype = ret_type
+                ret_type = self.env['tanmya.purchase.stage.type'].search([('currency','=',False),('minrange', '<=', tot),
+                                                                          ('maxrange', '>=', tot)], limit=1)
+            self.purchasetype=ret_type
 
 
 
 
 
     def get_stages(self):
+        """Selection values for state. Codes must be unique (see migrate_unique_stage_codes)."""
+        Stage = self.env['tanmya.purchase.stage'].sudo()
         lst = []
-        seen_codes = set()
-        recset = self.env['tanmya.purchase.stage'].search([], order='stageorder,id')
-        for stg in recset:
-            # Deduplicate stage keys to avoid Owl statusbar crash on duplicate t-key.
-            code = (stg.code or '').strip()
-            if not code or code in seen_codes:
-                continue
-            seen_codes.add(code)
-            lst.append((code, stg.name))
+        seen = set()
+        # System stages first (RFQ / Sent / Purchase Order / ...)
+        for stg in Stage.search([('issystem', '=', True)], order='stageorder'):
+            if stg.code and stg.code not in seen:
+                lst.append((stg.code, stg.name))
+                seen.add(stg.code)
+        # Then approval stages grouped by purchase type
+        for stg in Stage.search(
+            [('issystem', '=', False)],
+            order='purchase_template, stageorder, id',
+        ):
+            if stg.code and stg.code not in seen:
+                lst.append((stg.code, stg.name))
+                seen.add(stg.code)
         return lst
 
 
@@ -178,8 +166,8 @@ class TanmyaPurchaseExt(models.Model):
           self.check_stage()
           # print('newstate')
           # print(self.state)
-          current_stage = self._get_stage_by_code(self.state)
-          if current_stage and current_stage.approvetype == 'sequence' and oldstate == self.state:
+          current_stage = self._get_current_stage()
+          if current_stage.approvetype=='sequence' and oldstate==self.state:
                 rec_next=self.env['tanmya.purchase.order.pending'].search([('state', '=', self.state)
                                                                , ('purchaseorder', '=', self.id)
                                                                , ('status', '=', 'queue')]
@@ -216,9 +204,7 @@ class TanmyaPurchaseExt(models.Model):
         count_approve=self.env['tanmya.purchase.order.pending'].search_count([('state', '=', self.state)
                                                                , ('purchaseorder', '=', self.id)
                                                                , ('status', '=', 'approve')])
-        current_stage = self._get_stage_by_code(self.state)
-        if not current_stage or not self.purchasetype:
-            return
+        current_stage = self._get_current_stage()
         newlist = sorted(self.purchasetype.stages, key=lambda x: x.stageorder)
 
         if current_stage.approvetype == 'anyone':
@@ -245,10 +231,15 @@ class TanmyaPurchaseExt(models.Model):
 
 
 
+    def _get_current_stage(self):
+        """Resolve stage by code within this PO's purchase type (codes are reused)."""
+        domain = [('code', '=', self.state)]
+        if self.purchasetype:
+            domain.append(('purchase_template', '=', self.purchasetype.id))
+        return self.env['tanmya.purchase.stage'].sudo().search(domain, limit=1)
+
     def process_stages(self):
-        current_stage = self._get_stage_by_code(self.state)
-        if not current_stage:
-            return
+        current_stage = self._get_current_stage()
         uorder = 0
         rec_id=self.env['ir.model'].sudo().search([('model','=','purchase.order')], limit=1)
        # print(rec_id)

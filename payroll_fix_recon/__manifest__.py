@@ -16,6 +16,7 @@
         'views/hr_work_entry_type_views.xml',
         'views/res_config_settings_views.xml',
         'views/pfr_advance_wizard_views.xml',
+        'views/hr_payslip_run_views.xml',
     ],
     'pre_init_hook': 'pre_init_hook',
     'post_init_hook': 'post_init_hook',

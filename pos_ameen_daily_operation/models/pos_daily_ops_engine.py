@@ -11,8 +11,12 @@ BUSINESS_DAY_START = time(6, 0)
 
 DELIVERY_CHANNELS = ('talabat', 'careem', 'mythings', 'kabseh')
 
+# Advance Applied is a deposit already received (and reported) on the advance order's
+# creation day; counting it again at pickup would report the same money twice.
+SALES_EXCLUDED_TYPES = ('hospitality', 'advance_applied')
+
 FIGURE_KEYS = (
-    'sales', 'cash', 'visa', 'hospitality', 'employee_debt', 'other_sales',
+    'sales', 'cash', 'visa', 'hospitality', 'advance_applied', 'employee_debt', 'other_sales',
     'talabat', 'careem', 'mythings', 'kabseh', 'online_sales',
     'cash_in', 'cash_out', 'delivery_amount', 'delivery_cash',
     'rahen_in', 'rahen_out', 'pledge_cash_in', 'pledge_cash_out',
@@ -114,7 +118,7 @@ class PosDailyOpsEngine(models.AbstractModel):
 
     @api.model
     def _is_in_sales(self, payment_method):
-        return self._get_bucket(payment_method) != 'hospitality'
+        return self._get_bucket(payment_method) not in SALES_EXCLUDED_TYPES
 
     @api.model
     def _get_channel(self, payment_method):
@@ -258,7 +262,7 @@ class PosDailyOpsEngine(models.AbstractModel):
                 continue
             amount = amount or 0.0
             bucket = self._get_bucket(payment_method)
-            if bucket != 'hospitality':
+            if bucket not in SALES_EXCLUDED_TYPES:
                 values['sales'] += amount
             values['other_sales' if bucket == 'none' else bucket] += amount
 

@@ -35,8 +35,8 @@
 
     <menuitem id="menu_pos_delivery_cash_excel_wizard"
               name="Cash vs Closing Delivery (Excel)"
-              parent="account.menu_finance_entries"
+              parent="point_of_sale.menu_point_rep"
               action="action_pos_delivery_cash_excel_wizard"
-              groups="account.group_account_readonly,account.group_account_invoice,account.group_account_manager"
-              sequence="92"/>
+              groups="point_of_sale.group_pos_manager,account.group_account_readonly,account.group_account_invoice,account.group_account_manager"
+              sequence="50"/>
 </odoo>

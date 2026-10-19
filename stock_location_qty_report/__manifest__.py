@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Stock Period Movement Report",
-    "version": "19.0.1.0.4",
+    "version": "19.0.1.0.5",
     "summary": "Opening, receipts, sales, transfers and closing by location and product",
     "description": """
 Stock Period Movement Report under Inventory > Reporting.

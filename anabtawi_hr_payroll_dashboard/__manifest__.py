@@ -17,6 +17,7 @@
         "wizard/hr_payroll_report_wizard_views.xml",
         "views/hr_payroll_dashboard_views.xml",
         "views/pos_config_views.xml",
+        "views/hr_payroll_executive_pdf_report.xml",
     ],
     "assets": {
         "web.assets_backend": [

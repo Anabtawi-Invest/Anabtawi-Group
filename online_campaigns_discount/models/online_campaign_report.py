@@ -14,7 +14,6 @@ class OnlineCampaignPerformanceReport(models.Model):
     company_id = fields.Many2one("res.company", readonly=True)
     currency_id = fields.Many2one("res.currency", readonly=True)
     session_id = fields.Many2one("pos.session", readonly=True)
-    config_id = fields.Many2one("pos.config", string="Branch", readonly=True)
     order_count = fields.Integer(readonly=True)
     line_count = fields.Integer(readonly=True)
     gross_amount = fields.Monetary(readonly=True, currency_field="currency_id")
@@ -39,7 +38,6 @@ class OnlineCampaignPerformanceReport(models.Model):
                         po.company_id AS company_id,
                         pc.currency_id AS currency_id,
                         po.session_id AS session_id,
-                        po.config_id AS config_id,
                         po.id AS order_id,
                         COUNT(pol.id) AS line_count,
                         SUM((CASE WHEN pol.qty * pol.price_unit < 0 THEN -1 ELSE 1 END) * pol.online_gross_amount) AS gross_amount,
@@ -55,7 +53,7 @@ class OnlineCampaignPerformanceReport(models.Model):
                       AND pol.online_campaign_id IS NOT NULL
                       AND po.state IN ('paid', 'done')
                     GROUP BY DATE(po.date_order), pol.online_aggregator_id, pol.online_campaign_id,
-                             po.company_id, pc.currency_id, po.session_id, po.config_id, po.id
+                             po.company_id, pc.currency_id, po.session_id, po.id
                 ),
                 non_campaign_payment_rows AS (
                     SELECT
@@ -66,7 +64,6 @@ class OnlineCampaignPerformanceReport(models.Model):
                         po.company_id AS company_id,
                         pc.currency_id AS currency_id,
                         po.session_id AS session_id,
-                        po.config_id AS config_id,
                         po.id AS order_id,
                         COALESCE(line_counts.line_count, 0) AS line_count,
                         ABS(po.amount_total - po.amount_tax) AS gross_amount,
@@ -119,7 +116,7 @@ class OnlineCampaignPerformanceReport(models.Model):
                 )
                 SELECT
                     ROW_NUMBER() OVER (
-                        ORDER BY date, aggregator_id, campaign_id, session_id, config_id, is_campaign_order
+                        ORDER BY date, aggregator_id, campaign_id, session_id, is_campaign_order
                     ) AS id,
                     date,
                     aggregator_id,
@@ -128,7 +125,6 @@ class OnlineCampaignPerformanceReport(models.Model):
                     company_id,
                     currency_id,
                     session_id,
-                    config_id,
                     COUNT(DISTINCT order_id) AS order_count,
                     SUM(line_count) AS line_count,
                     SUM(gross_amount) AS gross_amount,
@@ -141,6 +137,6 @@ class OnlineCampaignPerformanceReport(models.Model):
                     SUM(company_contribution + estimated_commission) AS estimated_campaign_cost
                 FROM all_rows
                 GROUP BY date, aggregator_id, campaign_id, is_campaign_order,
-                         company_id, currency_id, session_id, config_id
+                         company_id, currency_id, session_id
             )
         """)

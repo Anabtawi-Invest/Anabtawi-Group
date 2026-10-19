@@ -625,7 +625,7 @@ class HrPayslipRun(models.Model):
                     or (getattr(payslip, "version_id", False) and payslip.version_id.department_id)
                     or (emp and emp.department_id)
                 )
-                dept_val = hist_dept.name if hist_dept else "N/A"
+                dept_val = (hist_dept.sudo().name if hist_dept else False) or "N/A"
                 if not hist_dept:
                     issues.append(_("Missing Department"))
 
@@ -634,7 +634,7 @@ class HrPayslipRun(models.Model):
                     or (getattr(payslip, "version_id", False) and payslip.version_id.job_id)
                     or (emp and emp.job_id)
                 )
-                job_val = hist_job.name if hist_job else "N/A"
+                job_val = (hist_job.sudo().name if hist_job else False) or "N/A"
                 code_val = emp_id_val
 
                 period_from_val = format_date(self.env, payslip.date_from or self.date_start)
