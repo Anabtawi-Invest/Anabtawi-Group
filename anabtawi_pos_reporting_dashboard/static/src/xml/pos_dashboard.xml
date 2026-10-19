@@ -207,6 +207,22 @@
                         </div>
                     </div>
 
+                    <!-- POS Expenses -->
+                    <div class="o_kpi_card card-expense clickable_kpi" t-on-click="() => this.onKpiClick('expense_amount')" title="Click to view POS expenses">
+                        <div class="kpi_icon"><i class="fa fa-ticket text-warning"/></div>
+                        <div class="kpi_title">POS Expenses</div>
+                        <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.expense_amount)"/></div>
+                        <div class="kpi_subtext d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="badge bg-warning text-dark badge_sub"><t t-esc="data.kpis.expense_count || 0"/> Approved</span>
+                                <span class="badge bg-secondary badge_sub ms-1" t-if="data.kpis.expense_pending_count">
+                                    Pending: <t t-esc="formatCurrency(data.kpis.expense_pending_amount)"/>
+                                    (<t t-esc="data.kpis.expense_pending_count"/>)
+                                </span>
+                            </div>
+                            <span class="drill_badge"><i class="fa fa-search-plus me-1"/>Drill Down</span>
+                        </div>
+                    </div>
                     <!-- Pledge (Rahen) In / Out -->
                     <div class="o_kpi_card card-pledges clickable_kpi" t-on-click="() => this.onKpiClick('net_pledges')" title="Click to view detailed transactions &amp; export Excel">
                         <div class="kpi_icon"><i class="fa fa-handshake-o text-danger"/></div>
@@ -510,7 +526,13 @@
                                         <i class="fa fa-sort-amount-asc text-primary ms-1" t-if="state.sortKey === 'cash_out' &amp;&amp; state.sortOrder === 'asc'"/>
                                         <i class="fa fa-sort text-muted ms-1 opacity-50" t-if="state.sortKey !== 'cash_out'"/>
                                     </th>
-                                    <th class="text-end sortable_th" t-on-click="() => this.sortBy('net_cash_moves')">
+                                                                        <th class="text-end sortable_th" t-on-click="() => this.sortBy('expense_amount')">
+                                        Expenses
+                                        <i class="fa fa-sort-amount-desc text-primary ms-1" t-if="state.sortKey === 'expense_amount' &amp;&amp; state.sortOrder === 'desc'"/>
+                                        <i class="fa fa-sort-amount-asc text-primary ms-1" t-if="state.sortKey === 'expense_amount' &amp;&amp; state.sortOrder === 'asc'"/>
+                                        <i class="fa fa-sort text-muted ms-1 opacity-50" t-if="state.sortKey !== 'expense_amount'"/>
+                                    </th>
+<th class="text-end sortable_th" t-on-click="() => this.sortBy('net_cash_moves')">
                                         Net Cash Moves
                                         <i class="fa fa-sort-amount-desc text-primary ms-1" t-if="state.sortKey === 'net_cash_moves' &amp;&amp; state.sortOrder === 'desc'"/>
                                         <i class="fa fa-sort-amount-asc text-primary ms-1" t-if="state.sortKey === 'net_cash_moves' &amp;&amp; state.sortOrder === 'asc'"/>
@@ -604,6 +626,7 @@
                                         <td class="val_num clickable_cell" t-on-click="() => this.onKpiClick('online_sales', branch.config_id)" title="Click to view branch Careem sales"><t t-esc="formatCurrency(branch.careem)"/></td>
                                         <td class="val_num text-success clickable_cell" t-on-click="() => this.onKpiClick('cash_in', branch.config_id)" title="Click to view branch cash in">+<t t-esc="formatCurrency(branch.cash_in)"/></td>
                                         <td class="val_num text-danger clickable_cell" t-on-click="() => this.onKpiClick('cash_out', branch.config_id)" title="Click to view branch cash out">-<t t-esc="formatCurrency(branch.cash_out)"/></td>
+                                        <td class="val_num text-danger clickable_cell" t-on-click="() => this.onKpiClick('expense_amount', branch.config_id)" title="Click to view branch expenses"><t t-esc="formatCurrency(branch.expense_amount)"/></td>
                                         <td class="val_num fw-bold clickable_cell" t-on-click="() => this.onKpiClick('net_cash_moves', branch.config_id)" title="Click to view branch net cash moves"><t t-esc="formatCurrency(branch.net_cash_moves)"/></td>
                                         <td class="val_num clickable_cell" t-on-click="() => this.onKpiClick('rahen_in', branch.config_id)" title="Click to view branch pledges received"><t t-esc="formatCurrency(branch.rahen_in)"/></td>
                                         <td class="val_num clickable_cell" t-on-click="() => this.onKpiClick('rahen_out', branch.config_id)" title="Click to view branch pledges returned"><t t-esc="formatCurrency(branch.rahen_out)"/></td>
@@ -637,6 +660,7 @@
                                     <td class="val_num clickable_cell" t-on-click="() => this.onKpiClick('online_sales')" title="Click to view total Careem sales"><t t-esc="formatCurrency(data.global_totals.careem)"/></td>
                                     <td class="val_num clickable_cell" t-on-click="() => this.onKpiClick('cash_in')" title="Click to view total cash in">+<t t-esc="formatCurrency(data.global_totals.cash_in)"/></td>
                                     <td class="val_num clickable_cell" t-on-click="() => this.onKpiClick('cash_out')" title="Click to view total cash out">-<t t-esc="formatCurrency(data.global_totals.cash_out)"/></td>
+                                    <td class="val_num text-danger clickable_cell" t-on-click="() => this.onKpiClick('expense_amount')" title="Click to view total expenses"><t t-esc="formatCurrency(data.global_totals.expense_amount)"/></td>
                                     <td class="val_num clickable_cell" t-on-click="() => this.onKpiClick('net_cash_moves')" title="Click to view total net cash moves"><t t-esc="formatCurrency(data.global_totals.net_cash_moves)"/></td>
                                     <td class="val_num clickable_cell" t-on-click="() => this.onKpiClick('rahen_in')" title="Click to view total pledges received"><t t-esc="formatCurrency(data.global_totals.rahen_in)"/></td>
                                     <td class="val_num clickable_cell" t-on-click="() => this.onKpiClick('rahen_out')" title="Click to view total pledges returned"><t t-esc="formatCurrency(data.global_totals.rahen_out)"/></td>
