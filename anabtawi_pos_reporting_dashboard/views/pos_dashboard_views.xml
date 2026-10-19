@@ -66,6 +66,7 @@
                 <field name="tax_amount" string="Tax Amount" sum="Total Tax" optional="hide"/>
                 <field name="discount_amount" string="Discount Amount" sum="Total Discount" optional="hide"/>
                 <field name="gift_amount" sum="Total Gifts" optional="show"/>
+                <field name="expense_amount" sum="Total Expenses" optional="show"/>
                 <field name="cash_amount" sum="Total Cash" optional="hide"/>
                 <field name="visa_amount" sum="Total Visa" optional="hide"/>
                 <field name="employee_debt_amount" string="Debt Sales (مبيعات الذمم)" sum="Total Debt Sales" optional="hide"/>
@@ -162,6 +163,7 @@
                 <filter string="POS Sales" name="filter_sales" domain="[('report_type', '=', 'pos_sales')]"/>
                 <filter string="Cash In" name="filter_cash_in" domain="[('report_type', '=', 'cash_in')]"/>
                 <filter string="Cash Out" name="filter_cash_out" domain="[('report_type', '=', 'cash_out')]"/>
+                <filter string="POS Expense" name="filter_expense" domain="[('report_type', '=', 'expense')]"/>
                 <filter string="Pledge (Rahen) In" name="filter_rahen_in" domain="[('report_type', '=', 'rahen_in')]"/>
                 <filter string="Pledge (Rahen) Out" name="filter_rahen_out" domain="[('report_type', '=', 'rahen_out')]"/>
                 <filter string="Advance Deposits" name="filter_advance" domain="[('report_type', '=', 'advance_deposit')]"/>

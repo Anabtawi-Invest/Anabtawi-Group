@@ -137,6 +137,7 @@ class PosUnifiedReportWizard(models.TransientModel):
             (_("Kabseh"), "kabseh", False),
             (_("Cash In"), "cash_in", False),
             (_("Cash Out"), "cash_out", False),
+            (_("POS Expenses"), "expense_amount", False),
             (_("Net Cash Moves"), "net_cash_moves", False),
             (_("Pledge (Rahen) In"), "rahen_in", False),
             (_("Pledge (Rahen) Out"), "rahen_out", False),

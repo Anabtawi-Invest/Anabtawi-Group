@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="anabtawi_pos_expense.RefusedExpensesPopup">
+        <Dialog title.translate="Refused Expenses" size="'xl'">
+            <div t-if="state.loading" class="text-center p-4">
+                <i class="fa fa-spinner fa-spin fa-2x"/>
+            </div>
+            <div t-elif="!state.expenses.length" class="text-center text-muted p-4">
+                <i class="fa fa-check-circle fa-2x text-success d-block mb-2"/>
+                <t t-esc="labels.empty"/>
+            </div>
+            <t t-else="">
+                <div class="alert alert-warning" t-esc="labels.warning"/>
+                <table class="table table-sm align-middle">
+                    <thead>
+                        <tr>
+                            <th/>
+                            <th t-esc="labels.reference"/>
+                            <th t-esc="labels.type"/>
+                            <th t-esc="labels.date"/>
+                            <th t-esc="labels.cashier"/>
+                            <th t-esc="labels.refuseReason"/>
+                            <th class="text-end" t-esc="labels.amount"/>
+                            <th/>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr t-foreach="state.expenses" t-as="expense" t-key="expense.id">
+                            <td style="width: 64px;">
+                                <img t-if="expense.image_thumbnail"
+                                     t-att-src="'data:image/png;base64,' + expense.image_thumbnail"
+                                     class="rounded border" style="width: 56px; height: 56px; object-fit: cover;" alt=""/>
+                            </td>
+                            <td class="fw-bold">
+                                <t t-esc="expense.name"/>
+                                <div t-if="expense.resubmit_count" class="small text-muted"
+                                     t-esc="resentLabel(expense.resubmit_count)"/>
+                            </td>
+                            <td t-esc="expense.type"/>
+                            <td t-esc="formatDate(expense.date)"/>
+                            <td t-esc="expense.cashier_name"/>
+                            <td class="text-danger" t-esc="expense.refuse_reason"/>
+                            <td class="text-end fw-bold" t-esc="format(expense.amount)"/>
+                            <td class="text-end text-nowrap">
+                                <button class="btn btn-secondary me-1" t-on-click="() => this.onClickEdit(expense)">
+                                    <i class="fa fa-pencil me-1"/><t t-esc="labels.editResend"/>
+                                </button>
+                                <button class="btn btn-primary" t-on-click="() => this.onClickReturn(expense)">
+                                    <i class="fa fa-undo me-1"/><t t-esc="labels.return"/>
+                                </button>
+                            </td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="6" class="text-end fw-bold" t-esc="labels.total"/>
+                            <td class="text-end fw-bold" t-esc="format(total)"/>
+                            <td/>
+                        </tr>
+                    </tfoot>
+                </table>
+            </t>
+            <t t-set-slot="footer">
+                <button class="btn btn-secondary btn-lg" t-on-click="props.close" t-esc="labels.close"/>
+            </t>
+        </Dialog>
+    </t>
+
+</templates>

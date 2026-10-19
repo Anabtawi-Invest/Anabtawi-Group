@@ -77,6 +77,10 @@ DASHBOARD_EXTRA_KEYS = {
     "orders_per_hour": 0.0,
     "paying_order_count": 0,
     "avg_basket": 0.0,
+    "expense_amount": 0.0,
+    "expense_count": 0,
+    "expense_pending_amount": 0.0,
+    "expense_pending_count": 0,
     "attendant_employee_count": 0,
     "total_labor_cost": 0.0,
     "extra_hours": 0.0,
@@ -203,6 +207,15 @@ class PosReportingDashboard(models.TransientModel):
         if not values["paying_order_count"]:
             return 0.0
         return round(values["sales"] / values["paying_order_count"], 3)
+
+    def _get_session_expenses(self, sessions):
+        """POS expenses created in the period's sessions (same day rule as sales)."""
+        if "pos.expense" not in self.env:
+            return False
+        Expense = self.env["pos.expense"].sudo()
+        if not sessions:
+            return Expense.browse()
+        return Expense.search([("session_id", "in", sessions.ids)])
 
     @staticmethod
     def _orders_per_hour(values):
@@ -408,6 +421,22 @@ class PosReportingDashboard(models.TransientModel):
             branch["pledge_visa_net"] = branch["pledge_visa_in"] - branch["pledge_visa_out"]
             branch["orders_per_hour"] = self._orders_per_hour(branch)
             branch["avg_basket"] = self._avg_basket(branch)
+
+        # --- D2. POS Expenses (approved = KPI; to_approve + refused = pending badge) ---
+        expenses = self._get_session_expenses(sessions)
+        if expenses:
+            for expense in expenses:
+                cfg = expense.config_id
+                if not cfg or (active_config_ids and cfg.id not in active_config_ids):
+                    continue
+                branch = branch_data[cfg.id]
+                amt = expense.amount or 0.0
+                if expense.state == "approved":
+                    branch["expense_amount"] += amt
+                    branch["expense_count"] += 1
+                elif expense.state in ("to_approve", "refused"):
+                    branch["expense_pending_amount"] += amt
+                    branch["expense_pending_count"] += 1
 
         # --- E. Collect Advance Orders ---
         if "pos.advance.order" in self.env:
@@ -640,6 +669,10 @@ class PosReportingDashboard(models.TransientModel):
                 "avg_basket": global_totals["avg_basket"],
                 "paying_order_count": global_totals["paying_order_count"],
                 "open_hours": global_totals["open_hours"],
+                "expense_amount": global_totals["expense_amount"],
+                "expense_count": global_totals["expense_count"],
+                "expense_pending_amount": global_totals["expense_pending_amount"],
+                "expense_pending_count": global_totals["expense_pending_count"],
                 "attendant_employee_count": global_totals["attendant_employee_count"],
                 "total_labor_cost": global_totals["total_labor_cost"],
                 "total_extra_hours": global_totals["extra_hours"],
@@ -798,6 +831,30 @@ class PosReportingDashboard(models.TransientModel):
                         "amount": value,
                         "gift_amount": value,
                         "partner_id": order.partner_id.id or False,
+                        "company_id": cfg.company_id.id,
+                    })
+
+        elif metric_type == "expense_amount":
+            expenses = self._get_session_expenses(sessions)
+            if expenses:
+                for expense in expenses.filtered(
+                    lambda e: e.state in ("approved", "to_approve", "refused")
+                    and e.config_id.id in active_config_ids
+                ):
+                    cfg = expense.config_id
+                    label = "%s — %s [%s]" % (
+                        expense.name,
+                        expense.type_id.display_name or "",
+                        dict(expense._fields["state"].selection).get(expense.state, expense.state),
+                    )
+                    vals_list.append({
+                        "name": label,
+                        "date": expense.date,
+                        "config_id": cfg.id,
+                        "session_id": expense.session_id.id or False,
+                        "report_type": "expense",
+                        "amount": expense.amount or 0.0,
+                        "expense_amount": expense.amount or 0.0,
                         "company_id": cfg.company_id.id,
                     })
 
@@ -1020,6 +1077,7 @@ class PosReportingDashboard(models.TransientModel):
             "tax_amount": _("Sales Tax Transactions"),
             "discount_amount": _("Order Discount Transactions"),
             "gift_amount": _("Gifts (Hospitality) Lines"),
+            "expense_amount": _("POS Expenses"),
             "cash_sales": _("Cash Sales Transactions"),
             "visa_sales": _("Visa & Card Sales Transactions"),
             "online_sales": _("Online & Delivery Sales Transactions"),
@@ -1073,6 +1131,7 @@ class PosReportingDashboard(models.TransientModel):
             "sales": "search_default_filter_sales",
             "cash_in": "search_default_filter_cash_in",
             "cash_out": "search_default_filter_cash_out",
+            "expense_amount": "search_default_filter_expense",
             "rahen_in": "search_default_filter_rahen_in",
             "rahen_out": "search_default_filter_rahen_out",
             "advance_deposits": "search_default_filter_advance",
