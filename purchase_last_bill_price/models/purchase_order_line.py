@@ -11,18 +11,23 @@ class PurchaseOrderLine(models.Model):
     _inherit = 'purchase.order.line'
 
     def _get_po_line_uom(self):
-        """Return the PO line UoM across Odoo field renames."""
+        """Return the PO line UoM across Odoo field renames.
+
+        Never access uom fields by bare attribute — staging may not have
+        uom_id / product_uom on purchase.order.line.
+        """
         self.ensure_one()
         for fname in ('uom_id', 'product_uom', 'product_uom_id'):
             if fname in self._fields:
-                return self[fname] or self.product_id.uom_id
-        return self.product_id.uom_id
+                uom = self[fname]
+                if uom:
+                    return uom
+        return self.product_id.uom_id if self.product_id else self.env['uom.uom']
 
     def _get_last_bill_price_unit(self):
-        """Return the unit price from the latest posted vendor bill for this product.
+        """Return unit price from the latest posted vendor bill (any vendor).
 
-        Searches any vendor in the same company. Returns 0.0 when no bill exists.
-        Converts bill currency and UoM to the PO line currency and UoM.
+        Returns 0.0 when no bill exists. Converts currency and UoM to the PO line.
         """
         self.ensure_one()
         if not self.product_id or not self.company_id:
@@ -80,14 +85,11 @@ class PurchaseOrderLine(models.Model):
 
         _logger.info(
             "PLBP found bill=%s date=%s raw_price=%s display_type=%s "
-            "bill_currency=%s bill_uom=%s po_uom=%s product=%s company=%s",
+            "product=%s company=%s",
             row.get('bill_name'),
             row.get('invoice_date'),
             price_unit,
             row.get('display_type'),
-            bill_currency.name if bill_currency else None,
-            bill_uom.name if bill_uom else None,
-            po_uom.name if po_uom else None,
             self.product_id.default_code or self.product_id.id,
             self.company_id.id,
         )
@@ -104,18 +106,15 @@ class PurchaseOrderLine(models.Model):
         if bill_uom and po_uom and bill_uom != po_uom:
             price_unit = bill_uom._compute_price(price_unit, po_uom)
 
-        price_unit = float_round(
-            price_unit,
-            precision_digits=max(
-                self.currency_id.decimal_places if self.currency_id else 2,
-                self.env['decimal.precision'].precision_get('Product Price'),
-            ),
-        )
+        precision = self.env['decimal.precision'].precision_get('Product Price')
+        if self.currency_id:
+            precision = max(self.currency_id.decimal_places, precision)
+
+        price_unit = float_round(price_unit, precision_digits=precision)
         _logger.info("PLBP converted price=%s", price_unit)
         return price_unit
 
     def _apply_last_bill_price(self, source='compute'):
-        """Apply last bill price; return True if applied."""
         for line in self:
             if not line.product_id:
                 _logger.info("PLBP %s skip: no product", source)
@@ -129,13 +128,13 @@ class PurchaseOrderLine(models.Model):
                 continue
             if not line.company_id:
                 _logger.info(
-                    "PLBP %s skip: no company_id product=%s",
+                    "PLBP %s skip: no company product=%s",
                     source,
                     line.product_id.default_code or line.product_id.id,
                 )
                 continue
             if self.env.context.get('skip_uom_conversion'):
-                _logger.info("PLBP %s skip: skip_uom_conversion context", source)
+                _logger.info("PLBP %s skip: skip_uom_conversion", source)
                 continue
             if line.technical_price_unit != line.price_unit:
                 _logger.info(
@@ -152,23 +151,21 @@ class PurchaseOrderLine(models.Model):
             line.discount = 0.0
             line.price_unit = line.technical_price_unit = price_unit
             _logger.info(
-                "PLBP %s applied: product=%s before=%s after=%s company=%s partner=%s",
+                "PLBP %s applied: product=%s before=%s after=%s company=%s",
                 source,
                 line.product_id.default_code or line.product_id.id,
                 before,
                 price_unit,
                 line.company_id.id,
-                line.order_id.partner_id.id if line.order_id else False,
             )
-        return True
 
-    # Include product_id so price refreshes on product select.
-    # Do not depend on uom_id (missing on some staging builds).
+    # product_id included so price refreshes on product select.
+    # Do NOT depend on uom_id (not present on some staging builds).
     @api.depends('product_id', 'product_qty', 'company_id', 'order_id.partner_id')
     def _compute_price_unit_and_date_planned_and_name(self):
         _logger.info(
             "PLBP compute start: products=%s",
-            self.mapped(lambda l: l.product_id.default_code or l.product_id.id),
+            [l.product_id.default_code or l.product_id.id for l in self if l.product_id],
         )
         super()._compute_price_unit_and_date_planned_and_name()
         self._apply_last_bill_price(source='compute')
@@ -182,10 +179,6 @@ class PurchaseOrderLine(models.Model):
             self.price_unit,
             self.technical_price_unit,
         )
-        # Force apply after core onchange (UI path).
         if self.product_id and self.company_id:
-            # Reset technical so a previous manual price does not block re-select.
-            if self.technical_price_unit != self.price_unit and self.price_unit == 0.0:
-                self.technical_price_unit = 0.0
             self._apply_last_bill_price(source='onchange')
         return res
