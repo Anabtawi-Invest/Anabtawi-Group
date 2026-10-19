@@ -1,17 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- 1. Header Button on Payrun Form View -->
-    <record id="view_hr_payslip_run_form_inherit_pfr_bank" model="ir.ui.view">
-        <field name="name">hr.payslip.run.form.inherit.pfr.bank</field>
-        <field name="model">hr.payslip.run</field>
-        <field name="inherit_id" ref="hr_payroll.hr_payslip_run_form"/>
-        <field name="arch" type="xml">
-            <xpath expr="//header" position="inside">
-                <button name="action_export_bank_xlsx" type="object" string="Export Bank File"
-                        class="btn-secondary" icon="fa-university"/>
-            </xpath>
-        </field>
-    </record>
 
     <!-- 2. Header Button on Payslips List View inside Payrun -->
     <record id="view_hr_payslip_list_pfr_bank" model="ir.ui.view">
