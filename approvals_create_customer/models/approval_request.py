@@ -26,8 +26,15 @@ class ApprovalRequest(models.Model):
 
     def action_confirm(self):
         for request in self:
-            if request.approval_type == "create_customer" and not (request.customer_name or "").strip():
+            if request.approval_type != "create_customer":
+                continue
+            if not (request.customer_name or "").strip():
                 raise UserError(_("Please enter the customer name before submitting."))
+            request.invalidate_recordset(["attachment_number"])
+            if not request.attachment_number:
+                raise UserError(
+                    _("Please attach at least one Commercial Register (السجل التجاري) document.")
+                )
         return super().action_confirm()
 
     def action_approve(self, approver=None):

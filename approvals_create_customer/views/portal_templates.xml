@@ -73,6 +73,19 @@
                                 <input type="email" class="form-control" id="customer_email"
                                        placeholder="Email address" autocomplete="email"/>
                             </div>
+                            <div class="col-12">
+                                <label class="form-label" for="commercial_register_files">
+                                    السجل التجاري / Commercial Register
+                                    <span class="text-danger">*</span>
+                                </label>
+                                <input type="file" class="form-control" id="commercial_register_files"
+                                       multiple="multiple"
+                                       accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,image/*,application/pdf"/>
+                                <div class="form-text">
+                                    At least one file is required. You can attach more than one.
+                                </div>
+                                <ul id="commercial_register_file_list" class="list-group mt-2 d-none"/>
+                            </div>
                         </div>
                         <div class="mt-4">
                             <button type="button" class="btn btn-success btn-lg" id="btn_submit_customer_request">
@@ -174,6 +187,18 @@
                                 <div class="fw-bold text-success">
                                     <t t-esc="approval.created_partner_id.display_name"/>
                                 </div>
+                            </div>
+                            <div class="col-12" t-if="attachments">
+                                <div class="text-muted mb-1">السجل التجاري / Commercial Register</div>
+                                <ul class="list-group">
+                                    <li t-foreach="attachments" t-as="attachment" class="list-group-item d-flex justify-content-between align-items-center">
+                                        <span t-esc="attachment.name"/>
+                                        <a class="btn btn-sm btn-outline-primary"
+                                           t-att-href="'/my/customer-requests/%s/attachment/%s' % (approval.id, attachment.id)">
+                                            Download
+                                        </a>
+                                    </li>
+                                </ul>
                             </div>
                         </div>
 

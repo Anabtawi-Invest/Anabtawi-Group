@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import base64
 import logging
 import re
 
@@ -13,6 +14,16 @@ _logger = logging.getLogger(__name__)
 GROUP_XMLID = "approvals_create_customer.group_portal_customer_request"
 CATEGORY_XMLID = "approvals_create_customer.approval_category_data_create_customer"
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+MAX_ATTACHMENT_BYTES = 15 * 1024 * 1024  # 15 MB per file
+ALLOWED_EXTENSIONS = {
+    ".pdf",
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".webp",
+    ".doc",
+    ".docx",
+}
 
 
 class PortalCustomerRequest(http.Controller):
@@ -57,6 +68,20 @@ class PortalCustomerRequest(http.Controller):
             raise AccessError(_("Request not found or access denied."))
         return approval
 
+    def _get_request_attachments(self, approval):
+        return (
+            request.env["ir.attachment"]
+            .sudo()
+            .search(
+                [
+                    ("res_model", "=", "approval.request"),
+                    ("res_id", "=", approval.id),
+                    ("res_field", "=", False),
+                ],
+                order="id",
+            )
+        )
+
     def _status_label(self, status):
         return {
             "new": _("To Submit"),
@@ -65,6 +90,64 @@ class PortalCustomerRequest(http.Controller):
             "refused": _("Refused"),
             "cancel": _("Canceled"),
         }.get(status, status or "")
+
+    def _normalize_attachments(self, attachments):
+        if not attachments:
+            return []
+        if not isinstance(attachments, (list, tuple)):
+            raise UserError(_("Invalid commercial register attachments."))
+        cleaned = []
+        for item in attachments:
+            if not isinstance(item, dict):
+                raise UserError(_("Invalid commercial register attachments."))
+            name = (item.get("name") or "").strip()
+            datas = item.get("datas") or ""
+            if isinstance(datas, str) and datas.startswith("data:") and "," in datas:
+                datas = datas.split(",", 1)[1]
+            datas = (datas or "").strip()
+            mimetype = (item.get("mimetype") or "application/octet-stream").strip()
+            if not name or not datas:
+                continue
+            ext = ""
+            if "." in name:
+                ext = "." + name.rsplit(".", 1)[-1].lower()
+            if ext and ext not in ALLOWED_EXTENSIONS:
+                raise UserError(
+                    _("File type %(ext)s is not allowed for Commercial Register.", ext=ext)
+                )
+            try:
+                raw = base64.b64decode(datas, validate=False)
+            except Exception as exc:
+                raise UserError(_("One of the attached files is invalid.")) from exc
+            if not raw:
+                continue
+            if len(raw) > MAX_ATTACHMENT_BYTES:
+                raise UserError(
+                    _("Each Commercial Register file must be %(limit)s MB or smaller.", limit=15)
+                )
+            cleaned.append(
+                {
+                    "name": name,
+                    "datas": base64.b64encode(raw),
+                    "mimetype": mimetype or "application/octet-stream",
+                }
+            )
+        return cleaned
+
+    def _create_attachments(self, approval, attachments):
+        Attachment = request.env["ir.attachment"].sudo()
+        for item in attachments:
+            Attachment.create(
+                {
+                    "name": item["name"],
+                    "datas": item["datas"],
+                    "res_model": "approval.request",
+                    "res_id": approval.id,
+                    "mimetype": item["mimetype"],
+                    "description": _("Commercial Register (السجل التجاري)"),
+                }
+            )
+        approval.invalidate_recordset(["attachment_number", "attachment_ids"])
 
     @http.route("/my/customer-requests/create", type="http", auth="user", website=True)
     def portal_customer_request_create(self, **kwargs):
@@ -120,14 +203,38 @@ class PortalCustomerRequest(http.Controller):
             {
                 "page_name": "portal_customer_request_detail",
                 "approval": approval,
+                "attachments": self._get_request_attachments(approval),
                 "status_label": self._status_label(approval.request_status),
             },
         )
 
-    @http.route("/my/customer-requests/api/submit", type="jsonrpc", auth="user", website=True)
-    def api_submit(self, name="", phone="", email="", **kwargs):
+    @http.route(
+        "/my/customer-requests/<int:request_id>/attachment/<int:attachment_id>",
+        type="http",
+        auth="user",
+        website=True,
+    )
+    def portal_customer_request_attachment(self, request_id, attachment_id, **kwargs):
         self._ensure_access()
-        return self._submit_request(name, phone, email)
+        approval = self._get_my_request(request_id)
+        attachment = (
+            request.env["ir.attachment"]
+            .sudo()
+            .browse(int(attachment_id))
+            .exists()
+        )
+        if (
+            not attachment
+            or attachment.res_model != "approval.request"
+            or attachment.res_id != approval.id
+        ):
+            raise AccessError(_("Attachment not found or access denied."))
+        return request.env["ir.binary"]._get_stream_from(attachment).get_response(as_attachment=True)
+
+    @http.route("/my/customer-requests/api/submit", type="jsonrpc", auth="user", website=True)
+    def api_submit(self, name="", phone="", email="", attachments=None, **kwargs):
+        self._ensure_access()
+        return self._submit_request(name, phone, email, attachments)
 
     @http.route(
         "/my/customer-requests/api/submit/http",
@@ -144,10 +251,11 @@ class PortalCustomerRequest(http.Controller):
             payload.get("name", ""),
             payload.get("phone", ""),
             payload.get("email", ""),
+            payload.get("attachments"),
         )
         return request.make_json_response(result)
 
-    def _submit_request(self, name, phone, email):
+    def _submit_request(self, name, phone, email, attachments=None):
         name = (name or "").strip()
         phone = (phone or "").strip()
         email = (email or "").strip()
@@ -155,6 +263,12 @@ class PortalCustomerRequest(http.Controller):
             raise UserError(_("Customer name is required."))
         if email and not EMAIL_RE.match(email):
             raise UserError(_("Please enter a valid email address."))
+
+        cleaned_attachments = self._normalize_attachments(attachments)
+        if not cleaned_attachments:
+            raise UserError(
+                _("Please attach at least one Commercial Register (السجل التجاري) document.")
+            )
 
         category = self._get_category()
         Approval = request.env["approval.request"].sudo()
@@ -172,6 +286,7 @@ class PortalCustomerRequest(http.Controller):
         approval = False
         try:
             approval = Approval.create(vals)
+            self._create_attachments(approval, cleaned_attachments)
             approval.action_confirm()
         except (UserError, ValidationError):
             if approval:

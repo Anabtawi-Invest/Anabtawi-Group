@@ -22,4 +22,4 @@ class ApprovalCategory(models.Model):
             self.has_location = "no"
             self.has_reference = "no"
             self.has_payment_method = "no"
-            self.requirer_document = "optional"
+            self.requirer_document = "required"

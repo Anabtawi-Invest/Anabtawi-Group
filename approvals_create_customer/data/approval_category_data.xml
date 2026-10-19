@@ -15,7 +15,7 @@
             <field name="has_partner">no</field>
             <field name="has_payment_method">no</field>
             <field name="has_location">no</field>
-            <field name="requirer_document">optional</field>
+            <field name="requirer_document">required</field>
             <field name="approval_minimum">1</field>
             <field name="automated_sequence" eval="True"/>
             <field name="sequence_code">APCUST</field>
