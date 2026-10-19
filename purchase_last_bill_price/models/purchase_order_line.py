@@ -1,10 +1,17 @@
 # -*- coding: utf-8 -*-
-from odoo import api, fields, models
+from odoo import fields, models
 from odoo.tools.float_utils import float_round
 
 
 class PurchaseOrderLine(models.Model):
     _inherit = 'purchase.order.line'
+
+    def _get_po_line_uom(self):
+        """Return the PO line UoM (Odoo 19: uom_id, older: product_uom)."""
+        self.ensure_one()
+        if 'uom_id' in self._fields:
+            return self.uom_id or self.product_id.uom_id
+        return self.product_uom or self.product_id.uom_id
 
     def _get_last_bill_price_unit(self):
         """Return the unit price from the latest posted vendor bill for this product.
@@ -44,8 +51,12 @@ class PurchaseOrderLine(models.Model):
 
         price_unit = row['price_unit'] or 0.0
         bill_currency = self.env['res.currency'].browse(row['currency_id'])
-        bill_uom = self.env['uom.uom'].browse(row['product_uom_id']) if row['product_uom_id'] else self.product_id.uom_id
-        po_uom = self.uom_id or self.product_id.uom_id
+        bill_uom = (
+            self.env['uom.uom'].browse(row['product_uom_id'])
+            if row['product_uom_id']
+            else self.product_id.uom_id
+        )
+        po_uom = self._get_po_line_uom()
         conversion_date = row['invoice_date'] or self.date_order or fields.Date.context_today(self)
 
         if bill_currency and self.currency_id and bill_currency != self.currency_id:
@@ -68,9 +79,9 @@ class PurchaseOrderLine(models.Model):
             ),
         )
 
-    @api.depends('product_qty', 'uom_id', 'company_id', 'order_id.partner_id')
     def _compute_price_unit_and_date_planned_and_name(self):
-        # Keep standard name / planned date / seller selection behaviour.
+        # Do not redeclare @api.depends: keep core triggers (avoids invalid
+        # dependency fields across Odoo versions).
         super()._compute_price_unit_and_date_planned_and_name()
         for line in self:
             # Same early exits as core: skip if already invoiced or manually edited.
