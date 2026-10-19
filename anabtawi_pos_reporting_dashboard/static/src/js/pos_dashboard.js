@@ -179,10 +179,11 @@ export class PosReportingDashboard extends Component {
         return ((value / total) * 100).toFixed(1);
     }
 
-    async onKpiClick(metricType) {
+    async onKpiClick(metricType, configId = null) {
         try {
             const strFrom = this.state.date_from;
             const strTo = this.state.date_to;
+            const targetConfigs = configId ? [configId] : (this.state.config_ids || []);
 
             const action = await this.orm.call(
                 "pos.reporting.dashboard",
@@ -192,7 +193,7 @@ export class PosReportingDashboard extends Component {
                     metric_type: metricType,
                     date_from: strFrom,
                     date_to: strTo,
-                    config_ids: this.state.config_ids,
+                    config_ids: targetConfigs,
                 }
             );
 

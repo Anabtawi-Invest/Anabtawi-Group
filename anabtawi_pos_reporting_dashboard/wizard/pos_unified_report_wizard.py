@@ -23,6 +23,12 @@ class PosUnifiedReportWizard(models.TransientModel):
     )
     config_ids = fields.Many2many(
         "pos.config",
+        domain=[
+            ("active", "=", True),
+            ("name", "not ilike", "كافيه"),
+            ("name", "not ilike", "نجيب"),
+            ("name", "not ilike", "ذوابي"),
+        ],
         string="POS Branches",
         help="Leave empty to include all active branches.",
     )
@@ -114,7 +120,8 @@ class PosUnifiedReportWizard(models.TransientModel):
         # (header, data key, is_integer)
         summary_columns = [
             (_("Total Sales (Gross)"), "sales", False),
-            (_("Orders / Min"), "orders_per_min", False),
+            (_("Orders / Hour"), "orders_per_hour", False),
+            (_("Avg Basket"), "avg_basket", False),
             (_("Sales Without Tax"), "untaxed_sales", False),
             (_("Tax Amount"), "tax_amount", False),
             (_("Total Discounts"), "discount_amount", False),
@@ -148,6 +155,7 @@ class PosUnifiedReportWizard(models.TransientModel):
             (_("Delivery Fees"), "delivery_amount", False),
             (_("Attendant Staff"), "attendant_employee_count", True),
             (_("Daily Labor Cost"), "total_labor_cost", False),
+            (_("Extra Hours (hrs)"), "extra_hours", False),
         ]
 
         sheet1.set_column(0, 0, 28)
