@@ -31,7 +31,9 @@ class HrPayslipRun(models.Model):
         readonly=True,
         attachment=True,
         copy=False,
-        help="Immutable Excel snapshot frozen when the pay run was marked as paid or closed.",
+        help="Immutable Excel snapshot saved on the first PayRun Audit download "
+             "(or when the pay run is marked paid/closed if not downloaded yet). "
+             "Later downloads reuse this file and do not overwrite it.",
     )
     audit_filename = fields.Char(string="PayRun Audit Filename", copy=False)
     audit_file_generated_at = fields.Datetime(string="Audit Snapshot Date", readonly=True, copy=False)

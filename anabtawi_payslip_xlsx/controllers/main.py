@@ -79,37 +79,18 @@ class PayslipXlsxController(http.Controller):
         if not payrun:
             return request.not_found()
 
-        # Check if the Pay Run is marked as paid/closed or all slips are paid/done
-        is_paid_or_closed = payrun.state in ("paid", "close") or (
-            payrun.slip_ids and all(s.state in ("paid", "done") for s in payrun.slip_ids)
-        )
-        is_full_run = not parsed_payslip_ids or set(parsed_payslip_ids) >= set(payrun.slip_ids.ids)
+        # First download: generate full-run Excel and save once on audit_file.
+        # Later downloads: always return that copy — never overwrite.
+        # (Explicit "Re-freeze Audit Snapshot" can still replace it on purpose.)
+        if not payrun.audit_file:
+            payrun._freeze_payrun_audit()
 
-        # If paid / closed, ensure audit_file is frozen and serve the stored immutable snapshot
-        if is_paid_or_closed:
-            if not payrun.audit_file:
-                payrun._freeze_payrun_audit()
+        if payrun.audit_file:
+            xlsx_content = base64.b64decode(payrun.audit_file)
+        else:
+            # Fallback if freeze failed (e.g. no slips): live generate, still not stored
+            xlsx_content = payrun._generate_payrun_xlsx(payslip_ids=parsed_payslip_ids)
 
-            if is_full_run and payrun.audit_file:
-                xlsx_content = base64.b64decode(payrun.audit_file)
-                period_str = payrun.date_start.strftime("%Y%m") if payrun.date_start else ""
-                if period_str:
-                    filename = f"PayRun_Audit_{period_str}"
-                else:
-                    filename = f"PayRun_Audit_{payrun.name or 'Report'}"
-                filename = osutil.clean_filename(filename + ".xlsx")
-
-                headers = [
-                    (
-                        "Content-Type",
-                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    ),
-                    ("Content-Disposition", content_disposition(filename)),
-                ]
-                return request.make_response(xlsx_content, headers=headers)
-
-        # Dynamic generation for draft/verify or custom subset
-        xlsx_content = payrun._generate_payrun_xlsx(payslip_ids=parsed_payslip_ids)
         period_str = payrun.date_start.strftime("%Y%m") if payrun.date_start else ""
         if period_str:
             filename = f"PayRun_Audit_{period_str}"
