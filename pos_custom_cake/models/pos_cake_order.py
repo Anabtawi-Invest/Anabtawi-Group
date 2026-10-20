@@ -481,6 +481,7 @@ class PosCakeOrder(models.Model):
                 {
                     "id": category.id,
                     "name": category.name,
+                    "allow_multiple": bool(category.allow_multiple),
                     "lines": lines,
                 }
             )

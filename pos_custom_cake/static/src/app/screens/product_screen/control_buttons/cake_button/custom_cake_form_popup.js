@@ -33,6 +33,7 @@ export class CustomCakeFormPopup extends Component {
             partner: null,
             cake_size_id: 0,
             sugar_paste_choice: "no",
+            allow_multiple_choices: false,
             selectedLines: {},
             categorySearch: {},
             note: "",
@@ -143,6 +144,7 @@ export class CustomCakeFormPopup extends Component {
             sugarPaste: _t("Contains Sugar Paste"),
             yes: _t("Yes"),
             no: _t("No"),
+            allowMultipleChoices: _t("Allow Multiple Choices / السماح باختيارات متعددة"),
             priceSummary: _t("Price Summary"),
             sugarPasteCost: _t("Sugar Paste Cost"),
             totalComponentsCost: _t("Total Components Cost"),
@@ -226,6 +228,45 @@ export class CustomCakeFormPopup extends Component {
         return this.state.sugar_paste_choice === "yes";
     }
 
+    get showAllowMultipleCheckbox() {
+        return this._getSelectedPieces() > 15;
+    }
+
+    get isAllowMultipleEnabled() {
+        return this.showAllowMultipleCheckbox && this.state.allow_multiple_choices;
+    }
+
+    _getSelectedLineIds(categoryId) {
+        return this.state.selectedLines[categoryId] || [];
+    }
+
+    _clearSelectedLines() {
+        this.state.selectedLines = {};
+    }
+
+    onCakeSizeChange(ev) {
+        const wasMultiEnabled = this.state.allow_multiple_choices;
+        this.state.cake_size_id = Number(ev.target.value) || 0;
+        if (!this.showAllowMultipleCheckbox) {
+            this.state.allow_multiple_choices = false;
+            if (wasMultiEnabled) {
+                this._clearSelectedLines();
+            }
+        }
+    }
+
+    onAllowMultipleChange(ev) {
+        const checked = Boolean(ev.target.checked);
+        this.state.allow_multiple_choices = checked;
+        if (!checked) {
+            this._clearSelectedLines();
+        }
+    }
+
+    isCategoryMultiSelect(category) {
+        return this.isAllowMultipleEnabled && Boolean(category?.allow_multiple);
+    }
+
     _getSugarPasteCost(config, pieces) {
         if (!this.hasSugarPaste || !config) {
             return 0;
@@ -254,13 +295,12 @@ export class CustomCakeFormPopup extends Component {
         const pieces = this._getSelectedPieces();
         let componentsCost = 0;
         for (const category of config.categories) {
-            const selectedId = this.state.selectedLines[category.id];
-            if (!selectedId) {
-                continue;
-            }
-            const line = category.lines.find((l) => l.id === selectedId);
-            if (line) {
-                componentsCost += (line.quantity || 1) * (line.cost || 0) * pieces;
+            const selectedIds = this._getSelectedLineIds(category.id);
+            for (const selectedId of selectedIds) {
+                const line = category.lines.find((l) => l.id === selectedId);
+                if (line) {
+                    componentsCost += (line.quantity || 1) * (line.cost || 0) * pieces;
+                }
             }
         }
         const sugarPasteCost = this._getSugarPasteCost(config, pieces);
@@ -297,9 +337,27 @@ export class CustomCakeFormPopup extends Component {
     }
 
     onComponentSelect(categoryId, lineId) {
+        const category = this.categories.find((c) => Number(c.id) === Number(categoryId));
+        if (this.isCategoryMultiSelect(category)) {
+            const current = [...this._getSelectedLineIds(categoryId)];
+            const index = current.indexOf(lineId);
+            if (index >= 0) {
+                current.splice(index, 1);
+            } else {
+                current.push(lineId);
+            }
+            const next = { ...this.state.selectedLines };
+            if (current.length) {
+                next[categoryId] = current;
+            } else {
+                delete next[categoryId];
+            }
+            this.state.selectedLines = next;
+            return;
+        }
         this.state.selectedLines = {
             ...this.state.selectedLines,
-            [categoryId]: lineId,
+            [categoryId]: [lineId],
         };
     }
 
@@ -319,22 +377,23 @@ export class CustomCakeFormPopup extends Component {
         if (!query) {
             return category.lines;
         }
-        const selectedId = this.state.selectedLines[category.id];
+        const selectedIds = this._getSelectedLineIds(category.id);
         return category.lines.filter(
             (line) =>
-                line.id === selectedId ||
+                selectedIds.includes(line.id) ||
                 normalize(line.product_name || "").includes(query)
         );
     }
 
     isComponentSelected(categoryId, lineId) {
-        return this.state.selectedLines[categoryId] === lineId;
+        return this._getSelectedLineIds(categoryId).includes(lineId);
     }
 
     getSelectedCount() {
-        return Object.keys(this.state.selectedLines).filter(
-            (key) => this.state.selectedLines[key]
-        ).length;
+        return Object.values(this.state.selectedLines).reduce(
+            (count, lineIds) => count + (lineIds?.length || 0),
+            0
+        );
     }
 
     _validate() {
@@ -365,8 +424,7 @@ export class CustomCakeFormPopup extends Component {
     _buildPayload(payLater) {
         const selectedLines = [];
         for (const category of this.categories) {
-            const lineId = this.state.selectedLines[category.id];
-            if (lineId) {
+            for (const lineId of this._getSelectedLineIds(category.id)) {
                 selectedLines.push({ category_line_id: lineId });
             }
         }

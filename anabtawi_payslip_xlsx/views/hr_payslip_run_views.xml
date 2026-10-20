@@ -39,4 +39,42 @@ action = records.action_export_payrun_excel()
 action = records.action_regenerate_audit_snapshot()
         </field>
     </record>
+
+    <!-- 4. Show frozen audit file on Pay Run form -->
+    <record id="view_hr_payslip_run_form_audit_file" model="ir.ui.view">
+        <field name="name">hr.payslip.run.form.audit.file</field>
+        <field name="model">hr.payslip.run</field>
+        <field name="inherit_id" ref="hr_payroll.hr_payslip_run_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//group" position="after">
+                <group string="PayRun Audit Snapshot" groups="hr_payroll.group_hr_payroll_user">
+                    <field name="audit_file" filename="audit_filename" readonly="1"/>
+                    <field name="audit_filename" invisible="1"/>
+                    <field name="audit_file_generated_at" readonly="1"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- 5. Show frozen audit file on Pay Run kanban card menu (easy to find) -->
+    <record id="view_hr_payslip_run_kanban_audit_file" model="ir.ui.view">
+        <field name="name">hr.payslip.run.kanban.audit.file</field>
+        <field name="model">hr.payslip.run</field>
+        <field name="inherit_id" ref="hr_payroll.hr_payslip_run_view_kanban"/>
+        <field name="arch" type="xml">
+            <xpath expr="//kanban" position="inside">
+                <field name="audit_file"/>
+                <field name="audit_filename"/>
+                <field name="audit_file_generated_at"/>
+            </xpath>
+            <xpath expr="//t[@t-name='menu']/field[@name='payment_report']" position="after">
+                <field name="audit_file"
+                         filename="audit_filename"
+                         widget="binary"
+                         class="btn btn-secondary btn-addr align-content-center text-center"
+                         invisible="not audit_file"
+                         groups="hr_payroll.group_hr_payroll_user"/>
+            </xpath>
+        </field>
+    </record>
 </odoo>

@@ -11,6 +11,12 @@ class CakeCategory(models.Model):
     name = fields.Char(string="Category Name", required=True, translate=True)
     active = fields.Boolean(default=True)
     sequence = fields.Integer(default=10)
+    allow_multiple = fields.Boolean(
+        string="Allow Multiple Choices",
+        default=False,
+        help="When enabled, cashiers can select more than one product in this category "
+             "if the cake size is greater than 15 pieces and multi-select is turned on in POS.",
+    )
     line_ids = fields.One2many("cake.category.line", "category_id", string="Products")
 
 
