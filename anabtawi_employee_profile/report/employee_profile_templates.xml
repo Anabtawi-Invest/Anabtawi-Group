@@ -65,7 +65,7 @@
                         </tr>
                         <tr>
                             <td class="aep-mlab">Start Date</td>
-                            <td class="aep-mval"><span t-if="o.contract_date_start" t-field="o.contract_date_start"/></td>
+                            <td class="aep-mval"><span t-out="o.profile_contract_start_display()"/></td>
                             <td class="aep-mlab">National Number</td>
                             <td class="aep-mval"><span t-out="o.identification_id or ''"/></td>
                             <td class="aep-mlab">Mobile No.</td>
@@ -84,8 +84,8 @@
                             <td class="aep-mval"><span t-out="o.job_id.name or ''"/></td>
                             <td class="aep-mlab">Mother Name</td>
                             <td class="aep-mval"><span t-out="o.mother_name or ''"/></td>
-                            <td class="aep-mlab">Termination Date</td>
-                            <td class="aep-mval"><span t-if="o.departure_date" t-field="o.departure_date"/></td>
+                            <td class="aep-mlab" t-out="o.profile_contract_end_label()"/>
+                            <td class="aep-mval"><span t-out="o.profile_contract_end_display()"/></td>
                         </tr>
                         <tr>
                             <td class="aep-mlab">فرع</td>
@@ -121,7 +121,7 @@
                         </tr>
                     </table>
 
-                    <table class="aep-salary-bar" style="width: 100%; background: #e8e8e8; border: 1px solid #ccc; margin: 12px 0; border-collapse: collapse;">
+                    <table class="aep-salary-bar" style="width: 100%; background: #e8e8e8; border: 1px solid #ccc; margin: 12px 0 8px 0; border-collapse: collapse;">
                         <tr>
                             <td style="width: 33%; text-align: center; font-weight: bold;">
                                 Basic Salary<br/>
@@ -136,6 +136,41 @@
                                 Service Charge Points<br/><span style="font-weight:normal;">—</span>
                             </td>
                         </tr>
+                    </table>
+
+                    <!-- Company Loans Section -->
+                    <t t-set="loans" t-value="o.profile_company_loans()"/>
+                    <div class="aep-section-title" style="margin: 6px 0 3px 0;">Company Loan Adjustments</div>
+                    <table class="aep-data-table" style="width: 100%; border: 1px solid #ccc; border-collapse: collapse; margin-bottom: 8px;">
+                        <tr style="background: #e8e8e8;">
+                            <th style="border: 1px solid #ccc; width: 16%;">Start Date</th>
+                            <th style="border: 1px solid #ccc; width: 22%;">Starting Amount</th>
+                            <th style="border: 1px solid #ccc; width: 20%;">Monthly Deduction</th>
+                            <th style="border: 1px solid #ccc; width: 22%;">Remaining Balance</th>
+                            <th style="border: 1px solid #ccc; width: 20%;">Status / Note</th>
+                        </tr>
+                        <t t-foreach="loans" t-as="loan">
+                            <tr>
+                                <td style="border: 1px solid #ccc; text-align: center;" t-out="loan['date_start_formatted'] or '—'"/>
+                                <td style="border: 1px solid #ccc; text-align: right; font-weight: bold;">
+                                    <span t-out="'%.3f' % loan['total_amount']"/> <span t-out="o.company_id.currency_id.symbol or ''"/>
+                                </td>
+                                <td style="border: 1px solid #ccc; text-align: right;">
+                                    <span t-out="'%.3f' % loan['monthly_amount']"/> <span t-out="o.company_id.currency_id.symbol or ''"/>
+                                </td>
+                                <td style="border: 1px solid #ccc; text-align: right; font-weight: bold; color: #c0392b;">
+                                    <span t-out="'%.3f' % loan['remaining_amount']"/> <span t-out="o.company_id.currency_id.symbol or ''"/>
+                                </td>
+                                <td style="border: 1px solid #ccc;" t-out="loan['note'] or loan['state'] or '—'"/>
+                            </tr>
+                        </t>
+                        <t t-if="not loans">
+                            <tr>
+                                <td colspan="5" style="border: 1px solid #ccc; height: 22px; text-align: center; color: #888; font-style: italic;">
+                                    No active company loan adjustments
+                                </td>
+                            </tr>
+                        </t>
                     </table>
 
                     <table style="width: 100%; border-collapse: collapse;">
@@ -216,13 +251,13 @@
                                 <div class="aep-section-title">Warnings</div>
                                 <table class="aep-data-table" style="width:100%; border:1px solid #ccc; border-collapse:collapse;">
                                     <tr style="background:#e8e8e8;">
-                                        <th style="border:1px solid #ccc;">Date</th>
-                                        <th style="border:1px solid #ccc;">Warning Type</th>
-                                        <th style="border:1px solid #ccc;">Reason</th>
+                                        <th style="border:1px solid #ccc; width: 24%;">Date</th>
+                                        <th style="border:1px solid #ccc; width: 28%;">Warning Type</th>
+                                        <th style="border:1px solid #ccc; width: 48%;">Reason</th>
                                     </tr>
                                     <t t-foreach="o.warning_line_ids" t-as="w">
                                         <tr>
-                                            <td style="border:1px solid #ccc;"><span t-if="w.warning_date" t-field="w.warning_date"/></td>
+                                            <td style="border:1px solid #ccc; text-align:center;"><span t-if="w.warning_date" t-field="w.warning_date"/></td>
                                             <td style="border:1px solid #ccc;" t-out="w.warning_type_id.name or ''"/>
                                             <td style="border:1px solid #ccc;" t-out="w.reason or ''"/>
                                         </tr>

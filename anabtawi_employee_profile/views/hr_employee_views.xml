@@ -21,8 +21,25 @@
                 <field name="medical_insurance_ref"/>
                 <field name="blood_type"/>
                 <field name="profile_employment_status"/>
+                <field name="profile_contract_start_date" readonly="1"/>
+                <field name="profile_contract_end_date" readonly="1"
+                       invisible="profile_employment_status == 'active' and not profile_contract_end_date"/>
+                <field name="departure_date" string="Termination Date"
+                       invisible="profile_employment_status != 'terminated'"/>
             </xpath>
             <xpath expr="//page[@name='personal_information']" position="after">
+                <page name="profile_company_loans" string="Company Loans" groups="hr.group_hr_user">
+                    <field name="company_loan_attachment_ids" widget="many2many" readonly="1">
+                        <list create="0" delete="0">
+                            <field name="date_start" string="Start Date"/>
+                            <field name="total_amount" string="Starting Amount"/>
+                            <field name="monthly_amount" string="Monthly Deduction"/>
+                            <field name="paid_amount" string="Paid Amount" optional="show"/>
+                            <field name="state" string="Status" widget="badge"/>
+                            <field name="description" string="Note"/>
+                        </list>
+                    </field>
+                </page>
                 <page name="profile_warnings" string="Warnings" groups="hr.group_hr_user">
                     <field name="warning_line_ids" context="{'default_employee_id': id}" widget="one2many" nolabel="1">
                         <list editable="bottom">
