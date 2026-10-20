@@ -77,12 +77,23 @@
                         <label class="form-label fw-bold">
                             <t t-esc="labels.cakePieces"/> *
                         </label>
-                        <select class="form-select" t-model.number="state.cake_size_id">
+                        <select class="form-select"
+                                t-att-value="state.cake_size_id"
+                                t-on-change="onCakeSizeChange">
                             <option value="0" t-esc="labels.selectSize"/>
                             <t t-foreach="sizes" t-as="size" t-key="size.id">
                                 <option t-att-value="size.id" t-esc="size.name"/>
                             </t>
                         </select>
+                    </div>
+
+                    <div class="mb-3" t-if="showAllowMultipleCheckbox">
+                        <label class="form-check">
+                            <input class="form-check-input" type="checkbox"
+                                   t-att-checked="state.allow_multiple_choices ? 'checked' : undefined"
+                                   t-on-change="onAllowMultipleChange"/>
+                            <span class="form-check-label fw-bold ms-1" t-esc="labels.allowMultipleChoices"/>
+                        </label>
                     </div>
 
                     <div class="mb-3">
@@ -117,9 +128,11 @@
                                        t-on-input="(ev) => this.onCategorySearchInput(category.id, ev)"/>
                             </div>
                             <div class="category-products-list" style="max-height: 180px; overflow-y: auto;">
-                                <t t-foreach="getFilteredLines(category)" t-as="line" t-key="line.id">
+                                <t t-foreach="getFilteredLines(category)" t-as="line"
+                                   t-key="line.id + '_' + (isCategoryMultiSelect(category) ? 'multi' : 'single')">
                                     <label class="form-check d-block mb-1">
-                                        <input class="form-check-input" type="radio"
+                                        <input class="form-check-input"
+                                               t-att-type="isCategoryMultiSelect(category) ? 'checkbox' : 'radio'"
                                                t-att-name="'category_' + category.id"
                                                t-att-checked="isComponentSelected(category.id, line.id) ? 'checked' : undefined"
                                                t-on-change="() => this.onComponentSelect(category.id, line.id)"/>
