@@ -13,6 +13,13 @@
                         invisible="not line_ids"
                         groups="hr_payroll.group_hr_payroll_user"/>
             </xpath>
+            <xpath expr="//page[@name='account_info']" position="inside">
+                <group string="PayRun Audit Snapshot" groups="hr_payroll.group_hr_payroll_user">
+                    <field name="payrun_audit_file" filename="payrun_audit_filename" readonly="1"/>
+                    <field name="payrun_audit_filename" invisible="1"/>
+                    <field name="payrun_audit_file_generated_at" readonly="1"/>
+                </group>
+            </xpath>
         </field>
     </record>
 
