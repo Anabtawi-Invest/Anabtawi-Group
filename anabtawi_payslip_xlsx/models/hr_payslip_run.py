@@ -31,14 +31,14 @@ class HrPayslipRun(models.Model):
         readonly=True,
         attachment=True,
         copy=False,
-        help="Immutable Excel snapshot saved on the first PayRun Audit download "
-             "after the pay run is marked as paid. Downloads before paid are not stored. "
+        help="Immutable Excel snapshot generated when Mark as Paid is pressed the first time. "
              "Later downloads reuse this file and do not overwrite it.",
     )
     audit_filename = fields.Char(string="PayRun Audit Filename", copy=False)
     audit_file_generated_at = fields.Datetime(string="Audit Snapshot Date", readonly=True, copy=False)
 
     def _freeze_payrun_audit(self, force=False):
+        """Generate and store the full PayRun Audit Excel once (unless force=True)."""
         for run in self:
             if not run.slip_ids:
                 continue
@@ -55,18 +55,37 @@ class HrPayslipRun(models.Model):
                 except Exception:
                     pass
 
+    def _clear_payrun_audit(self):
+        self.sudo().write({
+            "audit_file": False,
+            "audit_filename": False,
+            "audit_file_generated_at": False,
+        })
+
+    def action_paid(self):
+        """On Mark as Paid: generate and save the audit Excel the first time only."""
+        res = super().action_paid()
+        self._freeze_payrun_audit()
+        return res
+
+    def action_unpaid(self):
+        res = super().action_unpaid() if hasattr(super(), "action_unpaid") else None
+        self._clear_payrun_audit()
+        return res
+
     def write(self, vals):
         res = super().write(vals)
-        # Clear snapshot if pay run is reverted to Ready (so a new paid cycle can freeze again)
-        if "state" in vals and vals.get("state") in ("01_ready", "draft", "verify"):
-            try:
-                self.sudo().write({
-                    "audit_file": False,
-                    "audit_filename": False,
-                    "audit_file_generated_at": False,
-                })
-            except Exception:
-                pass
+        if "state" in vals:
+            target_state = vals.get("state")
+            # Fallback freeze if state becomes paid outside action_paid
+            if target_state in ("03_paid", "paid"):
+                self._freeze_payrun_audit()
+            # Clear snapshot if pay run is reverted to Ready
+            elif target_state in ("01_ready", "draft", "verify"):
+                try:
+                    self._clear_payrun_audit()
+                except Exception:
+                    pass
         return res
 
     def action_regenerate_audit_snapshot(self):
