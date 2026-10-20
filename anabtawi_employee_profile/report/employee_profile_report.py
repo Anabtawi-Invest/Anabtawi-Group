@@ -15,10 +15,6 @@ class ReportEmployeeProfileDocument(models.AbstractModel):
             )
             for emp in docs
         }
-        loan_map = {
-            emp.id: emp.profile_salary_adjustment_loans()
-            for emp in docs
-        }
         tz_now = fields.Datetime.context_timestamp(
             self.env.user, fields.Datetime.now()
         )
@@ -27,7 +23,6 @@ class ReportEmployeeProfileDocument(models.AbstractModel):
             'doc_model': 'hr.employee',
             'docs': docs,
             'dep_map': dep_map,
-            'loan_map': loan_map,
             'print_user': self.env.user,
             'print_time': tz_now,
         }
