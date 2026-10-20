@@ -15,7 +15,7 @@ class CakeCategory(models.Model):
         string="Allow Multiple Choices",
         default=False,
         help="When enabled, cashiers can select more than one product in this category "
-             "if the cake size is greater than 15 pieces and multi-select is turned on in POS.",
+             "if the cake size is 15 pieces or more and multi-select is turned on in POS.",
     )
     line_ids = fields.One2many("cake.category.line", "category_id", string="Products")
 
