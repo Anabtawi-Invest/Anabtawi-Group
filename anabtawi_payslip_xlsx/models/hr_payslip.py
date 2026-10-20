@@ -1,13 +1,30 @@
 import calendar
 import io
 
-from odoo import _, models
+from odoo import _, fields, models
 from odoo.exceptions import ValidationError
 from odoo.tools.misc import format_date
 
 
 class HrPayslip(models.Model):
     _inherit = "hr.payslip"
+
+    # Related from pay run — shown on payslip Other Info tab
+    payrun_audit_file = fields.Binary(
+        related="payslip_run_id.audit_file",
+        string="PayRun Audit File",
+        readonly=True,
+    )
+    payrun_audit_filename = fields.Char(
+        related="payslip_run_id.audit_filename",
+        string="PayRun Audit Filename",
+        readonly=True,
+    )
+    payrun_audit_file_generated_at = fields.Datetime(
+        related="payslip_run_id.audit_file_generated_at",
+        string="Audit Snapshot Date",
+        readonly=True,
+    )
 
     def action_export_payslip(self):
         if self.filtered("error_count"):

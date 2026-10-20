@@ -229,7 +229,7 @@ export class CustomCakeFormPopup extends Component {
     }
 
     get showAllowMultipleCheckbox() {
-        return this._getSelectedPieces() > 15;
+        return this._getSelectedPieces() >= 15;
     }
 
     get isAllowMultipleEnabled() {
