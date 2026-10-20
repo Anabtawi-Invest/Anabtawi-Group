@@ -75,6 +75,7 @@ class HrPayslip(models.Model):
         for slip in self:
             if not slip.employee_id or not slip.date_to:
                 continue
+            slip._pfr_create_pto_settlement_leaves(types['pto'][:1])
             slip._pfr_create_annual_settlement_leaves(types['annual'][:1])
             if types['extra'] and 'hr.leave.allocation' in self.env:
                 slip._pfr_force_extra_hours(types['extra'][:1])
@@ -84,8 +85,13 @@ class HrPayslip(models.Model):
                 if fname in emp._fields:
                     emp.write({fname: balance})
 
+    def _pfr_create_pto_settlement_leaves(self, leave_type):
+        """Step 2: consume Paid Time Off, one validated leave per settled day."""
+        self.ensure_one()
+        self._pfr_create_settlement_leaves(leave_type, self.lateness_covered_by_pto, 'Paid Time Off')
+
     def _pfr_create_annual_settlement_leaves(self, leave_type):
-        """Step 2: consume Annual Leave, one validated leave per settled day."""
+        """Step 3: consume Annual Leave, one validated leave per settled day."""
         self.ensure_one()
         self._pfr_create_settlement_leaves(leave_type, self.lateness_covered_by_annual_leave, 'Annual Leave')
 

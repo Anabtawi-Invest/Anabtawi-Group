@@ -17,7 +17,7 @@ class HrEmployee(models.Model):
         help="Lunch break subtracted from shifts. Overrides the station default.")
     allow_annual_leave_lateness_deduction = fields.Boolean(
         string="Accept Annual Deduction", default=True, tracking=True,
-        help="Allow lateness to be settled from the Annual Leave balance (step 2).")
+        help="Allow lateness to be settled from the Annual Leave balance (step 3).")
     pfr_attendance_exempt = fields.Boolean(
         string="Exempt from Attendance", tracking=True,
         help="The employee does not check in/out: no absent entries, no lateness, no overtime. "

@@ -59,4 +59,5 @@ class HrPayslip(models.Model):
             slip._pfr_set_input('CLEAR_ANNUAL', annual, round(annual * daily, 3))
 
             pto = slip._pfr_leave_balance_days(types['pto'], bal)
+            pto = max(0.0, round(pto - (slip.lateness_covered_by_pto or 0.0) / U.DAILY_HOURS, 4))
             slip._pfr_set_input('CLEAR_PTO', pto, round(pto * daily, 3))

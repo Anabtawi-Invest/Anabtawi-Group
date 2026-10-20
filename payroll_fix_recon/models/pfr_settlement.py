@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
-"""Monthly overtime / lateness figures and the 3-step lateness settlement.
+"""Monthly overtime / lateness figures and the 4-step lateness settlement.
 
     gross lateness = daily punch undertime + ABSENT work entry hours
     step 1  deduct 1:1 from banked Extra Hours (previous balance + this month's overtime)
-    step 2  deduct from Annual Leave (only if the employee opted in)
-    step 3  whatever is left is deducted from cash (hours x wage / 240)
+    step 2  deduct from Paid Time Off (automatic when balance > 0)
+    step 3  deduct from Annual Leave (only if the employee opted in)
+    step 4  whatever is left is deducted from cash (hours x wage / 240)
 
 Pure computation: nothing is written here.
 """
@@ -72,7 +73,7 @@ class PfrSettlement(models.AbstractModel):
         emp_ids = slips.employee_id.ids
         d_min, d_max = min(slips.mapped('date_from')), max(slips.mapped('date_to'))
         types = self.leave_types(slips[:1].company_id)
-        type_ids = list((types['extra'] | types['annual']).ids)
+        type_ids = list((types['extra'] | types['annual'] | types['pto']).ids)
         pre = {'types': types, 'balance': self.balance_hours(emp_ids, type_ids),
                'approved_ot': defaultdict(float), 'banked': defaultdict(float), 'recon_alloc': {}}
         if 'hr.attendance.overtime.line' in self.env:
@@ -195,8 +196,15 @@ class PfrSettlement(models.AbstractModel):
 
         covered_extra = round(min(gross_ut, total_avail), 2)                       # step 1
         remaining = round(gross_ut - covered_extra, 2)
+
+        total_pto = round(max(0.0, sum(bal.get((emp.id, t), 0.0) for t in types['pto'].ids)), 2)
+        covered_pto = 0.0
+        if remaining > 0.01 and total_pto > 0.01:                                 # step 2 (auto)
+            covered_pto = round(min(remaining, math.floor(total_pto * 100) / 100.0), 2)
+            remaining = round(remaining - covered_pto, 2)
+
         covered_annual = 0.0
-        if remaining > 0.01 and emp.allow_annual_leave_lateness_deduction:        # step 2
+        if remaining > 0.01 and emp.allow_annual_leave_lateness_deduction:        # step 3
             annual = max(0.0, sum(bal.get((emp.id, t), 0.0) for t in types['annual'].ids))
             covered_annual = min(remaining, math.floor(annual * 100) / 100.0)   # never above the real balance
             remaining = round(remaining - covered_annual, 2)
@@ -211,6 +219,9 @@ class PfrSettlement(models.AbstractModel):
             'total_extra_hours_available': total_avail,
             'lateness_covered_by_extra_hours': covered_extra,
             'remaining_extra_hours_balance': round(max(0.0, total_avail - covered_extra), 2),
+            'total_pto_available': total_pto,
+            'lateness_covered_by_pto': covered_pto,
+            'remaining_pto_balance': round(max(0.0, total_pto - covered_pto), 2),
             'lateness_covered_by_annual_leave': covered_annual,
-            'undertime_cash_deduction_hours': remaining if remaining >= 0.01 else 0.0,   # step 3
+            'undertime_cash_deduction_hours': remaining if remaining >= 0.01 else 0.0,   # step 4
         }

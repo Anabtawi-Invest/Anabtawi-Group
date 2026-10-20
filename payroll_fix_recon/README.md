@@ -13,7 +13,7 @@ work entries and attendance.
 | `models/hr_attendance.py` | daily net/lateness/overtime metrics, overtime approval |
 | `models/pfr_absent_engine.py` | ABSENT work entries + earned rest-day quota, leave work entries, cron |
 | `models/pfr_day_ledger.py` | **every calendar day of a payslip -> exactly one bucket** |
-| `models/pfr_settlement.py` | overtime figures + 3-step lateness settlement (pure computation) |
+| `models/pfr_settlement.py` | overtime figures + 4-step lateness settlement (pure computation) |
 | `models/hr_payslip.py` | fields, worked-day lines from the ledger, compute sheet |
 | `models/hr_payslip_sync.py` | confirm / cancel: annual settlement leaves, Extra Hours allocation |
 | `models/hr_payslip_termination.py` | CLEAR_EXTRA / CLEAR_ANNUAL / CLEAR_PTO inputs |
@@ -31,9 +31,10 @@ work entries and attendance.
 ## Pay = once
 
 `ACTUAL = paid days x wage / days in month` (paid days = all lines except out-of-contract and unpaid
-leave). ABSENT hours are part of the lateness settlement (extra hours -> annual leave -> cash), and the
-cash leftover is deducted by `DED_UNDERTIME` at `wage / 240`. An absent day is therefore deducted
-exactly once, and not at all when covered by banked Extra Hours.
+leave). ABSENT hours are part of the lateness settlement
+(extra hours -> paid time off -> annual leave -> cash), and the cash leftover is deducted by
+`DED_UNDERTIME` at `wage / 240`. An absent day is therefore deducted exactly once, and not at all
+when covered by Extra Hours / PTO / Annual Leave.
 
 ## Migration
 
