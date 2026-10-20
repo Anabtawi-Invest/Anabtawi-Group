@@ -36,6 +36,9 @@ leave). ABSENT hours are part of the lateness settlement
 `DED_UNDERTIME` at `wage / 240`. An absent day is therefore deducted exactly once, and not at all
 when covered by Extra Hours / PTO / Annual Leave.
 
+Banking: regular OT (x1.25) goes to Extra Hours; public-holiday OT (x1.5) and unused rest days
+(12h each) go to Paid Time Off. Remaining balances of both are allocated to Time Off on confirm.
+
 ## Migration
 
 1. `CREATE TABLE pfr_employee_backup AS SELECT id, employee_work_station, break_duration_hours,

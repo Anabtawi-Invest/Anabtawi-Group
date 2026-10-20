@@ -47,7 +47,7 @@ class HrPayslip(models.Model):
         string="Net Reconciled Hours", compute="_compute_attendance_reconciliation_fields", store=True)
     total_extra_hours_available = fields.Float(
         string="Total Extra Hours Available", compute="_compute_attendance_reconciliation_fields", store=True,
-        help="Previous Extra Hours balance plus Monthly Overtime Earned.")
+        help="Previous Extra Hours balance plus regular overtime (x1.25).")
     remaining_extra_hours_balance = fields.Float(
         string="Remaining Extra Hours Balance", compute="_compute_attendance_reconciliation_fields", store=True,
         help="Extra Hours left after step 1.")
@@ -56,13 +56,14 @@ class HrPayslip(models.Model):
         compute="_compute_attendance_reconciliation_fields", store=True)
     total_pto_available = fields.Float(
         string="Total Paid Time Off Available", compute="_compute_attendance_reconciliation_fields",
-        store=True, help="Paid Time Off leave balance (hours) available at compute.")
+        store=True,
+        help="Previous PTO balance plus public-holiday overtime (x1.5) and unused rest days (12h each).")
     lateness_covered_by_pto = fields.Float(
         string="Step 2: Lateness Deducted from Paid Time Off",
         compute="_compute_attendance_reconciliation_fields", store=True)
     remaining_pto_balance = fields.Float(
         string="Remaining Paid Time Off Available", compute="_compute_attendance_reconciliation_fields",
-        store=True, help="Paid Time Off left after step 2.")
+        store=True, help="Paid Time Off left after step 2 (allocated to Time Off on confirm).")
     lateness_covered_by_annual_leave = fields.Float(
         string="Step 3: Lateness Deducted from Annual Leave",
         compute="_compute_attendance_reconciliation_fields", store=True)
@@ -76,6 +77,8 @@ class HrPayslip(models.Model):
     is_reconciled = fields.Boolean(string="Attendance Reconciled", default=False, copy=False)
     extra_hours_allocated_days = fields.Float(
         string="Extra Hours Added to Allocation", default=0.0, copy=False)
+    pto_allocated_days = fields.Float(
+        string="Paid Time Off Added to Allocation", default=0.0, copy=False)
 
     # ------------------------------------------------------------------
     # Reconciliation figures (in-memory only)

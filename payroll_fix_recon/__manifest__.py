@@ -1,6 +1,6 @@
 {
     'name': 'Payroll Fix Recon',
-    'version': '19.0.1.1.0',
+    'version': '19.0.1.2.0',
     'category': 'Human Resources/Payroll',
     'summary': 'Attendance reconciliation payroll: break policy, daily metrics, rest/absent engine, '
                '4-step lateness settlement and a single-source worked-days ledger.',
