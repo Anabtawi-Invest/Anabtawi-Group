@@ -176,28 +176,38 @@
                     <table style="width: 100%; border-collapse: collapse;">
                         <tr>
                             <td style="width: 50%; vertical-align: top; padding-right: 8px;">
-                                <div class="aep-section-title">Dependants</div>
+                                <t t-set="hi_lines" t-value="o.profile_health_insurance_entries()"/>
+                                <t t-set="hi_total" t-value="o.profile_health_insurance_total_monthly()"/>
+                                <div class="aep-section-title">Health Insurance &amp; Family</div>
                                 <table class="aep-data-table" style="width:100%; border:1px solid #ccc; border-collapse:collapse;">
                                     <tr style="background:#e8e8e8;">
-                                        <th style="border:1px solid #ccc;">No.</th>
-                                        <th style="border:1px solid #ccc;">Name</th>
-                                        <th style="border:1px solid #ccc;">Birth Date</th>
-                                        <th style="border:1px solid #ccc;">Birth Place</th>
-                                        <th style="border:1px solid #ccc;">Med. Ins.</th>
+                                        <th style="border:1px solid #ccc; width: 18%;">Rel.</th>
+                                        <th style="border:1px solid #ccc; width: 34%;">Name</th>
+                                        <th style="border:1px solid #ccc; width: 14%; text-align:center;">Grade</th>
+                                        <th style="border:1px solid #ccc; width: 14%; text-align:right;">Contrib %</th>
+                                        <th style="border:1px solid #ccc; width: 20%; text-align:right;">Monthly</th>
                                     </tr>
-                                    <t t-foreach="dep_map.get(o.id, [])" t-as="dep">
+                                    <t t-foreach="hi_lines" t-as="hi">
                                         <tr>
-                                            <td style="border:1px solid #ccc; text-align:center;" t-out="dep_index + 1"/>
-                                            <td style="border:1px solid #ccc;" t-out="dep.name or ''"/>
-                                            <td style="border:1px solid #ccc;"><span t-if="dep.birthdate" t-field="dep.birthdate"/></td>
-                                            <td style="border:1px solid #ccc;"><span t-out="dep.notes or ''"/></td>
-                                            <td style="border:1px solid #ccc; text-align:center;">
-                                                <t t-if="dep.grade_id">☑</t>
+                                            <td style="border:1px solid #ccc;" t-out="hi['relationship_display']"/>
+                                            <td style="border:1px solid #ccc;" t-out="hi['name'] or ''"/>
+                                            <td style="border:1px solid #ccc; text-align:center;" t-out="hi['grade'] or '—'"/>
+                                            <td style="border:1px solid #ccc; text-align:right;" t-out="'%.1f%%' % hi['employee_contribution'] if hi['employee_contribution'] else '0%'"/>
+                                            <td style="border:1px solid #ccc; text-align:right; font-weight:bold;">
+                                                <span t-out="'%.2f' % hi['monthly_contribution']"/>
                                             </td>
                                         </tr>
                                     </t>
-                                    <t t-if="not len(dep_map.get(o.id, []))">
-                                        <tr><td colspan="5" style="border:1px solid #ccc; height:22px;">&#160;</td></tr>
+                                    <t t-if="hi_lines">
+                                        <tr style="background:#f1f3f5; font-weight:bold;">
+                                            <td colspan="4" style="border:1px solid #ccc; text-align:right;">Total Monthly Deduction:</td>
+                                            <td style="border:1px solid #ccc; text-align:right; color:#c0392b;">
+                                                <span t-out="'%.2f' % hi_total"/> <span t-out="o.company_id.currency_id.symbol or ''"/>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                    <t t-if="not hi_lines">
+                                        <tr><td colspan="5" style="border:1px solid #ccc; height:22px; text-align:center; color:#888; font-style:italic;">No health insurance coverage</td></tr>
                                     </t>
                                 </table>
 

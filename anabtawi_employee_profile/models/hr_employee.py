@@ -281,6 +281,51 @@ class HrEmployee(models.Model):
             parts.append(format_date(self.env, line.effective_date))
         return ' — '.join(p for p in parts if p)
 
+    def profile_health_insurance_entries(self):
+        """Returns health insurance lines for the employee and covered family members.
+        Sorted with 'employee' first, followed by spouse, child, parent.
+        """
+        self.ensure_one()
+        if not hasattr(self, 'health_insurance_ids'):
+            return []
+
+        rel_priority = {'employee': 0, 'spouse': 1, 'child': 2, 'parent': 3}
+        rel_labels = {
+            'employee': 'Employee',
+            'spouse': 'Spouse',
+            'child': 'Child',
+            'parent': 'Parent',
+        }
+
+        records = self.health_insurance_ids.sorted(
+            key=lambda r: (rel_priority.get(r.relationship, 9), r.id)
+        )
+
+        entries = []
+        for r in records:
+            entries.append({
+                'id': r.id,
+                'name': r.name or self.name if r.relationship == 'employee' else (r.name or ''),
+                'relationship': r.relationship,
+                'relationship_display': rel_labels.get(r.relationship, (r.relationship or '').capitalize()),
+                'grade': r.grade_id.name if r.grade_id else '',
+                'birthdate': r.birthdate,
+                'birthdate_formatted': format_date(self.env, r.birthdate) if r.birthdate else '',
+                'effective_date': r.effective_date,
+                'effective_date_formatted': format_date(self.env, r.effective_date) if r.effective_date else '',
+                'policy_full_amount': r.policy_full_amount or 0.0,
+                'employee_contribution': r.employee_contribution or 0.0,
+                'monthly_contribution': r.monthly_contribution or 0.0,
+            })
+        return entries
+
+    def profile_health_insurance_total_monthly(self):
+        """Returns total monthly health insurance contribution deducted from the employee."""
+        self.ensure_one()
+        if not hasattr(self, 'health_insurance_ids'):
+            return 0.0
+        return sum(self.health_insurance_ids.mapped('monthly_contribution') or [0.0])
+
     def profile_blood_type_display(self):
         self.ensure_one()
         if not self.blood_type:
