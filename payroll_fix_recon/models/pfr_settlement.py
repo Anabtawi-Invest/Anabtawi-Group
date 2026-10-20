@@ -10,6 +10,9 @@
     step 3  deduct from Annual Leave (only if the employee opted in)
     step 4  whatever is left is deducted from cash (hours x wage / 240)
 
+    Remaining balances written to Time Off are REAL hours: leftover earned OT is
+    divided by 1.25 (Extra Hours) or 1.5 (PH/rest -> PTO); prior leave stays 1:1.
+
 Pure computation: nothing is written here.
 """
 import math
@@ -41,6 +44,21 @@ def recon_alloc_name(slip):
 def pto_recon_alloc_name(slip):
     month = slip.date_to.strftime('%B %Y') if slip.date_to else ''
     return f"Paid Time Off Reconciliation: {month} - {slip.employee_id.name}"
+
+
+def remaining_real_hours(prior_real, earned_weighted, covered, rate):
+    """Convert settlement leftover to Time Off hours.
+
+    Lateness is covered from earned (weighted) first, then from prior (already real).
+    Leftover earned hours are divided by `rate` (1.25 or 1.5) before banking.
+    """
+    prior = max(0.0, prior_real or 0.0)
+    earned = max(0.0, earned_weighted or 0.0)
+    used = max(0.0, covered or 0.0)
+    rate = rate or 1.0
+    if used <= earned:
+        return round(prior + (earned - used) / rate, 2)
+    return round(max(0.0, prior - (used - earned)), 2)
 
 
 class PfrSettlement(models.AbstractModel):
@@ -208,6 +226,8 @@ class PfrSettlement(models.AbstractModel):
 
         covered_extra = round(min(gross_ut, total_avail), 2)                       # step 1
         remaining = round(gross_ut - covered_extra, 2)
+        # Time Off banks REAL hours: leftover earned OT / 1.25; prior leave 1:1
+        remaining_extra_real = remaining_real_hours(prev_extra, reg_ot, covered_extra, U.OT_RATE)
 
         # PTO = previous bank + public holiday (x1.5) + unused rest days (12h)
         current_pto_recon = max((slip.pto_allocated_days or 0.0) * 8.0,
@@ -219,6 +239,8 @@ class PfrSettlement(models.AbstractModel):
         if remaining > 0.01 and total_pto > 0.01:                                 # step 2 (auto)
             covered_pto = round(min(remaining, math.floor(total_pto * 100) / 100.0), 2)
             remaining = round(remaining - covered_pto, 2)
+        # leftover earned PH/rest / 1.5; prior PTO 1:1
+        remaining_pto_real = remaining_real_hours(prior_pto, pto_earned, covered_pto, U.PH_RATE)
 
         covered_annual = 0.0
         if remaining > 0.01 and emp.allow_annual_leave_lateness_deduction:        # step 3
@@ -235,10 +257,10 @@ class PfrSettlement(models.AbstractModel):
             'attendance_net_reconciled': round(gross_ot - gross_ut, 2),
             'total_extra_hours_available': total_avail,
             'lateness_covered_by_extra_hours': covered_extra,
-            'remaining_extra_hours_balance': round(max(0.0, total_avail - covered_extra), 2),
+            'remaining_extra_hours_balance': remaining_extra_real,
             'total_pto_available': total_pto,
             'lateness_covered_by_pto': covered_pto,
-            'remaining_pto_balance': round(max(0.0, total_pto - covered_pto), 2),
+            'remaining_pto_balance': remaining_pto_real,
             'lateness_covered_by_annual_leave': covered_annual,
             'undertime_cash_deduction_hours': remaining if remaining >= 0.01 else 0.0,   # step 4
         }

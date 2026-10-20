@@ -50,7 +50,7 @@ class HrPayslip(models.Model):
         help="Previous Extra Hours balance plus regular overtime (x1.25).")
     remaining_extra_hours_balance = fields.Float(
         string="Remaining Extra Hours Balance", compute="_compute_attendance_reconciliation_fields", store=True,
-        help="Extra Hours left after step 1.")
+        help="Real hours left after step 1 (leftover earned OT divided by 1.25). Allocated on confirm.")
     lateness_covered_by_extra_hours = fields.Float(
         string="Step 1: Lateness Deducted from Extra Hours",
         compute="_compute_attendance_reconciliation_fields", store=True)
@@ -63,7 +63,9 @@ class HrPayslip(models.Model):
         compute="_compute_attendance_reconciliation_fields", store=True)
     remaining_pto_balance = fields.Float(
         string="Remaining Paid Time Off Available", compute="_compute_attendance_reconciliation_fields",
-        store=True, help="Paid Time Off left after step 2 (allocated to Time Off on confirm).")
+        store=True,
+        help="Real hours left after step 2 (leftover PH/rest divided by 1.5; prior PTO 1:1). "
+             "Allocated on confirm.")
     lateness_covered_by_annual_leave = fields.Float(
         string="Step 3: Lateness Deducted from Annual Leave",
         compute="_compute_attendance_reconciliation_fields", store=True)

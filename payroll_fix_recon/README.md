@@ -37,7 +37,9 @@ leave). ABSENT hours are part of the lateness settlement
 when covered by Extra Hours / PTO / Annual Leave.
 
 Banking: regular OT (x1.25) goes to Extra Hours; public-holiday OT (x1.5) and unused rest days
-(12h each) go to Paid Time Off. Remaining balances of both are allocated to Time Off on confirm.
+(12h each) go to Paid Time Off. Settlement uses the weighted credit; before Time Off allocation,
+leftover earned Extra Hours are divided by 1.25 and leftover earned PH/rest by 1.5 (prior leave
+balances stay 1:1).
 
 ## Migration
 
