@@ -13,7 +13,8 @@
                         invisible="not line_ids"
                         groups="hr_payroll.group_hr_payroll_user"/>
             </xpath>
-            <xpath expr="//page[@name='account_info']" position="inside">
+            <!-- First block on Other Info so it is easy to find -->
+            <xpath expr="//page[@name='account_info']/group" position="before">
                 <group string="PayRun Audit Snapshot" groups="hr_payroll.group_hr_payroll_user">
                     <field name="payrun_audit_file" filename="payrun_audit_filename" readonly="1"/>
                     <field name="payrun_audit_filename" invisible="1"/>

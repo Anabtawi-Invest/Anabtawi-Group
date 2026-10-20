@@ -79,19 +79,22 @@ class PayslipXlsxController(http.Controller):
         if not payrun:
             return request.not_found()
 
-        # Paid only: first download after paid saves audit_file once; later downloads reuse it.
-        # Before paid: always live generate — do not save to audit_file.
+        # After Mark as Paid the report is already saved on audit_file — serve that copy.
+        # Before paid: live generate only (do not save).
         is_paid = payrun.state in ("03_paid", "paid") or (
             payrun.slip_ids and all(s.state in ("paid", "done") for s in payrun.slip_ids)
         )
 
-        if is_paid:
-            if not payrun.audit_file:
-                payrun._freeze_payrun_audit()
-            if payrun.audit_file:
-                xlsx_content = base64.b64decode(payrun.audit_file)
-            else:
-                xlsx_content = payrun._generate_payrun_xlsx()
+        if is_paid and payrun.audit_file:
+            xlsx_content = base64.b64decode(payrun.audit_file)
+        elif is_paid:
+            # Fallback if Mark as Paid did not store the file for any reason
+            payrun._freeze_payrun_audit()
+            xlsx_content = (
+                base64.b64decode(payrun.audit_file)
+                if payrun.audit_file
+                else payrun._generate_payrun_xlsx()
+            )
         else:
             xlsx_content = payrun._generate_payrun_xlsx(payslip_ids=parsed_payslip_ids)
 
