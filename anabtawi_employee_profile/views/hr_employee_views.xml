@@ -21,9 +21,9 @@
                 <field name="medical_insurance_ref"/>
                 <field name="blood_type"/>
                 <field name="profile_employment_status"/>
-                <field name="contract_date_start" string="Contract Start Date" readonly="1"/>
-                <field name="contract_date_end" string="Contract End Date" readonly="1"
-                       invisible="profile_employment_status == 'active' and not contract_date_end"/>
+                <field name="profile_contract_start_date" readonly="1"/>
+                <field name="profile_contract_end_date" readonly="1"
+                       invisible="profile_employment_status == 'active' and not profile_contract_end_date"/>
                 <field name="departure_date" string="Termination Date"
                        invisible="profile_employment_status != 'terminated'"/>
             </xpath>

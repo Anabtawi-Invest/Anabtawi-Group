@@ -93,6 +93,41 @@ class HrEmployee(models.Model):
         string='Company Loans',
         groups='hr.group_hr_user',
     )
+    profile_contract_start_date = fields.Date(
+        string='Contract Start Date',
+        compute='_compute_profile_contract_dates',
+        groups='hr.group_hr_user',
+    )
+    profile_contract_end_date = fields.Date(
+        string='Contract End Date',
+        compute='_compute_profile_contract_dates',
+        groups='hr.group_hr_user',
+    )
+
+    def _compute_profile_contract_dates(self):
+        for emp in self:
+            start = (
+                getattr(emp, 'contract_date_start', False)
+                or getattr(emp, 'first_contract_date', False)
+                or getattr(emp, 'date_start', False)
+            )
+            if not start and hasattr(emp, 'contract_id') and emp.contract_id:
+                start = emp.contract_id.date_start
+            emp.profile_contract_start_date = start or False
+
+            end = (
+                getattr(emp, 'contract_date_end', False)
+                or getattr(emp, 'date_end', False)
+            )
+            if not end and hasattr(emp, 'contract_id') and emp.contract_id:
+                end = emp.contract_id.date_end
+            if not end and 'hr.version' in self.env:
+                v = self.env['hr.version'].sudo().search(
+                    [('employee_id', '=', emp.id)], order='date_start desc', limit=1
+                )
+                if v and getattr(v, 'date_end', False):
+                    end = v.date_end
+            emp.profile_contract_end_date = end or False
 
     def _compute_company_loan_attachments(self):
         for employee in self:
@@ -187,9 +222,7 @@ class HrEmployee(models.Model):
     def profile_contract_start_display(self):
         """Returns formatted contract start date."""
         self.ensure_one()
-        start_date = getattr(self, 'contract_date_start', False) or getattr(self, 'first_contract_date', False)
-        if not start_date and hasattr(self, 'contract_id') and self.contract_id:
-            start_date = self.contract_id.date_start
+        start_date = self.profile_contract_start_date
         return format_date(self.env, start_date) if start_date else ''
 
     def profile_contract_end_label(self):
@@ -207,21 +240,16 @@ class HrEmployee(models.Model):
         """
         self.ensure_one()
         if self.profile_employment_status == 'terminated':
-            end_date = getattr(self, 'departure_date', False) or getattr(self, 'contract_date_end', False)
-            if not end_date and hasattr(self, 'contract_id') and self.contract_id:
-                end_date = self.contract_id.date_end
+            end_date = getattr(self, 'departure_date', False) or self.profile_contract_end_date
             return format_date(self.env, end_date) if end_date else ''
 
         if self.profile_employment_status == 'active':
-            contract_end = getattr(self, 'contract_date_end', False)
-            if not contract_end and hasattr(self, 'contract_id') and self.contract_id:
-                contract_end = self.contract_id.date_end
-            if contract_end:
-                return format_date(self.env, contract_end)
+            if self.profile_contract_end_date:
+                return format_date(self.env, self.profile_contract_end_date)
             return ''
 
         # Other statuses (suspended, on_leave, etc.)
-        other_end = getattr(self, 'departure_date', False) or getattr(self, 'contract_date_end', False)
+        other_end = getattr(self, 'departure_date', False) or self.profile_contract_end_date
         return format_date(self.env, other_end) if other_end else ''
 
     def action_print_employee_profile_pdf(self):

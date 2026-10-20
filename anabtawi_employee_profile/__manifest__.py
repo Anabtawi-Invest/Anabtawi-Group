@@ -5,7 +5,7 @@
     'category': 'Human Resources',
     'summary': 'Employee profile PDF report and related HR fields',
     # hr_health_insurance: Anabtawi Group (new_pull21/Anabtawi-Group/hr_health_insurance)
-    'depends': ['hr', 'hr_contract', 'hr_payroll', 'hr_health_insurance'],
+    'depends': ['hr', 'hr_health_insurance'],
     'author': 'Anabtawi Group',
     'license': 'LGPL-3',
     'data': [
