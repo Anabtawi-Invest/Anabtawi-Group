@@ -94,6 +94,15 @@ class HrEmployee(models.Model):
             'anabtawi_employee_profile.action_report_employee_profile'
         ).report_action(self)
 
+    def profile_salary_adjustment_loans(self):
+        """Salary adjustments used as the Loans section on the employee profile PDF."""
+        self.ensure_one()
+        if 'hr.salary.attachment' not in self.env:
+            return []
+        return self.env['hr.salary.attachment'].sudo().search([
+            ('employee_ids', 'in', self.id),
+        ], order='date_start desc, id desc')
+
     def profile_primary_bank_account(self):
         self.ensure_one()
         if self.primary_bank_account_id:
