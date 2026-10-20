@@ -8,19 +8,19 @@ class StockPicking(models.Model):
         """Moves printed on Picking Operations.
 
         Standard Odoo only prints moves with done quantity > 0.
-        Also include non-cancelled moves that still have demand > 0
-        so receivers can see expected products before qty is entered.
+        Also include moves with demand > 0 even when done is 0 or the
+        move was cancelled (so expected products still appear on paper).
         """
         self.ensure_one()
 
         def _include(move):
-            if move.state == "cancel" or not move.product_uom_qty:
+            if not move.product_uom_qty:
                 return False
             lines = move.move_line_ids.filtered(lambda ml: not ml.is_entire_pack)
             if lines:
                 return True
-            # Demand exists but no detailed lines / done still 0
-            return not move.move_line_ids
+            # Demand exists but no detailed lines / done still 0 / cancelled
+            return not move.move_line_ids or move.state == "cancel"
 
         moves = self.move_ids.filtered(_include)
         return moves.sorted(
