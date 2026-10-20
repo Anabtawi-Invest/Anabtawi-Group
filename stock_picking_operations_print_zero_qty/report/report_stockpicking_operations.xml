@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="report_picking_include_zero_qty" inherit_id="stock.report_picking">
+        <!-- Show the operations table when there are demand lines, even if done qty is still 0 -->
+        <xpath expr="//table[hasclass('o_main_table')]" position="attributes">
+            <attribute name="t-if">o._get_picking_operations_report_moves()</attribute>
+        </xpath>
+
+        <!-- Replace the move loop filter that requires done quantity > 0 -->
+        <xpath expr="//table[hasclass('o_main_table')]/tbody/t[@t-foreach]" position="attributes">
+            <attribute name="t-foreach">o._get_picking_operations_report_moves()</attribute>
+        </xpath>
+
+        <!-- When done is 0, show demand so the paper list has the expected qty -->
+        <xpath expr="//td[hasclass('o_td_quantity')]/span[@t-out][1]" position="replace">
+            <span t-out="format_number(move.quantity if move.quantity else move.product_uom_qty)" class="text-nowrap">3.00</span>
+        </xpath>
+
+        <!-- Fallback From/To from the move when there are no move lines yet -->
+        <xpath expr="//td[@t-if='from_col_exists']/div[@t-if='move.move_line_ids and not move_has_multiple_lines']" position="after">
+            <div t-if="not move.move_line_ids">
+                <span t-field="move.location_id.display_name">WH/Stock</span>
+            </div>
+        </xpath>
+        <xpath expr="//td[@t-if='to_col_exists']/div[@t-if='move.move_line_ids and not move_has_multiple_lines']" position="after">
+            <div t-if="not move.move_line_ids">
+                <span t-field="move.location_dest_id.display_name">WH/Outgoing</span>
+            </div>
+        </xpath>
+    </template>
+</odoo>
