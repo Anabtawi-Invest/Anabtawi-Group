@@ -87,6 +87,15 @@ class HrEmployee(models.Model):
         string='Career Movements',
         groups='hr.group_hr_user',
     )
+    profile_use_loan_paid_amount = fields.Boolean(
+        string='Detect Remaining from Paid Amount',
+        default=True,
+        groups='hr.group_hr_user',
+        tracking=True,
+        help='Same idea as Extra Hours: when checked, remaining loan balance is detected '
+             'from Paid Amount (Starting Amount − Paid). When unchecked, Paid Amount is skipped '
+             'and remaining uses the native Remaining Amount field only (or Starting Amount).',
+    )
     company_loan_attachment_ids = fields.Many2many(
         'hr.salary.attachment',
         compute='_compute_company_loan_attachments',
@@ -200,13 +209,15 @@ class HrEmployee(models.Model):
             total_amount = getattr(att, 'total_amount', 0.0) or getattr(att, 'monthly_amount', 0.0) or 0.0
             monthly_amount = getattr(att, 'monthly_amount', 0.0) or 0.0
 
-            if 'remaining_amount' in fields_dict:
+            if self.profile_use_loan_paid_amount and 'paid_amount' in fields_dict:
+                # Checkbox True (like Enable Overtime): detect remaining from paid amount
+                remaining_amount = max(0.0, total_amount - (att.paid_amount or 0.0))
+            elif 'remaining_amount' in fields_dict:
                 remaining_amount = att.remaining_amount
             elif 'remaining_total' in fields_dict:
                 remaining_amount = att.remaining_total
-            elif 'paid_amount' in fields_dict:
-                remaining_amount = max(0.0, total_amount - (att.paid_amount or 0.0))
             else:
+                # Checkbox False / no paid_amount: skip paid_amount entirely
                 remaining_amount = total_amount
 
             loan_data.append({
