@@ -122,11 +122,14 @@ class HrEmployee(models.Model):
             if not end and hasattr(emp, 'contract_id') and emp.contract_id:
                 end = emp.contract_id.date_end
             if not end and 'hr.version' in self.env:
-                v = self.env['hr.version'].sudo().search(
-                    [('employee_id', '=', emp.id)], order='date_start desc', limit=1
-                )
-                if v and getattr(v, 'date_end', False):
-                    end = v.date_end
+                try:
+                    v = self.env['hr.version'].sudo().search(
+                        [('employee_id', '=', emp.id)], order='id desc', limit=1
+                    )
+                    if v and getattr(v, 'date_end', False):
+                        end = v.date_end
+                except Exception:
+                    pass
             emp.profile_contract_end_date = end or False
 
     def _compute_company_loan_attachments(self):
@@ -148,7 +151,10 @@ class HrEmployee(models.Model):
         else:
             return self.env['hr.salary.attachment']
 
-        records = Attachment.search(domain, order='date_start desc, id desc')
+        try:
+            records = Attachment.search(domain, order='date_start desc, id desc')
+        except Exception:
+            records = Attachment.search(domain, order='id desc')
         loan_ids = []
         for att in records:
             is_company_loan = False
