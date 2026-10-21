@@ -130,10 +130,12 @@
                                 </span>
                             </td>
                             <td style="width: 33%; text-align: center; font-weight: bold; border-left: 1px solid #ccc; border-right: 1px solid #ccc;">
-                                SS Salary<br/><span style="font-weight:normal;">—</span>
+                                SS Salary<br/>
+                                <span t-out="o.profile_ssc_salary_display()" t-att-style="'font-weight:normal;' if o.profile_ssc_salary_display() == '—' else ''"/>
                             </td>
                             <td style="width: 33%; text-align: center; font-weight: bold;">
-                                Service Charge Points<br/><span style="font-weight:normal;">—</span>
+                                Service Charge Points<br/>
+                                <span t-out="o.profile_service_charge_display()" t-att-style="'font-weight:normal;' if o.profile_service_charge_display() == '—' else ''"/>
                             </td>
                         </tr>
                     </table>

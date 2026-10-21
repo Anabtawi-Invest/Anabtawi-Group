@@ -261,6 +261,104 @@ class HrEmployee(models.Model):
         other_end = getattr(self, 'departure_date', False) or self.profile_contract_end_date
         return format_date(self.env, other_end) if other_end else ''
 
+    def profile_ssc_salary_display(self):
+        """Returns formatted SSC Wage / SS Salary with currency if available."""
+        self.ensure_one()
+        candidates = [
+            'x_studio_x_studio_ssc_wage',
+            'x_studio_ssc_wage',
+            'sb_ss_salary',
+            'ssc_wage',
+            'ss_wage',
+            'social_security_wage',
+            'ss_salary',
+        ]
+        val = None
+        for attr in candidates:
+            if hasattr(self, attr):
+                v = getattr(self, attr, None)
+                if v is not None and v != '' and v is not False:
+                    try:
+                        fval = float(v)
+                        if fval > 0:
+                            val = fval
+                            break
+                    except (ValueError, TypeError):
+                        pass
+
+        if val is None and hasattr(self, 'contract_id') and self.contract_id:
+            for attr in candidates:
+                if hasattr(self.contract_id, attr):
+                    v = getattr(self.contract_id, attr, None)
+                    if v is not None and v != '' and v is not False:
+                        try:
+                            fval = float(v)
+                            if fval > 0:
+                                val = fval
+                                break
+                        except (ValueError, TypeError):
+                            pass
+
+        if val is None and 'hr.version' in self.env:
+            try:
+                v = self.env['hr.version'].sudo().search(
+                    [('employee_id', '=', self.id)], order='id desc', limit=1
+                )
+                if v:
+                    for attr in candidates:
+                        if hasattr(v, attr):
+                            cv = getattr(v, attr, None)
+                            if cv is not None and cv != '' and cv is not False:
+                                try:
+                                    fval = float(cv)
+                                    if fval > 0:
+                                        val = fval
+                                        break
+                                except (ValueError, TypeError):
+                                    pass
+            except Exception:
+                pass
+
+        if val is not None and val > 0:
+            currency = self.currency_id or self.company_id.currency_id
+            sym = currency.symbol if currency else ''
+            return f"{val:,.3f} {sym}".strip()
+        return "—"
+
+    def profile_service_charge_display(self):
+        """Returns formatted Service Charge / Points if available."""
+        self.ensure_one()
+        sc = None
+        for attr in ['sb_service_charge', 'x_studio_service_charge', 'service_charge']:
+            if hasattr(self, attr):
+                v = getattr(self, attr, None)
+                if v:
+                    sc = v
+                    break
+
+        pts = None
+        for attr in ['sb_points', 'x_studio_points', 'points']:
+            if hasattr(self, attr):
+                v = getattr(self, attr, None)
+                if v:
+                    pts = v
+                    break
+
+        parts = []
+        if sc:
+            try:
+                parts.append(f"{float(sc):,.2f}")
+            except (ValueError, TypeError):
+                parts.append(str(sc))
+        if pts:
+            try:
+                parts.append(f"{float(pts):g}")
+            except (ValueError, TypeError):
+                parts.append(str(pts))
+        if parts:
+            return " / ".join(parts)
+        return "—"
+
     def action_print_employee_profile_pdf(self):
         self.ensure_one()
         return self.env.ref(
