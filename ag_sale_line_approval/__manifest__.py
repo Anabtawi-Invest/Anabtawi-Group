@@ -1,6 +1,6 @@
 {
     "name": "Sale Line Approval",
-    "version": "19.0.1.0.1",
+    "version": "19.0.1.0.2",
     "category": "Sales",
     "author":"Anabtawi",
     "summary": "Per-line sale approvals for discounts and price overrides.",
