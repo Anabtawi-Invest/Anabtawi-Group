@@ -29,9 +29,6 @@
             </xpath>
             <xpath expr="//page[@name='personal_information']" position="after">
                 <page name="profile_company_loans" string="Company Loans" groups="hr.group_hr_user">
-                    <group>
-                        <field name="profile_use_loan_paid_amount"/>
-                    </group>
                     <field name="company_loan_attachment_ids" widget="many2many" readonly="1">
                         <list create="0" delete="0">
                             <field name="date_start" string="Start Date"/>

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Anabtawi Employee Profile PDF',
-    'version': '19.0.1.0.2',
+    'version': '19.0.1.0.1',
     'category': 'Human Resources',
     'summary': 'Employee profile PDF report and related HR fields',
     # hr_health_insurance: Anabtawi Group (new_pull21/Anabtawi-Group/hr_health_insurance)
