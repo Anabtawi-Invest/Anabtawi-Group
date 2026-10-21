@@ -9,7 +9,7 @@
                 <div class="alert alert-info d-flex align-items-center justify-content-between mb-3" role="alert" invisible="state != 'done'">
                     <div>
                         <strong>Salary Adjustments Done / Historical Run Loaded.</strong>
-                        <div>You can re-download the <strong>Audit XLSX</strong> or the <strong>Bank Transfer File</strong> anytime below.</div>
+                        <div>You can re-download the <strong>Audit XLSX</strong> or the <strong>Bank Transfer File</strong>, or <strong>Cash Sheet</strong> anytime below.</div>
                     </div>
                     <button name="action_reset_draft" type="object" string="New Advance Run"
                             class="btn btn-sm btn-outline-primary" icon="fa-refresh"/>
@@ -85,6 +85,8 @@
                             invisible="state == 'draft'" icon="fa-download"/>
                     <button name="action_export_bank_xlsx" type="object" string="Export Bank File"
                             invisible="state == 'draft'" icon="fa-university"/>
+                    <button name="action_export_cash_xlsx" type="object" string="Export Cash Sheet"
+                            invisible="state == 'draft'" icon="fa-money"/>
                     <button string="Close" special="cancel"/>
                 </footer>
             </form>

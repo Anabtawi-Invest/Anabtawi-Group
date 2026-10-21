@@ -19,7 +19,7 @@ RULES = [
         'sequence': 70, 'appears_on_payslip': True, 'condition_select': 'python',
         'condition_python': "result = round(payslip.undertime_cash_deduction_hours, 2) >= 0.01\n",
         'amount_python_compute': (
-            "# lateness + absent hours NOT covered by Extra Hours / Annual Leave (step 3)\n"
+            "# lateness + absent hours NOT covered by Extra Hours / PTO / Annual Leave (step 4)\n"
             "hours = round(payslip.undertime_cash_deduction_hours, 2)\n"
             "wage = employee.wage or 0.0\n"
             "result = round(min(hours * wage / 240.0, wage), 3) if hours >= 0.01 else 0.0\n"),
@@ -29,7 +29,7 @@ RULES = [
         'sequence': 90, 'appears_on_payslip': True, 'condition_select': 'none',
         'amount_python_compute': (
             "# calendar days - out of contract - unpaid - partial-pay types (e.g. Work Injury 7.5%).\n"
-            "# ABSENT days are NOT cut here: Extra Hours cover them, any rest goes to DED_UNDERTIME.\n"
+            "# ABSENT days are NOT cut here: Extra Hours / PTO / Annual cover them; rest -> DED_UNDERTIME.\n"
             "dim = float(payslip.pfr_days_in_month or 30)\n"
             "wage = employee.wage or 0.0\n"
             "if wage <= 0 or not payslip:\n"
