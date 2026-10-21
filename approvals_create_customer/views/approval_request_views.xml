@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="approval_request_view_form_create_customer" model="ir.ui.view">
+        <field name="name">approval.request.view.form.create.customer</field>
+        <field name="model">approval.request</field>
+        <field name="inherit_id" ref="approvals.approval_request_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//button[@name='action_get_attachment_view']" position="after">
+                <button name="action_open_created_partner"
+                        type="object"
+                        class="oe_stat_button"
+                        icon="fa-user"
+                        invisible="not created_partner_id">
+                    <div class="o_stat_info">
+                        <span class="o_stat_text">Customer</span>
+                    </div>
+                </button>
+            </xpath>
+            <xpath expr="//group[@name='request_main']" position="inside">
+                <field name="customer_name"
+                        invisible="approval_type != 'create_customer'"
+                        required="approval_type == 'create_customer'"
+                        readonly="request_status != 'new'"/>
+                <field name="customer_phone"
+                        invisible="approval_type != 'create_customer'"
+                        readonly="request_status != 'new'"/>
+                <field name="customer_email"
+                        invisible="approval_type != 'create_customer'"
+                        readonly="request_status != 'new'"/>
+                <field name="created_partner_id"
+                        invisible="approval_type != 'create_customer' or not created_partner_id"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="approval_request_view_tree_create_customer" model="ir.ui.view">
+        <field name="name">approval.request.view.list.create.customer</field>
+        <field name="model">approval.request</field>
+        <field name="inherit_id" ref="approvals.approval_request_view_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='category_id']" position="after">
+                <field name="customer_name" optional="hide"/>
+                <field name="customer_phone" optional="hide"/>
+                <field name="created_partner_id" optional="hide"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

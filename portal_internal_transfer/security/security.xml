@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="module_category_portal_internal_transfer" model="ir.module.category">
+        <field name="name">Portal Internal Transfer</field>
+        <field name="description">Portal stock internal transfers</field>
+        <field name="sequence">37</field>
+    </record>
+
+    <record id="privilege_portal_internal_transfer" model="res.groups.privilege">
+        <field name="name">Portal Internal Transfer</field>
+        <field name="category_id" ref="module_category_portal_internal_transfer"/>
+        <field name="sequence">10</field>
+    </record>
+
+    <record id="group_portal_internal_transfer" model="res.groups">
+        <field name="name">Internal Transfer Portal User</field>
+        <field name="sequence">10</field>
+        <field name="privilege_id" ref="privilege_portal_internal_transfer"/>
+        <field name="comment">Portal users who can create and cancel stock internal transfers.</field>
+    </record>
+</odoo>
