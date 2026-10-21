@@ -25,4 +25,5 @@ class ReportEmployeeProfileDocument(models.AbstractModel):
             'dep_map': dep_map,
             'print_user': self.env.user,
             'print_time': tz_now,
+            'print_time_str': tz_now.strftime('%Y-%m-%d %H:%M') if tz_now else '',
         }

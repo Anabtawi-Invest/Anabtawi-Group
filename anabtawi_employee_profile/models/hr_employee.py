@@ -218,8 +218,11 @@ class HrEmployee(models.Model):
                 'date_start': date_start,
                 'date_start_formatted': format_date(self.env, date_start) if date_start else '',
                 'total_amount': total_amount,
+                'total_amount_formatted': f"{total_amount:.3f}",
                 'monthly_amount': monthly_amount,
+                'monthly_amount_formatted': f"{monthly_amount:.3f}",
                 'remaining_amount': remaining_amount,
+                'remaining_amount_formatted': f"{remaining_amount:.3f}",
                 'note': getattr(att, 'description', '') or '',
                 'state': state,
             })
@@ -309,6 +312,7 @@ class HrEmployee(models.Model):
 
         entries = []
         for r in records:
+            contrib_pct = r.employee_contribution or 0.0
             entries.append({
                 'id': r.id,
                 'name': r.name or self.name if r.relationship == 'employee' else (r.name or ''),
@@ -320,8 +324,10 @@ class HrEmployee(models.Model):
                 'effective_date': r.effective_date,
                 'effective_date_formatted': format_date(self.env, r.effective_date) if r.effective_date else '',
                 'policy_full_amount': r.policy_full_amount or 0.0,
-                'employee_contribution': r.employee_contribution or 0.0,
+                'employee_contribution': contrib_pct,
+                'employee_contribution_formatted': f"{contrib_pct:.1f}%" if contrib_pct else "0%",
                 'monthly_contribution': r.monthly_contribution or 0.0,
+                'monthly_contribution_formatted': f"{(r.monthly_contribution or 0.0):.2f}",
             })
         return entries
 
@@ -331,6 +337,11 @@ class HrEmployee(models.Model):
         if not hasattr(self, 'health_insurance_ids'):
             return 0.0
         return sum(self.health_insurance_ids.mapped('monthly_contribution') or [0.0])
+
+    def profile_health_insurance_total_monthly_formatted(self):
+        """Returns formatted string of total monthly health insurance contribution."""
+        self.ensure_one()
+        return f"{self.profile_health_insurance_total_monthly():.2f}"
 
     def profile_blood_type_display(self):
         self.ensure_one()

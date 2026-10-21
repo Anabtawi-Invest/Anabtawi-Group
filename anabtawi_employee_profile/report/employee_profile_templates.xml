@@ -153,13 +153,13 @@
                             <tr>
                                 <td style="border: 1px solid #ccc; text-align: center;" t-out="loan['date_start_formatted'] or '—'"/>
                                 <td style="border: 1px solid #ccc; text-align: right; font-weight: bold;">
-                                    <span t-out="'%.3f' % loan['total_amount']"/> <span t-out="o.company_id.currency_id.symbol or ''"/>
+                                    <span t-out="loan['total_amount_formatted']"/> <span t-out="o.company_id.currency_id.symbol or ''"/>
                                 </td>
                                 <td style="border: 1px solid #ccc; text-align: right;">
-                                    <span t-out="'%.3f' % loan['monthly_amount']"/> <span t-out="o.company_id.currency_id.symbol or ''"/>
+                                    <span t-out="loan['monthly_amount_formatted']"/> <span t-out="o.company_id.currency_id.symbol or ''"/>
                                 </td>
                                 <td style="border: 1px solid #ccc; text-align: right; font-weight: bold; color: #c0392b;">
-                                    <span t-out="'%.3f' % loan['remaining_amount']"/> <span t-out="o.company_id.currency_id.symbol or ''"/>
+                                    <span t-out="loan['remaining_amount_formatted']"/> <span t-out="o.company_id.currency_id.symbol or ''"/>
                                 </td>
                                 <td style="border: 1px solid #ccc;" t-out="loan['note'] or loan['state'] or '—'"/>
                             </tr>
@@ -177,7 +177,6 @@
                         <tr>
                             <td style="width: 50%; vertical-align: top; padding-right: 8px;">
                                 <t t-set="hi_lines" t-value="o.profile_health_insurance_entries()"/>
-                                <t t-set="hi_total" t-value="o.profile_health_insurance_total_monthly()"/>
                                 <div class="aep-section-title">Health Insurance &amp; Family</div>
                                 <table class="aep-data-table" style="width:100%; border:1px solid #ccc; border-collapse:collapse;">
                                     <tr style="background:#e8e8e8;">
@@ -192,9 +191,9 @@
                                             <td style="border:1px solid #ccc;" t-out="hi['relationship_display']"/>
                                             <td style="border:1px solid #ccc;" t-out="hi['name'] or ''"/>
                                             <td style="border:1px solid #ccc; text-align:center;" t-out="hi['grade'] or '—'"/>
-                                            <td style="border:1px solid #ccc; text-align:right;" t-out="'%.1f%%' % hi['employee_contribution'] if hi['employee_contribution'] else '0%'"/>
+                                            <td style="border:1px solid #ccc; text-align:right;" t-out="hi['employee_contribution_formatted']"/>
                                             <td style="border:1px solid #ccc; text-align:right; font-weight:bold;">
-                                                <span t-out="'%.2f' % hi['monthly_contribution']"/>
+                                                <span t-out="hi['monthly_contribution_formatted']"/>
                                             </td>
                                         </tr>
                                     </t>
@@ -202,7 +201,7 @@
                                         <tr style="background:#f1f3f5; font-weight:bold;">
                                             <td colspan="4" style="border:1px solid #ccc; text-align:right;">Total Monthly Deduction:</td>
                                             <td style="border:1px solid #ccc; text-align:right; color:#c0392b;">
-                                                <span t-out="'%.2f' % hi_total"/> <span t-out="o.company_id.currency_id.symbol or ''"/>
+                                                <span t-out="o.profile_health_insurance_total_monthly_formatted()"/> <span t-out="o.company_id.currency_id.symbol or ''"/>
                                             </td>
                                         </tr>
                                     </t>
@@ -325,7 +324,7 @@
                     <div class="aep-footer" style="margin-top: 16px; color: #555; display: flex; justify-content: space-between;">
                         <div>
                             Printed by <t t-out="print_user.name"/> —
-                            <t t-out="print_time.strftime('%Y-%m-%d %H:%M')"/>
+                            <t t-out="print_time_str or (print_time and print_time.strftime('%Y-%m-%d %H:%M')) or ''"/>
                         </div>
                         <div>
                             Licensed To: <t t-out="o.company_id.name"/>
