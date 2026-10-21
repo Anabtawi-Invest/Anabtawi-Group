@@ -122,11 +122,13 @@ class HrEmployee(models.Model):
             if not end and hasattr(emp, 'contract_id') and emp.contract_id:
                 end = emp.contract_id.date_end
             if not end and 'hr.version' in self.env:
+                # date_start/date_end are computed; order/filter on stored contract dates
                 v = self.env['hr.version'].sudo().search(
-                    [('employee_id', '=', emp.id)], order='date_start desc', limit=1
+                    [('employee_id', '=', emp.id), ('contract_date_start', '!=', False)],
+                    order='contract_date_start desc, id desc', limit=1,
                 )
-                if v and getattr(v, 'date_end', False):
-                    end = v.date_end
+                if v:
+                    end = v.contract_date_end or False
             emp.profile_contract_end_date = end or False
 
     def _compute_company_loan_attachments(self):
