@@ -9,13 +9,19 @@ class StockPicking(models.Model):
     def _get_product_catalog_domain(self):
         domain = super()._get_product_catalog_domain()
 
-        if self.env.user.has_group("branch_product_whitelist.group_branch_restricted_product_selection"):
+        if (
+            self.env.user.has_group("branch_product_whitelist.group_branch_restricted_product_selection")
+            and self.picking_type_id.code == "internal"
+        ):
             domain &= Domain("product_tmpl_id.branch_allowed", "=", True)
 
         return domain
 
     def _update_order_line_info(self, product_id, quantity, *, child_field="move_ids", **kwargs):
-        if self.env.user.has_group("branch_product_whitelist.group_branch_restricted_product_selection"):
+        if (
+            self.env.user.has_group("branch_product_whitelist.group_branch_restricted_product_selection")
+            and self.picking_type_id.code == "internal"
+        ):
             product = self.env["product.product"].browse(product_id)
             if not product.product_tmpl_id.branch_allowed:
                 raise UserError("This product is not allowed for branch internal transfers.")

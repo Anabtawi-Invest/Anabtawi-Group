@@ -36,6 +36,10 @@ class StockMoveLine(models.Model):
         if not self.env.user.has_group(GROUP_XMLID):
             return
         for line in self:
+            picking = line.picking_id or line.move_id.picking_id
+            # Only enforce whitelist on internal transfers (not POS/outgoing/etc.)
+            if not picking or picking.picking_type_id.code != "internal":
+                continue
             if line.product_id and not line.product_id.product_tmpl_id.branch_allowed:
                 raise UserError(ERROR_MSG)
 
