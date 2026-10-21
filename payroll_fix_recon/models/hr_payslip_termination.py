@@ -44,6 +44,11 @@ class HrPayslip(models.Model):
             self.input_line_ids = [(0, 0, dict(vals, input_type_id=itype.id))]
 
     def _pfr_apply_termination_inputs(self):
+        """Write CLEAR_* inputs at stored (inflated) rates for Other Inputs / salary rules.
+
+        PDF leave boxes divide for display only (PTO / 1.5, Extra Hours / 1.25) in the report
+        template — quantity and amount here stay on the full banked figures.
+        """
         settlement = self.env['pfr.settlement']
         for slip in self.filtered(lambda s: s.employee_id and s._pfr_is_termination()):
             wage = slip._pfr_wage()
@@ -51,12 +56,19 @@ class HrPayslip(models.Model):
             types = settlement.leave_types(slip.company_id)
             bal = settlement.balance_hours([slip.employee_id.id], (types['annual'] | types['pto']).ids)
 
-            extra = max(0.0, round(slip.remaining_extra_hours_balance, 2))
+            # Full Extra Hours bank (already x1.25 in storage) — amount uses this quantity.
+            extra = max(0.0, round(slip.remaining_extra_hours_balance or 0.0, 2))
             slip._pfr_set_input('CLEAR_EXTRA', extra, round(extra * hourly, 3))
 
             annual = slip._pfr_leave_balance_days(types['annual'], bal)
             annual = max(0.0, round(annual - (slip.lateness_covered_by_annual_leave or 0.0) / U.DAILY_HOURS, 4))
             slip._pfr_set_input('CLEAR_ANNUAL', annual, round(annual * daily, 3))
 
-            pto = slip._pfr_leave_balance_days(types['pto'], bal)
+            # Full PTO days (entered already x1.5) — amount uses this quantity.
+            if 'remaining_pto_balance' in slip._fields:
+                pto = max(0.0, round((slip.remaining_pto_balance or 0.0) / U.DAILY_HOURS, 4))
+            else:
+                pto = slip._pfr_leave_balance_days(types['pto'], bal)
+                covered = getattr(slip, 'lateness_covered_by_pto', 0.0) or 0.0
+                pto = max(0.0, round(pto - covered / U.DAILY_HOURS, 4))
             slip._pfr_set_input('CLEAR_PTO', pto, round(pto * daily, 3))

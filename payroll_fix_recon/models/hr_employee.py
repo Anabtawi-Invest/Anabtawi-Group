@@ -15,14 +15,19 @@ class HrEmployee(models.Model):
     break_duration_hours = fields.Float(
         string="Break Duration (Hours)", default=1.0, tracking=True,
         help="Lunch break subtracted from shifts. Overrides the station default.")
+    allow_pto_lateness_deduction = fields.Boolean(
+        string="Accept PTO Deduction", default=True, tracking=True,
+        help="Allow lateness to be settled from the Paid Time Off balance (step 2).")
     allow_annual_leave_lateness_deduction = fields.Boolean(
         string="Accept Annual Deduction", default=True, tracking=True,
-        help="Allow lateness to be settled from the Annual Leave balance (step 2).")
+        help="Allow lateness to be settled from the Annual Leave balance (step 3).")
     pfr_attendance_exempt = fields.Boolean(
         string="Exempt from Attendance", tracking=True,
         help="The employee does not check in/out: no absent entries, no lateness, no overtime. "
              "Every unpunched day inside the contract is paid.")
-    annual_deduction_approval_document =fields.Binary(string="Approval Document", attachment=True)
+    pto_deduction_approval_document = fields.Binary(string="PTO Approval Document", attachment=True)
+    pto_deduction_approval_filename = fields.Char(string="PTO Approval Document Filename")
+    annual_deduction_approval_document = fields.Binary(string="Approval Document", attachment=True)
     annual_deduction_approval_filename = fields.Char(string="Approval Document Filename")
 
     @api.onchange('employee_work_station')

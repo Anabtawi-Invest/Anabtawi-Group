@@ -13,7 +13,8 @@ RECON_FIELDS = (
     'attendance_gross_overtime', 'overtime_holiday_hours', 'overtime_regular_hours', 'overtime_rest_hours',
     'rest_days_taken', 'attendance_gross_undertime',
     'attendance_net_reconciled', 'total_extra_hours_available', 'lateness_covered_by_extra_hours',
-    'lateness_covered_by_annual_leave', 'remaining_extra_hours_balance', 'undertime_cash_deduction_hours',
+    'remaining_extra_hours_balance', 'total_pto_available', 'lateness_covered_by_pto',
+    'remaining_pto_balance', 'lateness_covered_by_annual_leave', 'undertime_cash_deduction_hours',
 )
 
 # display order of the worked-day lines
@@ -46,18 +47,30 @@ class HrPayslip(models.Model):
         string="Net Reconciled Hours", compute="_compute_attendance_reconciliation_fields", store=True)
     total_extra_hours_available = fields.Float(
         string="Total Extra Hours Available", compute="_compute_attendance_reconciliation_fields", store=True,
-        help="Previous Extra Hours balance plus Monthly Overtime Earned.")
+        help="Previous Extra Hours balance plus regular overtime (x1.25).")
     remaining_extra_hours_balance = fields.Float(
         string="Remaining Extra Hours Balance", compute="_compute_attendance_reconciliation_fields", store=True,
-        help="Extra Hours left after step 1.")
+        help="Real hours left after step 1 (leftover earned OT divided by 1.25). Allocated on confirm.")
     lateness_covered_by_extra_hours = fields.Float(
         string="Step 1: Lateness Deducted from Extra Hours",
         compute="_compute_attendance_reconciliation_fields", store=True)
+    total_pto_available = fields.Float(
+        string="Total Paid Time Off Available", compute="_compute_attendance_reconciliation_fields",
+        store=True,
+        help="Previous PTO balance plus public-holiday overtime (x1.5) and unused rest days (12h each).")
+    lateness_covered_by_pto = fields.Float(
+        string="Step 2: Lateness Deducted from Paid Time Off",
+        compute="_compute_attendance_reconciliation_fields", store=True)
+    remaining_pto_balance = fields.Float(
+        string="Remaining Paid Time Off Available", compute="_compute_attendance_reconciliation_fields",
+        store=True,
+        help="Real hours left after step 2 (leftover PH/rest divided by 1.5; prior PTO 1:1). "
+             "Allocated on confirm.")
     lateness_covered_by_annual_leave = fields.Float(
-        string="Step 2: Lateness Deducted from Annual Leave",
+        string="Step 3: Lateness Deducted from Annual Leave",
         compute="_compute_attendance_reconciliation_fields", store=True)
     undertime_cash_deduction_hours = fields.Float(
-        string="Step 3: Remaining Lateness Deducted from Cash",
+        string="Step 4: Remaining Lateness Deducted from Cash",
         compute="_compute_attendance_reconciliation_fields", store=True)
     pfr_paid_days = fields.Float(
         string="Paid Days", compute="_compute_pfr_paid_days",
@@ -66,6 +79,8 @@ class HrPayslip(models.Model):
     is_reconciled = fields.Boolean(string="Attendance Reconciled", default=False, copy=False)
     extra_hours_allocated_days = fields.Float(
         string="Extra Hours Added to Allocation", default=0.0, copy=False)
+    pto_allocated_days = fields.Float(
+        string="Paid Time Off Added to Allocation", default=0.0, copy=False)
 
     # ------------------------------------------------------------------
     # Reconciliation figures (in-memory only)
@@ -146,13 +161,13 @@ class HrPayslip(models.Model):
         # Layout: days close at the calendar days of the period, hours close at days x 8.
         # The table is derived from the CASH deduction (what is really taken from the salary), so that
         #     Absent hours + Lateness hours == Attendance Deduction hours.
-        # Everything that Extra Hours / Annual Leave already settled is paid time and sits in Attendance.
+        # Everything that Extra Hours / PTO / Annual Leave already settled is paid time and sits in Attendance.
         absent_days = float(L.count('ABSENT'))
         cash_hours = max(0.0, slip.undertime_cash_deduction_hours or 0.0)
         # whole 8h days of the cash remain Absent days; the rest (< 8h) stays as lateness hours
         absent_shown = min(absent_days, float(int(cash_hours / U.DAILY_HOURS + 1e-9)))
         punch_lateness = max(0.0, cash_hours - absent_shown * U.DAILY_HOURS)
-        reconciled_days = absent_days - absent_shown        # absent days settled by Extra Hours / Annual Leave
+        reconciled_days = absent_days - absent_shown   # absent days settled by Extra Hours / PTO / Annual
 
         # (kind, days, hours)
         rows = []

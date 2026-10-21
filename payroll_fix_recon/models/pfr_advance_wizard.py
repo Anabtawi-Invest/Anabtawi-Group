@@ -114,14 +114,12 @@ class PfrAdvanceWizard(models.TransientModel):
         domain = [('description', 'ilike', 'Mid-month advance')]
         if self.history_batch:
             domain = [('description', '=', self.history_batch)]
-        if self.company_id:
-            domain.append(('company_id', '=', self.company_id.id))
         return {
             'name': _("Salary Advance Adjustments"),
             'type': 'ir.actions.act_window',
             'res_model': 'hr.salary.attachment',
-            'view_mode': 'list,form',
-            'views': [(False, 'list'), (False, 'form')],
+            'view_mode': 'tree,form',
+            'views': [(False, 'tree'), (False, 'form')],
             'domain': domain,
             'context': dict(self.env.context),
         }
@@ -935,17 +933,205 @@ class PfrAdvanceWizard(models.TransientModel):
                     return found.sudo()
         return False
 
+    @api.model
+    def _is_employee_suspended(self, emp):
+        """Returns True if the employee is marked as suspended."""
+        emp_sudo = emp.sudo()
+        status = getattr(emp_sudo, 'profile_employment_status', False)
+        if status and str(status).strip().lower() in ('suspended', 'suspend', 'on_leave_unpaid'):
+            return True
+        for f in ('suspended', 'is_suspended', 'on_suspension'):
+            if f in emp_sudo._fields and getattr(emp_sudo, f, False):
+                return True
+        return False
+
+    def _split_advance_lines(self):
+        """Splits selected advance lines into (bank_lines, cash_lines).
+        - bank_lines: line_ids with selected, advance > 0, valid bank account, NOT suspended.
+        - cash_lines: tuple (line, reason) with selected, advance > 0, NO bank account OR suspended.
+        """
+        self.ensure_one()
+        all_lines = self.line_ids.filtered(lambda l: l.selected and l.advance > 0)
+        bank_lines = []
+        cash_lines = []
+
+        for line in all_lines:
+            emp = line.sudo().employee_id
+            is_suspended = self._is_employee_suspended(emp)
+            bank = self._get_employee_bank_account(emp)
+            acc_number = (getattr(bank, 'acc_number', '') or '').replace(' ', '') if bank else ''
+
+            if not is_suspended and acc_number:
+                bank_lines.append(line)
+            else:
+                reason = _("Suspended Employee") if is_suspended else _("No Bank Account")
+                cash_lines.append((line, reason))
+
+        return bank_lines, cash_lines
+
     def action_export_bank_xlsx(self):
         self.ensure_one()
-        lines = self.line_ids.filtered(lambda l: l.selected and l.advance > 0)
-        if not lines:
+        all_lines = self.line_ids.filtered(lambda l: l.selected and l.advance > 0)
+        if not all_lines:
             raise UserError(_("Nothing selected."))
-        data = self._build_bank_xlsx(lines)
+        bank_lines, cash_lines = self._split_advance_lines()
+        if not bank_lines:
+            raise UserError(_(
+                "No employees with a valid bank account found among the selected advance lines.\n"
+                "(Found %d employee(s) requiring cash payment due to missing bank account or suspension)."
+            ) % len(cash_lines))
+        data = self._build_bank_xlsx(bank_lines)
+        cutoff_str = self.date_cutoff.strftime('%m_%Y') if self.date_cutoff else fields.Date.today().strftime('%m_%Y')
         att = self.env['ir.attachment'].create({
-            'name': "Banks Advance List %s.xlsx" % self.date_cutoff.strftime('%m_%Y'),
+            'name': "Banks Advance List %s.xlsx" % cutoff_str,
             'datas': base64.b64encode(data), 'res_model': self._name, 'res_id': self.id,
             'mimetype': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})
         return {'type': 'ir.actions.act_url', 'url': '/web/content/%s?download=true' % att.id, 'target': 'self'}
+
+    def action_export_cash_xlsx(self):
+        self.ensure_one()
+        all_lines = self.line_ids.filtered(lambda l: l.selected and l.advance > 0)
+        if not all_lines:
+            raise UserError(_("Nothing selected."))
+        bank_lines, cash_lines = self._split_advance_lines()
+        if not cash_lines:
+            raise UserError(_(
+                "No employees requiring cash payment found among the selected advance lines.\n"
+                "(All %d selected employee(s) have valid bank accounts and are not suspended)."
+            ) % len(bank_lines))
+        data = self._build_cash_xlsx(cash_lines)
+        cutoff_str = self.date_cutoff.strftime('%m_%Y') if self.date_cutoff else fields.Date.today().strftime('%m_%Y')
+        att = self.env['ir.attachment'].create({
+            'name': "Cash Advance Payout %s.xlsx" % cutoff_str,
+            'datas': base64.b64encode(data), 'res_model': self._name, 'res_id': self.id,
+            'mimetype': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})
+        return {'type': 'ir.actions.act_url', 'url': '/web/content/%s?download=true' % att.id, 'target': 'self'}
+
+    def _build_cash_xlsx(self, cash_lines):
+        """Builds a formatted Excel sheet for cash advance payout with employee signatures."""
+        import xlsxwriter  # pylint: disable=import-outside-toplevel
+        buf = io.BytesIO()
+        wb = xlsxwriter.Workbook(buf, {'in_memory': True})
+        sh = wb.add_worksheet("Cash Advance Payout")
+        sh.set_portrait()
+        sh.set_paper(9)  # A4
+        sh.fit_to_pages(1, 0)
+
+        title_fmt = wb.add_format({
+            'bold': True, 'font_size': 14, 'align': 'center', 'valign': 'vcenter',
+            'font_color': '#1B4F72'
+        })
+        subtitle_fmt = wb.add_format({
+            'font_size': 10, 'italic': True, 'align': 'center', 'valign': 'vcenter',
+            'font_color': '#5D6D7E'
+        })
+        th_fmt = wb.add_format({
+            'bold': True, 'font_size': 10, 'align': 'center', 'valign': 'vcenter',
+            'bg_color': '#2C3E50', 'font_color': '#FFFFFF',
+            'border': 1, 'text_wrap': True
+        })
+        td_center = wb.add_format({'font_size': 9.5, 'align': 'center', 'valign': 'vcenter', 'border': 1})
+        td_left = wb.add_format({'font_size': 9.5, 'align': 'left', 'valign': 'vcenter', 'border': 1})
+        td_right = wb.add_format({'font_size': 9.5, 'align': 'right', 'valign': 'vcenter', 'border': 1})
+        td_money = wb.add_format({
+            'font_size': 9.5, 'bold': True, 'align': 'right', 'valign': 'vcenter',
+            'border': 1, 'num_format': '#,##0.000'
+        })
+        td_reason_susp = wb.add_format({
+            'font_size': 9, 'bold': True, 'align': 'center', 'valign': 'vcenter',
+            'border': 1, 'font_color': '#C0392B', 'bg_color': '#FDEDEC'
+        })
+        td_reason_nobank = wb.add_format({
+            'font_size': 9, 'align': 'center', 'valign': 'vcenter',
+            'border': 1, 'font_color': '#7D6608', 'bg_color': '#FEF9E7'
+        })
+        total_label_fmt = wb.add_format({
+            'bold': True, 'font_size': 10, 'align': 'right', 'valign': 'vcenter',
+            'border': 1, 'bg_color': '#EAEDED'
+        })
+        total_money_fmt = wb.add_format({
+            'bold': True, 'font_size': 10, 'align': 'right', 'valign': 'vcenter',
+            'border': 1, 'top': 1, 'bottom': 6, 'bg_color': '#EAEDED',
+            'font_color': '#922B21', 'num_format': '#,##0.000'
+        })
+
+        # Columns:
+        # 0: #, 1: Emp No, 2: Name, 3: Arabic Name, 4: Department, 5: Job Title / Branch,
+        # 6: Advance Amount (JOD), 7: Reason, 8: Recipient Signature, 9: Date Received
+        col_widths = [5, 12, 28, 24, 20, 20, 18, 18, 22, 14]
+        for c, w in enumerate(col_widths):
+            sh.set_column(c, c, w)
+
+        company = self.company_id or self.env.company
+        company_name = company.name or "Anabtawi Group"
+        cutoff_date_str = (self.date_cutoff or fields.Date.today()).strftime('%d/%m/%Y')
+
+        sh.merge_range(0, 0, 0, 9, f"{company_name} — Mid-Month Advance Cash Payout Register (كشف تسليم السلف نقدياً)", title_fmt)
+        batch_info = f"  |  Batch: {self.batch_name}" if self.batch_name else ""
+        sh.merge_range(1, 0, 1, 9, f"Cut-off Date: {cutoff_date_str}{batch_info}  |  Currency: JOD", subtitle_fmt)
+        sh.set_row(0, 26)
+        sh.set_row(1, 18)
+        sh.set_row(2, 6)
+
+        headers = [
+            "#",
+            "Emp No.",
+            "Employee Name",
+            "الاسم بالعربية",
+            "Department",
+            "Job Title / Branch",
+            "Advance Amount (JOD)",
+            "Payment Reason",
+            "Recipient Signature",
+            "Date Received",
+        ]
+        sh.set_row(3, 24)
+        for c, h in enumerate(headers):
+            sh.write(3, c, h, th_fmt)
+
+        row = 4
+        total_cash = 0.0
+        for idx, (line, reason) in enumerate(cash_lines, start=1):
+            emp = line.sudo().employee_id
+            emp_num = (
+                getattr(emp, 'employee_number', False)
+                or getattr(emp, 'sb_employee_number', False)
+                or getattr(emp, 'registration_number', False)
+                or getattr(emp, 'barcode', False)
+                or str(emp.id)
+            )
+            name_en = emp.name or ''
+            name_ar = getattr(emp, 'name_arabic', '') or getattr(emp, 'legal_name', '') or ''
+            dept = emp.department_id.name if emp.department_id else ''
+            job = emp.job_title or (emp.job_id.name if emp.job_id else '')
+            adv_val = round(line.advance or 0.0, 3)
+
+            reason_fmt = td_reason_susp if "suspend" in str(reason).lower() else td_reason_nobank
+
+            sh.set_row(row, 20)
+            sh.write_number(row, 0, idx, td_center)
+            sh.write_string(row, 1, str(emp_num), td_center)
+            sh.write_string(row, 2, name_en, td_left)
+            sh.write_string(row, 3, name_ar, td_right)
+            sh.write_string(row, 4, dept, td_left)
+            sh.write_string(row, 5, job, td_left)
+            sh.write_number(row, 6, adv_val, td_money)
+            sh.write_string(row, 7, reason, reason_fmt)
+            sh.write_string(row, 8, "", td_center)
+            sh.write_string(row, 9, "", td_center)
+
+            total_cash += adv_val
+            row += 1
+
+        sh.set_row(row, 22)
+        sh.merge_range(row, 0, row, 5, "TOTAL CASH ADVANCE (المجموع الكلي للسلف نقداً):", total_label_fmt)
+        sh.write_number(row, 6, total_cash, total_money_fmt)
+        sh.write_string(row, 7, "", total_label_fmt)
+        sh.write_string(row, 8, "", total_label_fmt)
+        sh.write_string(row, 9, "", total_label_fmt)
+
+        wb.close()
+        return buf.getvalue()
 
     def _build_bank_xlsx(self, lines):
         import xlsxwriter  # pylint: disable=import-outside-toplevel
@@ -993,7 +1179,7 @@ class PfrAdvanceWizard(models.TransientModel):
             acc_number = (getattr(bank, 'acc_number', '') or '').replace(' ', '') if bank else ''
 
             # Col 3: Beneficiary Name
-            holder = (getattr(bank, 'acc_holder_name', '') or getattr(emp, 'legal_name', '') or emp.name or '').strip()
+            holder = (emp.name or getattr(emp, 'legal_name', '') or getattr(bank, 'acc_holder_name', '') or '').strip()
 
             # Col 4: Bank Identifier Code (BIC)
             bic = (getattr(bank, 'bank_bic', '') or '') if bank else ''

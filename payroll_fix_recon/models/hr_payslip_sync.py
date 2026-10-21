@@ -8,7 +8,7 @@ from datetime import datetime, time, timedelta
 
 from odoo import models
 
-from .pfr_settlement import recon_alloc_name
+from .pfr_settlement import recon_alloc_name, pto_recon_alloc_name
 
 _logger = logging.getLogger(__name__)
 
@@ -76,8 +76,11 @@ class HrPayslip(models.Model):
             if not slip.employee_id or not slip.date_to:
                 continue
             slip._pfr_create_annual_settlement_leaves(types['annual'][:1])
-            if types['extra'] and 'hr.leave.allocation' in self.env:
-                slip._pfr_force_extra_hours(types['extra'][:1])
+            if 'hr.leave.allocation' in self.env:
+                if types['extra']:
+                    slip._pfr_force_extra_hours(types['extra'][:1])
+                if types['pto']:
+                    slip._pfr_force_pto(types['pto'][:1])
             balance = round(slip.remaining_extra_hours_balance or 0.0, 2)
             emp = slip.employee_id.sudo()
             for fname in PROFILE_FIELDS:
@@ -85,7 +88,7 @@ class HrPayslip(models.Model):
                     emp.write({fname: balance})
 
     def _pfr_create_annual_settlement_leaves(self, leave_type):
-        """Step 2: consume Annual Leave, one validated leave per settled day."""
+        """Step 3: consume Annual Leave, one validated leave per settled day."""
         self.ensure_one()
         self._pfr_create_settlement_leaves(leave_type, self.lateness_covered_by_annual_leave, 'Annual Leave')
 
@@ -133,39 +136,50 @@ class HrPayslip(models.Model):
             remaining -= chunk
             day += timedelta(days=1)
 
-    def _pfr_force_extra_hours(self, extra_type):
-        """Make the Extra Hours time-off balance equal the slip's Remaining Extra Hours Balance."""
+    def _pfr_force_leave_balance(self, leave_type, target_hours, alloc_name, allocated_field, consume_label):
+        """Make `leave_type` balance equal `target_hours` via allocation (gap>0) or settlement leave (gap<0)."""
         self.ensure_one()
         Alloc = self.env['hr.leave.allocation'].sudo()
         settlement = self.env['pfr.settlement']
-        name = recon_alloc_name(self)
         self.env['hr.leave'].sudo().search([
-            ('employee_id', '=', self.employee_id.id), ('holiday_status_id', '=', extra_type.id),
+            ('employee_id', '=', self.employee_id.id), ('holiday_status_id', '=', leave_type.id),
             ('request_date_from', '>=', self.date_from), ('request_date_to', '<=', self.date_to),
             ('name', 'ilike', 'Lateness Settlement')]).unlink()
-        Alloc.search([('employee_id', '=', self.employee_id.id), ('holiday_status_id', '=', extra_type.id),
-                      ('name', '=', name)]).write({'state': 'confirm'})
-        Alloc.search([('employee_id', '=', self.employee_id.id), ('name', '=', name)]).unlink()
+        Alloc.search([('employee_id', '=', self.employee_id.id), ('holiday_status_id', '=', leave_type.id),
+                      ('name', '=', alloc_name)]).write({'state': 'confirm'})
+        Alloc.search([('employee_id', '=', self.employee_id.id), ('name', '=', alloc_name)]).unlink()
         self.env.flush_all()
 
-        target = round(self.remaining_extra_hours_balance or 0.0, 2)
-        current = round(sum(settlement.balance_hours([self.employee_id.id], extra_type.ids).values()), 2)
+        target = round(target_hours or 0.0, 2)
+        current = round(sum(settlement.balance_hours([self.employee_id.id], leave_type.ids).values()), 2)
         gap = round(target - current, 2)
         if gap > 0.01:
-            vals = {'name': name, 'employee_id': self.employee_id.id, 'holiday_status_id': extra_type.id,
+            vals = {'name': alloc_name, 'employee_id': self.employee_id.id, 'holiday_status_id': leave_type.id,
                     'number_of_days': round(gap / 8.0, 4), 'date_from': self.date_from}
             for fname, val in (('holiday_type', 'employee'), ('allocation_type', 'regular')):
                 if fname in Alloc._fields:
                     vals[fname] = val
             alloc = Alloc.with_context(employee_id=self.employee_id.id, **ALLOC_CTX).create(vals)
             self._pfr_validate_allocation(alloc)
-            self._pfr_set({'extra_hours_allocated_days': vals['number_of_days']})
+            self._pfr_set({allocated_field: vals['number_of_days']})
         else:
-            self._pfr_set({'extra_hours_allocated_days': 0.0})
+            self._pfr_set({allocated_field: 0.0})
             if gap < -0.01:
-                # Step 1 used banked hours: record them in Time Off (days) as a fractional leave so the
-                # balance (days) equals the slip's remaining Extra Hours balance (hours / 8)
-                self._pfr_create_settlement_leaves(extra_type, -gap, 'Extra Hours')
+                self._pfr_create_settlement_leaves(leave_type, -gap, consume_label)
+
+    def _pfr_force_extra_hours(self, extra_type):
+        """Make the Extra Hours time-off balance equal the slip's Remaining Extra Hours Balance."""
+        self.ensure_one()
+        self._pfr_force_leave_balance(
+            extra_type, self.remaining_extra_hours_balance, recon_alloc_name(self),
+            'extra_hours_allocated_days', 'Extra Hours')
+
+    def _pfr_force_pto(self, pto_type):
+        """Make the Paid Time Off balance equal the slip's Remaining Paid Time Off Available."""
+        self.ensure_one()
+        self._pfr_force_leave_balance(
+            pto_type, self.remaining_pto_balance, pto_recon_alloc_name(self),
+            'pto_allocated_days', 'Paid Time Off')
 
     def _pfr_validate_allocation(self, alloc):
         alloc = alloc.sudo()
@@ -194,7 +208,8 @@ class HrPayslip(models.Model):
                 continue
             if not slip.is_reconciled and slip.state in ('draft', 'verify'):
                 continue                                         # fast path: nothing was applied
-            slip._pfr_set({'is_reconciled': False, 'extra_hours_allocated_days': 0.0})
+            slip._pfr_set({'is_reconciled': False, 'extra_hours_allocated_days': 0.0,
+                           'pto_allocated_days': 0.0})
             emp = slip.employee_id.sudo()
             for fname in PROFILE_FIELDS:
                 if fname in emp._fields:
@@ -208,7 +223,8 @@ class HrPayslip(models.Model):
                 settled.write({'state': 'draft'})
                 settled.unlink()
             if Alloc:
-                allocs = Alloc.search([('employee_id', '=', emp.id), ('name', '=', recon_alloc_name(slip))])
+                names = [recon_alloc_name(slip), pto_recon_alloc_name(slip)]
+                allocs = Alloc.search([('employee_id', '=', emp.id), ('name', 'in', names)])
                 allocs.write({'state': 'confirm'})
                 allocs.unlink()
 

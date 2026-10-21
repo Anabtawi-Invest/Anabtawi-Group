@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
-    <!-- 2. Header Button on Payslips List View inside Payrun -->
+    <!-- 1. Header Button on Payslips List View inside Payrun -->
     <record id="view_hr_payslip_list_pfr_bank" model="ir.ui.view">
         <field name="name">hr.payslip.list.pfr.bank</field>
         <field name="model">hr.payslip</field>
@@ -18,9 +18,55 @@
         </field>
     </record>
 
-    <!-- 3. Action Menu on Pay Run (Form & List View) -->
+    <!-- 2. Actions menu on hr.payslip (List View checkboxes selected) -->
+    <record id="action_payslip_export_bank_paid_server" model="ir.actions.server">
+        <field name="name">Export Bank File (Paid Slips)</field>
+        <field name="model_id" ref="hr_payroll.model_hr_payslip"/>
+        <field name="binding_model_id" ref="hr_payroll.model_hr_payslip"/>
+        <field name="binding_view_types">list</field>
+        <field name="state">code</field>
+        <field name="code">
+action = records.action_export_bank_paid_xlsx()
+        </field>
+    </record>
+
+    <record id="action_payslip_export_cash_paid_server" model="ir.actions.server">
+        <field name="name">Export Cash Sheet (Paid Slips)</field>
+        <field name="model_id" ref="hr_payroll.model_hr_payslip"/>
+        <field name="binding_model_id" ref="hr_payroll.model_hr_payslip"/>
+        <field name="binding_view_types">list</field>
+        <field name="state">code</field>
+        <field name="code">
+action = records.action_export_cash_paid_xlsx()
+        </field>
+    </record>
+
+    <!-- 3. Actions menu on Pay Run hr.payslip.run (Form & List View) -->
+    <record id="action_payrun_export_bank_paid_server" model="ir.actions.server">
+        <field name="name">Export Bank File (Paid Slips)</field>
+        <field name="model_id" ref="hr_payroll.model_hr_payslip_run"/>
+        <field name="binding_model_id" ref="hr_payroll.model_hr_payslip_run"/>
+        <field name="binding_view_types">form,list</field>
+        <field name="state">code</field>
+        <field name="code">
+action = records.action_export_bank_paid_xlsx()
+        </field>
+    </record>
+
+    <record id="action_payrun_export_cash_paid_server" model="ir.actions.server">
+        <field name="name">Export Cash Sheet (Paid Slips)</field>
+        <field name="model_id" ref="hr_payroll.model_hr_payslip_run"/>
+        <field name="binding_model_id" ref="hr_payroll.model_hr_payslip_run"/>
+        <field name="binding_view_types">form,list</field>
+        <field name="state">code</field>
+        <field name="code">
+action = records.action_export_cash_paid_xlsx()
+        </field>
+    </record>
+
+    <!-- 4. Legacy Action Menu on Pay Run -->
     <record id="action_payrun_export_bank_server" model="ir.actions.server">
-        <field name="name">Export Bank File</field>
+        <field name="name">Export Bank File (All Slips)</field>
         <field name="model_id" ref="hr_payroll.model_hr_payslip_run"/>
         <field name="binding_model_id" ref="hr_payroll.model_hr_payslip_run"/>
         <field name="binding_view_types">form,list</field>
@@ -29,4 +75,5 @@
 action = records.action_export_bank_xlsx()
         </field>
     </record>
+
 </odoo>

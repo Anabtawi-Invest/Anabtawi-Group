@@ -1,10 +1,17 @@
 # -*- coding: utf-8 -*-
-"""Monthly overtime / lateness figures and the 3-step lateness settlement.
+"""Monthly overtime / lateness figures and the 4-step lateness settlement.
+
+    Regular OT (x1.25)          -> Extra Hours bank
+    Public holiday (x1.5) + unused rest days (12h each) -> Paid Time Off bank
 
     gross lateness = daily punch undertime + ABSENT work entry hours
-    step 1  deduct 1:1 from banked Extra Hours (previous balance + this month's overtime)
-    step 2  deduct from Annual Leave (only if the employee opted in)
-    step 3  whatever is left is deducted from cash (hours x wage / 240)
+    step 1  deduct 1:1 from banked Extra Hours (previous balance + regular OT)
+    step 2  deduct from Paid Time Off (previous balance + PH/rest earned; if employee opted in)
+    step 3  deduct from Annual Leave (only if the employee opted in)
+    step 4  whatever is left is deducted from cash (hours x wage / 240)
+
+    Remaining balances written to Time Off are REAL hours: leftover earned OT is
+    divided by 1.25 (Extra Hours) or 1.5 (PH/rest -> PTO); prior leave stays 1:1.
 
 Pure computation: nothing is written here.
 """
@@ -32,6 +39,26 @@ def leave_hours(rec):
 def recon_alloc_name(slip):
     month = slip.date_to.strftime('%B %Y') if slip.date_to else ''
     return f"Extra Hours Reconciliation: {month} - {slip.employee_id.name}"
+
+
+def pto_recon_alloc_name(slip):
+    month = slip.date_to.strftime('%B %Y') if slip.date_to else ''
+    return f"Paid Time Off Reconciliation: {month} - {slip.employee_id.name}"
+
+
+def remaining_real_hours(prior_real, earned_weighted, covered, rate):
+    """Convert settlement leftover to Time Off hours.
+
+    Lateness is covered from earned (weighted) first, then from prior (already real).
+    Leftover earned hours are divided by `rate` (1.25 or 1.5) before banking.
+    """
+    prior = max(0.0, prior_real or 0.0)
+    earned = max(0.0, earned_weighted or 0.0)
+    used = max(0.0, covered or 0.0)
+    rate = rate or 1.0
+    if used <= earned:
+        return round(prior + (earned - used) / rate, 2)
+    return round(max(0.0, prior - (used - earned)), 2)
 
 
 class PfrSettlement(models.AbstractModel):
@@ -72,7 +99,7 @@ class PfrSettlement(models.AbstractModel):
         emp_ids = slips.employee_id.ids
         d_min, d_max = min(slips.mapped('date_from')), max(slips.mapped('date_to'))
         types = self.leave_types(slips[:1].company_id)
-        type_ids = list((types['extra'] | types['annual']).ids)
+        type_ids = list((types['extra'] | types['annual'] | types['pto']).ids)
         pre = {'types': types, 'balance': self.balance_hours(emp_ids, type_ids),
                'approved_ot': defaultdict(float), 'banked': defaultdict(float), 'recon_alloc': {}}
         if 'hr.attendance.overtime.line' in self.env:
@@ -85,11 +112,13 @@ class PfrSettlement(models.AbstractModel):
                     dur = (line.manual_duration if 'manual_duration' in line._fields else 0.0) or line.duration
                     if dur > 0:
                         pre['approved_ot'][(line.employee_id.id, line.date)] = dur
-        if types['extra']:
+        recon_types = types['extra'] | types['pto']
+        if recon_types:
             for alloc in self.env['hr.leave.allocation'].sudo().search([
                     ('employee_id', 'in', emp_ids), ('state', '=', 'validate'),
-                    ('holiday_status_id', 'in', types['extra'].ids),
-                    ('name', 'ilike', 'Extra Hours Reconciliation')]):
+                    ('holiday_status_id', 'in', recon_types.ids),
+                    '|', ('name', 'ilike', 'Extra Hours Reconciliation'),
+                         ('name', 'ilike', 'Paid Time Off Reconciliation')]):
                 pre['recon_alloc'][(alloc.employee_id.id, alloc.name)] = leave_hours(alloc)
         return pre
 
@@ -180,37 +209,58 @@ class PfrSettlement(models.AbstractModel):
                 gross_ot, rest_taken, ot_parts = self.overtime_hours(slip, L, pre)
             punch = sum(a.daily_undertime_hours for d, a in L.attendances
                         if not a.is_public_holiday and d in L.days and L.days[d] != 'OUT')
-        gross_ot = round(gross_ot, 2)
+        ph_ot = round(ot_parts[0], 2)
+        reg_ot = round(ot_parts[1], 2)
+        rest_ot = round(ot_parts[2], 2)
+        gross_ot = round(reg_ot + ph_ot + rest_ot, 2)        # all OT earned (audit)
         gross_ut = round(punch + L.absent_hours, 2)          # absent days are settled like lateness
 
-        # Extra Hours available before this payslip
+        # Extra Hours = previous bank + regular OT only (x1.25)
         types = pre['types']
-        extra_ids = types['extra'].ids
         bal = pre['balance']
         current_recon = max((slip.extra_hours_allocated_days or 0.0) * 8.0,
                             pre['recon_alloc'].get((emp.id, recon_alloc_name(slip)), 0.0))
-        prior_alloc = max(0.0, sum(bal.get((emp.id, t), 0.0) for t in extra_ids) - current_recon)
+        prior_alloc = max(0.0, sum(bal.get((emp.id, t), 0.0) for t in types['extra'].ids) - current_recon)
         prev_extra = max(prior_alloc, round(pre['banked'].get(emp.id, 0.0), 2))
-        total_avail = round(prev_extra + gross_ot, 2)
+        total_avail = round(prev_extra + reg_ot, 2)
 
         covered_extra = round(min(gross_ut, total_avail), 2)                       # step 1
         remaining = round(gross_ut - covered_extra, 2)
+        # Time Off banks REAL hours: leftover earned OT / 1.25; prior leave 1:1
+        remaining_extra_real = remaining_real_hours(prev_extra, reg_ot, covered_extra, U.OT_RATE)
+
+        # PTO = previous bank + public holiday (x1.5) + unused rest days (12h)
+        current_pto_recon = max((slip.pto_allocated_days or 0.0) * 8.0,
+                                pre['recon_alloc'].get((emp.id, pto_recon_alloc_name(slip)), 0.0))
+        prior_pto = max(0.0, sum(bal.get((emp.id, t), 0.0) for t in types['pto'].ids) - current_pto_recon)
+        pto_earned = round(ph_ot + rest_ot, 2)
+        total_pto = round(prior_pto + pto_earned, 2)
+        covered_pto = 0.0
+        if remaining > 0.01 and total_pto > 0.01 and emp.allow_pto_lateness_deduction:  # step 2
+            covered_pto = round(min(remaining, math.floor(total_pto * 100) / 100.0), 2)
+            remaining = round(remaining - covered_pto, 2)
+        # leftover earned PH/rest / 1.5; prior PTO 1:1
+        remaining_pto_real = remaining_real_hours(prior_pto, pto_earned, covered_pto, U.PH_RATE)
+
         covered_annual = 0.0
-        if remaining > 0.01 and emp.allow_annual_leave_lateness_deduction:        # step 2
+        if remaining > 0.01 and emp.allow_annual_leave_lateness_deduction:        # step 3
             annual = max(0.0, sum(bal.get((emp.id, t), 0.0) for t in types['annual'].ids))
             covered_annual = min(remaining, math.floor(annual * 100) / 100.0)   # never above the real balance
             remaining = round(remaining - covered_annual, 2)
         return {
             'attendance_gross_overtime': gross_ot,
-            'overtime_holiday_hours': round(ot_parts[0], 2),
-            'overtime_regular_hours': round(ot_parts[1], 2),
-            'overtime_rest_hours': round(ot_parts[2], 2),
+            'overtime_holiday_hours': ph_ot,
+            'overtime_regular_hours': reg_ot,
+            'overtime_rest_hours': rest_ot,
             'rest_days_taken': rest_taken,
             'attendance_gross_undertime': gross_ut,
             'attendance_net_reconciled': round(gross_ot - gross_ut, 2),
             'total_extra_hours_available': total_avail,
             'lateness_covered_by_extra_hours': covered_extra,
-            'remaining_extra_hours_balance': round(max(0.0, total_avail - covered_extra), 2),
+            'remaining_extra_hours_balance': remaining_extra_real,
+            'total_pto_available': total_pto,
+            'lateness_covered_by_pto': covered_pto,
+            'remaining_pto_balance': remaining_pto_real,
             'lateness_covered_by_annual_leave': covered_annual,
-            'undertime_cash_deduction_hours': remaining if remaining >= 0.01 else 0.0,   # step 3
+            'undertime_cash_deduction_hours': remaining if remaining >= 0.01 else 0.0,   # step 4
         }
