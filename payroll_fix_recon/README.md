@@ -34,7 +34,8 @@ work entries and attendance.
 leave). ABSENT hours are part of the lateness settlement
 (extra hours -> paid time off -> annual leave -> cash), and the cash leftover is deducted by
 `DED_UNDERTIME` at `wage / 240`. An absent day is therefore deducted exactly once, and not at all
-when covered by Extra Hours / PTO / Annual Leave.
+when covered by Extra Hours / PTO / Annual Leave. PTO and Annual cover are gated by the employee
+checkboxes **Accept PTO Deduction** and **Accept Annual Deduction**.
 
 Banking: regular OT (x1.25) goes to Extra Hours; public-holiday OT (x1.5) and unused rest days
 (12h each) go to Paid Time Off. Settlement uses the weighted credit; before Time Off allocation,

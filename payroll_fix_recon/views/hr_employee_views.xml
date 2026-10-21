@@ -9,9 +9,14 @@
                 <field name="employee_work_station"/>
                 <field name="break_duration_hours"/>
                 <field name="pfr_attendance_exempt"/>
+                <field name="allow_pto_lateness_deduction"/>
+                <field name="pto_deduction_approval_filename" invisible="1"/>
+                <field name="pto_deduction_approval_document" filename="pto_deduction_approval_filename"
+                          invisible="not allow_pto_lateness_deduction"/>
                 <field name="allow_annual_leave_lateness_deduction"/>
                 <field name="annual_deduction_approval_filename" invisible="1"/>
-                <field name="annual_deduction_approval_document" filename="annual_deduction_approval_filename" invisible="not allow_annual_leave_lateness_deduction"/>
+                <field name="annual_deduction_approval_document" filename="annual_deduction_approval_filename"
+                          invisible="not allow_annual_leave_lateness_deduction"/>
             </xpath>
         </field>
     </record>

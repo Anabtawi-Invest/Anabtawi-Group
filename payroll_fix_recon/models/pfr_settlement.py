@@ -6,7 +6,7 @@
 
     gross lateness = daily punch undertime + ABSENT work entry hours
     step 1  deduct 1:1 from banked Extra Hours (previous balance + regular OT)
-    step 2  deduct from Paid Time Off (previous balance + PH/rest earned; automatic)
+    step 2  deduct from Paid Time Off (previous balance + PH/rest earned; if employee opted in)
     step 3  deduct from Annual Leave (only if the employee opted in)
     step 4  whatever is left is deducted from cash (hours x wage / 240)
 
@@ -236,7 +236,7 @@ class PfrSettlement(models.AbstractModel):
         pto_earned = round(ph_ot + rest_ot, 2)
         total_pto = round(prior_pto + pto_earned, 2)
         covered_pto = 0.0
-        if remaining > 0.01 and total_pto > 0.01:                                 # step 2 (auto)
+        if remaining > 0.01 and total_pto > 0.01 and emp.allow_pto_lateness_deduction:  # step 2
             covered_pto = round(min(remaining, math.floor(total_pto * 100) / 100.0), 2)
             remaining = round(remaining - covered_pto, 2)
         # leftover earned PH/rest / 1.5; prior PTO 1:1
