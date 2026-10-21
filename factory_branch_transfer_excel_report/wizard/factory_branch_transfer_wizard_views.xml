@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_factory_branch_transfer_wizard_form" model="ir.ui.view">
+        <field name="name">factory.branch.transfer.wizard.form</field>
+        <field name="model">factory.branch.transfer.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Factory to Branch Transfers">
+                <group>
+                    <group>
+                        <field name="date_from"/>
+                        <field name="date_to"/>
+                    </group>
+                    <group>
+                        <field name="company_id" groups="base.group_multi_company"/>
+                        <field name="only_done"/>
+                    </group>
+                </group>
+                <div class="text-muted" colspan="2">
+                    Exports done stock moves from Factory to branches via corridor
+                    locations (المصنع - فرع … / فرع … - المصنع). Same logic as the July shell report.
+                </div>
+                <footer>
+                    <button name="action_export_xlsx"
+                            type="object"
+                            string="Download Excel"
+                            class="btn-primary"/>
+                    <button string="Cancel" special="cancel" class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_factory_branch_transfer_wizard" model="ir.actions.act_window">
+        <field name="name">Factory to Branch Transfers (Excel)</field>
+        <field name="res_model">factory.branch.transfer.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <!-- Accounting > Reporting -->
+    <menuitem id="menu_factory_branch_transfer_report"
+              name="Factory to Branch Transfers (Excel)"
+              parent="account.menu_finance_reports"
+              action="action_factory_branch_transfer_wizard"
+              sequence="55"
+              groups="account.group_account_readonly,account.group_account_invoice"/>
+</odoo>
