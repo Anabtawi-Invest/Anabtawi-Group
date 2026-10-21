@@ -41,6 +41,10 @@ async function submitRequest(payload) {
     try {
         return await rpc("/my/customer-requests/api/submit", payload);
     } catch (e1) {
+        // Only fall back for transport/route failures, not business UserErrors.
+        if (e1 && e1.data && e1.data.message) {
+            throw e1;
+        }
         const response = await fetch("/my/customer-requests/api/submit/http", {
             method: "POST",
             credentials: "same-origin",
@@ -50,7 +54,11 @@ async function submitRequest(payload) {
         if (!response.ok) {
             throw e1;
         }
-        return await response.json();
+        const result = await response.json();
+        if (result && result.error) {
+            throw result.error;
+        }
+        return result.result !== undefined ? result.result : result;
     }
 }
 
@@ -75,10 +83,16 @@ function readFileAsBase64(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => {
-            const result = reader.result || "";
-            const datas = String(result).includes(",")
-                ? String(result).split(",", 1)[1]
-                : String(result);
+            // Data URLs are "data:<mime>;base64,<payload>".
+            // JS split(sep, limit) caps array length (unlike Python maxsplit) —
+            // use indexOf so the base64 payload is not dropped.
+            const result = String(reader.result || "");
+            const commaIdx = result.indexOf(",");
+            const datas = commaIdx >= 0 ? result.slice(commaIdx + 1) : result;
+            if (!datas) {
+                reject(new Error(`Could not read file: ${file.name}`));
+                return;
+            }
             resolve({
                 name: file.name,
                 mimetype: file.type || "application/octet-stream",

@@ -30,8 +30,19 @@ class ApprovalRequest(models.Model):
                 continue
             if not (request.customer_name or "").strip():
                 raise UserError(_("Please enter the customer name before submitting."))
-            request.invalidate_recordset(["attachment_number"])
-            if not request.attachment_number:
+            # Count via sudo search — more reliable than attachment_number for portal/sudo flows.
+            attachment_count = (
+                self.env["ir.attachment"]
+                .sudo()
+                .search_count(
+                    [
+                        ("res_model", "=", "approval.request"),
+                        ("res_id", "=", request.id),
+                        ("res_field", "=", False),
+                    ]
+                )
+            )
+            if not attachment_count:
                 raise UserError(
                     _("Please attach at least one Commercial Register (السجل التجاري) document.")
                 )

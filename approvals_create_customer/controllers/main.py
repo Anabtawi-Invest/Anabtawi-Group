@@ -128,7 +128,8 @@ class PortalCustomerRequest(http.Controller):
             cleaned.append(
                 {
                     "name": name,
-                    "datas": base64.b64encode(raw),
+                    # Odoo 19 Binary fields expect a base64 *string*, not bytes.
+                    "datas": base64.b64encode(raw).decode("ascii"),
                     "mimetype": mimetype or "application/octet-stream",
                 }
             )
@@ -136,16 +137,21 @@ class PortalCustomerRequest(http.Controller):
 
     def _create_attachments(self, approval, attachments):
         Attachment = request.env["ir.attachment"].sudo()
-        for item in attachments:
-            Attachment.create(
-                {
-                    "name": item["name"],
-                    "datas": item["datas"],
-                    "res_model": "approval.request",
-                    "res_id": approval.id,
-                    "mimetype": item["mimetype"],
-                    "description": _("Commercial Register (السجل التجاري)"),
-                }
+        vals_list = [
+            {
+                "name": item["name"],
+                "datas": item["datas"],
+                "res_model": "approval.request",
+                "res_id": approval.id,
+                "mimetype": item["mimetype"],
+                "description": _("Commercial Register (السجل التجاري)"),
+            }
+            for item in attachments
+        ]
+        created = Attachment.create(vals_list) if vals_list else Attachment
+        if not created:
+            raise UserError(
+                _("Please attach at least one Commercial Register (السجل التجاري) document.")
             )
         approval.invalidate_recordset(["attachment_number", "attachment_ids"])
 
