@@ -346,7 +346,7 @@ class HrPayrollReportWizard(models.TransientModel):
                     self._get_emp_code(emp),
                     emp.name,
                     dept_name,
-                    slip.number or slip.name or "OT-RUN",
+                    getattr(slip, "number", False) or slip.name or "OT-RUN",
                     str(slip.date_to or self.date_to),
                     1.25,
                     pay_rate,
