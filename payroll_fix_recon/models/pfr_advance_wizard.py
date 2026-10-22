@@ -259,6 +259,7 @@ class PfrAdvanceWizard(models.TransientModel):
 
             lines.append((0, 0, {
                 'employee_id': emp.id,
+                'start_date': self._get_employee_start_date(emp),
                 'worked_days': float(L.count('WORK') + L.count('PHD')),
                 'rest_days': float(L.count('REST')),
                 'absent_days': float(L.count('ABSENT')),
@@ -313,6 +314,27 @@ class PfrAdvanceWizard(models.TransientModel):
         earned = max(0.0, paid_days * daily)
         return L, earned, deduction, paid_days, daily
 
+    def _get_employee_start_date(self, emp):
+        """Find the start date of an employee from standard and custom contract/employee fields."""
+        emp = emp.sudo()
+        for fname in ('first_contract_date', 'start_date', 'date_start', 'hire_date'):
+            if fname in emp._fields and emp[fname]:
+                return fields.Date.to_date(emp[fname])
+        if 'contract_id' in emp._fields and emp.contract_id:
+            c = emp.contract_id
+            c_start = getattr(c, 'contract_date_start', False) or getattr(c, 'date_start', False)
+            if c_start:
+                return fields.Date.to_date(c_start)
+        if 'contract_ids' in emp._fields and emp.contract_ids:
+            starts = []
+            for c in emp.contract_ids:
+                c_start = getattr(c, 'contract_date_start', False) or getattr(c, 'date_start', False)
+                if c_start:
+                    starts.append(fields.Date.to_date(c_start))
+            if starts:
+                return min(starts)
+        return False
+
     def action_calculate(self):
         self.ensure_one()
         if not self.date_cutoff:
@@ -328,9 +350,33 @@ class PfrAdvanceWizard(models.TransientModel):
             if company:
                 domain.append(('company_id', '=', company.id))
             employees = self.env['hr.employee'].search(domain)
+
+        # 1. Must have wage > 0
         employees = employees.filtered(lambda e: (e.wage or 0.0) > 0)
+
+        # 2. Only add employees with Salary Payment Method = 'two_payments'
+        if 'salary_payment_method' in self.env['hr.employee']._fields:
+            employees = employees.filtered(lambda e: getattr(e, 'salary_payment_method', False) == 'two_payments')
+
+        # 3. Employee status profile: only show who is active or empty (not set)
+        if 'profile_employment_status' in self.env['hr.employee']._fields:
+            employees = employees.filtered(
+                lambda e: not getattr(e, 'profile_employment_status', False) or e.profile_employment_status == 'active'
+            )
+
+        # 4. Start date: exclude employees whose start date falls in the same month as the advance run (or after cut-off)
+        valid_employees = self.env['hr.employee']
+        emp_start_dates = {}
+        for emp in employees:
+            s_date = self._get_employee_start_date(emp)
+            emp_start_dates[emp.id] = s_date
+            if s_date and ((s_date.year == d_from.year and s_date.month == d_from.month) or s_date > d_to):
+                continue
+            valid_employees |= emp
+        employees = valid_employees
+
         if not employees:
-            raise UserError(_("No employee with a wage found."))
+            raise UserError(_("No eligible employee with a wage found (must have 'Two Payments' payment method, Active or empty status, and Start Date before this month)."))
         # same absent / rest-day entries the payslip would see, up to the cut-off date
         employees._pfr_create_absent_entries(d_from, d_to)
         self.env.flush_all()
@@ -436,6 +482,7 @@ class PfrAdvanceWizard(models.TransientModel):
 
             lines.append((0, 0, {
                 'employee_id': emp.id,
+                'start_date': emp_start_dates.get(emp.id, False),
                 'worked_days': float(L.count('WORK') + L.count('PHD')),
                 'rest_days': float(L.count('REST')),
                 'absent_days': float(L.count('ABSENT')),
@@ -607,7 +654,7 @@ class PfrAdvanceWizard(models.TransientModel):
             sh.write_number(8, c, val, card_v)
 
         info = [(_("Employee ID"), 14), (_("Employee Name"), 28), (_("Department"), 22),
-                (_("Job Title / Position"), 22), (_("Monthly Wage"), 14), (_("Daily Wage"), 12)]
+                (_("Job Title / Position"), 22), (_("Start Date"), 14), (_("Monthly Wage"), 14), (_("Daily Wage"), 12)]
         att = [(_("Attendance Days"), 15), (_("Rest Days"), 11), (_("Absent Days"), 12)]
         lves = [(_("Sick Leave (Days)"), 15), (_("Annual Leave (Days)"), 16), (_("Other Paid Leaves"), 16)]
         bals = [(_("Annual Leave Bal (Days)"), 20), (_("Extra Hours Bal (Hrs)"), 20), (_("Paid Leave Bal (Days)"), 20)]
@@ -644,15 +691,16 @@ class PfrAdvanceWizard(models.TransientModel):
             dept = (emp.department_id.sudo().name if emp.department_id else False) or "N/A"
             name = emp.sudo().legal_name or emp.sudo().name or "N/A"
             job_title = (emp.job_id.sudo().name if emp.job_id else False) or "N/A"
+            s_date_str = format_date(self.env, line.start_date) if line.start_date else ""
             gross_earned = ((line.paid_days or 0.0) + (line.absent_days or 0.0)) * (line.daily_wage or 0.0)
-            vals = [emp_id, name, dept, job_title, line.wage, line.daily_wage,
+            vals = [emp_id, name, dept, job_title, s_date_str, line.wage, line.daily_wage,
                     line.worked_days, line.rest_days, line.absent_days,
                     line.sick_leave_days, line.annual_leave_days, line.other_paid_leave_days,
                     line.annual_leave_balance, line.extra_hours_balance, line.paid_leave_balance,
                     line.paid_days, gross_earned, line.deduction,
                     line.earned, line.advance if line.selected else 0.0,
                     _("Yes") if line.selected else _("No"), line.note or ""]
-            fmts = [center, left, left, left, num, num3,
+            fmts = [center, left, left, left, center, num, num3,
                     num, num, num,
                     num, num, num,
                     num, num, num,
@@ -684,13 +732,13 @@ class PfrAdvanceWizard(models.TransientModel):
             row += 1
 
         sh.write(row, 0, _("Total"), tot_l)
-        for c in range(1, 4):
+        for c in range(1, 5):
             sh.write(row, c, "", tot_l)
-        letter_wage = xlsxwriter.utility.xl_col_to_name(4)
-        sh.write_formula(row, 4, "=SUM(%s%d:%s%d)" % (letter_wage, r0 + 1, letter_wage, row), tot_n)
-        sh.write(row, 5, "", tot_l)
+        letter_wage = xlsxwriter.utility.xl_col_to_name(5)
+        sh.write_formula(row, 5, "=SUM(%s%d:%s%d)" % (letter_wage, r0 + 1, letter_wage, row), tot_n)
+        sh.write(row, 6, "", tot_l)
         sum_to = total_cols - 2                          # numeric columns up to Advance (Included / Note are text)
-        for c in range(6, total_cols):
+        for c in range(7, total_cols):
             if c < sum_to:
                 letter = xlsxwriter.utility.xl_col_to_name(c)
                 sh.write_formula(row, c, "=SUM(%s%d:%s%d)" % (letter, r0 + 1, letter, row), tot_n)
@@ -1248,6 +1296,7 @@ class PfrAdvanceWizardLine(models.TransientModel):
     wizard_id = fields.Many2one('pfr.advance.wizard', required=True, ondelete='cascade')
     selected = fields.Boolean(string="Pay", default=True)
     employee_id = fields.Many2one('hr.employee', string="Employee", readonly=True)
+    start_date = fields.Date(string="Start Date", readonly=True)
     wage = fields.Float(string="Wage", readonly=True)
     worked_days = fields.Float(string="Attendance Days", readonly=True)
     rest_days = fields.Float(string="Rest Days", readonly=True)

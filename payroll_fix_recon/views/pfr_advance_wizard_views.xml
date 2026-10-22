@@ -55,6 +55,7 @@
                     <list editable="bottom" create="0" delete="0">
                         <field name="selected"/>
                         <field name="employee_id"/>
+                        <field name="start_date" optional="show"/>
                         <field name="wage" optional="hide"/>
                         <field name="worked_days" string="Attendance Days"/>
                         <field name="rest_days" optional="hide"/>
