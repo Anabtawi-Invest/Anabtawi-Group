@@ -1,9 +1,9 @@
 {
     'name': 'Payroll Fix Recon',
-    'version': '19.0.1.4.2',
+    'version': '19.0.1.4.4',
     'category': 'Human Resources/Payroll',
     'summary': 'Attendance reconciliation payroll: break policy, daily metrics, rest/absent engine, '
-               '4-step lateness settlement and a single-source worked-days ledger.',
+               '3-step lateness settlement and a single-source worked-days ledger.',
     'author': 'Anabtawi Group',
     'license': 'OPL-1',
     'depends': [
