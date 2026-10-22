@@ -1,9 +1,9 @@
 {
     'name': 'Payroll Fix Recon',
-    'version': '19.0.1.4.6',
+    'version': '19.0.1.4.2',
     'category': 'Human Resources/Payroll',
     'summary': 'Attendance reconciliation payroll: break policy, daily metrics, rest/absent engine, '
-               '3-step lateness settlement and a single-source worked-days ledger.',
+               '4-step lateness settlement and a single-source worked-days ledger.',
     'author': 'Anabtawi Group',
     'license': 'OPL-1',
     'depends': ['hr_payroll', 'hr_attendance', 'hr_work_entry', 'hr_holidays'],
@@ -18,6 +18,7 @@
         'views/pfr_advance_wizard_views.xml',
         'views/hr_payslip_run_views.xml',
     ],
+    'pre_init_hook': 'pre_init_hook',
     'post_init_hook': 'post_init_hook',
     'installable': True,
     'application': False,
