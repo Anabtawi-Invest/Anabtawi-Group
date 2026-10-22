@@ -7,7 +7,7 @@
             <list>
                 <field name="location_id"/>
                 <field name="location_dest_id"/>
-                <field name="group_ids" widget="many2many_tags"/>
+                <field name="user_ids" widget="many2many_tags"/>
                 <field name="company_id" groups="base.group_multi_company"/>
                 <field name="active"/>
             </list>
@@ -31,16 +31,17 @@
                             <field name="location_dest_id"/>
                         </group>
                         <group>
-                            <field name="group_ids" widget="many2many_tags"/>
+                            <field name="user_ids" widget="many2many_tags"/>
                             <field name="company_id" groups="base.group_multi_company"/>
                             <field name="active"/>
                         </group>
                     </group>
                     <div class="alert alert-info" role="alert">
-                        Users in the allowed groups can edit quantities and validate
+                        Only the selected users can edit quantities and validate
                         transfers for this From → To path.
                         Other inventory users can still open the transfer and print reports,
                         but cannot edit or approve it.
+                        If no rule exists for a path, default Odoo access applies.
                     </div>
                 </sheet>
             </form>

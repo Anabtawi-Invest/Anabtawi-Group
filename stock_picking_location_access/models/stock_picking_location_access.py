@@ -29,16 +29,18 @@ class StockPickingLocationAccess(models.Model):
         index=True,
         check_company=True,
     )
-    group_ids = fields.Many2many(
-        "res.groups",
-        "stock_picking_location_access_group_rel",
+    user_ids = fields.Many2many(
+        "res.users",
+        "stock_picking_location_access_user_rel",
         "access_id",
-        "group_id",
-        string="Allowed Groups",
+        "user_id",
+        string="Allowed Users",
         required=True,
-        help="Only users in these groups can edit, validate, or change "
-        "transfers from this From location to this To location. "
-        "Other users can still view and print reports.",
+        domain="[('share', '=', False)]",
+        help="Only these users can edit, validate, or change transfers "
+        "from this From location to this To location. "
+        "Other users can still view and print reports. "
+        "If no rule exists for a From/To path, normal Odoo access applies.",
     )
 
     _sql_constraints = [
@@ -62,4 +64,12 @@ class StockPickingLocationAccess(models.Model):
             if rule.location_id and rule.location_dest_id and rule.location_id == rule.location_dest_id:
                 raise ValidationError(
                     self.env._("From Location and To Location must be different.")
+                )
+
+    @api.constrains("user_ids")
+    def _check_user_ids(self):
+        for rule in self:
+            if not rule.user_ids:
+                raise ValidationError(
+                    self.env._("Please select at least one allowed user.")
                 )
