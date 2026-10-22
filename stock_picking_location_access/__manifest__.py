@@ -1,8 +1,8 @@
 {
     "name": "Stock Picking Location Access",
-    "version": "19.0.1.0.1",
+    "version": "19.0.1.1.0",
     "category": "Inventory/Inventory",
-    "summary": "Restrict edit/validate of internal transfers by From/To location and group",
+    "summary": "Restrict edit/validate of internal transfers by From/To location and users",
     "author": "Anabtawi",
     "depends": ["stock"],
     "data": [

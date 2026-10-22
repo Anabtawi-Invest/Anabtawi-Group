@@ -29,11 +29,10 @@ class StockPicking(models.Model):
                 if allowed
                 else self.env._(
                     "This transfer (%(src)s → %(dest)s) can only be edited or "
-                    "approved by members of: %(groups)s. You can view it and "
-                    "print reports only.",
+                    "approved by: %(users)s. You can view it and print reports only.",
                     src=picking.location_id.display_name,
                     dest=picking.location_dest_id.display_name,
-                    groups=", ".join(rule.group_ids.mapped("display_name")),
+                    users=", ".join(rule.user_ids.mapped("name")),
                 )
             )
 
@@ -59,7 +58,8 @@ class StockPicking(models.Model):
         rule = rule if rule is not None else self._get_location_access_rule()
         if not rule:
             return True
-        return bool(self.env.user.all_group_ids & rule.group_ids)
+        # No rule => default Odoo access (no extra restriction).
+        return self.env.user in rule.user_ids
 
     def _check_location_access(self, action_label=None):
         """Raise if current user is not allowed to modify these pickings."""
@@ -68,6 +68,7 @@ class StockPicking(models.Model):
         for picking in self:
             rule = picking._get_location_access_rule()
             if not rule:
+                # No From/To mapping configured => fallback to default access.
                 continue
             if picking._user_has_location_access(rule):
                 continue
@@ -76,13 +77,13 @@ class StockPicking(models.Model):
                 self.env._(
                     "You are not allowed to %(action)s transfer %(name)s "
                     "(%(src)s → %(dest)s).\n"
-                    "Only members of these groups can: %(groups)s.\n"
+                    "Only these users can: %(users)s.\n"
                     "You can still view the transfer and download its reports.",
                     action=action,
                     name=picking.display_name,
                     src=picking.location_id.display_name,
                     dest=picking.location_dest_id.display_name,
-                    groups=", ".join(rule.group_ids.mapped("display_name")),
+                    users=", ".join(rule.user_ids.mapped("name")),
                 )
             )
 
