@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_picking_form_location_access" model="ir.ui.view">
+        <field name="name">stock.picking.form.location.access</field>
+        <field name="model">stock.picking</field>
+        <field name="inherit_id" ref="stock.view_picking_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header" position="before">
+                <field name="location_access_readonly" invisible="1"/>
+                <field name="location_access_warning" invisible="1"/>
+                <div class="alert alert-warning text-center" role="alert"
+                     invisible="not location_access_readonly">
+                    <field name="location_access_warning" nolabel="1" readonly="1"/>
+                </div>
+            </xpath>
+
+            <!-- Hide action buttons for users without location access -->
+            <xpath expr="//header/button[@name='action_confirm']" position="attributes">
+                <attribute name="invisible">state != 'draft' or location_access_readonly</attribute>
+            </xpath>
+            <xpath expr="//header/button[@name='button_validate'][1]" position="attributes">
+                <attribute name="invisible">state in ('draft', 'confirmed', 'done', 'cancel') or location_access_readonly</attribute>
+            </xpath>
+            <xpath expr="//header/button[@name='button_validate'][2]" position="attributes">
+                <attribute name="invisible">state in ('waiting', 'assigned', 'done', 'cancel') or location_access_readonly</attribute>
+            </xpath>
+            <xpath expr="//header/button[@name='action_cancel']" position="attributes">
+                <attribute name="invisible">state not in ('assigned', 'confirmed', 'draft', 'waiting') or location_access_readonly</attribute>
+            </xpath>
+            <xpath expr="//header/button[@name='action_toggle_is_locked'][1]" position="attributes">
+                <attribute name="invisible">is_locked or state == 'cancel' or location_access_readonly</attribute>
+            </xpath>
+            <xpath expr="//header/button[@name='action_toggle_is_locked'][2]" position="attributes">
+                <attribute name="invisible">not is_locked or state not in ('done', 'cancel') or location_access_readonly</attribute>
+            </xpath>
+            <xpath expr="//header/button[@name='action_return']" position="attributes">
+                <attribute name="invisible">not show_return or state != 'done' or location_access_readonly</attribute>
+            </xpath>
+            <xpath expr="//header/button[@name='action_exchange']" position="attributes">
+                <attribute name="invisible">show_return or state not in ('assigned', 'done') or location_access_readonly</attribute>
+            </xpath>
+
+            <!-- Keep Print visible; make operations readonly -->
+            <xpath expr="//field[@name='move_ids']" position="attributes">
+                <attribute name="readonly">location_access_readonly or state == 'done'</attribute>
+            </xpath>
+            <xpath expr="//field[@name='location_id'][@groups='stock.group_stock_multi_locations']" position="attributes">
+                <attribute name="readonly">state == 'done' or location_access_readonly</attribute>
+            </xpath>
+            <xpath expr="//field[@name='location_dest_id'][@groups='stock.group_stock_multi_locations']" position="attributes">
+                <attribute name="readonly">state == 'done' or location_access_readonly</attribute>
+            </xpath>
+        </field>
+    </record>
+</odoo>

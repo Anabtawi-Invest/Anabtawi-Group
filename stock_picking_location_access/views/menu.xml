@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem
+        id="menu_stock_picking_location_access"
+        name="Transfer Location Access"
+        parent="stock.menu_stock_config_settings"
+        action="action_stock_picking_location_access"
+        groups="stock_picking_location_access.group_stock_picking_location_access_manager"
+        sequence="95"/>
+</odoo>
