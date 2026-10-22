@@ -2,7 +2,7 @@ from datetime import timedelta
 
 from odoo import fields
 from odoo.addons.point_of_sale.tests.common import CommonPosTest
-from odoo.exceptions import ValidationError
+from odoo.exceptions import AccessError, UserError, ValidationError
 from odoo.fields import Command
 from odoo.tests import tagged
 
@@ -116,12 +116,38 @@ class TestOnlineCampaign(CommonPosTest):
         self.assertTrue(campaign.ecommerce_approved)
         self.assertTrue(campaign.finance_approved)
 
+    def test_09a_finance_cannot_approve_before_ecommerce(self):
+        campaign = self._campaign()
+        campaign.action_submit()
+        with self.assertRaises(UserError):
+            campaign.action_finance_approve()
+        self.assertEqual(campaign.state, "pending")
+
+    def test_09b_cannot_approve_by_direct_write(self):
+        campaign = self._campaign()
+        with self.assertRaises(AccessError):
+            campaign.write({"state": "approved"})
+        with self.assertRaises(AccessError):
+            campaign.write({"ecommerce_approved": True, "finance_approved": True})
+        with self.assertRaises(AccessError):
+            self._campaign(state="approved", ecommerce_approved=True, finance_approved=True)
+        campaign.action_submit()
+        campaign.action_ecommerce_approve()
+        self.assertNotIn(
+            campaign, self.env["online.discount.campaign"].search(
+                campaign._load_pos_data_domain({}, self.pos_config_usd)
+            ),
+        )
+
     def test_10_unapproved_and_expired_campaigns_not_loaded(self):
         draft = self._campaign(name="Draft")
         expired = self._campaign(
-            name="Expired", state="approved", ecommerce_approved=True, finance_approved=True,
+            name="Expired",
             start_datetime=self.now - timedelta(days=3), end_datetime=self.now - timedelta(days=2),
         )
+        expired._write_approval({
+            "state": "approved", "ecommerce_approved": True, "finance_approved": True,
+        })
         domain = draft._load_pos_data_domain({}, self.pos_config_usd)
         loaded = self.env["online.discount.campaign"].search(domain)
         self.assertNotIn(draft, loaded)
