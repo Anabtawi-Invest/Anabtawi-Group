@@ -1179,7 +1179,7 @@ class PfrAdvanceWizard(models.TransientModel):
             acc_number = (getattr(bank, 'acc_number', '') or '').replace(' ', '') if bank else ''
 
             # Col 3: Beneficiary Name
-            holder = (emp.name or getattr(emp, 'legal_name', '') or getattr(bank, 'acc_holder_name', '') or '').strip()
+            holder = (getattr(bank, 'acc_holder_name', '') or getattr(emp, 'legal_name', '') or emp.name or '').strip()
 
             # Col 4: Bank Identifier Code (BIC)
             bic = (getattr(bank, 'bank_bic', '') or '') if bank else ''

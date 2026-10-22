@@ -156,8 +156,19 @@
                 <t t-set="pto_input" t-value="o.input_line_ids.filtered(lambda l: l.input_type_id.code == 'CLEAR_PTO' or 'paid time off' in (l.name or '').lower())"/>
                 <t t-set="extra_input" t-value="o.input_line_ids.filtered(lambda l: l.input_type_id.code in ('CLEAR_EXTRA', 'ETH_PAY_EOC') or 'extra' in (l.name or '').lower())"/>
                 <t t-set="annual_days" t-value="annual_input[0].quantity if annual_input and 'quantity' in annual_input._fields else 0.0"/>
-                <t t-set="pto_days" t-value="pto_input[0].quantity if pto_input and 'quantity' in pto_input._fields else 0.0"/>
-                <t t-set="extra_hrs" t-value="extra_input[0].quantity if extra_input and 'quantity' in extra_input._fields else (o.employee_extra_hours_balance if 'employee_extra_hours_balance' in o._fields else 0.0)"/>
+                <t t-set="pto_days_raw" t-value="pto_input[0].quantity if pto_input and 'quantity' in pto_input._fields else 0.0"/>
+                <!-- Prefer CLEAR_EXTRA code only (avoid matching other lines whose name contains 'extra'). -->
+                <t t-set="extra_clear" t-value="o.input_line_ids.filtered(lambda l: l.input_type_id.code in ('CLEAR_EXTRA', 'ETH_PAY_EOC'))"/>
+                <t t-set="extra_hrs_raw" t-value="extra_clear[0].quantity if extra_clear and 'quantity' in extra_clear._fields else (o.remaining_extra_hours_balance if 'remaining_extra_hours_balance' in o._fields else (o.employee_extra_hours_balance if 'employee_extra_hours_balance' in o._fields else 0.0))"/>
+                <!-- PDF boxes only: on termination show real PTO/Extra (÷1.5 / ÷1.25). Other Inputs keep full qty/amount. -->
+                <t t-if="'termination_clearance' in o._fields and o.termination_clearance">
+                    <t t-set="pto_days" t-value="(pto_days_raw or 0.0) / 1.5"/>
+                    <t t-set="extra_hrs" t-value="(extra_hrs_raw or 0.0) / 1.25"/>
+                </t>
+                <t t-else="">
+                    <t t-set="pto_days" t-value="pto_days_raw or 0.0"/>
+                    <t t-set="extra_hrs" t-value="extra_hrs_raw or 0.0"/>
+                </t>
                 <t t-set="unpaid" t-value="o.worked_days_line_ids.filtered(lambda d: d.work_entry_type_id.code in cfg['unpaid_codes'] or 'unpaid' in (d.work_entry_type_id.code or '').lower() or 'unpaid' in (d.name or '').lower() or 'absent' in (d.work_entry_type_id.code or '').lower() or 'absent' in (d.name or '').lower())"/>
                 <t t-set="lateness" t-value="o.worked_days_line_ids.filtered(lambda d: d.work_entry_type_id.code in ('LAT', 'LATENESS', 'DED_UNDERTIME') or 'late' in (d.work_entry_type_id.code or '').lower() or 'late' in (d.name or '').lower() or 'undertime' in (d.work_entry_type_id.code or '').lower() or 'undertime' in (d.name or '').lower())"/>
                 <t t-set="deduction_worked_lines" t-value="unpaid | lateness"/>
