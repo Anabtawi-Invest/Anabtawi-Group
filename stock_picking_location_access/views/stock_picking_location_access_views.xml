@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_stock_picking_location_access_list" model="ir.ui.view">
+        <field name="name">stock.picking.location.access.list</field>
+        <field name="model">stock.picking.location.access</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="location_id"/>
+                <field name="location_dest_id"/>
+                <field name="group_ids" widget="many2many_tags"/>
+                <field name="company_id" groups="base.group_multi_company"/>
+                <field name="active"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_stock_picking_location_access_form" model="ir.ui.view">
+        <field name="name">stock.picking.location.access.form</field>
+        <field name="model">stock.picking.location.access</field>
+        <field name="arch" type="xml">
+            <form string="Transfer Location Access Rule">
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" readonly="1"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="location_id"/>
+                            <field name="location_dest_id"/>
+                        </group>
+                        <group>
+                            <field name="group_ids" widget="many2many_tags"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="active"/>
+                        </group>
+                    </group>
+                    <div class="alert alert-info" role="alert">
+                        Users in the allowed groups can edit quantities and validate
+                        transfers for this From → To path.
+                        Other inventory users can still open the transfer and print reports,
+                        but cannot edit or approve it.
+                    </div>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_stock_picking_location_access" model="ir.actions.act_window">
+        <field name="name">Transfer Location Access</field>
+        <field name="res_model">stock.picking.location.access</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>
