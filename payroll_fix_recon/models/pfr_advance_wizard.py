@@ -349,6 +349,10 @@ class PfrAdvanceWizard(models.TransientModel):
             domain = [('active', '=', True)]
             if company:
                 domain.append(('company_id', '=', company.id))
+            if 'salary_payment_method' in self.env['hr.employee']._fields:
+                domain.append(('salary_payment_method', '=', 'two_payments'))
+            if 'profile_employment_status' in self.env['hr.employee']._fields:
+                domain.append(('profile_employment_status', 'in', ['active', False]))
             employees = self.env['hr.employee'].search(domain)
 
         # 1. Must have wage > 0
