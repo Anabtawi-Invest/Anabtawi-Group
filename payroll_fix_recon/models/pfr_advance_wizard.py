@@ -362,7 +362,7 @@ class PfrAdvanceWizard(models.TransientModel):
         if 'salary_payment_method' in self.env['hr.employee']._fields:
             employees = employees.filtered(lambda e: getattr(e, 'salary_payment_method', False) == 'two_payments')
 
-        # 3. Employee status profile: only show who is active or empty (not set)
+        # 3. Employee status profile: only show who is active or empty (not set) - exclude terminated/suspended
         if 'profile_employment_status' in self.env['hr.employee']._fields:
             employees = employees.filtered(
                 lambda e: not getattr(e, 'profile_employment_status', False) or e.profile_employment_status == 'active'
@@ -486,6 +486,7 @@ class PfrAdvanceWizard(models.TransientModel):
 
             lines.append((0, 0, {
                 'employee_id': emp.id,
+                'start_date': emp_start_dates.get(emp.id, False),
                 'worked_days': float(L.count('WORK') + L.count('PHD')),
                 'rest_days': float(L.count('REST')),
                 'absent_days': float(L.count('ABSENT')),
