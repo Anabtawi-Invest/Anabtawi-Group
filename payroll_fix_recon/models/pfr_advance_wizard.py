@@ -114,12 +114,14 @@ class PfrAdvanceWizard(models.TransientModel):
         domain = [('description', 'ilike', 'Mid-month advance')]
         if self.history_batch:
             domain = [('description', '=', self.history_batch)]
+        if self.company_id:
+            domain.append(('company_id', '=', self.company_id.id))
         return {
             'name': _("Salary Advance Adjustments"),
             'type': 'ir.actions.act_window',
             'res_model': 'hr.salary.attachment',
-            'view_mode': 'tree,form',
-            'views': [(False, 'tree'), (False, 'form')],
+            'view_mode': 'list,form',
+            'views': [(False, 'list'), (False, 'form')],
             'domain': domain,
             'context': dict(self.env.context),
         }
@@ -313,6 +315,27 @@ class PfrAdvanceWizard(models.TransientModel):
         earned = max(0.0, paid_days * daily)
         return L, earned, deduction, paid_days, daily
 
+    def _get_employee_start_date(self, emp):
+        """Find the start date of an employee from standard and custom contract/employee fields."""
+        emp = emp.sudo()
+        for fname in ('first_contract_date', 'start_date', 'date_start', 'hire_date'):
+            if fname in emp._fields and emp[fname]:
+                return fields.Date.to_date(emp[fname])
+        if 'contract_id' in emp._fields and emp.contract_id:
+            c = emp.contract_id
+            c_start = getattr(c, 'contract_date_start', False) or getattr(c, 'date_start', False)
+            if c_start:
+                return fields.Date.to_date(c_start)
+        if 'contract_ids' in emp._fields and emp.contract_ids:
+            starts = []
+            for c in emp.contract_ids:
+                c_start = getattr(c, 'contract_date_start', False) or getattr(c, 'date_start', False)
+                if c_start:
+                    starts.append(fields.Date.to_date(c_start))
+            if starts:
+                return min(starts)
+        return False
+
     def action_calculate(self):
         self.ensure_one()
         if not self.date_cutoff:
@@ -327,10 +350,38 @@ class PfrAdvanceWizard(models.TransientModel):
             domain = [('active', '=', True)]
             if company:
                 domain.append(('company_id', '=', company.id))
+            if 'salary_payment_method' in self.env['hr.employee']._fields:
+                domain.append(('salary_payment_method', '=', 'two_payments'))
+            if 'profile_employment_status' in self.env['hr.employee']._fields:
+                domain.append(('profile_employment_status', 'in', ['active', False]))
             employees = self.env['hr.employee'].search(domain)
+
+        # 1. Must have wage > 0
         employees = employees.filtered(lambda e: (e.wage or 0.0) > 0)
+
+        # 2. Only add employees with Salary Payment Method = 'two_payments'
+        if 'salary_payment_method' in self.env['hr.employee']._fields:
+            employees = employees.filtered(lambda e: getattr(e, 'salary_payment_method', False) == 'two_payments')
+
+        # 3. Employee status profile: only show who is active or empty (not set)
+        if 'profile_employment_status' in self.env['hr.employee']._fields:
+            employees = employees.filtered(
+                lambda e: not getattr(e, 'profile_employment_status', False) or e.profile_employment_status == 'active'
+            )
+
+        # 4. Start date: exclude employees whose start date falls in the same month as the advance run (or after cut-off)
+        valid_employees = self.env['hr.employee']
+        emp_start_dates = {}
+        for emp in employees:
+            s_date = self._get_employee_start_date(emp)
+            emp_start_dates[emp.id] = s_date
+            if s_date and ((s_date.year == d_from.year and s_date.month == d_from.month) or s_date > d_to):
+                continue
+            valid_employees |= emp
+        employees = valid_employees
+
         if not employees:
-            raise UserError(_("No employee with a wage found."))
+            raise UserError(_("No eligible employee with a wage found (must have 'Two Payments' payment method, Active or empty status, and Start Date before this month)."))
         # same absent / rest-day entries the payslip would see, up to the cut-off date
         employees._pfr_create_absent_entries(d_from, d_to)
         self.env.flush_all()
@@ -436,6 +487,7 @@ class PfrAdvanceWizard(models.TransientModel):
 
             lines.append((0, 0, {
                 'employee_id': emp.id,
+                'start_date': emp_start_dates.get(emp.id, False),
                 'worked_days': float(L.count('WORK') + L.count('PHD')),
                 'rest_days': float(L.count('REST')),
                 'absent_days': float(L.count('ABSENT')),
@@ -607,7 +659,7 @@ class PfrAdvanceWizard(models.TransientModel):
             sh.write_number(8, c, val, card_v)
 
         info = [(_("Employee ID"), 14), (_("Employee Name"), 28), (_("Department"), 22),
-                (_("Job Title / Position"), 22), (_("Monthly Wage"), 14), (_("Daily Wage"), 12)]
+                (_("Job Title / Position"), 22), (_("Start Date"), 14), (_("Monthly Wage"), 14), (_("Daily Wage"), 12)]
         att = [(_("Attendance Days"), 15), (_("Rest Days"), 11), (_("Absent Days"), 12)]
         lves = [(_("Sick Leave (Days)"), 15), (_("Annual Leave (Days)"), 16), (_("Other Paid Leaves"), 16)]
         bals = [(_("Annual Leave Bal (Days)"), 20), (_("Extra Hours Bal (Hrs)"), 20), (_("Paid Leave Bal (Days)"), 20)]
@@ -644,15 +696,16 @@ class PfrAdvanceWizard(models.TransientModel):
             dept = (emp.department_id.sudo().name if emp.department_id else False) or "N/A"
             name = emp.sudo().legal_name or emp.sudo().name or "N/A"
             job_title = (emp.job_id.sudo().name if emp.job_id else False) or "N/A"
+            s_date_str = format_date(self.env, line.start_date) if line.start_date else ""
             gross_earned = ((line.paid_days or 0.0) + (line.absent_days or 0.0)) * (line.daily_wage or 0.0)
-            vals = [emp_id, name, dept, job_title, line.wage, line.daily_wage,
+            vals = [emp_id, name, dept, job_title, s_date_str, line.wage, line.daily_wage,
                     line.worked_days, line.rest_days, line.absent_days,
                     line.sick_leave_days, line.annual_leave_days, line.other_paid_leave_days,
                     line.annual_leave_balance, line.extra_hours_balance, line.paid_leave_balance,
                     line.paid_days, gross_earned, line.deduction,
                     line.earned, line.advance if line.selected else 0.0,
                     _("Yes") if line.selected else _("No"), line.note or ""]
-            fmts = [center, left, left, left, num, num3,
+            fmts = [center, left, left, left, center, num, num3,
                     num, num, num,
                     num, num, num,
                     num, num, num,
@@ -684,13 +737,13 @@ class PfrAdvanceWizard(models.TransientModel):
             row += 1
 
         sh.write(row, 0, _("Total"), tot_l)
-        for c in range(1, 4):
+        for c in range(1, 5):
             sh.write(row, c, "", tot_l)
-        letter_wage = xlsxwriter.utility.xl_col_to_name(4)
-        sh.write_formula(row, 4, "=SUM(%s%d:%s%d)" % (letter_wage, r0 + 1, letter_wage, row), tot_n)
-        sh.write(row, 5, "", tot_l)
+        letter_wage = xlsxwriter.utility.xl_col_to_name(5)
+        sh.write_formula(row, 5, "=SUM(%s%d:%s%d)" % (letter_wage, r0 + 1, letter_wage, row), tot_n)
+        sh.write(row, 6, "", tot_l)
         sum_to = total_cols - 2                          # numeric columns up to Advance (Included / Note are text)
-        for c in range(6, total_cols):
+        for c in range(7, total_cols):
             if c < sum_to:
                 letter = xlsxwriter.utility.xl_col_to_name(c)
                 sh.write_formula(row, c, "=SUM(%s%d:%s%d)" % (letter, r0 + 1, letter, row), tot_n)
@@ -750,6 +803,7 @@ class PfrAdvanceWizard(models.TransientModel):
 
         header_row_idx = None
         col_id_idx = None
+        col_name_idx = None
         col_adv_idx = None
         col_inc_idx = None
 
@@ -765,6 +819,9 @@ class PfrAdvanceWizard(models.TransientModel):
                     if any(k in cell for k in ('employee id', 'employee number', 'emp id', 'code', 'badge', 'رقم الموظف', 'الرقم')):
                         if col_id_idx is None:
                             col_id_idx = c_idx
+                    elif any(k in cell for k in ('employee name', 'emp name', 'name', 'اسم الموظف', 'الاسم')):
+                        if col_name_idx is None:
+                            col_name_idx = c_idx
                     elif any(k in cell for k in ('advance', 'سلفة', 'قيمة السلفة', 'advance amount')):
                         if 'earned' not in cell and 'total' not in cell:
                             col_adv_idx = c_idx
@@ -788,23 +845,60 @@ class PfrAdvanceWizard(models.TransientModel):
         if col_id_idx is None or col_adv_idx is None:
             raise UserError(_("Could not locate 'Employee ID' and 'Advance' columns in the uploaded Excel file."))
 
-        lines_by_emp_code = {}
+        if col_name_idx is None and col_id_idx == 0 and header_row_idx is not None and len(rows[header_row_idx]) > 1:
+            col_name_idx = 1
+
+        wizard_company_id = self.company_id.id if self.company_id else False
+
+        def _norm_name(val):
+            if not val:
+                return ''
+            s = str(val).strip().lower()
+            for ch in ('أ', 'إ', 'آ'):
+                s = s.replace(ch, 'ا')
+            s = s.replace('ة', 'ه').replace('ى', 'ي')
+            return ' '.join(s.split())
+
+        lines_by_code_and_name = {}
+        lines_by_code = {}
+        lines_by_name = {}
+
         for line in self.line_ids:
             emp = line.employee_id
+            emp_comp_id = emp.company_id.id if emp.company_id else False
+            if wizard_company_id and emp_comp_id and emp_comp_id != wizard_company_id:
+                continue
+
+            emp_codes = set()
             for attr in ('employee_number', 'sb_employee_number', 'registration_number', 'barcode', 'identification_id'):
                 v = getattr(emp, attr, False)
                 if v:
                     s = str(v).strip()
-                    lines_by_emp_code[s] = line
-                    lines_by_emp_code[s.lstrip('0')] = line
-            lines_by_emp_code[str(emp.id)] = line
+                    if s.endswith('.0'):
+                        s = s[:-2]
+                    emp_codes.add(s)
+                    emp_codes.add(s.lstrip('0'))
+
+            emp_names = set()
             if emp.name:
-                lines_by_emp_code[emp.name.strip().lower()] = line
+                emp_names.add(_norm_name(emp.name))
             if getattr(emp, 'legal_name', False):
-                lines_by_emp_code[emp.legal_name.strip().lower()] = line
+                emp_names.add(_norm_name(emp.legal_name))
+
+            for c in emp_codes:
+                if c:
+                    lines_by_code[c] = line
+                    for n in emp_names:
+                        if n:
+                            lines_by_code_and_name[(c, n)] = line
+
+            for n in emp_names:
+                if n:
+                    lines_by_name[n] = line
 
         updated_count = 0
         unmatched_rows = []
+        matched_lines = self.env['pfr.advance.wizard.line']
         data_rows = rows[(header_row_idx + 1):] if header_row_idx is not None else rows[1:]
 
         for r_num, row in enumerate(data_rows, start=(header_row_idx + 2 if header_row_idx is not None else 2)):
@@ -823,9 +917,18 @@ class PfrAdvanceWizard(models.TransientModel):
             if id_str.endswith('.0'):
                 id_str = id_str[:-2]
 
-            line = lines_by_emp_code.get(id_str) or lines_by_emp_code.get(id_str.lstrip('0'))
+            raw_name = row[col_name_idx] if (col_name_idx is not None and col_name_idx < len(row)) else ''
+            norm_name = _norm_name(raw_name)
+
+            # Link employee id with company and employee name:
+            line = lines_by_code_and_name.get((id_str, norm_name)) or lines_by_code_and_name.get((id_str.lstrip('0'), norm_name))
             if not line:
-                unmatched_rows.append(f"Row {r_num}: ID '{id_str}'")
+                line = lines_by_code.get(id_str) or lines_by_code.get(id_str.lstrip('0'))
+            if not line and norm_name:
+                line = lines_by_name.get(norm_name)
+
+            if not line:
+                unmatched_rows.append(f"Row {r_num}: ID '{id_str}' - '{raw_name}'")
                 continue
 
             raw_adv = row[col_adv_idx] if col_adv_idx < len(row) else 0.0
@@ -862,7 +965,15 @@ class PfrAdvanceWizard(models.TransientModel):
             if abs(old_adv - adv_val) > 0.001:
                 line.note = _("Adjusted via Excel: was %.3f -> now %.3f", old_adv, adv_val)
 
+            matched_lines |= line
             updated_count += 1
+
+        # Exclude any wizard lines not present in the uploaded Excel so Odoo matches the Excel exactly
+        missing_lines = self.line_ids - matched_lines
+        for line in missing_lines:
+            line.selected = False
+            line.advance = 0.0
+            line.note = _("Excluded: not present in uploaded Excel sheet")
 
         self._compute_total()
 
@@ -933,205 +1044,17 @@ class PfrAdvanceWizard(models.TransientModel):
                     return found.sudo()
         return False
 
-    @api.model
-    def _is_employee_suspended(self, emp):
-        """Returns True if the employee is marked as suspended."""
-        emp_sudo = emp.sudo()
-        status = getattr(emp_sudo, 'profile_employment_status', False)
-        if status and str(status).strip().lower() in ('suspended', 'suspend', 'on_leave_unpaid'):
-            return True
-        for f in ('suspended', 'is_suspended', 'on_suspension'):
-            if f in emp_sudo._fields and getattr(emp_sudo, f, False):
-                return True
-        return False
-
-    def _split_advance_lines(self):
-        """Splits selected advance lines into (bank_lines, cash_lines).
-        - bank_lines: line_ids with selected, advance > 0, valid bank account, NOT suspended.
-        - cash_lines: tuple (line, reason) with selected, advance > 0, NO bank account OR suspended.
-        """
-        self.ensure_one()
-        all_lines = self.line_ids.filtered(lambda l: l.selected and l.advance > 0)
-        bank_lines = []
-        cash_lines = []
-
-        for line in all_lines:
-            emp = line.sudo().employee_id
-            is_suspended = self._is_employee_suspended(emp)
-            bank = self._get_employee_bank_account(emp)
-            acc_number = (getattr(bank, 'acc_number', '') or '').replace(' ', '') if bank else ''
-
-            if not is_suspended and acc_number:
-                bank_lines.append(line)
-            else:
-                reason = _("Suspended Employee") if is_suspended else _("No Bank Account")
-                cash_lines.append((line, reason))
-
-        return bank_lines, cash_lines
-
     def action_export_bank_xlsx(self):
         self.ensure_one()
-        all_lines = self.line_ids.filtered(lambda l: l.selected and l.advance > 0)
-        if not all_lines:
+        lines = self.line_ids.filtered(lambda l: l.selected and l.advance > 0)
+        if not lines:
             raise UserError(_("Nothing selected."))
-        bank_lines, cash_lines = self._split_advance_lines()
-        if not bank_lines:
-            raise UserError(_(
-                "No employees with a valid bank account found among the selected advance lines.\n"
-                "(Found %d employee(s) requiring cash payment due to missing bank account or suspension)."
-            ) % len(cash_lines))
-        data = self._build_bank_xlsx(bank_lines)
-        cutoff_str = self.date_cutoff.strftime('%m_%Y') if self.date_cutoff else fields.Date.today().strftime('%m_%Y')
+        data = self._build_bank_xlsx(lines)
         att = self.env['ir.attachment'].create({
-            'name': "Banks Advance List %s.xlsx" % cutoff_str,
+            'name': "Banks Advance List %s.xlsx" % self.date_cutoff.strftime('%m_%Y'),
             'datas': base64.b64encode(data), 'res_model': self._name, 'res_id': self.id,
             'mimetype': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})
         return {'type': 'ir.actions.act_url', 'url': '/web/content/%s?download=true' % att.id, 'target': 'self'}
-
-    def action_export_cash_xlsx(self):
-        self.ensure_one()
-        all_lines = self.line_ids.filtered(lambda l: l.selected and l.advance > 0)
-        if not all_lines:
-            raise UserError(_("Nothing selected."))
-        bank_lines, cash_lines = self._split_advance_lines()
-        if not cash_lines:
-            raise UserError(_(
-                "No employees requiring cash payment found among the selected advance lines.\n"
-                "(All %d selected employee(s) have valid bank accounts and are not suspended)."
-            ) % len(bank_lines))
-        data = self._build_cash_xlsx(cash_lines)
-        cutoff_str = self.date_cutoff.strftime('%m_%Y') if self.date_cutoff else fields.Date.today().strftime('%m_%Y')
-        att = self.env['ir.attachment'].create({
-            'name': "Cash Advance Payout %s.xlsx" % cutoff_str,
-            'datas': base64.b64encode(data), 'res_model': self._name, 'res_id': self.id,
-            'mimetype': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})
-        return {'type': 'ir.actions.act_url', 'url': '/web/content/%s?download=true' % att.id, 'target': 'self'}
-
-    def _build_cash_xlsx(self, cash_lines):
-        """Builds a formatted Excel sheet for cash advance payout with employee signatures."""
-        import xlsxwriter  # pylint: disable=import-outside-toplevel
-        buf = io.BytesIO()
-        wb = xlsxwriter.Workbook(buf, {'in_memory': True})
-        sh = wb.add_worksheet("Cash Advance Payout")
-        sh.set_portrait()
-        sh.set_paper(9)  # A4
-        sh.fit_to_pages(1, 0)
-
-        title_fmt = wb.add_format({
-            'bold': True, 'font_size': 14, 'align': 'center', 'valign': 'vcenter',
-            'font_color': '#1B4F72'
-        })
-        subtitle_fmt = wb.add_format({
-            'font_size': 10, 'italic': True, 'align': 'center', 'valign': 'vcenter',
-            'font_color': '#5D6D7E'
-        })
-        th_fmt = wb.add_format({
-            'bold': True, 'font_size': 10, 'align': 'center', 'valign': 'vcenter',
-            'bg_color': '#2C3E50', 'font_color': '#FFFFFF',
-            'border': 1, 'text_wrap': True
-        })
-        td_center = wb.add_format({'font_size': 9.5, 'align': 'center', 'valign': 'vcenter', 'border': 1})
-        td_left = wb.add_format({'font_size': 9.5, 'align': 'left', 'valign': 'vcenter', 'border': 1})
-        td_right = wb.add_format({'font_size': 9.5, 'align': 'right', 'valign': 'vcenter', 'border': 1})
-        td_money = wb.add_format({
-            'font_size': 9.5, 'bold': True, 'align': 'right', 'valign': 'vcenter',
-            'border': 1, 'num_format': '#,##0.000'
-        })
-        td_reason_susp = wb.add_format({
-            'font_size': 9, 'bold': True, 'align': 'center', 'valign': 'vcenter',
-            'border': 1, 'font_color': '#C0392B', 'bg_color': '#FDEDEC'
-        })
-        td_reason_nobank = wb.add_format({
-            'font_size': 9, 'align': 'center', 'valign': 'vcenter',
-            'border': 1, 'font_color': '#7D6608', 'bg_color': '#FEF9E7'
-        })
-        total_label_fmt = wb.add_format({
-            'bold': True, 'font_size': 10, 'align': 'right', 'valign': 'vcenter',
-            'border': 1, 'bg_color': '#EAEDED'
-        })
-        total_money_fmt = wb.add_format({
-            'bold': True, 'font_size': 10, 'align': 'right', 'valign': 'vcenter',
-            'border': 1, 'top': 1, 'bottom': 6, 'bg_color': '#EAEDED',
-            'font_color': '#922B21', 'num_format': '#,##0.000'
-        })
-
-        # Columns:
-        # 0: #, 1: Emp No, 2: Name, 3: Arabic Name, 4: Department, 5: Job Title / Branch,
-        # 6: Advance Amount (JOD), 7: Reason, 8: Recipient Signature, 9: Date Received
-        col_widths = [5, 12, 28, 24, 20, 20, 18, 18, 22, 14]
-        for c, w in enumerate(col_widths):
-            sh.set_column(c, c, w)
-
-        company = self.company_id or self.env.company
-        company_name = company.name or "Anabtawi Group"
-        cutoff_date_str = (self.date_cutoff or fields.Date.today()).strftime('%d/%m/%Y')
-
-        sh.merge_range(0, 0, 0, 9, f"{company_name} — Mid-Month Advance Cash Payout Register (كشف تسليم السلف نقدياً)", title_fmt)
-        batch_info = f"  |  Batch: {self.batch_name}" if self.batch_name else ""
-        sh.merge_range(1, 0, 1, 9, f"Cut-off Date: {cutoff_date_str}{batch_info}  |  Currency: JOD", subtitle_fmt)
-        sh.set_row(0, 26)
-        sh.set_row(1, 18)
-        sh.set_row(2, 6)
-
-        headers = [
-            "#",
-            "Emp No.",
-            "Employee Name",
-            "الاسم بالعربية",
-            "Department",
-            "Job Title / Branch",
-            "Advance Amount (JOD)",
-            "Payment Reason",
-            "Recipient Signature",
-            "Date Received",
-        ]
-        sh.set_row(3, 24)
-        for c, h in enumerate(headers):
-            sh.write(3, c, h, th_fmt)
-
-        row = 4
-        total_cash = 0.0
-        for idx, (line, reason) in enumerate(cash_lines, start=1):
-            emp = line.sudo().employee_id
-            emp_num = (
-                getattr(emp, 'employee_number', False)
-                or getattr(emp, 'sb_employee_number', False)
-                or getattr(emp, 'registration_number', False)
-                or getattr(emp, 'barcode', False)
-                or str(emp.id)
-            )
-            name_en = emp.name or ''
-            name_ar = getattr(emp, 'name_arabic', '') or getattr(emp, 'legal_name', '') or ''
-            dept = emp.department_id.name if emp.department_id else ''
-            job = emp.job_title or (emp.job_id.name if emp.job_id else '')
-            adv_val = round(line.advance or 0.0, 3)
-
-            reason_fmt = td_reason_susp if "suspend" in str(reason).lower() else td_reason_nobank
-
-            sh.set_row(row, 20)
-            sh.write_number(row, 0, idx, td_center)
-            sh.write_string(row, 1, str(emp_num), td_center)
-            sh.write_string(row, 2, name_en, td_left)
-            sh.write_string(row, 3, name_ar, td_right)
-            sh.write_string(row, 4, dept, td_left)
-            sh.write_string(row, 5, job, td_left)
-            sh.write_number(row, 6, adv_val, td_money)
-            sh.write_string(row, 7, reason, reason_fmt)
-            sh.write_string(row, 8, "", td_center)
-            sh.write_string(row, 9, "", td_center)
-
-            total_cash += adv_val
-            row += 1
-
-        sh.set_row(row, 22)
-        sh.merge_range(row, 0, row, 5, "TOTAL CASH ADVANCE (المجموع الكلي للسلف نقداً):", total_label_fmt)
-        sh.write_number(row, 6, total_cash, total_money_fmt)
-        sh.write_string(row, 7, "", total_label_fmt)
-        sh.write_string(row, 8, "", total_label_fmt)
-        sh.write_string(row, 9, "", total_label_fmt)
-
-        wb.close()
-        return buf.getvalue()
 
     def _build_bank_xlsx(self, lines):
         import xlsxwriter  # pylint: disable=import-outside-toplevel
@@ -1248,6 +1171,7 @@ class PfrAdvanceWizardLine(models.TransientModel):
     wizard_id = fields.Many2one('pfr.advance.wizard', required=True, ondelete='cascade')
     selected = fields.Boolean(string="Pay", default=True)
     employee_id = fields.Many2one('hr.employee', string="Employee", readonly=True)
+    start_date = fields.Date(string="Start Date", readonly=True)
     wage = fields.Float(string="Wage", readonly=True)
     worked_days = fields.Float(string="Attendance Days", readonly=True)
     rest_days = fields.Float(string="Rest Days", readonly=True)
