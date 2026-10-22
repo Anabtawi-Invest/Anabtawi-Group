@@ -5,6 +5,6 @@
         name="Transfer Location Access"
         parent="stock.menu_stock_config_settings"
         action="action_stock_picking_location_access"
-        groups="stock_picking_location_access.group_stock_picking_location_access_manager"
+        groups="stock.group_stock_manager"
         sequence="95"/>
 </odoo>
