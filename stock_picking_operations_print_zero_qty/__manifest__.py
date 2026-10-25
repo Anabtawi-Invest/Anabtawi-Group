@@ -1,8 +1,8 @@
 {
     "name": "Stock Picking Operations Print Zero Qty",
-    "version": "19.0.1.1.0",
+    "version": "19.0.1.2.0",
     "category": "Inventory/Inventory",
-    "summary": "Print demand lines with done quantity 0 (including cancelled) on Picking Operations",
+    "summary": "Print Demand and Quantity columns on Picking Operations, including zero-done lines",
     "author": "Anabtawi",
     "depends": ["stock"],
     "data": [
