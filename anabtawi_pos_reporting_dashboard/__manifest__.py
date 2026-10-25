@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Unified POS Reporting & Branch Dashboard",
-    "version": "19.0.1.1.0",
+    "version": "19.0.1.1.1",
     "category": "Point of Sale",
     "summary": "Comprehensive POS reporting and executive dashboard for Cash/Visa sales, Cash In/Out, Pledges, Advance Orders per branch",
     "author": "Anabtawi",
@@ -16,6 +16,7 @@
         "anabtawi_pos_expense",
         "hr_attendance",
         "portal_check_in",
+        "ceo_main_dashboard",
     ],
     "data": [
         "security/security_groups.xml",

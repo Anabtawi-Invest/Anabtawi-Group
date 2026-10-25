@@ -58,17 +58,18 @@
         <field name="tag">pos_expense_reporting_dashboard_main</field>
     </record>
 
+    <!-- Under CEO Main Dashboard (same app as Purchase) -->
     <menuitem id="menu_pos_expense_reporting_dashboard"
               name="Expenses Dashboard"
-              parent="point_of_sale.menu_point_rep"
+              parent="ceo_main_dashboard.menu_ceo_main_dashboard_root"
               action="action_pos_expense_reporting_dashboard"
-              groups="anabtawi_pos_reporting_dashboard.group_pos_reporting_dashboard_user"
-              sequence="3"/>
+              groups="ceo_main_dashboard.group_ceo_main_dashboard_user"
+              sequence="2"/>
 
     <menuitem id="menu_pos_expense_dashboard_account"
               name="Expense Dashboard Accounts"
-              parent="point_of_sale.menu_point_rep"
+              parent="ceo_main_dashboard.menu_ceo_main_dashboard_root"
               action="action_pos_expense_dashboard_account"
-              groups="anabtawi_pos_reporting_dashboard.group_pos_reporting_dashboard_user"
-              sequence="4"/>
+              groups="ceo_main_dashboard.group_ceo_main_dashboard_user"
+              sequence="3"/>
 </odoo>

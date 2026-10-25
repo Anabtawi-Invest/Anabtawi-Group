@@ -16,6 +16,11 @@
                         t-on-click="() => this.switchTab('purchase')">
                     <i class="fa fa-shopping-cart me-1"/> Purchase
                 </button>
+                <button t-if="state.data and state.data.has_expenses_dashboard"
+                        class="cmd_tab"
+                        t-on-click="openExpensesDashboard">
+                    <i class="fa fa-money me-1"/> Expenses
+                </button>
             </div>
             <div class="cmd_nav_actions">
                 <button class="cmd_btn" t-on-click="refresh" title="Refresh live data">
