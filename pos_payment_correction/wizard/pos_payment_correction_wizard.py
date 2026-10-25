@@ -280,6 +280,18 @@ class PosPaymentCorrectionWizard(models.TransientModel):
                 )
             )
 
+        account_ids = {cmd[2]["account_id"] for cmd in line_commands}
+        if len(account_ids) == 1 and float_compare(debit, credit, precision_rounding=currency.rounding) == 0:
+            # Same account on both sides = wash entry (what happened with 114002/114002)
+            raise UserError(
+                _(
+                    "Cannot post accounting correction: all fixing lines resolved to the same "
+                    "receivable account. Check each payment method's Intermediary Account "
+                    "(صندوق should differ from طلبات, e.g. 114001 vs 114002), or post the "
+                    "journal entry manually."
+                )
+            )
+
         move = (
             self.env["account.move"]
             .sudo()

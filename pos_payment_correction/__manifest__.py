@@ -1,6 +1,6 @@
 {
     "name": "POS Payment Correction",
-    "version": "19.0.1.0.0",
+    "version": "19.0.1.1.0",
     "category": "Point of Sale",
     "summary": "Correct wrong POS payments on posted orders with audit links and optional journal entry",
     "author": "Anabtawi",

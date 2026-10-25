@@ -83,11 +83,45 @@ class PosPayment(models.Model):
             self.corrected_payment_ids = [(5, 0, 0)]
 
     def _get_correction_receivable_account(self):
+        """Resolve the receivable account the original POS session actually used.
+
+        Priority:
+        1. Session move line for this payment method (same account as POSS/...)
+        2. Payment method Intermediary Account
+        3. Session / company PoS receivable fallback
+        """
         self.ensure_one()
+        method = self.payment_method_id
+        wrong = self.corrected_payment_ids[:1]
+        session_move = self.pos_order_id.session_move_id
+
+        if session_move and method:
+            method_name = method.display_name or method.name or ""
+            candidates = session_move.line_ids.filtered(
+                lambda line: method_name and method_name in (line.name or "")
+            )
+            if candidates and wrong:
+                # Wrong positive tender -> debit on receivable; change/negative -> credit
+                if wrong.amount >= 0:
+                    signed = candidates.filtered(lambda line: line.debit > 0)
+                else:
+                    signed = candidates.filtered(lambda line: line.credit > 0)
+                pool = signed or candidates
+                target = abs(wrong.amount)
+                best = min(
+                    pool,
+                    key=lambda line: abs((line.debit or line.credit or 0.0) - target),
+                )
+                if best.account_id:
+                    return best.account_id
+            elif candidates and candidates[0].account_id:
+                return candidates[0].account_id
+
+        if method.receivable_account_id:
+            return method.receivable_account_id
+
         session = self.session_id
         if session:
-            return session._get_receivable_account(self.payment_method_id)
-        return (
-            self.payment_method_id.receivable_account_id
-            or self.company_id.account_default_pos_receivable_account_id
-        )
+            return session._get_receivable_account(method)
+
+        return self.company_id.account_default_pos_receivable_account_id
