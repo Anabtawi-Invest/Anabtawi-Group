@@ -1189,58 +1189,76 @@ class PosReportingDashboard(models.TransientModel):
             ("display_type", "not in", ("line_section", "line_subsection", "line_note")),
         ]
 
+    def _get_period_pos_expenses(self, period):
+        """All company POS expenses in the period by expense date (no branch filter)."""
+        if "pos.expense" not in self.env:
+            return self.env["pos.expense"].browse()
+        dt_start, dt_end, _, _ = self._period_bounds(period)
+        return self.env["pos.expense"].sudo().search([
+            ("company_id", "in", self.env.companies.ids),
+            ("date", ">=", dt_start),
+            ("date", "<=", dt_end),
+            ("state", "in", ("to_approve", "approved", "refused")),
+        ])
+
+    def _open_period_expense_drilldown(self, period, states=None):
+        expenses = self._get_period_pos_expenses(period)
+        if states:
+            expenses = expenses.filtered(lambda e: e.state in states)
+        expense_ids = expenses.ids
+
+        list_view = self.env.ref(
+            "anabtawi_pos_expense.view_pos_expense_list", raise_if_not_found=False
+        )
+        form_view = self.env.ref(
+            "anabtawi_pos_expense.view_pos_expense_form", raise_if_not_found=False
+        )
+        views = []
+        if list_view:
+            views.append((list_view.id, "list"))
+        if form_view:
+            views.append((form_view.id, "form"))
+
+        return {
+            "name": _("POS Expenses"),
+            "type": "ir.actions.act_window",
+            "res_model": "pos.expense",
+            "view_mode": "list,form",
+            "views": views if views else [(False, "list"), (False, "form")],
+            "domain": [("id", "in", expense_ids)] if expense_ids else [("id", "=", 0)],
+            "target": "current",
+            "context": {"create": False, "delete": False},
+        }
+
     @api.model
     def get_expense_dashboard_data(self, date_from=None, date_to=None, config_ids=None):
         """
-        Expenses dashboard payload:
-        - POS expenses (same rules as the executive dashboard)
+        Expenses dashboard payload (company totals, no POS branch filter):
+        - All POS expenses in the period (by expense date)
         - Totals per configured GL expense account (posted journal items)
         """
-        engine = self.env["pos.daily.ops.engine"]
+        del config_ids  # unused: this dashboard is not branch-scoped
         period = self._parse_period(date_from, date_to)
-        configs = self._get_report_configs(config_ids)
-        active_config_ids = set(configs.ids)
-        sessions = engine._get_sessions(period, configs)
 
-        # --- POS Expenses (same as executive dashboard) ---
-        expense_amount = 0.0
-        expense_count = 0
+        # --- POS Expenses (all branches, by expense date) ---
+        expense_approved_amount = 0.0
+        expense_approved_count = 0
         expense_pending_amount = 0.0
         expense_pending_count = 0
-        branch_expenses = defaultdict(lambda: {
-            "expense_amount": 0.0,
-            "expense_count": 0,
-            "expense_pending_amount": 0.0,
-            "expense_pending_count": 0,
-        })
 
-        expenses = self._get_session_expenses(sessions)
-        if expenses:
-            for expense in expenses:
-                cfg = expense.config_id
-                if not cfg or (active_config_ids and cfg.id not in active_config_ids):
-                    continue
-                amt = expense.amount or 0.0
-                branch = branch_expenses[cfg.id]
-                if expense.state == "approved":
-                    branch["expense_amount"] += amt
-                    branch["expense_count"] += 1
-                    expense_amount += amt
-                    expense_count += 1
-                elif expense.state in ("to_approve", "refused"):
-                    branch["expense_pending_amount"] += amt
-                    branch["expense_pending_count"] += 1
-                    expense_pending_amount += amt
-                    expense_pending_count += 1
+        for expense in self._get_period_pos_expenses(period):
+            amt = expense.amount or 0.0
+            if expense.state == "approved":
+                expense_approved_amount += amt
+                expense_approved_count += 1
+            else:
+                # to_approve + refused
+                expense_pending_amount += amt
+                expense_pending_count += 1
 
-        branch_rows = []
-        for config in configs:
-            vals = branch_expenses[config.id]
-            branch_rows.append({
-                "config_id": config.id,
-                "branch_name": config.name,
-                **vals,
-            })
+        # Main POS total = approved + pending (so the card is not stuck at 0 while pending exists)
+        expense_amount = expense_approved_amount + expense_pending_amount
+        expense_count = expense_approved_count + expense_pending_count
 
         # --- Configured GL accounts ---
         configured = self._get_configured_expense_accounts()
@@ -1278,21 +1296,14 @@ class PosReportingDashboard(models.TransientModel):
                 "line_count": count,
             })
 
-        all_config_domain = [
-            ("active", "=", True),
-            ("company_id", "in", self.env.companies.ids),
-        ]
-        for kw in EXCLUDED_CONFIG_KEYWORDS:
-            all_config_domain.append(("name", "not ilike", kw))
-        all_configs = self.env["pos.config"].sudo().search(all_config_domain, order="name")
-
         return {
             "date_from": fields.Date.to_string(period["date_from"]),
             "date_to": fields.Date.to_string(period["date_to"]),
-            "all_branches": [{"id": cfg.id, "name": cfg.name} for cfg in all_configs],
             "kpis": {
                 "expense_amount": expense_amount,
                 "expense_count": expense_count,
+                "expense_approved_amount": expense_approved_amount,
+                "expense_approved_count": expense_approved_count,
                 "expense_pending_amount": expense_pending_amount,
                 "expense_pending_count": expense_pending_count,
                 "account_expense_total": account_expense_total,
@@ -1300,9 +1311,14 @@ class PosReportingDashboard(models.TransientModel):
                 "account_count": len(account_rows),
                 "combined_expense_total": expense_amount + account_expense_total,
             },
-            "branches": branch_rows,
             "accounts": account_rows,
         }
+
+    @api.model
+    def open_expense_dashboard_pos_drilldown(self, date_from=None, date_to=None):
+        """Open all POS expenses in the period (no branch filter)."""
+        period = self._parse_period(date_from, date_to)
+        return self._open_period_expense_drilldown(period)
 
     @api.model
     def open_account_expense_drilldown(self, account_id=None, date_from=None, date_to=None):

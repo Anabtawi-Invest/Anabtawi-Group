@@ -18,20 +18,15 @@ export class PosExpenseReportingDashboard extends Component {
             period: "today",
             date_from: (params.date_from || today).slice(0, 10),
             date_to: (params.date_to || today).slice(0, 10),
-            config_ids: params.config_ids || [],
             loading: true,
             sortKey: "amount",
             sortOrder: "desc",
-            branchSortKey: "expense_amount",
-            branchSortOrder: "desc",
         });
 
         this.data = useState({
             date_from: "",
             date_to: "",
-            all_branches: [],
             kpis: {},
-            branches: [],
             accounts: [],
         });
 
@@ -58,15 +53,12 @@ export class PosExpenseReportingDashboard extends Component {
                 {
                     date_from: this.state.date_from,
                     date_to: this.state.date_to,
-                    config_ids: this.state.config_ids,
                 }
             );
             this.data.date_from = res.date_from || this.state.date_from;
             this.data.date_to = res.date_to || this.state.date_to;
             this.data.kpis = res.kpis || {};
-            this.data.branches = res.branches || [];
             this.data.accounts = res.accounts || [];
-            this.data.all_branches = res.all_branches || [];
         } catch (error) {
             console.error("Failed to load Expenses dashboard data", error);
         } finally {
@@ -94,26 +86,6 @@ export class PosExpenseReportingDashboard extends Component {
         return rows;
     }
 
-    get sortedBranches() {
-        const rows = [...(this.data.branches || [])];
-        const key = this.state.branchSortKey;
-        const isAsc = this.state.branchSortOrder === "asc";
-        if (!key) return rows;
-        rows.sort((a, b) => {
-            let valA = a[key];
-            let valB = b[key];
-            if (typeof valA === "string") {
-                valA = (valA || "").toLowerCase();
-                valB = (valB || "").toLowerCase();
-                return isAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
-            }
-            valA = Number(valA) || 0;
-            valB = Number(valB) || 0;
-            return isAsc ? valA - valB : valB - valA;
-        });
-        return rows;
-    }
-
     sortAccountsBy(key) {
         if (this.state.sortKey === key) {
             this.state.sortOrder = this.state.sortOrder === "asc" ? "desc" : "asc";
@@ -121,31 +93,6 @@ export class PosExpenseReportingDashboard extends Component {
             this.state.sortKey = key;
             this.state.sortOrder = key === "account_name" || key === "account_code" ? "asc" : "desc";
         }
-    }
-
-    sortBranchesBy(key) {
-        if (this.state.branchSortKey === key) {
-            this.state.branchSortOrder = this.state.branchSortOrder === "asc" ? "desc" : "asc";
-        } else {
-            this.state.branchSortKey = key;
-            this.state.branchSortOrder = key === "branch_name" ? "asc" : "desc";
-        }
-    }
-
-    selectBranch(branchId) {
-        if (branchId === "all") {
-            this.state.config_ids = [];
-        } else {
-            this.state.config_ids = [branchId];
-        }
-        this.fetchDashboardData();
-    }
-
-    isBranchSelected(branchId) {
-        if (branchId === "all") {
-            return !this.state.config_ids || this.state.config_ids.length === 0;
-        }
-        return this.state.config_ids && this.state.config_ids.length === 1 && this.state.config_ids[0] === branchId;
     }
 
     setPeriod(period) {
@@ -184,18 +131,15 @@ export class PosExpenseReportingDashboard extends Component {
         return ((value / total) * 100).toFixed(1);
     }
 
-    async onPosExpenseClick(configId = null) {
+    async onPosExpenseClick() {
         try {
-            const targetConfigs = configId ? [configId] : (this.state.config_ids || []);
             const action = await this.orm.call(
                 "pos.reporting.dashboard",
-                "open_kpi_drilldown",
+                "open_expense_dashboard_pos_drilldown",
                 [],
                 {
-                    metric_type: "expense_amount",
                     date_from: this.state.date_from,
                     date_to: this.state.date_to,
-                    config_ids: targetConfigs,
                 }
             );
             if (action) {

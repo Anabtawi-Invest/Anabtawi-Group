@@ -6,7 +6,7 @@
                 <div class="o_dashboard_title">
                     <h2><i class="fa fa-money text-warning"/> Expenses Dashboard</h2>
                     <span class="subtitle">
-                        POS expenses &amp; configured GL expense accounts
+                        Company totals: POS expenses &amp; configured GL accounts
                         <t t-if="data.date_from and data.date_to">
                             (<t t-esc="data.date_from"/> to <t t-esc="data.date_to"/>)
                         </t>
@@ -33,35 +33,17 @@
                 </div>
             </div>
 
-            <div class="o_branch_selector_bar mb-4">
-                <ul class="nav nav-pills branch_pills">
-                    <li class="nav-item">
-                        <button type="button" class="nav-link" t-att-class="{'active': isBranchSelected('all')}" t-on-click="() => this.selectBranch('all')">
-                            <i class="fa fa-cubes me-1"/> All Branches
-                        </button>
-                    </li>
-                    <t t-foreach="data.all_branches || []" t-as="branch_item" t-key="branch_item.id">
-                        <li class="nav-item">
-                            <button type="button" class="nav-link" t-att-class="{'active': isBranchSelected(branch_item.id)}" t-on-click="() => this.selectBranch(branch_item.id)">
-                                <i class="fa fa-building-o me-1"/> <t t-esc="branch_item.name"/>
-                            </button>
-                        </li>
-                    </t>
-                </ul>
-            </div>
-
             <t t-if="state.loading">
                 <div class="text-center p-5">
                     <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
                         <span class="visually-hidden">Loading...</span>
                     </div>
-                    <p class="mt-3 text-muted">Calculating expense analytics...</p>
+                    <p class="mt-3 text-muted">Calculating expense totals...</p>
                 </div>
             </t>
 
             <t t-else="">
                 <div class="o_kpi_grid">
-                    <!-- Combined total -->
                     <div class="o_kpi_card card-expense">
                         <div class="kpi_icon"><i class="fa fa-pie-chart text-danger"/></div>
                         <div class="kpi_title">Total Expenses (POS + Accounts)</div>
@@ -71,24 +53,25 @@
                         </div>
                     </div>
 
-                    <!-- POS Expenses (same card as executive dashboard) -->
                     <div class="o_kpi_card card-expense clickable_kpi" t-on-click="() => this.onPosExpenseClick()" title="Click to view POS expenses">
                         <div class="kpi_icon"><i class="fa fa-ticket text-warning"/></div>
                         <div class="kpi_title">POS Expenses</div>
                         <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.expense_amount)"/></div>
                         <div class="kpi_subtext d-flex justify-content-between align-items-center">
                             <div>
-                                <span class="badge bg-warning text-dark badge_sub"><t t-esc="data.kpis.expense_count || 0"/> Approved</span>
-                                <span class="badge bg-secondary badge_sub ms-1" t-if="data.kpis.expense_pending_count">
+                                <span class="badge bg-success badge_sub">
+                                    Approved: <t t-esc="formatCurrency(data.kpis.expense_approved_amount)"/>
+                                    (<t t-esc="data.kpis.expense_approved_count || 0"/>)
+                                </span>
+                                <span class="badge bg-warning text-dark badge_sub ms-1">
                                     Pending: <t t-esc="formatCurrency(data.kpis.expense_pending_amount)"/>
-                                    (<t t-esc="data.kpis.expense_pending_count"/>)
+                                    (<t t-esc="data.kpis.expense_pending_count || 0"/>)
                                 </span>
                             </div>
                             <span class="drill_badge"><i class="fa fa-search-plus me-1"/>Drill Down</span>
                         </div>
                     </div>
 
-                    <!-- Configured account expenses total -->
                     <div class="o_kpi_card card-expense clickable_kpi" t-on-click="() => this.onAccountExpenseClick()" title="Click to view journal items">
                         <div class="kpi_icon"><i class="fa fa-book text-primary"/></div>
                         <div class="kpi_title">Account Expenses</div>
@@ -103,7 +86,6 @@
                     </div>
                 </div>
 
-                <!-- Per-account cards -->
                 <div class="o_dashboard_section mb-4" t-if="(data.accounts || []).length">
                     <div class="section_header">
                         <h4><i class="fa fa-list-alt text-primary"/> Configured Accounts</h4>
@@ -133,7 +115,6 @@
                     </div>
                 </div>
 
-                <!-- Account breakdown table -->
                 <div class="o_dashboard_section mb-4" t-if="(data.accounts || []).length">
                     <div class="section_header d-flex justify-content-between align-items-center flex-wrap gap-2">
                         <h4><i class="fa fa-table text-info"/> Account Expense Matrix</h4>
@@ -170,48 +151,6 @@
                                         <t t-esc="formatCurrency(data.kpis.account_expense_total)"/>
                                     </td>
                                     <td class="val_num text-end">100%</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <!-- POS expenses by branch -->
-                <div class="o_dashboard_section">
-                    <div class="section_header">
-                        <h4><i class="fa fa-building text-info"/> POS Expenses by Branch</h4>
-                    </div>
-                    <div class="table-responsive">
-                        <table class="table table_branch_data align-middle">
-                            <thead>
-                                <tr>
-                                    <th class="sortable_th" t-on-click="() => this.sortBranchesBy('branch_name')">Branch</th>
-                                    <th class="text-end sortable_th" t-on-click="() => this.sortBranchesBy('expense_count')">Approved Count</th>
-                                    <th class="text-end sortable_th" t-on-click="() => this.sortBranchesBy('expense_amount')">Approved Amount</th>
-                                    <th class="text-end sortable_th" t-on-click="() => this.sortBranchesBy('expense_pending_count')">Pending Count</th>
-                                    <th class="text-end sortable_th" t-on-click="() => this.sortBranchesBy('expense_pending_amount')">Pending Amount</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <t t-foreach="sortedBranches" t-as="branch" t-key="branch.config_id">
-                                    <tr>
-                                        <td class="branch_title"><t t-esc="branch.branch_name"/></td>
-                                        <td class="val_num text-end"><t t-esc="branch.expense_count"/></td>
-                                        <td class="val_num text-end text-danger clickable_cell" t-on-click="() => this.onPosExpenseClick(branch.config_id)">
-                                            <t t-esc="formatCurrency(branch.expense_amount)"/>
-                                        </td>
-                                        <td class="val_num text-end"><t t-esc="branch.expense_pending_count"/></td>
-                                        <td class="val_num text-end"><t t-esc="formatCurrency(branch.expense_pending_amount)"/></td>
-                                    </tr>
-                                </t>
-                                <tr class="row_total">
-                                    <td class="branch_title">TOTALS</td>
-                                    <td class="val_num text-end"><t t-esc="data.kpis.expense_count"/></td>
-                                    <td class="val_num text-end clickable_cell" t-on-click="() => this.onPosExpenseClick()">
-                                        <t t-esc="formatCurrency(data.kpis.expense_amount)"/>
-                                    </td>
-                                    <td class="val_num text-end"><t t-esc="data.kpis.expense_pending_count"/></td>
-                                    <td class="val_num text-end"><t t-esc="formatCurrency(data.kpis.expense_pending_amount)"/></td>
                                 </tr>
                             </tbody>
                         </table>
