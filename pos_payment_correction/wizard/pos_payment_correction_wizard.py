@@ -48,18 +48,23 @@ class PosPaymentCorrectionWizard(models.TransientModel):
     @api.model
     def default_get(self, fields_list):
         res = super().default_get(fields_list)
-        order = self.env["pos.order"].browse(res.get("order_id") or self.env.context.get("default_order_id"))
+        order = self.env["pos.order"].browse(
+            res.get("order_id") or self.env.context.get("default_order_id")
+        )
         if order:
             res["order_id"] = order.id
             res["note"] = _("Correct POS %(order)s (payment fix)", order=order.name)
-            res["accounting_date"] = fields.Date.to_date(order.date_order) or fields.Date.context_today(self)
+            res["accounting_date"] = fields.Date.to_date(order.date_order) or fields.Date.context_today(
+                self
+            )
             journal = self._default_misc_journal(order.company_id)
             if journal:
                 res["journal_id"] = journal.id
             if "line_ids" in fields_list or not fields_list:
                 lines = []
-                for payment in order.payment_ids.filtered(lambda p: not p.is_payment_correction).sorted("id"):
-                    # Default: keep current amount (no change). User sets the intended amount.
+                for payment in order.payment_ids.filtered(
+                    lambda p: not p.is_payment_correction
+                ).sorted("id"):
                     lines.append(
                         (
                             0,
@@ -110,10 +115,14 @@ class PosPaymentCorrectionWizard(models.TransientModel):
             != 0
         )
         if not active_lines:
-            raise UserError(_("Set at least one Correct Amount different from the current amount."))
+            raise UserError(
+                _("Set at least one Correct Amount different from the current amount.")
+            )
 
         if self.create_account_move and not self.journal_id:
-            raise UserError(_("Please select a miscellaneous journal for the accounting entry."))
+            raise UserError(
+                _("Please select a miscellaneous journal for the accounting entry.")
+            )
 
         Payment = self.env["pos.payment"].sudo().with_context(allow_pos_payment_correction=True)
         created_payments = Payment
@@ -131,7 +140,6 @@ class PosPaymentCorrectionWizard(models.TransientModel):
                 }
             )
 
-        # Refresh paid / returned without recalculating product totals
         amount_paid = sum(order.payment_ids.mapped("amount"))
         amount_return = order._get_payment_correction_amount_return()
         order.write(
@@ -142,7 +150,9 @@ class PosPaymentCorrectionWizard(models.TransientModel):
             }
         )
 
-        if float_compare(amount_paid, order.amount_total, precision_rounding=order.currency_id.rounding) != 0:
+        if float_compare(
+            amount_paid, order.amount_total, precision_rounding=order.currency_id.rounding
+        ) != 0:
             raise UserError(
                 _(
                     "After correction, payments (%(paid)s) do not equal order total (%(total)s). "
@@ -153,9 +163,13 @@ class PosPaymentCorrectionWizard(models.TransientModel):
             )
 
         account_move = self.env["account.move"]
+        accounting_note = False
         if self.create_account_move:
-            account_move = self._create_correction_account_move(created_payments)
-            created_payments.write({"correction_account_move_id": account_move.id})
+            account_move, accounting_note = self._create_correction_account_move(
+                created_payments
+            )
+            if account_move:
+                created_payments.write({"correction_account_move_id": account_move.id})
 
         body = _(
             "POS payment correction created %(count)s fixing payment(s).",
@@ -167,31 +181,46 @@ class PosPaymentCorrectionWizard(models.TransientModel):
                 body=body,
                 move=account_move._get_html_link(),
             )
+        elif accounting_note:
+            body = "%s %s" % (body, accounting_note)
         order.message_post(body=body)
 
-        action = {
+        message = _(
+            "%(count)s fixing payment(s) added on %(order)s.",
+            count=len(created_payments),
+            order=order.name,
+        )
+        if account_move:
+            message = _(
+                "%(msg)s Entry %(move)s posted.",
+                msg=message,
+                move=account_move.name,
+            )
+        elif accounting_note:
+            message = "%s %s" % (message, accounting_note)
+
+        return {
             "type": "ir.actions.client",
             "tag": "display_notification",
             "params": {
                 "title": _("Payments corrected"),
-                "message": _(
-                    "%(count)s fixing payment(s) added on %(order)s.",
-                    count=len(created_payments),
-                    order=order.name,
-                ),
+                "message": message,
                 "type": "success",
                 "next": {"type": "ir.actions.act_window_close"},
             },
         }
-        return action
 
     def _create_correction_account_move(self, correction_payments):
+        """Create JE with one line per fixing payment (no netting to empty).
+
+        Returns (move, skip_note).
+        """
         self.ensure_one()
         order = self.order_id
         currency = order.currency_id
         company = order.company_id
         line_commands = []
-        totals_by_account = {}
+        base_label = self.note or _("Correct POS %(order)s", order=order.name)
 
         for payment in correction_payments:
             account = payment._get_correction_receivable_account()
@@ -202,20 +231,11 @@ class PosPaymentCorrectionWizard(models.TransientModel):
                         method=payment.payment_method_id.display_name,
                     )
                 )
-            amount = payment.amount
-            # Positive correction payment => debit receivable (same as a normal POS payment)
-            # Negative correction payment => credit receivable
-            totals_by_account.setdefault(account, 0.0)
-            totals_by_account[account] += amount
-
-        for account, amount in totals_by_account.items():
-            amount = float_round(amount, precision_rounding=currency.rounding)
+            amount = float_round(payment.amount, precision_rounding=currency.rounding)
             if float_is_zero(amount, precision_rounding=currency.rounding):
                 continue
-            label = self.note or _(
-                "Correct POS %(order)s",
-                order=order.name,
-            )
+            label = "%s - %s" % (base_label, payment.payment_method_id.display_name)
+            # Positive fixing => debit receivable; negative fixing => credit receivable
             if amount > 0:
                 line_commands.append(
                     (
@@ -244,7 +264,9 @@ class PosPaymentCorrectionWizard(models.TransientModel):
                 )
 
         if not line_commands:
-            raise UserError(_("Nothing to post in accounting for these corrections."))
+            return self.env["account.move"], _(
+                "No accounting entry: fixing amounts were zero."
+            )
 
         debit = sum(cmd[2].get("debit", 0.0) for cmd in line_commands)
         credit = sum(cmd[2].get("credit", 0.0) for cmd in line_commands)
@@ -279,7 +301,7 @@ class PosPaymentCorrectionWizard(models.TransientModel):
             )
         )
         move.action_post()
-        return move
+        return move, False
 
 
 class PosPaymentCorrectionWizardLine(models.TransientModel):
