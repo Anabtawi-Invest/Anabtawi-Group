@@ -1,0 +1,223 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="anabtawi_pos_reporting_dashboard.PosExpenseReportingDashboard" owl="1">
+        <div class="o_pos_dashboard_wrapper">
+            <div class="o_pos_dashboard_header">
+                <div class="o_dashboard_title">
+                    <h2><i class="fa fa-money text-warning"/> Expenses Dashboard</h2>
+                    <span class="subtitle">
+                        POS expenses &amp; configured GL expense accounts
+                        <t t-if="data.date_from and data.date_to">
+                            (<t t-esc="data.date_from"/> to <t t-esc="data.date_to"/>)
+                        </t>
+                    </span>
+                </div>
+                <div class="o_dashboard_filters">
+                    <div class="btn-group btn-group-period" role="group">
+                        <button type="button" class="btn btn-outline-primary" t-att-class="{'active': state.period === 'today'}" t-on-click="() => this.setPeriod('today')">Today</button>
+                        <button type="button" class="btn btn-outline-primary" t-att-class="{'active': state.period === 'yesterday'}" t-on-click="() => this.setPeriod('yesterday')">Yesterday</button>
+                        <button type="button" class="btn btn-outline-primary" t-att-class="{'active': state.period === 'this_week'}" t-on-click="() => this.setPeriod('this_week')">This Week</button>
+                        <button type="button" class="btn btn-outline-primary" t-att-class="{'active': state.period === 'this_month'}" t-on-click="() => this.setPeriod('this_month')">This Month</button>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <input type="date" class="form-control filter_input" t-model="state.date_from"/>
+                        <span class="text-muted">to</span>
+                        <input type="date" class="form-control filter_input" t-model="state.date_to"/>
+                        <button class="btn btn-primary" t-on-click="fetchDashboardData">
+                            <i class="fa fa-refresh me-1"/> Apply
+                        </button>
+                        <button class="btn btn-outline-secondary" t-on-click="openAccountConfig" title="Configure expense accounts">
+                            <i class="fa fa-cog me-1"/> Accounts
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="o_branch_selector_bar mb-4">
+                <ul class="nav nav-pills branch_pills">
+                    <li class="nav-item">
+                        <button type="button" class="nav-link" t-att-class="{'active': isBranchSelected('all')}" t-on-click="() => this.selectBranch('all')">
+                            <i class="fa fa-cubes me-1"/> All Branches
+                        </button>
+                    </li>
+                    <t t-foreach="data.all_branches || []" t-as="branch_item" t-key="branch_item.id">
+                        <li class="nav-item">
+                            <button type="button" class="nav-link" t-att-class="{'active': isBranchSelected(branch_item.id)}" t-on-click="() => this.selectBranch(branch_item.id)">
+                                <i class="fa fa-building-o me-1"/> <t t-esc="branch_item.name"/>
+                            </button>
+                        </li>
+                    </t>
+                </ul>
+            </div>
+
+            <t t-if="state.loading">
+                <div class="text-center p-5">
+                    <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-3 text-muted">Calculating expense analytics...</p>
+                </div>
+            </t>
+
+            <t t-else="">
+                <div class="o_kpi_grid">
+                    <!-- Combined total -->
+                    <div class="o_kpi_card card-expense">
+                        <div class="kpi_icon"><i class="fa fa-pie-chart text-danger"/></div>
+                        <div class="kpi_title">Total Expenses (POS + Accounts)</div>
+                        <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.combined_expense_total)"/></div>
+                        <div class="kpi_subtext">
+                            <span class="badge bg-danger badge_sub">Combined</span>
+                        </div>
+                    </div>
+
+                    <!-- POS Expenses (same card as executive dashboard) -->
+                    <div class="o_kpi_card card-expense clickable_kpi" t-on-click="() => this.onPosExpenseClick()" title="Click to view POS expenses">
+                        <div class="kpi_icon"><i class="fa fa-ticket text-warning"/></div>
+                        <div class="kpi_title">POS Expenses</div>
+                        <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.expense_amount)"/></div>
+                        <div class="kpi_subtext d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="badge bg-warning text-dark badge_sub"><t t-esc="data.kpis.expense_count || 0"/> Approved</span>
+                                <span class="badge bg-secondary badge_sub ms-1" t-if="data.kpis.expense_pending_count">
+                                    Pending: <t t-esc="formatCurrency(data.kpis.expense_pending_amount)"/>
+                                    (<t t-esc="data.kpis.expense_pending_count"/>)
+                                </span>
+                            </div>
+                            <span class="drill_badge"><i class="fa fa-search-plus me-1"/>Drill Down</span>
+                        </div>
+                    </div>
+
+                    <!-- Configured account expenses total -->
+                    <div class="o_kpi_card card-expense clickable_kpi" t-on-click="() => this.onAccountExpenseClick()" title="Click to view journal items">
+                        <div class="kpi_icon"><i class="fa fa-book text-primary"/></div>
+                        <div class="kpi_title">Account Expenses</div>
+                        <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.account_expense_total)"/></div>
+                        <div class="kpi_subtext d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="badge bg-primary badge_sub"><t t-esc="data.kpis.account_count || 0"/> Accounts</span>
+                                <span class="badge bg-secondary badge_sub ms-1"><t t-esc="data.kpis.account_line_count || 0"/> Lines</span>
+                            </div>
+                            <span class="drill_badge"><i class="fa fa-search-plus me-1"/>Drill Down</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Per-account cards -->
+                <div class="o_dashboard_section mb-4" t-if="(data.accounts || []).length">
+                    <div class="section_header">
+                        <h4><i class="fa fa-list-alt text-primary"/> Configured Accounts</h4>
+                    </div>
+                    <div class="o_kpi_grid mt-3">
+                        <t t-foreach="sortedAccounts" t-as="acc" t-key="acc.account_id">
+                            <div class="o_kpi_card card-expense clickable_kpi" t-on-click="() => this.onAccountExpenseClick(acc.account_id)" title="Click to view journal items">
+                                <div class="kpi_icon"><i class="fa fa-file-text-o text-muted"/></div>
+                                <div class="kpi_title">
+                                    <t t-esc="acc.account_code"/> — <t t-esc="acc.account_name"/>
+                                </div>
+                                <div class="kpi_value"><t t-esc="formatCurrency(acc.amount)"/></div>
+                                <div class="kpi_subtext d-flex justify-content-between align-items-center">
+                                    <span class="badge bg-secondary badge_sub"><t t-esc="acc.line_count"/> Lines</span>
+                                    <span class="drill_badge"><i class="fa fa-search-plus me-1"/>Drill Down</span>
+                                </div>
+                            </div>
+                        </t>
+                    </div>
+                </div>
+                <div class="o_dashboard_section mb-4" t-else="">
+                    <div class="p-4 text-center text-muted border rounded bg-white">
+                        <p class="mb-2">No expense accounts configured yet.</p>
+                        <button class="btn btn-primary btn-sm" t-on-click="openAccountConfig">
+                            <i class="fa fa-plus me-1"/> Add Accounts
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Account breakdown table -->
+                <div class="o_dashboard_section mb-4" t-if="(data.accounts || []).length">
+                    <div class="section_header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <h4><i class="fa fa-table text-info"/> Account Expense Matrix</h4>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table_branch_data align-middle">
+                            <thead>
+                                <tr>
+                                    <th class="sortable_th" t-on-click="() => this.sortAccountsBy('account_code')">Code</th>
+                                    <th class="sortable_th" t-on-click="() => this.sortAccountsBy('account_name')">Account</th>
+                                    <th class="text-end sortable_th" t-on-click="() => this.sortAccountsBy('line_count')">Lines</th>
+                                    <th class="text-end sortable_th" t-on-click="() => this.sortAccountsBy('amount')">Amount</th>
+                                    <th class="text-end">% of Accounts</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-foreach="sortedAccounts" t-as="acc" t-key="'row-' + acc.account_id">
+                                    <tr>
+                                        <td><t t-esc="acc.account_code"/></td>
+                                        <td class="branch_title clickable_cell" t-on-click="() => this.onAccountExpenseClick(acc.account_id)"><t t-esc="acc.account_name"/></td>
+                                        <td class="val_num text-end"><t t-esc="acc.line_count"/></td>
+                                        <td class="val_num text-end fw-bold text-danger clickable_cell" t-on-click="() => this.onAccountExpenseClick(acc.account_id)">
+                                            <t t-esc="formatCurrency(acc.amount)"/>
+                                        </td>
+                                        <td class="val_num text-end">
+                                            <t t-esc="getPercent(acc.amount, data.kpis.account_expense_total)"/>%
+                                        </td>
+                                    </tr>
+                                </t>
+                                <tr class="row_total">
+                                    <td colspan="2" class="branch_title">TOTALS</td>
+                                    <td class="val_num text-end"><t t-esc="data.kpis.account_line_count"/></td>
+                                    <td class="val_num text-end clickable_cell" t-on-click="() => this.onAccountExpenseClick()">
+                                        <t t-esc="formatCurrency(data.kpis.account_expense_total)"/>
+                                    </td>
+                                    <td class="val_num text-end">100%</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- POS expenses by branch -->
+                <div class="o_dashboard_section">
+                    <div class="section_header">
+                        <h4><i class="fa fa-building text-info"/> POS Expenses by Branch</h4>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table_branch_data align-middle">
+                            <thead>
+                                <tr>
+                                    <th class="sortable_th" t-on-click="() => this.sortBranchesBy('branch_name')">Branch</th>
+                                    <th class="text-end sortable_th" t-on-click="() => this.sortBranchesBy('expense_count')">Approved Count</th>
+                                    <th class="text-end sortable_th" t-on-click="() => this.sortBranchesBy('expense_amount')">Approved Amount</th>
+                                    <th class="text-end sortable_th" t-on-click="() => this.sortBranchesBy('expense_pending_count')">Pending Count</th>
+                                    <th class="text-end sortable_th" t-on-click="() => this.sortBranchesBy('expense_pending_amount')">Pending Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-foreach="sortedBranches" t-as="branch" t-key="branch.config_id">
+                                    <tr>
+                                        <td class="branch_title"><t t-esc="branch.branch_name"/></td>
+                                        <td class="val_num text-end"><t t-esc="branch.expense_count"/></td>
+                                        <td class="val_num text-end text-danger clickable_cell" t-on-click="() => this.onPosExpenseClick(branch.config_id)">
+                                            <t t-esc="formatCurrency(branch.expense_amount)"/>
+                                        </td>
+                                        <td class="val_num text-end"><t t-esc="branch.expense_pending_count"/></td>
+                                        <td class="val_num text-end"><t t-esc="formatCurrency(branch.expense_pending_amount)"/></td>
+                                    </tr>
+                                </t>
+                                <tr class="row_total">
+                                    <td class="branch_title">TOTALS</td>
+                                    <td class="val_num text-end"><t t-esc="data.kpis.expense_count"/></td>
+                                    <td class="val_num text-end clickable_cell" t-on-click="() => this.onPosExpenseClick()">
+                                        <t t-esc="formatCurrency(data.kpis.expense_amount)"/>
+                                    </td>
+                                    <td class="val_num text-end"><t t-esc="data.kpis.expense_pending_count"/></td>
+                                    <td class="val_num text-end"><t t-esc="formatCurrency(data.kpis.expense_pending_amount)"/></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </t>
+        </div>
+    </t>
+</templates>

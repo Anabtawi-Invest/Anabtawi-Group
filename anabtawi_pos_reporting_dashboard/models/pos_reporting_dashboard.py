@@ -1169,3 +1169,172 @@ class PosReportingDashboard(models.TransientModel):
             "context": context,
         }
 
+    # -------------------------------------------------------------------------
+    # Expenses Dashboard (POS expenses + configured GL accounts)
+    # -------------------------------------------------------------------------
+
+    def _get_configured_expense_accounts(self):
+        return self.env["pos.expense.dashboard.account"].sudo().search([
+            ("active", "=", True),
+            ("company_id", "in", self.env.companies.ids),
+        ])
+
+    def _account_expense_line_domain(self, account_ids, date_from, date_to):
+        return [
+            ("account_id", "in", account_ids),
+            ("parent_state", "=", "posted"),
+            ("date", ">=", date_from),
+            ("date", "<=", date_to),
+            ("company_id", "in", self.env.companies.ids),
+            ("display_type", "not in", ("line_section", "line_subsection", "line_note")),
+        ]
+
+    @api.model
+    def get_expense_dashboard_data(self, date_from=None, date_to=None, config_ids=None):
+        """
+        Expenses dashboard payload:
+        - POS expenses (same rules as the executive dashboard)
+        - Totals per configured GL expense account (posted journal items)
+        """
+        engine = self.env["pos.daily.ops.engine"]
+        period = self._parse_period(date_from, date_to)
+        configs = self._get_report_configs(config_ids)
+        active_config_ids = set(configs.ids)
+        sessions = engine._get_sessions(period, configs)
+
+        # --- POS Expenses (same as executive dashboard) ---
+        expense_amount = 0.0
+        expense_count = 0
+        expense_pending_amount = 0.0
+        expense_pending_count = 0
+        branch_expenses = defaultdict(lambda: {
+            "expense_amount": 0.0,
+            "expense_count": 0,
+            "expense_pending_amount": 0.0,
+            "expense_pending_count": 0,
+        })
+
+        expenses = self._get_session_expenses(sessions)
+        if expenses:
+            for expense in expenses:
+                cfg = expense.config_id
+                if not cfg or (active_config_ids and cfg.id not in active_config_ids):
+                    continue
+                amt = expense.amount or 0.0
+                branch = branch_expenses[cfg.id]
+                if expense.state == "approved":
+                    branch["expense_amount"] += amt
+                    branch["expense_count"] += 1
+                    expense_amount += amt
+                    expense_count += 1
+                elif expense.state in ("to_approve", "refused"):
+                    branch["expense_pending_amount"] += amt
+                    branch["expense_pending_count"] += 1
+                    expense_pending_amount += amt
+                    expense_pending_count += 1
+
+        branch_rows = []
+        for config in configs:
+            vals = branch_expenses[config.id]
+            branch_rows.append({
+                "config_id": config.id,
+                "branch_name": config.name,
+                **vals,
+            })
+
+        # --- Configured GL accounts ---
+        configured = self._get_configured_expense_accounts()
+        account_ids = configured.mapped("account_id").ids
+        account_totals = {}
+        account_counts = {}
+        if account_ids:
+            MoveLine = self.env["account.move.line"].sudo()
+            domain = self._account_expense_line_domain(
+                account_ids, period["date_from"], period["date_to"]
+            )
+            for account, balance, count in MoveLine._read_group(
+                domain,
+                ["account_id"],
+                ["balance:sum", "__count"],
+            ):
+                account_totals[account.id] = balance or 0.0
+                account_counts[account.id] = count or 0
+
+        account_rows = []
+        account_expense_total = 0.0
+        account_line_count = 0
+        for conf in configured:
+            acc = conf.account_id
+            amount = account_totals.get(acc.id, 0.0)
+            count = account_counts.get(acc.id, 0)
+            account_expense_total += amount
+            account_line_count += count
+            account_rows.append({
+                "config_id": conf.id,
+                "account_id": acc.id,
+                "account_code": conf.account_code or acc.code or "",
+                "account_name": conf.account_name or acc.name or "",
+                "amount": amount,
+                "line_count": count,
+            })
+
+        all_config_domain = [
+            ("active", "=", True),
+            ("company_id", "in", self.env.companies.ids),
+        ]
+        for kw in EXCLUDED_CONFIG_KEYWORDS:
+            all_config_domain.append(("name", "not ilike", kw))
+        all_configs = self.env["pos.config"].sudo().search(all_config_domain, order="name")
+
+        return {
+            "date_from": fields.Date.to_string(period["date_from"]),
+            "date_to": fields.Date.to_string(period["date_to"]),
+            "all_branches": [{"id": cfg.id, "name": cfg.name} for cfg in all_configs],
+            "kpis": {
+                "expense_amount": expense_amount,
+                "expense_count": expense_count,
+                "expense_pending_amount": expense_pending_amount,
+                "expense_pending_count": expense_pending_count,
+                "account_expense_total": account_expense_total,
+                "account_line_count": account_line_count,
+                "account_count": len(account_rows),
+                "combined_expense_total": expense_amount + account_expense_total,
+            },
+            "branches": branch_rows,
+            "accounts": account_rows,
+        }
+
+    @api.model
+    def open_account_expense_drilldown(self, account_id=None, date_from=None, date_to=None):
+        """Open posted journal items for one (or all configured) expense account(s)."""
+        period = self._parse_period(date_from, date_to)
+        configured = self._get_configured_expense_accounts()
+        if account_id:
+            account_ids = [int(account_id)]
+            account = self.env["account.account"].browse(int(account_id))
+            title = _("Account Expenses: %s") % (account.display_name or account_id)
+        else:
+            account_ids = configured.mapped("account_id").ids
+            title = _("Configured Account Expenses")
+
+        if not account_ids:
+            account_ids = [0]
+
+        domain = self._account_expense_line_domain(
+            account_ids, period["date_from"], period["date_to"]
+        )
+        return {
+            "name": title,
+            "type": "ir.actions.act_window",
+            "res_model": "account.move.line",
+            "view_mode": "list,form",
+            "views": [(False, "list"), (False, "form")],
+            "domain": domain,
+            "target": "current",
+            "context": {
+                "create": False,
+                "delete": False,
+                "search_default_posted": 1,
+            },
+        }
+

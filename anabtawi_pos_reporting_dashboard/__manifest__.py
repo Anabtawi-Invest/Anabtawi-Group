@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Unified POS Reporting & Branch Dashboard",
-    "version": "19.0.1.0.12",
+    "version": "19.0.1.1.0",
     "category": "Point of Sale",
     "summary": "Comprehensive POS reporting and executive dashboard for Cash/Visa sales, Cash In/Out, Pledges, Advance Orders per branch",
     "author": "Anabtawi",
@@ -22,6 +22,7 @@
         "security/ir.model.access.csv",
         "wizard/pos_unified_report_wizard_views.xml",
         "views/pos_dashboard_views.xml",
+        "views/pos_expense_dashboard_views.xml",
         "views/hr_work_location_views.xml",
     ],
     "assets": {
@@ -29,6 +30,8 @@
             "anabtawi_pos_reporting_dashboard/static/src/scss/pos_dashboard.scss",
             "anabtawi_pos_reporting_dashboard/static/src/js/pos_dashboard.js",
             "anabtawi_pos_reporting_dashboard/static/src/xml/pos_dashboard.xml",
+            "anabtawi_pos_reporting_dashboard/static/src/js/expense_dashboard.js",
+            "anabtawi_pos_reporting_dashboard/static/src/xml/expense_dashboard.xml",
         ],
     },
     "installable": True,

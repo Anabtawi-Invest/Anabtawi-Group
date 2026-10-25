@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Config: accounts to show on the Expenses Dashboard -->
+    <record id="view_pos_expense_dashboard_account_list" model="ir.ui.view">
+        <field name="name">pos.expense.dashboard.account.list</field>
+        <field name="model">pos.expense.dashboard.account</field>
+        <field name="arch" type="xml">
+            <list string="Expense Dashboard Accounts" editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="account_code"/>
+                <field name="account_id"/>
+                <field name="company_id" groups="base.group_multi_company"/>
+                <field name="active"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_pos_expense_dashboard_account_form" model="ir.ui.view">
+        <field name="name">pos.expense.dashboard.account.form</field>
+        <field name="model">pos.expense.dashboard.account</field>
+        <field name="arch" type="xml">
+            <form string="Expense Dashboard Account">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="account_id"/>
+                            <field name="account_code"/>
+                            <field name="account_name"/>
+                        </group>
+                        <group>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="sequence"/>
+                            <field name="active"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_pos_expense_dashboard_account" model="ir.actions.act_window">
+        <field name="name">Expense Dashboard Accounts</field>
+        <field name="res_model">pos.expense.dashboard.account</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Add the expense accounts you want to track on the Expenses Dashboard.
+            </p>
+            <p>
+                Totals come from posted journal items on these accounts for the selected period.
+            </p>
+        </field>
+    </record>
+
+    <!-- Client action: Expenses Dashboard -->
+    <record id="action_pos_expense_reporting_dashboard" model="ir.actions.client">
+        <field name="name">Expenses Dashboard</field>
+        <field name="tag">pos_expense_reporting_dashboard_main</field>
+    </record>
+
+    <menuitem id="menu_pos_expense_reporting_dashboard"
+              name="Expenses Dashboard"
+              parent="point_of_sale.menu_point_rep"
+              action="action_pos_expense_reporting_dashboard"
+              groups="anabtawi_pos_reporting_dashboard.group_pos_reporting_dashboard_user"
+              sequence="3"/>
+
+    <menuitem id="menu_pos_expense_dashboard_account"
+              name="Expense Dashboard Accounts"
+              parent="point_of_sale.menu_point_rep"
+              action="action_pos_expense_dashboard_account"
+              groups="anabtawi_pos_reporting_dashboard.group_pos_reporting_dashboard_user"
+              sequence="4"/>
+</odoo>
