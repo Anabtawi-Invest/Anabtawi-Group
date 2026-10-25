@@ -217,6 +217,38 @@ class PosReportingDashboard(models.TransientModel):
             return Expense.browse()
         return Expense.search([("session_id", "in", sessions.ids)])
 
+    def _open_expense_drilldown(self, sessions, active_config_ids):
+        """Open pos.expense list/form for the dashboard period (and optional branch filter)."""
+        expenses = self._get_session_expenses(sessions)
+        if expenses:
+            expenses = expenses.filtered(lambda e: e.config_id.id in active_config_ids)
+            expense_ids = expenses.ids
+        else:
+            expense_ids = []
+
+        list_view = self.env.ref(
+            "anabtawi_pos_expense.view_pos_expense_list", raise_if_not_found=False
+        )
+        form_view = self.env.ref(
+            "anabtawi_pos_expense.view_pos_expense_form", raise_if_not_found=False
+        )
+        views = []
+        if list_view:
+            views.append((list_view.id, "list"))
+        if form_view:
+            views.append((form_view.id, "form"))
+
+        return {
+            "name": _("POS Expenses"),
+            "type": "ir.actions.act_window",
+            "res_model": "pos.expense",
+            "view_mode": "list,form",
+            "views": views if views else [(False, "list"), (False, "form")],
+            "domain": [("id", "in", expense_ids)] if expense_ids else [("id", "=", 0)],
+            "target": "current",
+            "context": {"create": False, "delete": False},
+        }
+
     @staticmethod
     def _orders_per_hour(values):
         if values["open_hours"] <= 0:
@@ -700,6 +732,10 @@ class PosReportingDashboard(models.TransientModel):
         active_config_ids = set(configs.ids)
         sessions = engine._get_sessions(period, configs)
 
+        # Open native POS Expenses list/form (type, status, amount) instead of unified report.
+        if metric_type == "expense_amount":
+            return self._open_expense_drilldown(sessions, active_config_ids)
+
         all_config_domain = [
             ("active", "=", True),
             ("company_id", "in", self.env.companies.ids),
@@ -831,30 +867,6 @@ class PosReportingDashboard(models.TransientModel):
                         "amount": value,
                         "gift_amount": value,
                         "partner_id": order.partner_id.id or False,
-                        "company_id": cfg.company_id.id,
-                    })
-
-        elif metric_type == "expense_amount":
-            expenses = self._get_session_expenses(sessions)
-            if expenses:
-                for expense in expenses.filtered(
-                    lambda e: e.state in ("approved", "to_approve", "refused")
-                    and e.config_id.id in active_config_ids
-                ):
-                    cfg = expense.config_id
-                    label = "%s — %s [%s]" % (
-                        expense.name,
-                        expense.type_id.display_name or "",
-                        dict(expense._fields["state"].selection).get(expense.state, expense.state),
-                    )
-                    vals_list.append({
-                        "name": label,
-                        "date": expense.date,
-                        "config_id": cfg.id,
-                        "session_id": expense.session_id.id or False,
-                        "report_type": "expense",
-                        "amount": expense.amount or 0.0,
-                        "expense_amount": expense.amount or 0.0,
                         "company_id": cfg.company_id.id,
                     })
 
