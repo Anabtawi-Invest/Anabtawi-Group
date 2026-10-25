@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_pos_payment_correction_wizard_form" model="ir.ui.view">
+        <field name="name">pos.payment.correction.wizard.form</field>
+        <field name="model">pos.payment.correction.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Correct POS Payments">
+                <group>
+                    <group>
+                        <field name="order_id"/>
+                        <field name="amount_total"/>
+                        <field name="currency_id" invisible="1"/>
+                        <field name="company_id" invisible="1"/>
+                    </group>
+                    <group>
+                        <field name="note"/>
+                        <field name="create_account_move"/>
+                        <field name="journal_id" invisible="not create_account_move" required="create_account_move"/>
+                        <field name="accounting_date" invisible="not create_account_move" required="create_account_move"/>
+                    </group>
+                </group>
+                <separator string="Set the amount each payment should have been"/>
+                <field name="line_ids">
+                    <list editable="bottom" create="0" delete="0">
+                        <field name="payment_id" column_invisible="1"/>
+                        <field name="payment_method_id"/>
+                        <field name="payment_date"/>
+                        <field name="currency_id" column_invisible="1"/>
+                        <field name="current_amount" sum="Current"/>
+                        <field name="correct_amount" sum="Correct"/>
+                        <field name="correction_amount" sum="Fixing"/>
+                    </list>
+                </field>
+                <footer>
+                    <button name="action_confirm" type="object" string="Create Fixing Payments" class="btn-primary"
+                            groups="pos_payment_correction.group_pos_payment_correction"/>
+                    <button string="Cancel" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

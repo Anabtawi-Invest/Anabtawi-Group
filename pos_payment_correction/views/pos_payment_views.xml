@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_pos_payment_form_correction" model="ir.ui.view">
+        <field name="name">pos.payment.form.correction</field>
+        <field name="model">pos.payment</field>
+        <field name="inherit_id" ref="point_of_sale.view_pos_payment_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//sheet" position="inside">
+                <group string="Payment Correction" groups="account.group_account_readonly,point_of_sale.group_pos_manager">
+                    <field name="is_payment_correction"/>
+                    <field name="corrected_payment_ids"
+                             widget="many2many_tags"
+                             invisible="not is_payment_correction"
+                             readonly="1"/>
+                    <field name="correction_of_ids"
+                             widget="many2many_tags"
+                             invisible="is_payment_correction or not correction_of_ids"
+                             readonly="1"/>
+                    <field name="correction_account_move_id" readonly="1"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_pos_payment_tree_correction" model="ir.ui.view">
+        <field name="name">pos.payment.list.correction</field>
+        <field name="model">pos.payment</field>
+        <field name="inherit_id" ref="point_of_sale.view_pos_payment_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='amount']" position="after">
+                <field name="is_payment_correction" optional="show"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_pos_order_form_payment_correction" model="ir.ui.view">
+        <field name="name">pos.order.form.payment.correction</field>
+        <field name="model">pos.order</field>
+        <field name="inherit_id" ref="point_of_sale.view_pos_pos_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <button name="action_open_payment_correction_wizard"
+                        type="object"
+                        string="Correct Payments"
+                        class="btn-secondary"
+                        groups="pos_payment_correction.group_pos_payment_correction"
+                        invisible="state not in ('paid', 'done')"/>
+            </xpath>
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button class="oe_stat_button"
+                        type="object"
+                        name="action_open_payment_correction_wizard"
+                        icon="fa-wrench"
+                        groups="pos_payment_correction.group_pos_payment_correction"
+                        invisible="payment_correction_count == 0">
+                    <field name="payment_correction_count" widget="statinfo" string="Fixes"/>
+                </button>
+            </xpath>
+            <xpath expr="//field[@name='payment_ids']//list" position="inside">
+                <field name="is_payment_correction" optional="show"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

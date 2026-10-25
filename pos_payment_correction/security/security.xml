@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="group_pos_payment_correction" model="res.groups">
+        <field name="name">Correct POS Payments</field>
+        <field name="privilege_id" ref="point_of_sale.res_groups_privilege_point_of_sale"/>
+        <field name="comment">Allow creating fixing payments on posted POS orders and optional accounting entries.</field>
+    </record>
+
+    <!-- POS managers get correction rights by default -->
+    <record id="point_of_sale.group_pos_manager" model="res.groups">
+        <field name="implied_ids" eval="[(4, ref('group_pos_payment_correction'))]"/>
+    </record>
+</odoo>
