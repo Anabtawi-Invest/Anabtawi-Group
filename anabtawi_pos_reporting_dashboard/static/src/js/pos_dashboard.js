@@ -3,9 +3,11 @@
 import { Component, useState, onWillStart } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
+import { useSetupAction } from "@web/search/action_hook";
 
 export class PosReportingDashboard extends Component {
     static template = "anabtawi_pos_reporting_dashboard.PosReportingDashboard";
+    static props = ["*"];
 
     setup() {
         this.orm = useService("orm");
@@ -26,6 +28,27 @@ export class PosReportingDashboard extends Component {
             loading: true,
             sortKey: "sales",
             sortOrder: "desc",
+        });
+
+        // Filters restored when coming back through the breadcrumbs.
+        const saved = (this.props.state && this.props.state.dashboard) || null;
+        if (saved) {
+            Object.assign(this.state, saved.filters);
+        }
+
+        useSetupAction({
+            getLocalState: () => ({
+                dashboard: {
+                    filters: {
+                        period: this.state.period,
+                        date_from: this.state.date_from,
+                        date_to: this.state.date_to,
+                        config_ids: this.state.config_ids,
+                        sortKey: this.state.sortKey,
+                        sortOrder: this.state.sortOrder,
+                    },
+                },
+            }),
         });
 
         this.data = useState({
