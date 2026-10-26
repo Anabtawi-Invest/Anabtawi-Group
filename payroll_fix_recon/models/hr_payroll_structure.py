@@ -25,6 +25,65 @@ RULES = [
             "result = round(min(hours * wage / 240.0, wage), 3) if hours >= 0.01 else 0.0\n"),
     },
     {
+        'code': 'DED_ANNUAL_LEAVE', 'name': 'Negative Annual Leave Deduction', 'category': 'hr_payroll.DED',
+        'sequence': 75, 'appears_on_payslip': True, 'condition_select': 'python',
+        'condition_python': (
+            "wage = employee.wage or (contract.wage if contract else 0.0)\n"
+            "annual = inputs['CLEAR_ANNUAL'].amount if 'CLEAR_ANNUAL' in inputs else 0.0\n"
+            "accrual_amount = 0.0\n"
+            "if employee and payslip and wage > 0 and payslip.date_to:\n"
+            "    end_date = payslip.date_to\n"
+            "    start_date = version.contract_date_start if (version and hasattr(version, 'contract_date_start')) else (contract.date_start if contract else None)\n"
+            "    if start_date and start_date <= end_date:\n"
+            "        years = end_date.year - start_date.year\n"
+            "        if (end_date.month, end_date.day) < (start_date.month, start_date.day):\n"
+            "            years -= 1\n"
+            "        monthly_accrual = 1.75 if years >= 5 else 1.17\n"
+            "        month = end_date.month\n"
+            "        year = end_date.year\n"
+            "        if month in (1, 3, 5, 7, 8, 10, 12):\n"
+            "            days_in_month = 31\n"
+            "        elif month in (4, 6, 9, 11):\n"
+            "            days_in_month = 30\n"
+            "        elif month == 2:\n"
+            "            leap_year = (year % 4 == 0 and (year % 100 != 0 or year % 400 == 0))\n"
+            "            days_in_month = 29 if leap_year else 28\n"
+            "        else:\n"
+            "            days_in_month = 30\n"
+            "        accrued_days = monthly_accrual * end_date.day / days_in_month\n"
+            "        accrual_amount = accrued_days * wage / 30.0\n"
+            "result = (annual + accrual_amount) < 0\n"
+        ),
+        'amount_python_compute': (
+            "wage = employee.wage or (contract.wage if contract else 0.0)\n"
+            "annual = inputs['CLEAR_ANNUAL'].amount if 'CLEAR_ANNUAL' in inputs else 0.0\n"
+            "accrual_amount = 0.0\n"
+            "if employee and payslip and wage > 0 and payslip.date_to:\n"
+            "    end_date = payslip.date_to\n"
+            "    start_date = version.contract_date_start if (version and hasattr(version, 'contract_date_start')) else (contract.date_start if contract else None)\n"
+            "    if start_date and start_date <= end_date:\n"
+            "        years = end_date.year - start_date.year\n"
+            "        if (end_date.month, end_date.day) < (start_date.month, start_date.day):\n"
+            "            years -= 1\n"
+            "        monthly_accrual = 1.75 if years >= 5 else 1.17\n"
+            "        month = end_date.month\n"
+            "        year = end_date.year\n"
+            "        if month in (1, 3, 5, 7, 8, 10, 12):\n"
+            "            days_in_month = 31\n"
+            "        elif month in (4, 6, 9, 11):\n"
+            "            days_in_month = 30\n"
+            "        elif month == 2:\n"
+            "            leap_year = (year % 4 == 0 and (year % 100 != 0 or year % 400 == 0))\n"
+            "            days_in_month = 29 if leap_year else 28\n"
+            "        else:\n"
+            "            days_in_month = 30\n"
+            "        accrued_days = monthly_accrual * end_date.day / days_in_month\n"
+            "        accrual_amount = accrued_days * wage / 30.0\n"
+            "net_annual = annual + accrual_amount\n"
+            "result = round(abs(net_annual), 3) if net_annual < 0 else 0.0\n"
+        ),
+    },
+    {
         'code': 'ACTUAL', 'name': 'Actual Salary', 'category': 'hr_payroll.NET',
         'sequence': 90, 'appears_on_payslip': True, 'condition_select': 'none',
         'amount_python_compute': (
