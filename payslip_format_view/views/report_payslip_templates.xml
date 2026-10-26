@@ -4,7 +4,7 @@
          Verify both XPath targets against the installed Enterprise view in staging.
          Localized reports may inherit a different primary template. See README. -->
     <template id="report_payslip_custom" inherit_id="hr_payroll.report_payslip"
-              name="Bilingual three-column payslip" priority="90">
+              name="Bilingual three-column payslip" priority="100">
         <!-- Always print custom layout for all payslips, replacing default layout -->
         <xpath expr="//t[@t-call='web.external_layout']" position="replace">
             <t t-call="web.basic_layout">
@@ -120,7 +120,7 @@
                 <t t-set="visible_lines" t-value="lines.filtered(lambda l: l.salary_rule_id.appears_on_payslip)"/>
                 <t t-set="rule_ids" t-value="{role: [rule.id for xmlid in refs for rule in [o.env.ref(xmlid, raise_if_not_found=False)] if rule] for role, refs in cfg['rule_refs'].items()}"/>
                 <t t-set="basic" t-value="lines.filtered(lambda l: l.salary_rule_id.code in ('BASIC', 'SALARY'))[:1]"/>
-                <t t-set="actual" t-value="(lines.filtered(lambda l: l.salary_rule_id.code == 'FULL_WAGE' or l.code == 'FULL_WAGE' or (l.name or '') in ('Actual Salary', 'الراتب الفعلي')))[:1]"/>
+                <t t-set="actual" t-value="(lines.filtered(lambda l: l.code in ('FULL_WAGE', 'ACTUAL', 'ACTUAL_SALARY', 'BASIC_ACTUAL', 'ACTUAL_WAGE') or (l.salary_rule_id and l.salary_rule_id.code in ('FULL_WAGE', 'ACTUAL', 'ACTUAL_SALARY', 'BASIC_ACTUAL', 'ACTUAL_WAGE')) or 'actual salary' in (l.name or '').lower() or 'الراتب الفعلي' in (l.name or '') or 'الفعلي' in (l.name or '') or (rule_ids.get('actual') and l.salary_rule_id.id in rule_ids['actual'])))[:1]"/>
                 <t t-set="gross" t-value="lines.filtered(lambda l: l.salary_rule_id.code in ('GROSS', 'GROSS_SALARY') or l.salary_rule_id.code in cfg['gross_codes'])[:1]"/>
                 <t t-set="net" t-value="lines.filtered(lambda l: l.salary_rule_id.code in ('NET', 'NET_SALARY') or l.salary_rule_id.id in rule_ids['net'])[:1]"/>
                 <t t-set="basic_amount" t-value="(basic.total if basic else False) or (o.employee_id.wage if ('wage' in o.employee_id._fields and o.employee_id.wage) else (o.contract_id.wage if ('contract_id' in o._fields and o.contract_id) else 0.0))"/>
@@ -131,7 +131,7 @@
                 <t t-set="allowance_categories" t-value="categories.search([('id', 'child_of', categories.search([('code', 'in', cfg['allowance_categories'])]).ids)])"/>
                 <t t-set="deduction_categories" t-value="categories.search([('id', 'child_of', categories.search([('code', 'in', cfg['deduction_categories'])]).ids)])"/>
                 <t t-set="excluded_categories" t-value="categories.search([('id', 'child_of', categories.search([('code', 'in', cfg['excluded_categories'])]).ids)])"/>
-                <t t-set="excluded" t-value="visible_lines.filtered(lambda l: l.salary_rule_id.id in rule_ids['employer'] or l.code in cfg['excluded_codes'] or l.salary_rule_id.category_id in excluded_categories)"/>
+                <t t-set="excluded" t-value="visible_lines.filtered(lambda l: l.salary_rule_id.id in rule_ids['employer'] or l.code in cfg['excluded_codes'] or l.salary_rule_id.category_id in excluded_categories or l.code in ('UNPAID', 'DED_UNPAID', 'UNP', 'OUTCON', 'UNPAID_TIME') or 'unpaid' in (l.name or '').lower() or 'أيام الخصم' in (l.name or ''))"/>
                 <t t-set="candidates" t-value="(visible_lines - reserved - excluded).filtered(lambda l: l.total != 0)"/>
                 <t t-set="allowance_candidates" t-value="candidates.filtered(lambda l: l.total &gt; 0 and (l.salary_rule_id.id in rule_ids['allowance'] or l.code in cfg['allowance_codes'] or l.salary_rule_id.category_id in allowance_categories))"/>
                 <t t-set="deduction_candidates" t-value="candidates.filtered(lambda l: l.salary_rule_id.id in rule_ids['deduction'] or l.code in cfg['deduction_codes'] or l.salary_rule_id.category_id in deduction_categories)"/>
@@ -178,14 +178,14 @@
                 <t t-set="month_total_days" t-value="((29 if (ref_date.year % 4 == 0 and (ref_date.year % 100 != 0 or ref_date.year % 400 == 0)) else 28) if ref_date.month == 2 else (30 if ref_date.month in (4, 6, 9, 11) else 31)) if ref_date else 30.0"/>
                 <t t-set="basic_days" t-value="o[cfg['basis_days_field']] if (cfg.get('basis_days_field') and cfg['basis_days_field'] in o._fields and o[cfg['basis_days_field']]) else month_total_days"/>
                 <t t-set="worked_days_count" t-value="sum(worked.mapped('number_of_days')) if worked else 0.0"/>
-                <t t-set="actual_days" t-value="worked_days_count"/>
+                <t t-set="actual_days" t-value="(actual.quantity if (actual and 'quantity' in actual._fields and actual.quantity and actual.quantity != 1.0) else False) or (worked_days_count if worked_days_count &gt; 0 else False) or (sum(o.worked_days_line_ids.filtered(lambda d: d.work_entry_type_id.code in cfg['worked_codes'] or d.code in cfg['worked_codes'] or 'attend' in (d.name or '').lower()).mapped('number_of_days')) if o.worked_days_line_ids else False) or basic_days"/>
                 <t t-set="unpaid_days_from_worked" t-value="sum(unpaid.mapped('number_of_days')) if unpaid else 0.0"/>
                 <t t-set="unpaid_days_count" t-value="unpaid_days_from_worked if unpaid_days_from_worked &gt; 0 else max(0.0, basic_days - worked_days_count)"/>
                 <t t-set="unpaid_days" t-value="unpaid_days_count"/>
                 <t t-set="month_days_divisor" t-value="basic_days if (basic_days and basic_days &gt; 0) else (month_total_days if (month_total_days and month_total_days &gt; 0) else 30.0)"/>
                 <t t-set="daily_wage" t-value="(basic_amount / month_days_divisor) if (month_days_divisor and basic_amount) else 0.0"/>
                 <t t-set="unpaid_amount" t-value="round(daily_wage * unpaid_days_count, 3) if (unpaid_days_count and daily_wage) else 0.0"/>
-                <t t-set="actual_amount" t-value="actual.total if actual else (max(0.0, round(basic_amount - unpaid_amount, 3)) if basic_amount &gt; 0 else (sum(worked.mapped('amount')) if worked else 0.0))"/>
+                <t t-set="actual_amount" t-value="actual.total if actual else (max(0.0, round(basic_amount - unpaid_amount, 3)) if basic_amount &gt; 0 else (sum(worked.mapped('amount')) if worked else basic_amount))"/>
                 <style>
                     .cpr { font-family: 'DejaVu Sans', Arial, sans-serif; font-size: 10px; color: #151515; }
                     .cpr table { width: 100%; border-collapse: collapse; table-layout: fixed; direction: ltr; }
@@ -350,7 +350,7 @@
                                     </tr>
                                     <tr>
                                         <td>Actual Salary<br/><span class="ar">الراتب الفعلي</span></td>
-                                        <td class="num"><span t-out="worked_days_count" t-options="{'widget': 'float', 'precision': 2}"/></td>
+                                        <td class="num"><span t-out="actual_days" t-options="{'widget': 'float', 'precision': 2}"/></td>
                                         <td class="num"><span t-out="actual_amount" t-options="{'widget': 'float', 'precision': precision}"/></td>
                                     </tr>
                                 </tbody>
