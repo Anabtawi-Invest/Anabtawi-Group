@@ -5,9 +5,9 @@
          Localized reports may inherit a different primary template. See README. -->
     <template id="report_payslip_custom" inherit_id="hr_payroll.report_payslip"
               name="Bilingual three-column payslip" priority="90">
-        <!-- Print custom layout if termination clearance is checked, otherwise print default layout -->
+        <!-- Normal payslips only. Termination-clearance slips are left untouched ($0) and handled by anabtawi_payslip_format. -->
         <xpath expr="//t[@t-call='web.external_layout']" position="replace">
-            <t t-if="'termination_clearance' in o._fields and o.termination_clearance">
+            <t t-if="not ('termination_clearance' in o._fields and o.termination_clearance)">
                 <t t-call="web.basic_layout">
                     <div class="page cpr" dir="ltr">
                 <!-- SITE CONFIGURATION: these are exact codes, never display names.
@@ -116,7 +116,6 @@
                 <t t-set="precision" t-value="currency.decimal_places"/>
                 <t t-set="version" t-value="o.version_id if 'version_id' in o._fields else False"/>
                 <t t-set="employee" t-value="o.employee_id.with_context(version_id=version.id) if version else o.employee_id"/>
-                <t t-set="term_date" t-value="(version.contract_date_end if (version and 'contract_date_end' in version._fields and version.contract_date_end) else False) or (employee.contract_date_end if ('contract_date_end' in employee._fields and employee.contract_date_end) else False) or o.date_to"/>
                 <t t-set="bank" t-value="employee.primary_bank_account_id"/>
                 <t t-set="lines" t-value="o.line_ids.sorted('sequence')"/>
                 <t t-set="visible_lines" t-value="lines.filtered(lambda l: l.salary_rule_id.appears_on_payslip)"/>
@@ -158,13 +157,8 @@
                 <t t-set="pto_input" t-value="o.input_line_ids.filtered(lambda l: l.input_type_id.code == 'CLEAR_PTO' or 'paid time off' in (l.name or '').lower())"/>
                 <t t-set="extra_input" t-value="o.input_line_ids.filtered(lambda l: l.input_type_id.code in ('CLEAR_EXTRA', 'ETH_PAY_EOC') or 'extra' in (l.name or '').lower())"/>
                 <t t-set="annual_days" t-value="annual_input[0].quantity if annual_input and 'quantity' in annual_input._fields else 0.0"/>
-                <t t-set="pto_days_raw" t-value="pto_input[0].quantity if pto_input and 'quantity' in pto_input._fields else 0.0"/>
-                <!-- Prefer CLEAR_EXTRA code only (avoid matching other lines whose name contains 'extra'). -->
-                <t t-set="extra_clear" t-value="o.input_line_ids.filtered(lambda l: l.input_type_id.code in ('CLEAR_EXTRA', 'ETH_PAY_EOC'))"/>
-                <t t-set="extra_hrs_raw" t-value="extra_clear[0].quantity if extra_clear and 'quantity' in extra_clear._fields else (o.remaining_extra_hours_balance if 'remaining_extra_hours_balance' in o._fields else (o.employee_extra_hours_balance if 'employee_extra_hours_balance' in o._fields else 0.0))"/>
-                <!-- This block only runs for termination_clearance: show real hours/days (÷ rates). Other Inputs keep full qty. -->
-                <t t-set="pto_days" t-value="(pto_days_raw or 0.0) / 1.5"/>
-                <t t-set="extra_hrs" t-value="(extra_hrs_raw or 0.0) / 1.25"/>
+                <t t-set="pto_days" t-value="pto_input[0].quantity if pto_input and 'quantity' in pto_input._fields else 0.0"/>
+                <t t-set="extra_hrs" t-value="extra_input[0].quantity if extra_input and 'quantity' in extra_input._fields else (o.employee_extra_hours_balance if 'employee_extra_hours_balance' in o._fields else 0.0)"/>
                 <t t-set="unpaid" t-value="o.worked_days_line_ids.filtered(lambda d: d.work_entry_type_id.code in cfg['unpaid_codes'] or 'unpaid' in (d.work_entry_type_id.code or '').lower() or 'unpaid' in (d.name or '').lower() or 'absent' in (d.work_entry_type_id.code or '').lower() or 'absent' in (d.name or '').lower())"/>
                 <t t-set="lateness" t-value="o.worked_days_line_ids.filtered(lambda d: d.work_entry_type_id.code in ('LAT', 'LATENESS', 'DED_UNDERTIME') or 'late' in (d.work_entry_type_id.code or '').lower() or 'late' in (d.name or '').lower() or 'undertime' in (d.work_entry_type_id.code or '').lower() or 'undertime' in (d.name or '').lower())"/>
                 <t t-set="deduction_worked_lines" t-value="unpaid | lateness"/>
@@ -230,15 +224,15 @@
                         <td style="width:65%; text-align: right;">
                             <div class="license">Licensed To: <span t-field="company.name"/></div>
                             <div class="title ar" lang="ar">
-                                <span>مخالصة / TERMINATION</span>
-                                <span dir="ltr" style="margin-right: 8px; margin-left: 8px;"><t t-out="term_date.strftime('%d/%m/%Y') if term_date else ''"/></span>
+                                <span>قسيمة راتب / PAYSLIP</span>
+                                <span dir="ltr" style="margin-right: 8px; margin-left: 8px;"><t t-out="o.date_to.strftime('%d/%m/%Y') if o.date_to else ''"/></span>
                             </div>
                         </td>
                     </tr>
                 </table>
                 <div class="muted center">
-                    Termination Date / تاريخ انتهاء الخدمة:
-                    <span t-if="term_date" t-out="term_date" t-options="{'widget': 'date', 'format': 'dd/MM/yyyy'}"/><span t-else="">—</span>
+                    Period / فترة الراتب:
+                    <span t-field="o.date_from" t-options="{'widget': 'date', 'format': 'dd/MM/yyyy'}"/> - <span t-field="o.date_to" t-options="{'widget': 'date', 'format': 'dd/MM/yyyy'}"/>
                     <span> | </span><span t-field="o.name"/>
                 </div>
 
@@ -279,8 +273,10 @@
                     </tr>
                     <tr>
                         <td class="label">Currency / العملة</td><td class="v-sep"><span t-field="currency.name"/></td>
-                        <td class="label right-col">Termination Date / تاريخ انتهاء الخدمة</td>
-                        <td><span t-if="term_date" t-out="term_date" t-options="{'widget': 'date', 'format': 'dd/MM/yyyy'}"/><span t-else="">—</span></td>
+                        <t>
+                            <td class="label right-col">Period / فترة الراتب</td>
+                            <td><span t-field="o.date_from" t-options="{'widget': 'date', 'format': 'dd/MM/yyyy'}"/> - <span t-field="o.date_to" t-options="{'widget': 'date', 'format': 'dd/MM/yyyy'}"/></td>
+                        </t>
                     </tr>
                 </table>
                 <div class="balance-boxes-container" style="margin: 10px 0 14px;">
@@ -400,10 +396,6 @@
                             </td>
                         </tr>
                     </table>
-
-                    <div class="clearance-declaration ar">
-                        أنا الموقع أدناه أقر بأنني استلمت جميع مستحقاتي ونهاية خدمتي كاملة وليس على الشركة أية مطالبات مستقبلية، وبهذه المخالصة تكون الشركة قد برأت ذمتها من أية مطالبة لي، وأقر بأنني قد وقعت على هذه المخالصة دون إكراه أو ضغط.
-                    </div>
 
                     <div class="employee-signature ar">
                         <span>توقيع الموظف:.............................</span>
