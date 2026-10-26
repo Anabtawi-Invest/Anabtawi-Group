@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Payroll Fix Recon - Negative Leave Allocation',
-    'version': '19.0.1.0.0',
+    'version': '19.0.2.0.0',
     'category': 'Human Resources/Payroll',
     'summary': 'Allow negative leave allocations and integrate seamlessly with Payroll Fix Recon settlement and termination balances',
     'author': 'Anabtawi Group',
