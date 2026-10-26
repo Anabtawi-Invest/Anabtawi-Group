@@ -126,6 +126,14 @@ export class CeoMainDashboard extends Component {
         this.state.activeTab = tab;
     }
 
+    async openExpensesDashboard() {
+        const actionId = this.state.data && this.state.data.expenses_action_id;
+        if (!actionId) {
+            return;
+        }
+        await this.action.doAction(actionId);
+    }
+
     // ------------------------------------------------------------------
     // Date filters
     // ------------------------------------------------------------------

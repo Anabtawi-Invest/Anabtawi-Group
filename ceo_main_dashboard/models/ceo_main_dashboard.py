@@ -53,6 +53,11 @@ class CeoMainDashboard(models.AbstractModel):
         compared_moves = moves if billing == 'all' else self._received_moves(company, date_from, date_to)[0]
         rows, impact = self._get_period_price_comparison(company, compared_moves, end)
 
+        expenses_action = self.env.ref(
+            'anabtawi_pos_reporting_dashboard.action_pos_expense_reporting_dashboard',
+            raise_if_not_found=False,
+        )
+
         return {
             'company_name': company.name,
             'currency': {
@@ -71,6 +76,8 @@ class CeoMainDashboard(models.AbstractModel):
             'price_rows': rows,
             'daily': self._get_daily_totals(moves, ratios, billing, date_from, date_to),
             'recent_receipts': self._get_recent_receipts(moves, ratios, billing),
+            'has_expenses_dashboard': bool(expenses_action),
+            'expenses_action_id': expenses_action.id if expenses_action else False,
         }
 
     @api.model

@@ -1169,3 +1169,182 @@ class PosReportingDashboard(models.TransientModel):
             "context": context,
         }
 
+    # -------------------------------------------------------------------------
+    # Expenses Dashboard (POS expenses + configured GL accounts)
+    # -------------------------------------------------------------------------
+
+    def _get_configured_expense_accounts(self):
+        return self.env["pos.expense.dashboard.account"].sudo().search([
+            ("active", "=", True),
+            ("company_id", "in", self.env.companies.ids),
+        ])
+
+    def _account_expense_line_domain(self, account_ids, date_from, date_to):
+        return [
+            ("account_id", "in", account_ids),
+            ("parent_state", "=", "posted"),
+            ("date", ">=", date_from),
+            ("date", "<=", date_to),
+            ("company_id", "in", self.env.companies.ids),
+            ("display_type", "not in", ("line_section", "line_subsection", "line_note")),
+        ]
+
+    def _get_period_pos_expenses(self, period):
+        """All company POS expenses in the period by expense date (no branch filter)."""
+        if "pos.expense" not in self.env:
+            return self.env["pos.expense"].browse()
+        dt_start, dt_end, _, _ = self._period_bounds(period)
+        return self.env["pos.expense"].sudo().search([
+            ("company_id", "in", self.env.companies.ids),
+            ("date", ">=", dt_start),
+            ("date", "<=", dt_end),
+            ("state", "in", ("to_approve", "approved", "refused")),
+        ])
+
+    def _open_period_expense_drilldown(self, period):
+        expenses = self._get_period_pos_expenses(period)
+        expense_ids = expenses.ids
+
+        list_view = self.env.ref(
+            "anabtawi_pos_expense.view_pos_expense_list", raise_if_not_found=False
+        )
+        form_view = self.env.ref(
+            "anabtawi_pos_expense.view_pos_expense_form", raise_if_not_found=False
+        )
+        views = []
+        if list_view:
+            views.append((list_view.id, "list"))
+        if form_view:
+            views.append((form_view.id, "form"))
+
+        return {
+            "name": _("POS Expenses"),
+            "type": "ir.actions.act_window",
+            "res_model": "pos.expense",
+            "view_mode": "list,form",
+            "views": views if views else [(False, "list"), (False, "form")],
+            "domain": [("id", "in", expense_ids)] if expense_ids else [("id", "=", 0)],
+            "target": "current",
+            "context": {"create": False, "delete": False},
+        }
+
+    @api.model
+    def get_expense_dashboard_data(self, date_from=None, date_to=None, config_ids=None):
+        """
+        Expenses dashboard payload (company totals, no POS branch filter):
+        - All POS expenses in the period (by expense date)
+        - Totals per configured GL expense account (posted journal items)
+        """
+        del config_ids  # unused: this dashboard is not branch-scoped
+        period = self._parse_period(date_from, date_to)
+
+        expense_approved_amount = 0.0
+        expense_approved_count = 0
+        expense_pending_amount = 0.0
+        expense_pending_count = 0
+
+        for expense in self._get_period_pos_expenses(period):
+            amt = expense.amount or 0.0
+            if expense.state == "approved":
+                expense_approved_amount += amt
+                expense_approved_count += 1
+            else:
+                expense_pending_amount += amt
+                expense_pending_count += 1
+
+        expense_amount = expense_approved_amount + expense_pending_amount
+        expense_count = expense_approved_count + expense_pending_count
+
+        configured = self._get_configured_expense_accounts()
+        account_ids = configured.mapped("account_id").ids
+        account_totals = {}
+        account_counts = {}
+        if account_ids:
+            MoveLine = self.env["account.move.line"].sudo()
+            domain = self._account_expense_line_domain(
+                account_ids, period["date_from"], period["date_to"]
+            )
+            for account, balance, count in MoveLine._read_group(
+                domain,
+                ["account_id"],
+                ["balance:sum", "__count"],
+            ):
+                account_totals[account.id] = balance or 0.0
+                account_counts[account.id] = count or 0
+
+        account_rows = []
+        account_expense_total = 0.0
+        account_line_count = 0
+        for conf in configured:
+            acc = conf.account_id
+            amount = account_totals.get(acc.id, 0.0)
+            count = account_counts.get(acc.id, 0)
+            account_expense_total += amount
+            account_line_count += count
+            account_rows.append({
+                "config_id": conf.id,
+                "account_id": acc.id,
+                "account_code": conf.account_code or acc.code or "",
+                "account_name": conf.account_name or acc.name or "",
+                "amount": amount,
+                "line_count": count,
+            })
+
+        return {
+            "date_from": fields.Date.to_string(period["date_from"]),
+            "date_to": fields.Date.to_string(period["date_to"]),
+            "kpis": {
+                "expense_amount": expense_amount,
+                "expense_count": expense_count,
+                "expense_approved_amount": expense_approved_amount,
+                "expense_approved_count": expense_approved_count,
+                "expense_pending_amount": expense_pending_amount,
+                "expense_pending_count": expense_pending_count,
+                "account_expense_total": account_expense_total,
+                "account_line_count": account_line_count,
+                "account_count": len(account_rows),
+                "combined_expense_total": expense_amount + account_expense_total,
+            },
+            "accounts": account_rows,
+        }
+
+    @api.model
+    def open_expense_dashboard_pos_drilldown(self, date_from=None, date_to=None):
+        """Open all POS expenses in the period (no branch filter)."""
+        period = self._parse_period(date_from, date_to)
+        return self._open_period_expense_drilldown(period)
+
+    @api.model
+    def open_account_expense_drilldown(self, account_id=None, date_from=None, date_to=None):
+        """Open posted journal items for one (or all configured) expense account(s)."""
+        period = self._parse_period(date_from, date_to)
+        configured = self._get_configured_expense_accounts()
+        if account_id:
+            account_ids = [int(account_id)]
+            account = self.env["account.account"].browse(int(account_id))
+            title = _("Account Expenses: %s") % (account.display_name or account_id)
+        else:
+            account_ids = configured.mapped("account_id").ids
+            title = _("Configured Account Expenses")
+
+        if not account_ids:
+            account_ids = [0]
+
+        domain = self._account_expense_line_domain(
+            account_ids, period["date_from"], period["date_to"]
+        )
+        return {
+            "name": title,
+            "type": "ir.actions.act_window",
+            "res_model": "account.move.line",
+            "view_mode": "list,form",
+            "views": [(False, "list"), (False, "form")],
+            "domain": domain,
+            "target": "current",
+            "context": {
+                "create": False,
+                "delete": False,
+                "search_default_posted": 1,
+            },
+        }
+
