@@ -1,7 +1,7 @@
 {
     "name": "Anabtawi Payslip & Termination Report",
-    "version": "19.0.1.0.0",
-    "summary": "Bilingual Arabic/English three-column payslip and termination clearance report",
+    "version": "19.0.2.0.0",
+    "summary": "Termination-clearance payslip only: no Unpaid Time row, Actual Salary from the payslip line",
     "category": "Human Resources/Payroll",
     "license": "LGPL-3",
     "depends": ["hr_payroll"],
