@@ -23,3 +23,11 @@ Changes added without changing the working route/static structure:
 
 ## 19.0.1.1.8
 Mobile Arabic fix: keeps global document direction LTR to prevent React Native Web / iOS PWA horizontal clipping while Arabic labels remain handled by the app language layer.
+
+
+## 19.0.2.0.0
+- Rebuilt from a new Expo / React Native Web codebase (`employee-app/` next to the addons).
+- New controller serves the whole build under `/employee-portal/*` with single-page fallback (deep links work after refresh).
+- New service worker: caches the app shell and hashed assets only. API responses (payslips, attendance) are never cached.
+- Manager Approvals tab, hourly / half-day leave, light and dark theme, English and Arabic (RTL).
+- Regenerate with `npm run build:pwa` inside `employee-app/`.

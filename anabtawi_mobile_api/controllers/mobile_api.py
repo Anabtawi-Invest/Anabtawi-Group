@@ -1,4 +1,5 @@
 import logging
+import os
 from datetime import datetime, time
 
 import pytz
@@ -665,13 +666,15 @@ class AnabtawiMobileAPI(http.Controller):
             })
         try:
             with request.env.cr.savepoint():
-                leave = request.env["hr.leave"].sudo().with_company(employee.company_id).create(vals)
+                # hr_leave_fallback may split one request into several leaves (extra hours, annual, unpaid).
+                leaves = request.env["hr.leave"].sudo().with_company(employee.company_id).create(vals)
         except (UserError, ValidationError) as exc:
             return _error("validation_error", exc.args[0] if exc.args else str(exc), 422)
         except Exception:
             _logger.exception("Mobile leave creation failed for employee_id=%s", employee.id)
             return _error("server_error", _("The time off request could not be saved."), 500)
-        return _json({"status": "ok", "leave_id": leave.id, "state": leave.state}, 201)
+        first = leaves[:1]
+        return _json({"status": "ok", "leave_id": first.id, "leave_ids": leaves.ids, "state": first.state}, 201)
 
     @http.route(
         "/anabtawi/mobile/leaves/list",
@@ -951,13 +954,13 @@ class AnabtawiMobileAPI(http.Controller):
         config = request.env["ir.config_parameter"].sudo()
         latest_version = config.get_param("anabtawi_mobile.latest_version")
         if not latest_version:
-            config.set_param("anabtawi_mobile.latest_version", "1.2.0")
-            latest_version = "1.2.0"
+            config.set_param("anabtawi_mobile.latest_version", "2.0.0")
+            latest_version = "2.0.0"
 
         min_version = config.get_param("anabtawi_mobile.min_version", "1.0.0")
         update_message = config.get_param(
             "anabtawi_mobile.update_message",
-            _("A new version of the Anabtawi Employee App (v1.2.0) with Payslip support is available. Please update to continue.")
+            _("A new version of the Anabtawi Employee App (v2.0.0) is available. Please install the latest version.")
         )
         download_url = config.get_param(
             "anabtawi_mobile.download_url",
@@ -987,7 +990,7 @@ class AnabtawiMobileAPI(http.Controller):
         with open(apk_path, "rb") as file:
             apk_bytes = file.read()
 
-        filename = "Employee-App-v1.2.0-with-payslip.apk"
+        filename = "Anabtawi-Employee-App.apk"
         headers = [
             ("Content-Type", "application/vnd.android.package-archive"),
             ("Content-Disposition", f'attachment; filename="{filename}"'),

@@ -1,49 +1,66 @@
-import json
+import mimetypes
 import os
 
 from odoo import http
 from odoo.http import request
 
+BASE_ROUTE = "/employee-portal"
+IMMUTABLE_PREFIXES = ("_expo/", "assets/")
+
 
 class AnabtawiEmployeeAppPWA(http.Controller):
+    """Serves the Employee App web build at /employee-portal.
 
-    def _static_path(self, *parts):
+    The build is a single-page app (Expo Router, web output "single"). Real files
+    (bundles, fonts, icons, manifest, service worker) are served as they are; any
+    other path falls back to index.html so deep links such as
+    /employee-portal/requests work after a refresh.
+    """
+
+    def _root(self):
         module_path = os.path.dirname(os.path.dirname(__file__))
-        return os.path.join(module_path, "static", "employee_app", *parts)
+        return os.path.realpath(os.path.join(module_path, "static", "employee_app"))
 
-    @http.route(["/employee-portal", "/employee-portal/"], type="http", auth="public", website=False, sitemap=False)
-    def employee_portal(self, **kwargs):
-        with open(self._static_path("index.html"), "r", encoding="utf-8") as file:
-            html = file.read()
-        return request.make_response(
-            html,
-            headers=[
-                ("Content-Type", "text/html; charset=utf-8"),
-                ("Cache-Control", "no-cache"),
-            ],
-        )
+    def _safe_file(self, relative_path):
+        root = self._root()
+        full = os.path.realpath(os.path.join(root, relative_path))
+        # Block path traversal: the resolved file must stay inside the build folder.
+        if full != root and not full.startswith(root + os.sep):
+            return None
+        return full if os.path.isfile(full) else None
 
-    @http.route("/employee-portal/manifest.webmanifest", type="http", auth="public", website=False, sitemap=False)
-    def employee_manifest(self, **kwargs):
-        with open(self._static_path("manifest.webmanifest"), "r", encoding="utf-8") as file:
-            manifest = json.loads(file.read())
-        return request.make_response(
-            json.dumps(manifest),
-            headers=[
-                ("Content-Type", "application/manifest+json; charset=utf-8"),
-                ("Cache-Control", "no-cache"),
-            ],
-        )
+    def _respond(self, full_path, relative_path):
+        content_type = mimetypes.guess_type(full_path)[0] or "application/octet-stream"
+        if relative_path.endswith(".webmanifest"):
+            content_type = "application/manifest+json"
+        if content_type.startswith("text/") or content_type in ("application/javascript", "application/json"):
+            content_type += "; charset=utf-8"
+        with open(full_path, "rb") as handle:
+            body = handle.read()
+        headers = [("Content-Type", content_type)]
+        if relative_path.startswith(IMMUTABLE_PREFIXES):
+            # Build output is content-hashed, safe to cache for a year.
+            headers.append(("Cache-Control", "public, max-age=31536000, immutable"))
+        else:
+            headers.append(("Cache-Control", "no-cache"))
+        if relative_path == "sw.js":
+            headers.append(("Service-Worker-Allowed", BASE_ROUTE + "/"))
+        return request.make_response(body, headers=headers)
 
-    @http.route("/employee-portal/sw.js", type="http", auth="public", website=False, sitemap=False)
-    def employee_service_worker(self, **kwargs):
-        with open(self._static_path("sw.js"), "r", encoding="utf-8") as file:
-            body = file.read()
-        return request.make_response(
-            body,
-            headers=[
-                ("Content-Type", "application/javascript; charset=utf-8"),
-                ("Service-Worker-Allowed", "/employee-portal"),
-                ("Cache-Control", "no-cache"),
-            ],
-        )
+    @http.route(
+        [BASE_ROUTE, BASE_ROUTE + "/", BASE_ROUTE + "/<path:subpath>"],
+        type="http", auth="public", website=False, sitemap=False, csrf=False, methods=["GET", "HEAD"],
+    )
+    def employee_portal(self, subpath="", **kwargs):
+        subpath = (subpath or "").strip("/")
+        if subpath:
+            full = self._safe_file(subpath)
+            if full:
+                return self._respond(full, subpath)
+            # Missing asset (has a file extension): real 404, not the HTML shell.
+            if "." in os.path.basename(subpath):
+                return request.not_found()
+        index = self._safe_file("index.html")
+        if not index:
+            return request.not_found()
+        return self._respond(index, "index.html")

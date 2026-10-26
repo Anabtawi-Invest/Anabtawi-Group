@@ -28,3 +28,14 @@ Command-line example:
 ```bash
 ./odoo-bin -d ANABTAWI_DATABASE -u anabtawi_mobile_api --stop-after-init
 ```
+
+## 19.0.1.7.0
+
+- Added manager approval endpoints for the Employee App:
+  - `GET  /anabtawi/mobile/manager/summary` (is_manager, pending counts)
+  - `GET  /anabtawi/mobile/manager/leaves/pending`, `POST /anabtawi/mobile/manager/leaves/decision`
+  - `GET  /anabtawi/mobile/manager/overtime/pending`, `POST /anabtawi/mobile/manager/overtime/decision`
+- Team = employees whose Time Off approver (`leave_manager_id`) or manager (`parent_id.user_id`) is the caller. A caller can never decide on their own request.
+- Time off: approve = first-level approval (`action_approve`); HR still validates in Odoo when the type uses two levels. Time Off officers can also give the second approval. Refuse needs a reason (posted to the chatter).
+- Overtime: acts on the caller's pending approver line of `approval.request`.
+- Fixed `NameError`: `os` was not imported, which broke `/anabtawi/mobile/apk/download` and `/pwa`.
