@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <data noupdate="0">
+    <!-- noupdate: values are edited in Settings > Technical > System Parameters when a new app version is released -->
+    <data noupdate="1">
         <record id="param_anabtawi_mobile_latest_version" model="ir.config_parameter">
             <field name="key">anabtawi_mobile.latest_version</field>
             <field name="value">2.0.0</field>

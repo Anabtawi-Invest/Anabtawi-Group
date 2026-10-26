@@ -6,7 +6,7 @@ import pytz
 
 from odoo import _, fields, http
 from odoo.exceptions import AccessDenied, UserError, ValidationError
-from odoo.http import request
+from odoo.http import Stream, request
 
 
 _logger = logging.getLogger(__name__)
@@ -41,6 +41,14 @@ def _payload():
     except Exception:
         pass
     return dict(request.params or {})
+
+
+def _version_tuple(value):
+    parts = []
+    for part in str(value or "").split("."):
+        digits = "".join(ch for ch in part if ch.isdigit())
+        parts.append(int(digits) if digits else 0)
+    return tuple(parts)
 
 
 def _as_float(value):
@@ -103,6 +111,9 @@ class AnabtawiMobileAPI(http.Controller):
             }
         if not payload and kwargs:
             payload = {k: v for k, v in kwargs.items() if v is not False}
+
+        if self._update_required(payload.get("platform"), payload.get("app_version")):
+            return self._update_required_error()
 
         login_name = (payload.get("login") or "").strip()
         password = payload.get("password") or ""
@@ -226,6 +237,23 @@ class AnabtawiMobileAPI(http.Controller):
             "uid": user.id,
         }, status=200)
 
+    def _update_required(self, platform, app_version):
+        """True when this Android build is older than the minimum version (or older than the latest one
+        while \"force update\" is on). Web and iPhone always run the newest build, so they are never blocked."""
+        if (platform or "").lower() != "android":
+            return False
+        icp = request.env["ir.config_parameter"].sudo()
+        installed = _version_tuple(app_version)
+        minimum = _version_tuple(icp.get_param("anabtawi_mobile.min_version", ""))
+        if minimum and installed < minimum:
+            return True
+        force = (icp.get_param("anabtawi_mobile.force_update", "False") or "").lower() in ("true", "1", "yes")
+        latest = _version_tuple(icp.get_param("anabtawi_mobile.latest_version", ""))
+        return bool(force and latest and installed < latest)
+
+    def _update_required_error(self):
+        return _error("update_required", _("Please install the latest version of the Employee App to continue."), 426)
+
     def _authenticated_user(self):
         token = _parse_bearer(request.httprequest.headers.get("Authorization"))
         if not token:
@@ -233,6 +261,13 @@ class AnabtawiMobileAPI(http.Controller):
         user = request.env["anabtawi.mobile.device"].authenticate_bearer_token(token, ip_address=self._client_ip())
         if not user:
             return None, token, _error("session_expired", _("Your session has expired."), 401)
+        # Builds before 2.0.1 send no version header: fall back to the version stored at login.
+        device = request.env["anabtawi.mobile.device"]._find_bearer_device(token)
+        headers = request.httprequest.headers
+        platform = headers.get("X-App-Platform") or device.platform
+        app_version = headers.get("X-App-Version") or device.app_version
+        if self._update_required(platform, app_version):
+            return None, token, self._update_required_error()
         return user, token, None
 
     def _employee(self, user):
@@ -1007,22 +1042,19 @@ class AnabtawiMobileAPI(http.Controller):
             type="http", auth="public", methods=["GET"], csrf=False, sitemap=False,
         )
     def apk_download(self, **kwargs):
-        module_path = os.path.dirname(os.path.dirname(__file__))
-        apk_path = os.path.join(module_path, "static", "apk", "employee_app_latest.apk")
-        if not os.path.exists(apk_path):
+        # Streamed in small pieces (with Range / resume support) instead of loading the whole APK in memory.
+        try:
+            stream = Stream.from_path(
+                "anabtawi_mobile_api/static/apk/employee_app_latest.apk", filter_ext=(".apk",)
+            )
+        except (FileNotFoundError, ValueError, OSError):
             return request.make_response("APK file not found on server.", status=404)
-
-        with open(apk_path, "rb") as file:
-            apk_bytes = file.read()
-
-        filename = "Anabtawi-Employee-App.apk"
-        headers = [
-            ("Content-Type", "application/vnd.android.package-archive"),
-            ("Content-Disposition", f'attachment; filename="{filename}"'),
-            ("Content-Length", str(len(apk_bytes))),
-            ("Cache-Control", "no-cache"),
-        ]
-        return request.make_response(apk_bytes, headers=headers)
+        return stream.get_response(
+            as_attachment=True,
+            mimetype="application/vnd.android.package-archive",
+            download_name="Anabtawi-Employee-App.apk",
+            max_age=0,
+        )
 
     @http.route(["/pwa", "/mobile/app"], type="http", auth="public", csrf=False)
     def pwa_index(self, **kwargs):

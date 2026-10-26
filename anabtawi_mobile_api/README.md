@@ -52,3 +52,13 @@ Command-line example:
 ## 19.0.1.7.3
 
 - Check-in / check-out wait message now shows the real remaining seconds. A wait written under an older, longer setting is shortened to the current limit.
+
+## 19.0.1.8.0
+
+- `/anabtawi/mobile/apk/download` now streams the APK (with resume support) instead of loading it into memory.
+- The app (Android APK, version 2.0.1 and later) checks `/anabtawi/mobile/app/check_update`: a dismissible banner when `latest_version` is newer, a blocking screen when the installed version is below `min_version` or `force_update` is true.
+- The update settings (`anabtawi_mobile.latest_version`, `min_version`, `force_update`, `download_url`, `update_message`) are no longer reset when the module is upgraded. Edit them in Settings > Technical > System Parameters.
+
+## 19.0.1.8.1
+
+- Mandatory updates are enforced by the server for the Android app: when the installed version is below `anabtawi_mobile.min_version` (or below `latest_version` while `force_update` is True), login and every other request return `update_required` (HTTP 426). This also reaches builds older than 2.0.1, which cannot show the update screen. The app sends `X-App-Version` / `X-App-Platform` headers; older builds are judged by the version stored at login. Web and iPhone are never blocked.
