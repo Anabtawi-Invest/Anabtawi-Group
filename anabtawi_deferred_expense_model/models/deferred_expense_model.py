@@ -29,7 +29,7 @@ class DeferredExpenseModel(models.Model):
         string="Deferred Expense Account",
         required=True,
         check_company=True,
-        domain="[('account_type', '=', 'asset_current'), ('deprecated', '=', False)]",
+        domain="[('account_type', '=', 'asset_current')]",
         help="Balance sheet (prepaid) account used for deferral entries.",
     )
     expense_account_id = fields.Many2one(
@@ -37,7 +37,7 @@ class DeferredExpenseModel(models.Model):
         string="Expense Account",
         required=True,
         check_company=True,
-        domain="[('internal_group', '=', 'expense'), ('deprecated', '=', False)]",
+        domain="[('account_type', 'in', ('expense', 'expense_direct_cost', 'expense_depreciation'))]",
     )
     journal_id = fields.Many2one(
         "account.journal",
