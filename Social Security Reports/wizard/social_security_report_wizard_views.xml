@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Wizard Form View (English Only) -->
+    <record id="view_social_security_report_wizard_form" model="ir.ui.view">
+        <field name="name">social.security.report.wizard.form</field>
+        <field name="model">social_security_report.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Social Security Reports">
+                <field name="state" invisible="1"/>
+                
+                <div invisible="state != 'choose'">
+                    <group>
+                        <group string="Report Configuration">
+                            <field name="report_type" widget="radio"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                        <group string="Period">
+                            <field name="month"/>
+                            <field name="year"/>
+                            <field name="report_date"/>
+                        </group>
+                    </group>
+                </div>
+
+                <div invisible="state != 'get'" class="alert alert-success text-center" role="status">
+                    <h4>File Generated Successfully!</h4>
+                    <p>Click below to download:</p>
+                    <field name="excel_filename" invisible="1"/>
+                    <field name="excel_file" filename="excel_filename" widget="binary"/>
+                </div>
+
+                <footer>
+                    <div invisible="state != 'choose'">
+                        <button name="action_print_pdf" string="Print PDF" type="object" class="btn-primary" icon="fa-print"/>
+                        <button name="action_export_excel" string="Export Excel" type="object" class="btn-success" icon="fa-file-excel-o"/>
+                        <button string="Cancel" class="btn-secondary" special="cancel"/>
+                    </div>
+                    <div invisible="state != 'get'">
+                        <button string="Close" class="btn-secondary" special="cancel"/>
+                    </div>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- Wizard Action Window -->
+    <record id="action_social_security_report_wizard" model="ir.actions.act_window">
+        <field name="name">Social Security Reports</field>
+        <field name="res_model">social_security_report.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="binding_model_id" eval="False"/>
+    </record>
+</odoo>
