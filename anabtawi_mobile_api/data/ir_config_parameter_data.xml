@@ -18,4 +18,11 @@
             <field name="value">A new version of the Anabtawi Employee App (v2.0.0) is available. Please install the latest version.</field>
         </record>
     </data>
+    <!-- noupdate: HR can change this in Settings > Technical > System Parameters -->
+    <data noupdate="1">
+        <record id="param_anabtawi_mobile_attendance_lock_minutes" model="ir.config_parameter">
+            <field name="key">anabtawi_mobile.attendance_lock_minutes</field>
+            <field name="value">2</field>
+        </record>
+    </data>
 </odoo>

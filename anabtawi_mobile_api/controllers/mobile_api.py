@@ -515,16 +515,22 @@ class AnabtawiMobileAPI(http.Controller):
                     422,
                 )
 
+        # Minimum time between two check-in / check-out actions (system parameter, default 2 minutes).
+        lock_minutes = _as_float(
+            request.env["ir.config_parameter"].sudo().get_param("anabtawi_mobile.attendance_lock_minutes", "2")
+        )
+        lock_minutes = int(lock_minutes) if lock_minutes and lock_minutes >= 1 else 2
+
         lock_acquired = False
         try:
-            employee._acquire_portal_attendance_action_lock(lock_minutes=10)
+            employee._acquire_portal_attendance_action_lock(lock_minutes=lock_minutes)
             lock_acquired = True
             attendance = employee._attendance_action_change(geo_information=geo_information)
         except (UserError, ValidationError) as exc:
             if lock_acquired:
                 employee._release_portal_attendance_action_lock()
             message = exc.args[0] if exc.args else str(exc)
-            code = "attendance_locked" if "10" in message or "wait" in message.lower() else "attendance_rejected"
+            code = "attendance_locked" if "wait" in message.lower() else "attendance_rejected"
             return _error(code, message, 429 if code == "attendance_locked" else 422)
         except Exception:
             if lock_acquired:

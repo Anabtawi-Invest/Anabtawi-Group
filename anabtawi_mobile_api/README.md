@@ -39,3 +39,7 @@ Command-line example:
 - Time off: approve = first-level approval (`action_approve`); HR still validates in Odoo when the type uses two levels. Time Off officers can also give the second approval. Refuse needs a reason (posted to the chatter).
 - Overtime: acts on the caller's pending approver line of `approval.request`.
 - Fixed `NameError`: `os` was not imported, which broke `/anabtawi/mobile/apk/download` and `/pwa`.
+
+## 19.0.1.7.1
+
+- The wait between two check-in / check-out actions in the Employee App is now 2 minutes (was fixed at 10). Change it with the system parameter `anabtawi_mobile.attendance_lock_minutes`.
