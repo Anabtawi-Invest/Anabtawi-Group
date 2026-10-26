@@ -1,1 +1,2 @@
-# No Python models: this module changes QWeb presentation only.
+# -*- coding: utf-8 -*-
+from . import models
