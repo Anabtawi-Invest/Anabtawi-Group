@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="report_social_security_new_template">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <div class="article" style="direction: rtl; font-family: 'Segoe UI', Tahoma, Arial, sans-serif; color: #000; font-size: 10.5px; margin: 0; padding: 0;">
+                    
+                    <!-- Main Table with separated card-like rows -->
+                    <table style="width: 100%; border-collapse: separate; border-spacing: 0 5.6px; text-align: center;">
+                        <thead>
+                            <tr>
+                                <th style="border: 1px solid #000; width: 15.5%; padding: 5px 2px; font-size: 10px; font-weight: bold; background: #fff; vertical-align: middle;">الرقم الوطني للمؤمن عليه الأردني</th>
+                                <th style="border: 1px solid #000; width: 11.5%; padding: 5px 2px; font-size: 10px; font-weight: bold; background: #fff; vertical-align: middle;">رقم تأمين المؤمن عليه</th>
+                                <th style="border: 1px solid #000; width: 8%; padding: 5px 2px; font-size: 10px; font-weight: bold; background: #fff; vertical-align: middle;">تاريخ البدء</th>
+                                <th style="border: 1px solid #000; width: 7.5%; padding: 5px 2px; font-size: 10px; font-weight: bold; background: #fff; vertical-align: middle;">الرقم الشخصي</th>
+                                <th style="border: 1px solid #000; width: 8.5%; padding: 5px 2px; font-size: 10px; font-weight: bold; background: #fff; vertical-align: middle;">تاريخ الميلاد اليوم</th>
+                                <th style="border: 1px solid #000; width: 8.5%; padding: 5px 2px; font-size: 10px; font-weight: bold; background: #fff; vertical-align: middle;">تاريخ الميلاد الشهر</th>
+                                <th style="border: 1px solid #000; width: 9.5%; padding: 5px 2px; font-size: 10px; font-weight: bold; background: #fff; vertical-align: middle;">تاريخ الميلاد السنة</th>
+                                <th style="border: 1px solid #000; width: 8.5%; padding: 5px 2px; font-size: 10px; font-weight: bold; background: #fff; vertical-align: middle;">الرقم الوظيفي</th>
+                                <th style="border: 1px solid #000; width: 9.5%; padding: 5px 2px; font-size: 10px; font-weight: bold; background: #fff; vertical-align: middle;">الأجر الشهري</th>
+                                <th style="border: 1px solid #000; width: 13%; padding: 5px 2px; font-size: 10px; font-weight: bold; background: #fff; vertical-align: middle;">رمز المهنة الخطرة</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <t t-set="emps" t-value="o.get_new_employees_data()"/>
+                            <tr t-foreach="emps" t-as="emp" style="height: 20px;">
+                                <t t-set="wage" t-value="emp.get_ssc_wage()"/>
+                                <t t-set="sdate" t-value="emp.get_ssc_start_date()"/>
+                                <t t-set="bdate" t-value="emp.birthday"/>
+                                <t t-set="nat_id" t-value="emp.get_national_id()"/>
+                                <t t-set="ssn" t-value="emp.get_ssc_number()"/>
+                                <t t-set="personal_id" t-value="nat_id"/>
+                                <t t-set="emp_num" t-value="emp.get_formatted_employee_number()"/>
+
+                                <td style="border: 1px solid #000; padding: 5px 2px; font-size: 10.5px; vertical-align: middle; background: #fff;"><t t-out="nat_id"/></td>
+                                <td style="border: 1px solid #000; padding: 5px 2px; font-size: 10.5px; vertical-align: middle; background: #fff;"><t t-out="ssn"/></td>
+                                <td style="border: 1px solid #000; padding: 5px 2px; font-size: 10.5px; vertical-align: middle; background: #fff;"><t t-out="sdate.strftime('%d/%m/%Y') if sdate else ''"/></td>
+                                <td style="border: 1px solid #000; padding: 5px 2px; font-size: 10.5px; vertical-align: middle; background: #fff;"><t t-out="personal_id"/></td>
+                                <td style="border: 1px solid #000; padding: 5px 2px; font-size: 10.5px; vertical-align: middle; background: #fff;"><t t-out="bdate.day if bdate else ''"/></td>
+                                <td style="border: 1px solid #000; padding: 5px 2px; font-size: 10.5px; vertical-align: middle; background: #fff;"><t t-out="bdate.month if bdate else ''"/></td>
+                                <td style="border: 1px solid #000; padding: 5px 2px; font-size: 10.5px; vertical-align: middle; background: #fff;"><t t-out="bdate.year if bdate else ''"/></td>
+                                <td style="border: 1px solid #000; padding: 5px 2px; font-size: 10.5px; vertical-align: middle; background: #fff;"><t t-out="emp_num"/></td>
+                                <td style="border: 1px solid #000; padding: 5px 2px; font-size: 10.5px; vertical-align: middle; background: #fff;"><t t-out="'{:,.0f}'.format(wage) if wage else ''"/></td>
+                                <td style="border: 1px solid #000; padding: 5px 2px; font-size: 10.5px; vertical-align: middle; background: #fff;">
+                                    <t t-if="'hazard_code' in emp._fields and emp.hazard_code"><t t-out="emp.hazard_code"/></t>
+                                </td>
+                            </tr>
+                            <tr t-if="not emps">
+                                <td colspan="10" style="border: 1px solid #000; padding: 15px; color: #666; font-size: 11px; background: #fff;">
+                                    لا يوجد موظفين جدد مطابقين لشروط الضمان الاجتماعي خلال هذا الشهر
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <!-- Signatures row -->
+                    <div style="margin-top: 45px; width: 100%; direction: ltr; font-size: 11px; font-weight: normal; color: #000; page-break-inside: avoid;">
+                        <table style="width: 100%; border: none;">
+                            <tr>
+                                <td style="width: 33%; text-align: left; padding-left: 60px;">Director of Human Resources</td>
+                                <td style="width: 34%; text-align: center;">Director of Finance</td>
+                                <td style="width: 33%; text-align: right; padding-right: 60px;">General Manager</td>
+                            </tr>
+                        </table>
+                    </div>
+
+                </div>
+
+                <!-- Footer matching sample format -->
+                <div class="footer" style="width: 100%; font-size: 10px; color: #000; direction: ltr; border-top: none; padding-top: 5px;">
+                    <table style="width: 100%; border: none;">
+                        <tr>
+                            <td style="width: 40%; text-align: left;">
+                                <t t-set="print_info" t-value="o.get_print_footer_info()"/>
+                                Printed by <span t-out="print_info[0]"/>|<span t-out="print_info[1]"/>  <span t-out="print_info[2]"/>
+                            </td>
+                            <td style="width: 35%; text-align: center;">
+                                Licensed To:<span t-out="o.company_id.ssc_licensed_to or 'Anabtawi Sweets'"/>
+                            </td>
+                            <td style="width: 25%; text-align: right;">
+                                Page <span class="page"/> of <span class="topage"/>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+
+            </t>
+        </t>
+    </template>
+</odoo>
