@@ -1,6 +1,6 @@
 {
     "name": "Custom Payslip Report",
-    "version": "19.0.2.1.0",
+    "version": "19.0.2.2.0",
     "summary": "Bilingual Arabic / English payslip with three salary sections",
     "category": "Human Resources/Payroll",
     "license": "LGPL-3",
