@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_deferred_expense_model_list" model="ir.ui.view">
+        <field name="name">deferred.expense.model.list</field>
+        <field name="model">deferred.expense.model</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="recognition_months"/>
+                <field name="deferred_expense_account_id"/>
+                <field name="expense_account_id"/>
+                <field name="journal_id"/>
+                <field name="company_id" groups="base.group_multi_company"/>
+                <field name="active" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_deferred_expense_model_form" model="ir.ui.view">
+        <field name="name">deferred.expense.model.form</field>
+        <field name="model">deferred.expense.model</field>
+        <field name="arch" type="xml">
+            <form string="Deferred Expense Model">
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_open_entries"
+                                type="object"
+                                class="oe_stat_button"
+                                icon="fa-bars"
+                                invisible="entry_count == 0">
+                            <field name="entry_count" widget="statinfo" string="Entries"/>
+                        </button>
+                    </div>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1>
+                            <field name="name" placeholder="e.g. Pest Control Expense"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Depreciation Method">
+                            <label for="recognition_months"/>
+                            <div class="o_row">
+                                <field name="recognition_months" class="oe_inline"/>
+                                <span>Months</span>
+                            </div>
+                            <field name="prorata_temporis"/>
+                        </group>
+                        <group string="Accounting">
+                            <field name="deferred_expense_account_id"/>
+                            <field name="expense_account_id"/>
+                            <field name="journal_id"/>
+                            <field name="analytic_account_id"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="active" invisible="1"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_deferred_expense_model_search" model="ir.ui.view">
+        <field name="name">deferred.expense.model.search</field>
+        <field name="model">deferred.expense.model</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="deferred_expense_account_id"/>
+                <field name="expense_account_id"/>
+                <filter string="Archived" name="inactive" domain="[('active', '=', False)]"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_deferred_expense_model" model="ir.actions.act_window">
+        <field name="name">Deferred Expense Models</field>
+        <field name="res_model">deferred.expense.model</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create a deferred expense model
+            </p>
+            <p>
+                Define prepaid and expense accounts plus the number of recognition months,
+                then assign the model on products used on vendor bills.
+            </p>
+        </field>
+    </record>
+
+    <menuitem id="menu_deferred_expense_model"
+              name="Deferred Expense Models"
+              parent="account.menu_finance_configuration"
+              action="action_deferred_expense_model"
+              sequence="55"
+              groups="account.group_account_manager"/>
+</odoo>
