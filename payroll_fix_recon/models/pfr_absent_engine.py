@@ -84,22 +84,30 @@ class HrEmployee(models.Model):
                 if d_out > d:                  # shift crosses midnight: it belongs to the check-in day
                     after_night[att.employee_id.id].update(U.daterange(d + timedelta(days=1), d_out))
 
-        leave_days = self._pfr_sync_leave_entries(date_from, date_to)   # emp -> dates
+        leave_days, paid_leave_days = self._pfr_sync_leave_entries(date_from, date_to)
 
         WE = self.env['hr.work.entry'].sudo()
         covered = defaultdict(set)             # emp -> dates carrying a non-absent work entry
         for we in WE.search([('employee_id', 'in', self.ids), ('state', '!=', 'cancelled')]
                             + U.we_date_domain(WE, date_from, date_to)):
             wet = we.work_entry_type_id
-            if wet and ledger.classify_type(wet) != 'ABSENT' and U.we_date(we):
-                covered[we.employee_id.id].add(U.we_date(we))
+            d = U.we_date(we)
+            if not wet or not d:
+                continue
+            kind = ledger.classify_type(wet)
+            if kind != 'ABSENT':
+                covered[we.employee_id.id].add(d)
+                if kind not in ('OUT', 'UNPAID', 'REST', 'IGNORE') and getattr(wet, 'pfr_pay_percent', 100.0) > 0:
+                    paid_leave_days[we.employee_id.id].add(d)
 
         for m_from, m_to in U.split_months(date_from, date_to):
             for emp in self:
+                qualifying = checkins[emp.id] | paid_leave_days[emp.id]
                 emp._pfr_apply_month(m_from, m_to, absent_type, holiday_map, checkins[emp.id],
-                                     leave_days[emp.id] | covered[emp.id], after_night[emp.id])
+                                     leave_days[emp.id] | covered[emp.id], after_night[emp.id],
+                                     qualifying_days=qualifying)
 
-    def _pfr_apply_month(self, m_from, m_to, absent_type, holiday_map, checkins, blocked, after_night=()):
+    def _pfr_apply_month(self, m_from, m_to, absent_type, holiday_map, checkins, blocked, after_night=(), qualifying_days=None):
         self.ensure_one()
         c_start, c_end = self._pfr_contract_window(m_from, m_to)
         holidays = self.env['pfr.day.ledger'].holidays_for(holiday_map, self.resource_calendar_id)
@@ -118,7 +126,9 @@ class HrEmployee(models.Model):
             elif self._pfr_expected_hours(d) > 0:
                 candidates.append(d)
 
-        rest_days = self._pfr_pick_rest_days(candidates, len([d for d in checkins if m_from <= d <= m_to]),
+        active_qualifying = qualifying_days if qualifying_days is not None else checkins
+        month_qualifying_count = len([d for d in active_qualifying if m_from <= d <= m_to])
+        rest_days = self._pfr_pick_rest_days(candidates, month_qualifying_count,
                                              eff_from, eff_to, after_night)
         for d in candidates:
             if d in rest_days:
@@ -126,10 +136,11 @@ class HrEmployee(models.Model):
             else:
                 self._pfr_apply_absence(d, self._pfr_expected_hours(d), absent_type)
 
-    def _pfr_pick_rest_days(self, candidates, month_checkins, eff_from, eff_to, after_night=()):
+    def _pfr_pick_rest_days(self, candidates, month_worked_days, eff_from, eff_to, after_night=()):
         """Candidate days that stay empty (earned rest days).
-        The quota (number of Fridays / Mondays, capped by check-ins // 6) only sets HOW MANY rest days there are;
-        any unpunched day may be taken. Days after an overnight shift are taken first, then the target
+        The quota (number of Fridays / Mondays, capped by worked_days // 6) sets HOW MANY rest days there are,
+        where worked days include physical check-ins and approved paid leaves (annual, sick, etc.).
+        Any unpunched day may be taken. Days after an overnight shift are taken first, then the target
         weekday, then the rest. Candidates beyond the quota stay absent."""
         station = self.employee_work_station or 'factory'
         if self._pfr_is_fixed_schedule():
@@ -140,7 +151,7 @@ class HrEmployee(models.Model):
             return {d for d in candidates if d.weekday() not in working}
         target = 0 if station == 'factory' else 4                    # Monday / Friday
         cap = sum(1 for d in U.daterange(eff_from, eff_to) if d.weekday() == target)
-        earned = min(cap, month_checkins // U.REST_CYCLE_DAYS)
+        earned = min(cap, month_worked_days // U.REST_CYCLE_DAYS)
         picked = [d for d in candidates if d in after_night][:earned]          # day after a night shift
         if len(picked) < earned:                                              # then the target weekday
             picked += [d for d in candidates if d.weekday() == target and d not in picked][:earned - len(picked)]
@@ -152,10 +163,12 @@ class HrEmployee(models.Model):
     # Leaves -> work entries
     # ------------------------------------------------------------------
     def _pfr_sync_leave_entries(self, date_from, date_to):
-        """Make sure every validated leave day has a work entry. Returns {emp_id: set(dates)}."""
+        """Make sure every validated leave day has a work entry. Returns (days, paid_days)."""
         days = defaultdict(set)
+        paid_days = defaultdict(set)
         if 'hr.leave' not in self.env:
-            return days
+            return days, paid_days
+        ledger = self.env['pfr.day.ledger']
         leaves = self.env['hr.leave'].sudo().search([
             ('employee_id', 'in', self.ids), ('state', 'in', ['validate', 'validate1']),
             ('date_from', '<=', datetime.combine(date_to, time.max)),
@@ -166,11 +179,14 @@ class HrEmployee(models.Model):
             l_from = lve.request_date_from or U.local_date(lve.date_from, tz)
             l_to = lve.request_date_to or U.local_date(lve.date_to, tz)
             wet = lve.holiday_status_id.work_entry_type_id
+            is_paid = (not wet) or (ledger.classify_type(wet) != 'UNPAID' and getattr(wet, 'pfr_pay_percent', 100.0) > 0)
             for d in U.daterange(max(l_from, date_from), min(l_to, date_to)):
                 days[emp.id].add(d)
+                if is_paid:
+                    paid_days[emp.id].add(d)
                 if wet:
                     emp._pfr_ensure_leave_entry(d, wet)
-        return days
+        return days, paid_days
 
     def _pfr_day_entries(self, target_date, states=('cancelled',)):
         WE = self.env['hr.work.entry'].sudo()

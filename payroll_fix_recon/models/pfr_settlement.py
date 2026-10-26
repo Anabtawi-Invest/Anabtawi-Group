@@ -101,7 +101,8 @@ class PfrSettlement(models.AbstractModel):
         types = self.leave_types(slips[:1].company_id)
         type_ids = list((types['extra'] | types['annual'] | types['pto']).ids)
         pre = {'types': types, 'balance': self.balance_hours(emp_ids, type_ids),
-               'approved_ot': defaultdict(float), 'banked': defaultdict(float), 'recon_alloc': {}}
+               'approved_ot': defaultdict(float), 'banked': defaultdict(float), 'recon_alloc': {},
+               'ot_lines_by_date': defaultdict(list)}
         if 'hr.attendance.overtime.line' in self.env:
             lines = self.env['hr.attendance.overtime.line'].sudo().search([
                 ('employee_id', 'in', emp_ids), ('compensable_as_leave', '=', True), ('status', '=', 'approved')])
@@ -112,6 +113,7 @@ class PfrSettlement(models.AbstractModel):
                     dur = (line.manual_duration if 'manual_duration' in line._fields else 0.0) or line.duration
                     if dur > 0:
                         pre['approved_ot'][(line.employee_id.id, line.date)] = dur
+                        pre['ot_lines_by_date'][(line.employee_id.id, line.date)].append(line)
         recon_types = types['extra'] | types['pto']
         if recon_types:
             for alloc in self.env['hr.leave.allocation'].sudo().search([
@@ -130,24 +132,51 @@ class PfrSettlement(models.AbstractModel):
         """Approved overtime weighted by rate (1.25 regular, 1.5 public holiday, 12h per unused rest day)."""
         emp = slip.employee_id
         approved = pre['approved_ot']
+        ot_lines_by_date = pre.get('ot_lines_by_date', {})
         by_date = defaultdict(list)
         for d, att in L.attendances:
             by_date[d].append(att)
 
         total = 0.0
         ph_total = reg_total = rest_total = 0.0             # breakdown: holiday x1.5 / regular x1.25 / rest days
+        stale_lines_to_clean = []
+
+        # 1. Clean orphan overtime lines on dates with no attendance at all
+        for (emp_id, d), ot_lines in ot_lines_by_date.items():
+            if emp_id == emp.id and d not in by_date and d not in L.holiday_dates:
+                approved[(emp_id, d)] = 0.0
+                if ot_lines:
+                    stale_lines_to_clean.extend(ot_lines)
+
+        # 2. Inspect overtime on attendance dates
         for d, atts in by_date.items():
+            is_holiday = d in L.holiday_dates or any(a.is_public_holiday for a in atts)
+            att_ot = sum(a.validated_overtime_hours or a.daily_overtime_hours for a in atts)
             line_ot = approved.get((emp.id, d), 0.0)
+
+            # Orphan / stale overtime line check:
+            # If actual attendance extra hours are zero on a normal working day,
+            # any approved overtime line is stale and must be ignored/unlinked.
+            if not is_holiday and att_ot < U.OT_MIN_HOURS:
+                if line_ot > 0:
+                    approved[(emp.id, d)] = 0.0
+                    stale_lines_to_clean.extend(ot_lines_by_date.get((emp.id, d), []))
+                    line_ot = 0.0
+
             if not (line_ot > 0 or any(a.overtime_status == 'approved' or a.validated_overtime_hours > 0
                                        for a in atts)):
                 continue                                    # unapproved extra hours never reach the payslip
-            if d in L.holiday_dates or any(a.is_public_holiday for a in atts):
+
+            if is_holiday:
                 ph_hours = sum(a.net_worked_hours or a.worked_hours for a in atts) * U.PH_RATE
                 total += ph_hours
                 ph_total += ph_hours
             elif line_ot > 0:
-                total += line_ot * U.OT_RATE
-                reg_total += line_ot * U.OT_RATE
+                # Cap approved overtime line by the actual physical overtime worked on that day
+                effective_ot = min(line_ot, att_ot) if att_ot >= U.OT_MIN_HOURS else 0.0
+                if effective_ot > 0:
+                    total += effective_ot * U.OT_RATE
+                    reg_total += effective_ot * U.OT_RATE
             else:
                 day_ot = sum(a.validated_overtime_hours or a.daily_overtime_hours for a in atts
                              if a.overtime_status == 'approved' or a.validated_overtime_hours > 0
@@ -155,6 +184,18 @@ class PfrSettlement(models.AbstractModel):
                 if day_ot >= U.OT_MIN_HOURS:
                     total += day_ot * U.OT_RATE
                     reg_total += day_ot * U.OT_RATE
+
+        # Clean up stale/orphan overtime lines in DB
+        if stale_lines_to_clean:
+            try:
+                stale_records = self.env['hr.attendance.overtime.line'].concat(*stale_lines_to_clean)
+                stale_records.sudo().unlink()
+            except Exception:
+                for line in stale_lines_to_clean:
+                    try:
+                        line.sudo().write({'duration': 0.0, 'status': 'refused'})
+                    except Exception:
+                        pass
 
         # worked more regular days than the monthly target (full periods only)
         active = L.active_days
@@ -169,13 +210,14 @@ class PfrSettlement(models.AbstractModel):
 
         # earned rest days that were worked instead of taken
         total_days = (slip.date_to - slip.date_from).days + 1
-        worked = len(L.physical_dates)
+        qualifying_dates = getattr(L, 'qualifying_dates', L.physical_dates)
+        worked = len(qualifying_dates)
         if worked:
             if emp._pfr_is_fixed_schedule():
                 # fixed schedule (head office): flat monthly allowance, as before
                 off = sum(1 for d in U.daterange(slip.date_from, slip.date_to)
                           if d not in L.physical_dates and (d in L.leave_calendar_dates or d in L.holiday_dates))
-                rest_taken = max(0, total_days - worked - off)
+                rest_taken = max(0, total_days - len(L.physical_dates) - off)
                 allowance = U.MONTHLY_REST_ALLOWANCE
             else:
                 # flexible (factory Monday / retail Friday): the weekday only sets HOW MANY rest days were
