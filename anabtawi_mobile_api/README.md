@@ -43,3 +43,12 @@ Command-line example:
 ## 19.0.1.7.1
 
 - The wait between two check-in / check-out actions in the Employee App is now 2 minutes (was fixed at 10). Change it with the system parameter `anabtawi_mobile.attendance_lock_minutes`.
+
+## 19.0.1.7.2
+
+- Employees stay signed in: the session now renews itself while the app is used (sliding expiry, at most one write per day). Default lifetime is 365 days of inactivity (system parameter `anabtawi_mobile.token_ttl_days`, maximum 365).
+- An expired session no longer unregisters the phone. Only the token is cleared, so the one-device rule still holds. HR reset and explicit sign-out behave as before.
+
+## 19.0.1.7.3
+
+- Check-in / check-out wait message now shows the real remaining seconds. A wait written under an older, longer setting is shortened to the current limit.

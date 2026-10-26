@@ -1,6 +1,6 @@
 import logging
 import os
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 
 import pytz
 
@@ -520,6 +520,25 @@ class AnabtawiMobileAPI(http.Controller):
             request.env["ir.config_parameter"].sudo().get_param("anabtawi_mobile.attendance_lock_minutes", "2")
         )
         lock_minutes = int(lock_minutes) if lock_minutes and lock_minutes >= 1 else 2
+
+        # Tell the employee the real remaining time. A lock written under an older, longer setting is
+        # shortened so it never outlasts the current limit.
+        employee.invalidate_recordset(["portal_attendance_lock_until"])
+        lock_until = employee.sudo().portal_attendance_lock_until
+        now = fields.Datetime.now()
+        if lock_until and lock_until > now:
+            if (lock_until - now).total_seconds() > lock_minutes * 60:
+                lock_until = now + timedelta(minutes=lock_minutes)
+                employee.sudo().write({"portal_attendance_lock_until": lock_until})
+            wait_seconds = int((lock_until - now).total_seconds()) + 1
+            return _json({
+                "error": "attendance_locked",
+                "message": _(
+                    "Attendance action already submitted. Please wait %(seconds)s seconds before trying again.",
+                    seconds=wait_seconds,
+                ),
+                "retry_after_seconds": wait_seconds,
+            }, status=429)
 
         lock_acquired = False
         try:

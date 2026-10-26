@@ -82,12 +82,12 @@ class AnabtawiMobileDevice(models.Model):
     @api.model
     def _token_ttl_days(self):
         raw_value = self.env["ir.config_parameter"].sudo().get_param(
-            "anabtawi_mobile.token_ttl_days", "30"
+            "anabtawi_mobile.token_ttl_days", "365"
         )
         try:
             return max(1, min(int(raw_value), 365))
         except (TypeError, ValueError):
-            return 30
+            return 365
 
     def _apply_new_tokens(self, plain_token, ip_address=None, extra_vals=None):
         digest = self._hash_plain_token(plain_token)
@@ -129,6 +129,21 @@ class AnabtawiMobileDevice(models.Model):
                 sorted(vals.keys()),
                 error,
             )
+
+    def _extend_token_if_needed(self):
+        """Sliding expiry: every active device keeps its session, so employees stay signed in.
+
+        The expiry is pushed forward at most once a day, so this adds no write to most requests.
+        """
+        now = fields.Datetime.now()
+        ttl = timedelta(days=self._token_ttl_days())
+        for device in self:
+            if not device.token_expires_at or (device.token_expires_at - now) < ttl - timedelta(days=1):
+                device._safe_write_device({"token_expires_at": now + ttl})
+
+    def _expire_token(self):
+        """Invalidate the token but keep the device registration (one-device rule stays intact)."""
+        self.sudo().write({"token_hash": False, "token_index": False, "token_expires_at": False})
 
     def _touch_last_activity(self, ip_address=None):
         """Refresh last activity without writing on every API request."""
@@ -257,12 +272,13 @@ class AnabtawiMobileDevice(models.Model):
         if not device:
             return self.env["res.users"]
         if device.token_expires_at and device.token_expires_at <= fields.Datetime.now():
-            device.action_revoke_token()
+            device._expire_token()
             return self.env["res.users"]
         if not device.user_id.active:
             device.action_revoke_token()
             return self.env["res.users"]
         device._touch_last_activity(ip_address=ip_address)
+        device._extend_token_if_needed()
         return device.user_id
 
     @api.model
