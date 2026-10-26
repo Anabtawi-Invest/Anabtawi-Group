@@ -1,4 +1,0 @@
-id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_social_security_report_wizard_user,social_security_report.wizard.user,model_social_security_report_wizard,hr.group_hr_user,1,1,1,1
-access_social_security_report_wizard_manager,social_security_report.wizard.manager,model_social_security_report_wizard,hr.group_hr_manager,1,1,1,1
-access_social_security_report_wizard_internal,social_security_report.wizard.internal,model_social_security_report_wizard,base.group_user,1,1,1,1
