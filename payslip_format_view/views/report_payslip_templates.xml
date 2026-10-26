@@ -93,7 +93,7 @@
  'deduction_sign': 1,
  'worked_codes': ['WORK100', 'ATTENDANCE', 'A',
                   'An_le', 'ANNUAL', 'LEAVE120', 'PTO', 'LEAVE110', 'SICK100', 'PHD',
-                  'Extra_Hours_days', 'BFV', 'BRK', 'DIE', 'FWS', 'HIL', 'MTL', 'TRV',
+                  'Extra_Hours_days', 'BFV', 'BRK', 'DIE', 'FWS', 'HIL', 'NJI', 'MTL', 'TRV',
                   'MRD', 'NPO', 'PID', 'HAJ', 'MAM', 'LDO', 'MKA', 'LEAVE105',
                   'SASICKLEAVE100', 'SASICKLEAVE75', 'EGSICKLEAVE100', 'EGSICKLEAVE75', 'PLSICK3166',
                   'SAMATERNITY', 'MATERNITY', 'LEAVE210', 'SAEMERGENCY', 'LEAVE260', 'IDLEAVE100',
@@ -120,7 +120,7 @@
                 <t t-set="visible_lines" t-value="lines.filtered(lambda l: l.salary_rule_id.appears_on_payslip)"/>
                 <t t-set="rule_ids" t-value="{role: [rule.id for xmlid in refs for rule in [o.env.ref(xmlid, raise_if_not_found=False)] if rule] for role, refs in cfg['rule_refs'].items()}"/>
                 <t t-set="basic" t-value="lines.filtered(lambda l: l.salary_rule_id.code in ('BASIC', 'SALARY'))[:1]"/>
-                <t t-set="actual" t-value="(lines.filtered(lambda l: l.salary_rule_id.code == 'FULL_WAGE') or lines.filtered(lambda l: (l.name or '') == 'Actual Salary'))[:1]"/>
+                <t t-set="actual" t-value="(lines.filtered(lambda l: l.salary_rule_id.code == 'FULL_WAGE' or l.code == 'FULL_WAGE' or (l.name or '') in ('Actual Salary', 'الراتب الفعلي')))[:1]"/>
                 <t t-set="gross" t-value="lines.filtered(lambda l: l.salary_rule_id.code in ('GROSS', 'GROSS_SALARY') or l.salary_rule_id.code in cfg['gross_codes'])[:1]"/>
                 <t t-set="net" t-value="lines.filtered(lambda l: l.salary_rule_id.code in ('NET', 'NET_SALARY') or l.salary_rule_id.id in rule_ids['net'])[:1]"/>
                 <t t-set="basic_amount" t-value="(basic.total if basic else False) or (o.employee_id.wage if ('wage' in o.employee_id._fields and o.employee_id.wage) else (o.contract_id.wage if ('contract_id' in o._fields and o.contract_id) else 0.0))"/>
@@ -185,7 +185,7 @@
                 <t t-set="month_days_divisor" t-value="basic_days if (basic_days and basic_days &gt; 0) else (month_total_days if (month_total_days and month_total_days &gt; 0) else 30.0)"/>
                 <t t-set="daily_wage" t-value="(basic_amount / month_days_divisor) if (month_days_divisor and basic_amount) else 0.0"/>
                 <t t-set="unpaid_amount" t-value="round(daily_wage * unpaid_days_count, 3) if (unpaid_days_count and daily_wage) else 0.0"/>
-                <t t-set="actual_amount" t-value="max(0.0, round(basic_amount - unpaid_amount, 3)) if basic_amount &gt; 0 else (sum(worked.mapped('amount')) if worked else 0.0)"/>
+                <t t-set="actual_amount" t-value="actual.total if actual else (max(0.0, round(basic_amount - unpaid_amount, 3)) if basic_amount &gt; 0 else (sum(worked.mapped('amount')) if worked else 0.0))"/>
                 <style>
                     .cpr { font-family: 'DejaVu Sans', Arial, sans-serif; font-size: 10px; color: #151515; }
                     .cpr table { width: 100%; border-collapse: collapse; table-layout: fixed; direction: ltr; }
@@ -347,11 +347,6 @@
                                         <td>Basic Salary<br/><span class="ar">الراتب الأساسي</span></td>
                                         <td class="num"><span t-if="cfg['basis_days_field'] in o._fields and o[cfg['basis_days_field']]" t-out="o[cfg['basis_days_field']]" t-options="{'widget': 'float', 'precision': 2}"/><span t-else="" t-out="basic_days" t-options="{'widget': 'float', 'precision': 2}"/></td>
                                         <td class="num"><span t-out="basic_amount" t-options="{'widget': 'float', 'precision': precision}"/></td>
-                                    </tr>
-                                    <tr>
-                                        <td>Unpaid Time<br/><span class="ar">أيام الخصم</span></td>
-                                        <td class="num"><span t-out="unpaid_days_count" t-options="{'widget': 'float', 'precision': 2}"/></td>
-                                        <td class="num"><span t-out="unpaid_amount" t-options="{'widget': 'float', 'precision': precision}"/></td>
                                     </tr>
                                     <tr>
                                         <td>Actual Salary<br/><span class="ar">الراتب الفعلي</span></td>
