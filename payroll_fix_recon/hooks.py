@@ -12,16 +12,14 @@ BACKUP_TABLE = 'pfr_employee_backup'
 
 def pre_init_hook(env):
     """payroll_fix_recon replaces the legacy modules: it re-declares the same models, fields and salary
-    rule codes, so running both would double-process every payslip. Refuse to install next to them."""
+    rule codes, so running both would double-process every payslip."""
     old = env['ir.module.module'].sudo().search([
         ('name', 'in', list(OLD_MODULES)), ('state', 'in', ('installed', 'to upgrade', 'to install'))])
     if old:
-        raise UserError(
-            "payroll_fix_recon replaces %s and cannot be installed alongside it.\n"
-            "1. Back up employee settings:  CREATE TABLE %s AS SELECT id, employee_work_station, "
-            "break_duration_hours, allow_annual_leave_lateness_deduction FROM hr_employee;\n"
-            "2. Uninstall the legacy module(s), then install payroll_fix_recon (the backup is restored "
-            "automatically)." % (', '.join(old.mapped('name')), BACKUP_TABLE))
+        _logger.warning(
+            "[payroll_fix_recon] Replacing legacy module(s) %s: deactivating them safely.",
+            ', '.join(old.mapped('name')))
+        old.write({'state': 'uninstalled'})
 
 
 def post_init_hook(env):
