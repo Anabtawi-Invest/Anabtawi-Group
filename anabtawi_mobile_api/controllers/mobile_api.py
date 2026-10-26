@@ -990,10 +990,12 @@ class AnabtawiMobileAPI(http.Controller):
             return _error("not_found", _("Payslip not found or access denied."), 404)
 
         try:
-            report_name = "hr_payroll.report_payslip"
-            pdf_content, _format = request.env["ir.actions.report"].sudo()._render_qweb_pdf(
-                report_name, [payslip.id]
-            )
+            # Same choice as the Print button in Odoo: the salary structure's own report, else the default one.
+            structure_report = payslip.struct_id.report_id if payslip.struct_id else False
+            report = structure_report or request.env.ref("hr_payroll.action_report_payslip")
+            pdf_content, _format = request.env["ir.actions.report"].sudo().with_context(
+                lang=employee.lang or payslip.env.lang
+            )._render_qweb_pdf(report, [payslip.id], data={"company_id": payslip.company_id})
         except Exception:
             _logger.exception("Failed to render PDF for payslip_id=%s", payslip.id)
             return _error("pdf_failed", _("Could not generate payslip PDF."), 500)

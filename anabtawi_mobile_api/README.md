@@ -62,3 +62,7 @@ Command-line example:
 ## 19.0.1.8.1
 
 - Mandatory updates are enforced by the server for the Android app: when the installed version is below `anabtawi_mobile.min_version` (or below `latest_version` while `force_update` is True), login and every other request return `update_required` (HTTP 426). This also reaches builds older than 2.0.1, which cannot show the update screen. The app sends `X-App-Version` / `X-App-Platform` headers; older builds are judged by the version stored at login. Web and iPhone are never blocked.
+
+## 19.0.1.8.2
+
+- Payslip PDF download now uses the report of the payslip's salary structure (same as the Print button in Odoo), with the company passed in, instead of always using the default report.
