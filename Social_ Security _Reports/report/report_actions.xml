@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Paper Format: Portrait A4 for Terminated Monthly Supplement -->
+    <record id="paperformat_social_security_portrait" model="report.paperformat">
+        <field name="name">Social Security Portrait A4</field>
+        <field name="default" eval="False"/>
+        <field name="format">A4</field>
+        <field name="orientation">Portrait</field>
+        <field name="margin_top">8</field>
+        <field name="margin_bottom">8</field>
+        <field name="margin_left">8</field>
+        <field name="margin_right">8</field>
+        <field name="header_line" eval="False"/>
+        <field name="header_spacing">0</field>
+        <field name="dpi">90</field>
+    </record>
+
+    <!-- Paper Format: Landscape A4 for New Members -->
+    <record id="paperformat_social_security_landscape" model="report.paperformat">
+        <field name="name">Social Security Landscape A4</field>
+        <field name="default" eval="False"/>
+        <field name="format">A4</field>
+        <field name="orientation">Landscape</field>
+        <field name="margin_top">8</field>
+        <field name="margin_bottom">8</field>
+        <field name="margin_left">8</field>
+        <field name="margin_right">8</field>
+        <field name="header_line" eval="False"/>
+        <field name="header_spacing">0</field>
+        <field name="dpi">90</field>
+    </record>
+
+    <!-- Report Action: Add New Employees TO Social Security -->
+    <record id="action_report_social_security_new" model="ir.actions.report">
+        <field name="name">Social Security New Members</field>
+        <field name="model">social_security_report.wizard</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">social_security_reports.report_social_security_new_template</field>
+        <field name="report_file">social_security_reports.report_social_security_new_template</field>
+        <field name="paperformat_id" ref="paperformat_social_security_landscape"/>
+        <field name="print_report_name">'Social Security New Members - %s_%s' % (object.month, object.year)</field>
+        <field name="binding_model_id" eval="False"/>
+    </record>
+
+    <!-- Report Action: Terminate Employees from Social Security -->
+    <record id="action_report_social_security_terminated" model="ir.actions.report">
+        <field name="name">Terminated Social Security Supplement</field>
+        <field name="model">social_security_report.wizard</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">social_security_reports.report_social_security_terminated_template</field>
+        <field name="report_file">social_security_reports.report_social_security_terminated_template</field>
+        <field name="paperformat_id" ref="paperformat_social_security_portrait"/>
+        <field name="print_report_name">'Terminated Social Security - %s_%s' % (object.month, object.year)</field>
+        <field name="binding_model_id" eval="False"/>
+    </record>
+</odoo>
