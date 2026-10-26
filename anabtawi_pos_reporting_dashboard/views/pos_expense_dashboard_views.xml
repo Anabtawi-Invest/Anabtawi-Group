@@ -7,9 +7,13 @@
         <field name="arch" type="xml">
             <list string="Expense Dashboard Accounts" editable="bottom">
                 <field name="sequence" widget="handle"/>
+                <field name="used_account_ids" column_invisible="True"/>
                 <field name="account_code"/>
                 <field name="account_id"/>
-                <field name="company_id" groups="base.group_multi_company"/>
+                <field name="company_id" groups="base.group_multi_company"
+                          optional="hide"/>
+                <field name="company_id" column_invisible="True"
+                          groups="!base.group_multi_company"/>
                 <field name="active"/>
             </list>
         </field>
@@ -23,6 +27,8 @@
                 <sheet>
                     <group>
                         <group>
+                            <field name="company_id" invisible="1"/>
+                            <field name="used_account_ids" invisible="1"/>
                             <field name="account_id"/>
                             <field name="account_code"/>
                             <field name="account_name"/>
