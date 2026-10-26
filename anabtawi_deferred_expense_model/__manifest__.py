@@ -1,6 +1,6 @@
 {
     "name": "Anabtawi Deferred Expense Models",
-    "version": "19.0.1.0.0",
+    "version": "19.0.1.1.0",
     "category": "Accounting/Accounting",
     "summary": "Odoo 15-style deferred expense models with per-model prepaid accounts",
     "author": "Anabtawi Group",

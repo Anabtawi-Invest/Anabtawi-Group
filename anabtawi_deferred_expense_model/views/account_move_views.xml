@@ -7,11 +7,13 @@
         <field name="arch" type="xml">
             <xpath expr="//page[@id='invoice_tab']//list/field[@name='analytic_distribution']" position="before">
                 <field name="deferred_expense_model_id"
-                         optional="hide"
+                         optional="show"
                          column_invisible="parent.move_type not in ('in_invoice', 'in_refund', 'in_receipt')"/>
             </xpath>
             <xpath expr="//page[@id='aml_tab']//list/field[@name='analytic_distribution']" position="before">
-                <field name="deferred_expense_model_id" optional="hide"/>
+                <field name="deferred_expense_model_id"
+                         optional="show"
+                         column_invisible="parent.move_type != 'entry'"/>
             </xpath>
         </field>
     </record>

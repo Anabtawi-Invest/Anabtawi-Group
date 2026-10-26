@@ -32,12 +32,12 @@ class AccountMove(models.Model):
         }
 
     def _prepare_deferred_expense_models_on_lines(self):
-        """Ensure product deferred models are applied before deferral generation."""
-        for move in self.filtered(lambda m: m.is_purchase_document(include_receipts=True)):
-            for line in move.line_ids.filtered(
-                lambda l: not l.display_type and l.product_id
-            ):
-                model = line.product_id.product_tmpl_id.deferred_expense_model_id
+        """Ensure deferred models are applied before deferral generation (bills + JE)."""
+        for move in self.filtered(
+            lambda m: m.is_purchase_document(include_receipts=True) or m.is_entry()
+        ):
+            for line in move.line_ids.filtered(lambda l: not l.display_type):
+                model = line._get_deferred_expense_model()
                 if not model:
                     continue
                 if not line.deferred_expense_model_id:
@@ -48,6 +48,39 @@ class AccountMove(models.Model):
     def _post(self, soft=True):
         self._prepare_deferred_expense_models_on_lines()
         return super()._post(soft)
+
+    def _get_deferred_entries_method(self):
+        """Journal entries with deferred expense models use expense generation settings."""
+        self.ensure_one()
+        if self.is_purchase_document():
+            return self.company_id.generate_deferred_expense_entries_method
+        if self.is_entry() and any(
+            line.deferred_start_date
+            and (
+                line._get_deferred_expense_model()
+                or line.account_id.internal_group == "expense"
+            )
+            for line in self.line_ids
+        ):
+            return self.company_id.generate_deferred_expense_entries_method
+        return super()._get_deferred_entries_method()
+
+    def _get_deferred_type_for_move(self):
+        self.ensure_one()
+        if self.is_purchase_document(include_receipts=True):
+            return "expense"
+        if self.is_sale_document(include_receipts=True):
+            return "revenue"
+        if self.is_entry() and any(
+            line.deferred_start_date
+            and (
+                line._get_deferred_expense_model()
+                or line.account_id.internal_group == "expense"
+            )
+            for line in self.line_ids
+        ):
+            return "expense"
+        return "revenue"
 
     def _get_deferred_account_journal_for_line(self, line, deferred_type):
         """Return (deferred_account, deferred_journal) for a move line."""
@@ -77,9 +110,7 @@ class AccountMove(models.Model):
         if self.state != "posted":
             return
 
-        deferred_type = (
-            "expense" if self.is_purchase_document(include_receipts=True) else "revenue"
-        )
+        deferred_type = self._get_deferred_type_for_move()
 
         moves_vals_to_create = []
         lines_vals_to_create = []
