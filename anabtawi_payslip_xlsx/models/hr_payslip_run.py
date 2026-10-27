@@ -12,7 +12,7 @@ class HrPayslipRun(models.Model):
 
     def action_export_payrun_excel(self):
         self.ensure_one()
-        url = f"/anabtawi_payroll/payrun/xlsx?payrun_id={self.id}"
+        url = f"/anabtawi_payroll/payrun/xlsx?payrun_id={self.id}&t={int(datetime.now().timestamp())}"
         
         ctx = self.env.context
         if ctx.get("active_model") == "hr.payslip" and ctx.get("active_ids"):
@@ -31,8 +31,7 @@ class HrPayslipRun(models.Model):
         readonly=True,
         attachment=True,
         copy=False,
-        help="Immutable Excel snapshot generated when Mark as Paid is pressed the first time. "
-             "Later downloads reuse this file and do not overwrite it.",
+        help="Excel snapshot generated for this Pay Run.",
     )
     audit_filename = fields.Char(string="PayRun Audit Filename", copy=False)
     audit_file_generated_at = fields.Datetime(string="Audit Snapshot Date", readonly=True, copy=False)

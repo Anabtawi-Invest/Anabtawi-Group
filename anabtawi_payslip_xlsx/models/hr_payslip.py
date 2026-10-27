@@ -1,5 +1,6 @@
 import calendar
 import io
+from datetime import datetime
 
 from odoo import _, fields, models
 from odoo.exceptions import ValidationError
@@ -40,10 +41,11 @@ class HrPayslip(models.Model):
     def action_export_payrun_excel(self):
         payrun = self.mapped("payslip_run_id")[:1]
         selected_ids = ",".join(str(i) for i in self.ids)
+        t = int(datetime.now().timestamp())
         if payrun:
-            url = f"/anabtawi_payroll/payrun/xlsx?payrun_id={payrun.id}&payslip_ids={selected_ids}"
+            url = f"/anabtawi_payroll/payrun/xlsx?payrun_id={payrun.id}&payslip_ids={selected_ids}&t={t}"
         else:
-            url = f"/anabtawi_payroll/payrun/xlsx?payslip_ids={selected_ids}"
+            url = f"/anabtawi_payroll/payrun/xlsx?payslip_ids={selected_ids}&t={t}"
         return {
             "name": "PayRun Audit",
             "type": "ir.actions.act_url",
