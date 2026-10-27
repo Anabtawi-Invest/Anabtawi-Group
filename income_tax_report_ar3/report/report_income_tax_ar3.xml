@@ -1,0 +1,445 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Report Action -->
+    <record id="action_report_income_tax_ar3" model="ir.actions.report">
+        <field name="name">Income TAX report (AR/3)</field>
+        <field name="model">income.tax.report.wizard</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">income_tax_report_ar3.report_income_tax_ar3_template</field>
+        <field name="report_file">income_tax_report_ar3.report_income_tax_ar3_template</field>
+        <field name="paperformat_id" ref="income_tax_report_ar3.paperformat_income_tax_ar3"/>
+        <field name="binding_model_id" eval="False"/>
+    </record>
+
+    <!-- QWeb Template -->
+    <template id="report_income_tax_ar3_template">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="doc">
+                <t t-call="web.basic_layout">
+                    <div class="page" dir="rtl" style="font-family: 'DejaVu Sans', Arial, Tahoma, sans-serif; font-size: 11px; color: #000; direction: rtl; text-align: right; line-height: 1.25;">
+                        <style>
+                            @page {
+                                size: A4 portrait;
+                                margin: 6mm 8mm 6mm 8mm;
+                            }
+                            table.it-header {
+                                width: 100%;
+                                border-collapse: collapse;
+                                border: none;
+                                margin-bottom: 4px;
+                            }
+                            table.it-header td {
+                                border: none;
+                                vertical-align: middle;
+                                padding: 0;
+                            }
+                            .it-ministry {
+                                font-size: 13.5px;
+                                font-weight: bold;
+                                line-height: 1.45;
+                                text-align: right;
+                            }
+                            .it-doc-code {
+                                font-size: 12px;
+                                font-weight: bold;
+                                text-align: left;
+                                direction: ltr;
+                            }
+                            .it-logo {
+                                text-align: center;
+                            }
+                            .it-logo img {
+                                max-height: 68px;
+                                width: auto;
+                            }
+                            .it-title-box {
+                                text-align: center;
+                                margin-top: 4px;
+                                margin-bottom: 12px;
+                            }
+                            .it-title-box .main-title {
+                                font-size: 15.5px;
+                                font-weight: bold;
+                                margin-bottom: 3px;
+                            }
+                            .it-title-box .sub-title {
+                                font-size: 10px;
+                            }
+                            
+                            /* Employee Info Table */
+                            table.it-form-table {
+                                width: 100%;
+                                border-collapse: collapse;
+                                margin-bottom: 12px;
+                                border: 1.2px solid #000;
+                            }
+                            table.it-form-table th, table.it-form-table td {
+                                border: 1px solid #000;
+                                padding: 4px 3px;
+                                text-align: center;
+                                font-size: 10px;
+                                background-color: #ffffff;
+                            }
+                            .it-tbl-head {
+                                font-weight: bold;
+                                font-size: 11px;
+                                padding: 3px;
+                            }
+                            .it-label-row td {
+                                font-weight: normal;
+                                font-size: 9.5px;
+                                padding: 3px 2px;
+                            }
+                            .it-val-row td {
+                                font-weight: bold;
+                                font-size: 11px;
+                                padding: 5px 3px;
+                            }
+
+                            /* Financial Table: Columns aligned with numbers on the RIGHT */
+                            table.it-fin-table {
+                                width: 100%;
+                                border-collapse: collapse;
+                                border: 1.2px solid #000;
+                                margin-bottom: 8px;
+                            }
+                            table.it-fin-table th, table.it-fin-table td {
+                                border: 1px solid #000;
+                                padding: 3.5px 3px;
+                                font-size: 10px;
+                                background-color: #ffffff;
+                            }
+                            .it-fin-th {
+                                font-weight: bold;
+                                text-align: center;
+                                font-size: 10.5px;
+                                padding: 3.5px 2px;
+                            }
+                            .it-row-desc {
+                                text-align: center;
+                                font-size: 10px;
+                                padding: 3.5px 3px;
+                            }
+                            .it-val-num {
+                                text-align: center;
+                                font-weight: bold;
+                                font-size: 10.5px;
+                            }
+
+                            /* Footer Section */
+                            .it-declaration-text {
+                                font-size: 10.5px;
+                                font-weight: bold;
+                                text-align: right;
+                                margin-top: 14px;
+                                margin-bottom: 8px;
+                                line-height: 1.45;
+                                padding-right: 1px;
+                            }
+                            table.it-sign-table {
+                                width: 100%;
+                                border-collapse: collapse;
+                                border: 1.2px solid #000;
+                                margin-bottom: 6px;
+                            }
+                            table.it-sign-table td {
+                                border: 1px solid #000;
+                                padding: 6px 4px;
+                                font-size: 10.5px;
+                                background-color: #ffffff;
+                            }
+                            table.it-date-table {
+                                width: 100%;
+                                border-collapse: collapse;
+                                border: none;
+                                margin-top: 4px;
+                            }
+                            table.it-date-table td {
+                                border: none;
+                                padding: 2px 0;
+                            }
+                        </style>
+
+                        <!-- Top Horizontal Rule as seen in original form -->
+                        <div style="border-top: 1px solid #000; margin-bottom: 8px;"></div>
+
+                        <!-- Header Section -->
+                        <table class="it-header">
+                            <tr>
+                                <td style="width: 32%;" class="it-ministry">
+                                    وزارة المالية<br/>
+                                    دائرة ضريبة الدخل والمبيعات
+                                </td>
+                                <td style="width: 36%;" class="it-logo">
+                                    <t t-set="logo_data" t-value="doc.get_logo_base64()"/>
+                                    <t t-if="logo_data">
+                                        <img t-att-src="'data:image/jpeg;base64,' + logo_data" alt="ISTD Emblem"/>
+                                    </t>
+                                    <t t-else="">
+                                        <img src="/income_tax_report_ar3/static/src/img/istd_logo.jpg" alt="ISTD Emblem"/>
+                                    </t>
+                                </td>
+                                <td style="width: 32%;" class="it-doc-code">
+                                    QP 177-F3
+                                </td>
+                            </tr>
+                        </table>
+
+                        <!-- Title Section -->
+                        <div class="it-title-box">
+                            <div class="main-title">شهادة مجموع الرواتب والاجور والضريبة المقتطعة</div>
+                            <div class="sub-title">صادر بالاستناد لأحكام الفقرة (و) من المادة (12) من قانون ضريبة الدخل رقم (34) لسنة 2014 م وتعديلاته</div>
+                        </div>
+
+                        <!-- Employee Info Section -->
+                        <t t-set="names" t-value="doc.get_name_parts()"/>
+                        <table class="it-form-table">
+                            <tr>
+                                <th colspan="4" class="it-tbl-head">معلومات الموظف</th>
+                            </tr>
+                            <tr>
+                                <th colspan="4" class="it-tbl-head">اسم الموظف</th>
+                            </tr>
+                            <tr class="it-label-row">
+                                <td style="width: 25%;">الاسم</td>
+                                <td style="width: 25%;">الاب</td>
+                                <td style="width: 25%;">الجد</td>
+                                <td style="width: 25%;">العائلة</td>
+                            </tr>
+                            <tr class="it-val-row">
+                                <td><span t-esc="names['first']"/></td>
+                                <td><span t-esc="names['father']"/></td>
+                                <td><span t-esc="names['grand']"/></td>
+                                <td><span t-esc="names['family']"/></td>
+                            </tr>
+                            <tr class="it-label-row">
+                                <td>الرقم الضريبي</td>
+                                <td>الرقم الوطني / جواز السفر</td>
+                                <td>صندوق البريد</td>
+                                <td>الرمز البريدي</td>
+                            </tr>
+                            <tr class="it-val-row">
+                                <td><span t-esc="doc.employee_id.tax_id or ''"/></td>
+                                <td><span t-esc="doc.employee_id.national_id or doc.employee_id.identification_id or ''"/></td>
+                                <td></td>
+                                <td></td>
+                            </tr>
+                            <tr class="it-label-row">
+                                <td colspan="3">العنوان</td>
+                                <td>الهاتف</td>
+                            </tr>
+                            <tr class="it-val-row">
+                                <td colspan="3">
+                                    <span t-esc="doc.employee_address or ''"/>
+                                </td>
+                                <td><span t-esc="doc.employee_id.mobile_phone or doc.employee_id.work_phone or ''"/></td>
+                            </tr>
+                            <tr class="it-label-row">
+                                <td style="width: 25%;">الفترة الضريبية</td>
+                                <td style="width: 25%;">مدة العمل اثناء الفترة الضريبية</td>
+                                <td style="width: 25%;">تاريخ مباشرة العمل (التعيين)</td>
+                                <td style="width: 25%;">تاريخ انتهاء العمل (انهاء الخدمة)</td>
+                            </tr>
+                            <tr class="it-val-row">
+                                <td><span t-esc="doc.tax_year"/></td>
+                                <td><span t-esc="doc.months_worked"/></td>
+                                <td><span t-esc="doc.hire_date.strftime('%d/%m/%Y') if doc.hire_date else ''"/></td>
+                                <td><span t-esc="doc.end_date.strftime('%d/%m/%Y') if doc.end_date else ''"/></td>
+                            </tr>
+                        </table>
+
+                        <!-- Financial Table: 6 columns matching original format exactly -->
+                        <table class="it-fin-table">
+                            <colgroup>
+                                <!-- Right Block: Gross Wages (الرواتب والأجور) -->
+                                <col style="width: 8.5%;"/>
+                                <col style="width: 13.5%;"/>
+                                <col style="width: 28%;"/>
+                                <!-- Left Block: Tax Withheld (الضريبة المقتطعة) -->
+                                <col style="width: 8.5%;"/>
+                                <col style="width: 13.5%;"/>
+                                <col style="width: 28%;"/>
+                            </colgroup>
+                            <thead>
+                                <tr>
+                                    <th colspan="2" class="it-fin-th">القيمة</th>
+                                    <th rowspan="2" class="it-fin-th" style="vertical-align: middle;">اجمالي الرواتب والاجور</th>
+                                    <th colspan="2" class="it-fin-th">القيمة</th>
+                                    <th rowspan="2" class="it-fin-th" style="vertical-align: middle;">الضريبة المقتطعة من اجمالي</th>
+                                </tr>
+                                <tr>
+                                    <th class="it-fin-th" style="font-size: 9.5px; padding: 2px;">فلس</th>
+                                    <th class="it-fin-th" style="font-size: 9.5px; padding: 2px;">دينار</th>
+                                    <th class="it-fin-th" style="font-size: 9.5px; padding: 2px;">فلس</th>
+                                    <th class="it-fin-th" style="font-size: 9.5px; padding: 2px;">دينار</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Row 1: الرواتب والاجور -->
+                                <tr>
+                                    <t t-set="gw" t-value="doc.split_val(doc.gross_salary_wages)"/>
+                                    <td class="it-val-num"><span t-esc="gw[1]"/></td>
+                                    <td class="it-val-num"><span t-esc="gw[0]"/></td>
+                                    <td class="it-row-desc">الرواتب والاجور</td>
+
+                                    <t t-set="tw" t-value="doc.split_val(doc.tax_salary_wages)"/>
+                                    <td class="it-val-num"><span t-esc="tw[1]"/></td>
+                                    <td class="it-val-num"><span t-esc="tw[0]"/></td>
+                                    <td class="it-row-desc">الرواتب والاجور</td>
+                                </tr>
+
+                                <!-- Row 2: الرواتب والاجور غير الشهرية -->
+                                <tr>
+                                    <t t-set="gnm" t-value="doc.split_val_zero(doc.gross_non_monthly, show_zero=True)"/>
+                                    <td class="it-val-num"><span t-esc="gnm[1]"/></td>
+                                    <td class="it-val-num"><span t-esc="gnm[0]"/></td>
+                                    <td class="it-row-desc">الرواتب والاجور غير الشهرية</td>
+
+                                    <t t-set="tnm" t-value="doc.split_val(doc.tax_non_monthly)"/>
+                                    <td class="it-val-num"><span t-esc="tnm[1]"/></td>
+                                    <td class="it-val-num"><span t-esc="tnm[0]"/></td>
+                                    <td class="it-row-desc">الرواتب والاجور غير الشهرية</td>
+                                </tr>
+
+                                <!-- Row 3: مكافآت أعضاء مجلس الادارة -->
+                                <tr>
+                                    <t t-set="gbr" t-value="doc.split_val(doc.gross_board_rewards)"/>
+                                    <td class="it-val-num"><span t-esc="gbr[1]"/></td>
+                                    <td class="it-val-num"><span t-esc="gbr[0]"/></td>
+                                    <td class="it-row-desc">مكافآت أعضاء مجلس الادارة</td>
+
+                                    <t t-set="tbr" t-value="doc.split_val(doc.tax_board_rewards)"/>
+                                    <td class="it-val-num"><span t-esc="tbr[1]"/></td>
+                                    <td class="it-val-num"><span t-esc="tbr[0]"/></td>
+                                    <td class="it-row-desc">مكافآت أعضاء مجلس الادارة</td>
+                                </tr>
+
+                                <!-- Row 4: مكافأة نهاية الخدمة عن الخدمات ما قبل 1/1/2010 -->
+                                <tr>
+                                    <t t-set="geos1" t-value="doc.split_val(doc.gross_eos_pre_2010)"/>
+                                    <td class="it-val-num"><span t-esc="geos1[1]"/></td>
+                                    <td class="it-val-num"><span t-esc="geos1[0]"/></td>
+                                    <td class="it-row-desc">مكافأة نهاية الخدمة عن الخدمات ما قبل 1/1/2010</td>
+
+                                    <t t-set="teos1" t-value="doc.split_val(doc.tax_eos_pre_2010)"/>
+                                    <td class="it-val-num"><span t-esc="teos1[1]"/></td>
+                                    <td class="it-val-num"><span t-esc="teos1[0]"/></td>
+                                    <td class="it-row-desc">مكافأة نهاية الخدمة عن الخدمات ما قبل 1/1/2010</td>
+                                </tr>
+
+                                <!-- Row 5: مكافأة نهاية الخدمة عن الخدمات 1/1/2010 حتى 31/12/2014 -->
+                                <tr>
+                                    <t t-set="geos2" t-value="doc.split_val(doc.gross_eos_2010_2014)"/>
+                                    <td class="it-val-num"><span t-esc="geos2[1]"/></td>
+                                    <td class="it-val-num"><span t-esc="geos2[0]"/></td>
+                                    <td class="it-row-desc">مكافأة نهاية الخدمة عن الخدمات 1/1/2010 حتى 31/12/2014</td>
+
+                                    <t t-set="teos2" t-value="doc.split_val(doc.tax_eos_2010_2014)"/>
+                                    <td class="it-val-num"><span t-esc="teos2[1]"/></td>
+                                    <td class="it-val-num"><span t-esc="teos2[0]"/></td>
+                                    <td class="it-row-desc">مكافأة نهاية الخدمة عن الخدمات 1/1/2010 حتى 31/12/2014</td>
+                                </tr>
+
+                                <!-- Row 6: مكافأة نهاية الخدمة عن الخدمات من 1/1/2015 حتى نهاية العمل -->
+                                <tr>
+                                    <t t-set="geos3" t-value="doc.split_val(doc.gross_eos_post_2015)"/>
+                                    <td class="it-val-num"><span t-esc="geos3[1]"/></td>
+                                    <td class="it-val-num"><span t-esc="geos3[0]"/></td>
+                                    <td class="it-row-desc">مكافأة نهاية الخدمة عن الخدمات من 1/1/2015 حتى نهاية العمل</td>
+
+                                    <t t-set="teos3" t-value="doc.split_val(doc.tax_eos_post_2015)"/>
+                                    <td class="it-val-num"><span t-esc="teos3[1]"/></td>
+                                    <td class="it-val-num"><span t-esc="teos3[0]"/></td>
+                                    <td class="it-row-desc">مكافأة نهاية الخدمة عن الخدمات من 1/1/2015 حتى نهاية العمل</td>
+                                </tr>
+
+                                <!-- Row 7: أي مبالغ أخرى -->
+                                <tr>
+                                    <t t-set="goth" t-value="doc.split_val(doc.gross_other_amounts)"/>
+                                    <td class="it-val-num"><span t-esc="goth[1]"/></td>
+                                    <td class="it-val-num"><span t-esc="goth[0]"/></td>
+                                    <td class="it-row-desc">أي مبالغ أخرى</td>
+
+                                    <t t-set="toth" t-value="doc.split_val(doc.tax_other_amounts)"/>
+                                    <td class="it-val-num"><span t-esc="toth[1]"/></td>
+                                    <td class="it-val-num"><span t-esc="toth[0]"/></td>
+                                    <td class="it-row-desc">أي مبالغ أخرى</td>
+                                </tr>
+
+                                <!-- Row 8: المساهمة الوطنية -->
+                                <tr>
+                                    <td></td>
+                                    <td></td>
+                                    <td></td>
+
+                                    <t t-set="tnat" t-value="doc.split_val(doc.tax_national_contrib)"/>
+                                    <td class="it-val-num"><span t-esc="tnat[1]"/></td>
+                                    <td class="it-val-num"><span t-esc="tnat[0]"/></td>
+                                    <td class="it-row-desc">المساهمة الوطنية</td>
+                                </tr>
+
+                                <!-- Row 9: المجموع -->
+                                <tr style="font-weight: bold;">
+                                    <t t-set="gtot" t-value="doc.split_val(doc.gross_total)"/>
+                                    <td class="it-val-num" style="font-size: 11px;"><span t-esc="gtot[1]"/></td>
+                                    <td class="it-val-num" style="font-size: 11px;"><span t-esc="gtot[0]"/></td>
+                                    <td class="it-row-desc" style="font-weight: bold; font-size: 11px;">المجموع</td>
+
+                                    <t t-set="ttot" t-value="doc.split_val(doc.tax_total)"/>
+                                    <td class="it-val-num" style="font-size: 11px;"><span t-esc="ttot[1]"/></td>
+                                    <td class="it-val-num" style="font-size: 11px;"><span t-esc="ttot[0]"/></td>
+                                    <td class="it-row-desc" style="font-weight: bold; font-size: 11px;">المجموع</td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <!-- Declaration Text -->
+                        <div class="it-declaration-text">
+                            أشهد أن المعلومات المدرجة أعلاه صحيحة و حقيقية و كاملة و غير منقوصة وأنني قمت بدفع ضريبة الدخل المقتطعة والمبينة أعلاه الى دائرة ضريبة الدخل والمبيعات
+                        </div>
+
+                        <!-- Sign-off Box: 4 columns matching original form -->
+                        <table class="it-sign-table">
+                            <tr>
+                                <td style="width: 18%; text-align: center; font-weight: bold;">
+                                    اسم صاحب العمل
+                                </td>
+                                <td style="width: 44%; text-align: center; font-weight: bold; font-size: 11px;">
+                                    <span t-esc="doc.employer_name"/>
+                                </td>
+                                <td rowspan="2" style="width: 15%; text-align: center; font-weight: bold; vertical-align: middle;">
+                                    ختم وتوقيع<br/>صاحب العمل
+                                </td>
+                                <td rowspan="2" style="width: 23%; height: 55px;">
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="text-align: center; font-weight: bold;">
+                                    الرقم الضريبي
+                                </td>
+                                <td style="text-align: center; font-weight: bold; font-size: 12px; letter-spacing: 1px;">
+                                    <span t-esc="doc.employer_tax_id"/>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <!-- Date and Bottom Reference Note -->
+                        <table class="it-date-table">
+                            <tr>
+                                <td style="width: 50%; text-align: right; font-weight: bold; font-size: 11px;">
+                                    التاريخ&#160;&#160;&#160;&#160;&#160;<span t-esc="doc.report_date.strftime('%d/%m/%Y') if doc.report_date else ''"/>
+                                </td>
+                                <td style="width: 50%; text-align: left; font-size: 9px; direction: rtl;">
+                                    محدث بتاريخ 2019/8/4 م
+                                </td>
+                            </tr>
+                        </table>
+
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+
+</odoo>
