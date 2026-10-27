@@ -157,9 +157,31 @@
                 <t t-set="annual_input" t-value="o.input_line_ids.filtered(lambda l: l.input_type_id.code in ('CLEAR_ANNUAL', 'REM_LEAVE') or 'annual leave' in (l.name or '').lower())"/>
                 <t t-set="pto_input" t-value="o.input_line_ids.filtered(lambda l: l.input_type_id.code == 'CLEAR_PTO' or 'paid time off' in (l.name or '').lower())"/>
                 <t t-set="extra_input" t-value="o.input_line_ids.filtered(lambda l: l.input_type_id.code in ('CLEAR_EXTRA', 'ETH_PAY_EOC') or 'extra' in (l.name or '').lower())"/>
+                <t t-set="is_termination" t-value="bool(('termination_clearance' in o._fields and o.termination_clearance) or (o.struct_id and ('termination' in (o.struct_id.name or '').lower() or 'مخالصة' in (o.struct_id.name or '').lower() or 'تيرمنيشن' in (o.struct_id.name or '').lower())))"/>
                 <t t-set="annual_days" t-value="annual_input[0].quantity if annual_input and 'quantity' in annual_input._fields else 0.0"/>
-                <t t-set="pto_days" t-value="pto_input[0].quantity if pto_input and 'quantity' in pto_input._fields else 0.0"/>
-                <t t-set="extra_hrs" t-value="extra_input[0].quantity if extra_input and 'quantity' in extra_input._fields else (o.employee_extra_hours_balance if 'employee_extra_hours_balance' in o._fields else 0.0)"/>
+                <t t-set="pto_days_raw" t-value="pto_input[0].quantity if pto_input and 'quantity' in pto_input._fields else 0.0"/>
+                <t t-set="extra_hrs_raw" t-value="extra_input[0].quantity if extra_input and 'quantity' in extra_input._fields else (o.employee_extra_hours_balance if 'employee_extra_hours_balance' in o._fields else 0.0)"/>
+                <!-- Termination PDF boxes: read the real balances straight from the slip fields
+                     (remaining_pto_balance is in hours -> /8 for days; remaining_extra_hours_balance is in hours). -->
+                <!-- Balance boxes show the actual remaining balances from the slip fields:
+                     Annual = remaining_annual_leave_balance_hours (hrs -> /8 days),
+                     PTO = remaining_pto_balance (hrs -> /8 days),
+                     Extra = remaining_extra_hours_balance (hrs). -->
+                <t t-if="'remaining_annual_leave_balance_hours' in o._fields">
+                    <t t-set="annual_days" t-value="(o.remaining_annual_leave_balance_hours or 0.0) / 8.0"/>
+                </t>
+                <t t-if="'remaining_pto_balance' in o._fields">
+                    <t t-set="pto_days" t-value="(o.remaining_pto_balance or 0.0) / 8.0"/>
+                </t>
+                <t t-else="">
+                    <t t-set="pto_days" t-value="pto_days_raw or 0.0"/>
+                </t>
+                <t t-if="'remaining_extra_hours_balance' in o._fields">
+                    <t t-set="extra_hrs" t-value="o.remaining_extra_hours_balance or 0.0"/>
+                </t>
+                <t t-else="">
+                    <t t-set="extra_hrs" t-value="extra_hrs_raw or 0.0"/>
+                </t>
                 <t t-set="unpaid" t-value="o.worked_days_line_ids.filtered(lambda d: d.work_entry_type_id.code in cfg['unpaid_codes'] or 'unpaid' in (d.work_entry_type_id.code or '').lower() or 'unpaid' in (d.name or '').lower() or 'absent' in (d.work_entry_type_id.code or '').lower() or 'absent' in (d.name or '').lower())"/>
                 <t t-set="lateness" t-value="o.worked_days_line_ids.filtered(lambda d: d.work_entry_type_id.code in ('LAT', 'LATENESS', 'DED_UNDERTIME') or 'late' in (d.work_entry_type_id.code or '').lower() or 'late' in (d.name or '').lower() or 'undertime' in (d.work_entry_type_id.code or '').lower() or 'undertime' in (d.name or '').lower())"/>
                 <t t-set="deduction_worked_lines" t-value="unpaid | lateness"/>
@@ -167,19 +189,6 @@
                 <t t-set="rows" t-value="max(cfg['minimum_rows'], len(allowances), len(deductions))"/>
                 <t t-set="ref_date" t-value="o.date_to or o.date_from"/>
                 <t t-set="month_total_days" t-value="((29 if (ref_date.year % 4 == 0 and (ref_date.year % 100 != 0 or ref_date.year % 400 == 0)) else 28) if ref_date.month == 2 else (30 if ref_date.month in (4, 6, 9, 11) else 31)) if ref_date else 30.0"/>
-                <!-- Annual leave accrual for the termination month -->
-                <t t-set="existing_annual_days" t-value="annual_days"/>
-                <t t-set="termination_accrued_days" t-value="0.0"/>
-                <t t-if="o.date_to">
-                    <t t-set="c_start" t-value="version.contract_date_start if (version and 'contract_date_start' in version._fields and version.contract_date_start) else (o.contract_id.date_start if (o.contract_id and 'date_start' in o.contract_id._fields and o.contract_id.date_start) else False)"/>
-                    <t t-set="svc_years" t-value="(o.date_to.year - c_start.year - (1 if (o.date_to.month, o.date_to.day) &lt; (c_start.month, c_start.day) else 0)) if c_start else 0"/>
-                    <t t-set="accrual_rate" t-value="1.75 if svc_years &gt;= 5 else 1.17"/>
-                    <t t-set="dim_accrual" t-value="30.0"/>
-                    <t t-set="rule_accrued_line" t-value="lines.filtered(lambda l: l.code in ('ACCRUED_ANNUAL', 'ACCRUAL_ANNUAL', 'LEAVE_ACCRUAL', 'CLEAR_ACCRUAL') or ('accrual' in (l.name or '').lower() and 'leave' in (l.name or '').lower()))[:1]"/>
-                    <t t-set="calc_accrued" t-value="round(accrual_rate * min(o.date_to.day, 30) / dim_accrual, 2)"/>
-                    <t t-set="termination_accrued_days" t-value="(rule_accrued_line.quantity if (rule_accrued_line and 'quantity' in rule_accrued_line._fields and rule_accrued_line.quantity) else False) or calc_accrued"/>
-                </t>
-                <t t-set="annual_days" t-value="round(existing_annual_days + termination_accrued_days, 2)"/>
                 <t t-set="basic_days" t-value="o[cfg['basis_days_field']] if (cfg.get('basis_days_field') and cfg['basis_days_field'] in o._fields and o[cfg['basis_days_field']]) else month_total_days"/>
                 <t t-set="worked_days_count" t-value="sum(worked.mapped('number_of_days')) if worked else 0.0"/>
                 <t t-set="actual_days" t-value="worked_days_count"/>
@@ -293,8 +302,7 @@
                 </table>
                 <div class="balance-boxes-container" style="margin: 10px 0 14px;">
                     <div style="font-weight: bold; font-size: 10px; margin-bottom: 5px; color: #151515;">
-                        Vacation &amp; Leave Balances / أرصدة الإجازات والمستحقات:
-                    </div>
+                        Vacation &amp; Leave Balances / أرصدة الإجازات والمستحقات:                    </div>
                     <table style="width: 100%; border-collapse: collapse; table-layout: fixed;">
                         <tr>
                             <td style="width: 33.333%; padding: 0 4px 0 0; vertical-align: top;">
@@ -305,11 +313,6 @@
                                     <div style="font-size: 11px; font-weight: bold; color: #000;">
                                         <span t-out="annual_days" t-options="{'widget': 'float', 'precision': 2}"/> يوم / Days
                                     </div>
-                                    <t t-if="termination_accrued_days &gt; 0">
-                                        <div class="muted" style="font-size: 8px; margin-top: 2px;">
-                                            (رصيد: <t t-out="existing_annual_days" t-options="{'widget': 'float', 'precision': 2}"/> + استحقاق: <t t-out="termination_accrued_days" t-options="{'widget': 'float', 'precision': 2}"/>)
-                                        </div>
-                                    </t>
                                 </div>
                             </td>
                             <td style="width: 33.333%; padding: 0 4px; vertical-align: top;">
