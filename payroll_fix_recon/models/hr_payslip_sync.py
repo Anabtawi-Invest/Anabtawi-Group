@@ -282,18 +282,26 @@ class HrLeave(models.Model):
         cr = self.env.cr
         pending = cr.precommit.data.setdefault('pfr_leave_fractions', {})
         pending[self.id] = (query, args)
-        cr.precommit.add(self._pfr_reapply_fractions)
+        # ONE hook per transaction: several hooks that each re-queue themselves behind the others never end
+        if not cr.precommit.data.get('pfr_leave_fraction_hook'):
+            cr.precommit.data['pfr_leave_fraction_hook'] = True
+            cr.precommit.data['pfr_leave_fraction_rounds'] = 0
+            cr.precommit.add(self._pfr_reapply_fractions)
 
     def _pfr_reapply_fractions(self):
         cr = self.env.cr
         pending = cr.precommit.data.get('pfr_leave_fractions') or {}
         for query, args in pending.values():
             cr.execute(query, args)
+        rounds = cr.precommit.data.get('pfr_leave_fraction_rounds', 0) + 1
+        cr.precommit.data['pfr_leave_fraction_rounds'] = rounds
         funcs = getattr(cr.precommit, '_funcs', None)
-        if funcs:                                       # other pre-commit hooks still queued: go last again
+        if funcs and rounds < 5:                        # other pre-commit hooks still queued: go last again
             cr.precommit.add(self._pfr_reapply_fractions)
         else:
             cr.precommit.data.pop('pfr_leave_fractions', None)
+            cr.precommit.data.pop('pfr_leave_fraction_hook', None)
+            cr.precommit.data.pop('pfr_leave_fraction_rounds', None)
         self.env['hr.leave'].invalidate_model(['number_of_days', 'number_of_hours', 'duration_display'])
 
     def pfr_fix_settlement_leave_days(self):
