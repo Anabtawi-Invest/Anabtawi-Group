@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from odoo import api, fields, models, _
+from odoo import fields, models
 
 
 class DeferredExpenseModel(models.Model):
@@ -51,12 +51,6 @@ class DeferredExpenseModel(models.Model):
         string="Analytic Account",
         check_company=True,
     )
-    entry_move_ids = fields.One2many(
-        "account.move",
-        "deferred_expense_model_id",
-        string="Deferral Entries",
-    )
-    entry_count = fields.Integer(compute="_compute_entry_count")
 
     _sql_constraints = [
         (
@@ -65,19 +59,3 @@ class DeferredExpenseModel(models.Model):
             "Number of Recognitions must be greater than zero.",
         ),
     ]
-
-    @api.depends("entry_move_ids")
-    def _compute_entry_count(self):
-        for model in self:
-            model.entry_count = len(model.entry_move_ids)
-
-    def action_open_entries(self):
-        self.ensure_one()
-        return {
-            "type": "ir.actions.act_window",
-            "name": _("Entries using %s", self.name),
-            "res_model": "account.move",
-            "view_mode": "list,form",
-            "domain": [("deferred_expense_model_id", "=", self.id)],
-            "context": {"default_move_type": "entry"},
-        }
