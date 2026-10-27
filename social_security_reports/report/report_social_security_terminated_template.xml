@@ -1,0 +1,306 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="report_social_security_terminated_template">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <div class="article" style="direction: rtl; font-family: Arial, sans-serif; color: #000; font-size: 8pt; margin: 0; padding: 0;">
+                    
+                    <style type="text/css">
+                        .boxes-table {
+                            border-collapse: collapse;
+                            display: inline-table;
+                            vertical-align: middle;
+                        }
+                        .box-cell {
+                            border: 1px solid #000;
+                            width: 30px;
+                            height: 18px;
+                            text-align: center;
+                            vertical-align: middle;
+                            font-size: 8pt;
+                            font-weight: bold;
+                            font-family: Arial, sans-serif;
+                            padding: 0;
+                        }
+                        .box-cell-deduct {
+                            border: 1px solid #000;
+                            width: 34px;
+                            height: 18px;
+                            text-align: center;
+                            vertical-align: middle;
+                            font-size: 10.5pt;
+                            font-family: Arial, sans-serif;
+                            padding: 0;
+                        }
+                        .main-table-term {
+                            width: 100%;
+                            border-collapse: collapse;
+                            border: 2px solid #000;
+                            font-family: Arial, sans-serif;
+                            text-align: center;
+                            table-layout: fixed;
+                        }
+                        .main-table-term th, .main-table-term td {
+                            border: 1px solid #000;
+                            padding: 1px 2px;
+                            vertical-align: middle;
+                            overflow: hidden;
+                        }
+                        .main-table-term th {
+                            font-size: 8.6pt;
+                            font-weight: bold;
+                            background: #fff;
+                        }
+                        .main-table-term td {
+                            font-size: 7.6pt;
+                        }
+                        .rot-col-seq {
+                            -webkit-transform: rotate(90deg);
+                            transform: rotate(90deg);
+                            white-space: nowrap;
+                            display: inline-block;
+                            font-weight: bold;
+                            font-size: 8.6pt;
+                            width: 65px;
+                            text-align: center;
+                            margin-left: -24px;
+                            margin-right: -24px;
+                        }
+                        .rot-col-reason {
+                            -webkit-transform: rotate(90deg);
+                            transform: rotate(90deg);
+                            white-space: nowrap;
+                            display: inline-block;
+                            font-weight: bold;
+                            font-size: 8.6pt;
+                            width: 65px;
+                            text-align: center;
+                        }
+                        .vth-term {
+                            padding: 0 !important;
+                            text-align: center;
+                            vertical-align: middle;
+                            height: 65px;
+                        }
+                        .total-table {
+                            width: 100%;
+                            border-collapse: collapse;
+                            margin-top: -1px;
+                            font-family: Arial, sans-serif;
+                            text-align: center;
+                            table-layout: fixed;
+                        }
+                        .total-table td {
+                            padding: 2px;
+                            vertical-align: middle;
+                        }
+                        .total-box {
+                            border: 2px solid #000;
+                            border-top: 1px solid #000;
+                        }
+                    </style>
+
+                    <!-- Top Header: Logo on Right, Title in Center, Page on Left in RTL -->
+                    <table style="width: 100%; border-collapse: collapse; border: none; margin-bottom: 2px;">
+                        <tr>
+                            <!-- Right in RTL: Logo -->
+                            <td style="width: 25%; text-align: right; vertical-align: top;">
+                                <div style="display: inline-block; text-align: center;">
+                                    <img src="data:image/jpeg;base64,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" style="height: 48px; display: block; margin: 0 auto;"/>
+                                    <div style="font-size: 15.3pt; font-family: Arial, sans-serif; margin-top: 2px; color: #000;">ضمان مستقبلك</div>
+                                </div>
+                            </td>
+                            <!-- Center: Title -->
+                            <td style="width: 50%; text-align: center; vertical-align: top;">
+                                <div style="font-size: 17.2pt; font-weight: bold; display: inline-block; border-bottom: 1.5px solid #000; padding-bottom: 4px; margin-bottom: 8px; color: #000;">
+                                    الكشف المالي للمؤمن عليهم الذين انتهت خدماتهم
+                                </div>
+                                <div style="font-size: 12.4pt; margin-top: 6px; color: #000;">
+                                    الاشتراكات الشهرية للمؤمن عليهم الذين انتهت خدماتهم خلال شهر
+                                    <span style="display: inline-block; border-bottom: 1.5px dotted #000; padding: 0 16px; font-size: 10.5pt;" t-out="o.get_month_name_ar()"/>
+                                    /
+                                    <span style="display: inline-block; border-bottom: 1.5px dotted #000; padding: 0 16px; font-size: 10.5pt;" t-out="o.year"/>
+                                </div>
+                            </td>
+                            <!-- Left in RTL: Page Number -->
+                            <td style="width: 25%; text-align: left; vertical-align: top; padding-top: 25px;">
+                                <div style="font-size: 10.5pt; text-align: left; color: #000;">
+                                    <span>رقم الصفحة</span>
+                                    <span style="display: inline-block; border-bottom: 2px dotted #000; padding: 0 12px; letter-spacing: 4px; margin-right: 4px; white-space: nowrap; direction: ltr;">0 1</span>
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+
+                    <!-- Facility Number and Deduction Rate -->
+                    <table style="width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 8px;">
+                        <tr>
+                            <!-- Right in RTL: Facility Number -->
+                            <td style="width: 55%; text-align: right; vertical-align: middle;">
+                                <span style="font-size: 11.5pt; font-family: Arial, sans-serif; margin-left: 15px; color: #000;">رقم التأمين الثابت للمنشأة</span>
+                                <t t-set="est_str" t-value="str(o.company_id.ssc_establishment_number or '2883').strip()"/>
+                                <table class="boxes-table">
+                                    <tr>
+                                        <td class="box-cell"><t t-out="est_str[0] if len(est_str) &gt; 0 else '2'"/></td>
+                                        <td class="box-cell"><t t-out="est_str[1] if len(est_str) &gt; 1 else '8'"/></td>
+                                        <td class="box-cell"><t t-out="est_str[2] if len(est_str) &gt; 2 else '8'"/></td>
+                                        <td class="box-cell"><t t-out="est_str[3] if len(est_str) &gt; 3 else '3'"/></td>
+                                        <td class="box-cell"><t t-out="est_str[4] if len(est_str) &gt; 4 else ''"/></td>
+                                    </tr>
+                                </table>
+                            </td>
+                            <!-- Left in RTL: Deduction Rate -->
+                            <td style="width: 45%; text-align: left; vertical-align: middle;">
+                                <span style="font-size: 11.5pt; font-family: Arial, sans-serif; margin-left: 8px; color: #000;">نسبة الاقتطاع</span>
+                                <table class="boxes-table" style="margin-left: 8px;">
+                                    <tr>
+                                        <td class="box-cell-deduct">75</td>
+                                        <td class="box-cell-deduct">21</td>
+                                    </tr>
+                                </table>
+                                <span style="font-size: 11.5pt; font-family: Arial, sans-serif; color: #000;">%</span>
+                            </td>
+                        </tr>
+                    </table>
+
+                    <!-- Company Name Line -->
+                    <div style="font-size: 11.5pt; margin-bottom: 12px; text-align: right; color: #000;">
+                        <span>اسم المنشأة : &#160;&#160;</span>
+                        <span style="display: inline-block; border-bottom: 1px dotted #000; padding: 0 10px;" t-out="o.company_id.name or 'شركة نجيب ذوابي وشركاه - حلويات العنبتاوي'"/>
+                        <div style="border-bottom: 1px dashed #000; width: 100%; margin-top: 4px;"></div>
+                    </div>
+
+                    <!-- Main Table -->
+                    <table class="main-table-term">
+                        <thead>
+                            <tr style="height: 42px;">
+                                <th rowspan="2" class="vth-term" style="width: 3.2%;"><span class="rot-col-seq">الرقم المتسلسل</span></th>
+                                <th rowspan="2" style="width: 13.7%;">رقم التأمين الثابت</th>
+                                <th colspan="4" style="width: 32.6%;">اسم المؤمن عليه</th>
+                                <th colspan="2" style="width: 11.6%;">الأجر الشهري<br/>الخاضع للاقتطاع</th>
+                                <th colspan="3" style="width: 21.0%;">تاريخ إيقاف<br/>الاقتطاع</th>
+                                <th rowspan="2" class="vth-term" style="width: 8.4%;"><span class="rot-col-reason">سبب الإيقاف</span></th>
+                                <th rowspan="2" style="width: 9.5%; line-height: 1.2;">الفرع<br/>أو<br/>المديرية</th>
+                            </tr>
+                            <tr style="height: 22px;">
+                                <th style="width: 9.5%;">الأول</th>
+                                <th style="width: 8.4%;">الأب</th>
+                                <th style="width: 7.4%;">الجد</th>
+                                <th style="width: 7.4%;">العائلة</th>
+                                <th style="width: 5.3%;">فلس</th>
+                                <th style="width: 6.3%;">دينار</th>
+                                <th style="width: 6.3%;">يوم</th>
+                                <th style="width: 6.3%;">شهر</th>
+                                <th style="width: 8.4%;">سنة</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <t t-set="seq" t-value="1"/>
+                            <t t-set="total_wage" t-value="0.0"/>
+                            <t t-set="emps" t-value="o.get_terminated_employees_data()"/>
+                            <tr t-foreach="emps" t-as="emp" style="height: 18px;">
+                                <t t-set="wage" t-value="emp.get_ssc_wage()"/>
+                                <t t-set="total_wage" t-value="total_wage + wage"/>
+                                <t t-set="dinars" t-value="int(wage)"/>
+                                <t t-set="ed" t-value="emp.get_ssc_end_date()"/>
+                                <t t-set="name_parts" t-value="emp.get_arabic_name_parts()"/>
+                                <t t-set="ssn" t-value="emp.get_ssc_number()"/>
+
+                                <td><t t-out="seq"/></td>
+                                <td><t t-out="ssn"/></td>
+                                <td><t t-out="name_parts[0]"/></td>
+                                <td><t t-out="name_parts[1]"/></td>
+                                <td><t t-out="name_parts[2]"/></td>
+                                <td><t t-out="name_parts[3]"/></td>
+                                <td>000</td>
+                                <td style="font-weight: bold;"><t t-out="dinars"/></td>
+                                <td><t t-out="'{:02d}'.format(ed.day) if ed else ''"/></td>
+                                <td><t t-out="'{:02d}'.format(ed.month) if ed else ''"/></td>
+                                <td><t t-out="ed.year if ed else ''"/></td>
+                                <td>
+                                    <t t-if="'departure_reason_id' in emp._fields and emp.departure_reason_id">
+                                        <t t-out="emp.departure_reason_id.name"/>
+                                    </t>
+                                    <t t-elif="'profile_employment_status' in emp._fields and emp.profile_employment_status">
+                                        <t t-out="emp.profile_employment_status"/>
+                                    </t>
+                                </td>
+                                <!-- عامود الفرع أو المديرية فارغ تماما -->
+                                <td></td>
+                                <t t-set="seq" t-value="seq + 1"/>
+                            </tr>
+                            <tr t-if="not emps">
+                                <td colspan="13" style="border: 1px solid #000; padding: 15px; color: #666; font-size: 10pt;">
+                                    لا يوجد موظفين انتهت خدماتهم في الضمان الاجتماعي خلال هذا الشهر
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <!-- Total Row: Directly under العائلة (7.4%) | فلس (5.3%) | دينار (6.3%) -->
+                    <t t-if="emps">
+                        <table class="total-table">
+                            <tr>
+                                <td style="width: 42.2%; border: none;"></td>
+                                <td class="total-box" style="width: 7.4%; font-size: 8.6pt; font-weight: bold;">المجموع</td>
+                                <td class="total-box" style="width: 5.3%; font-size: 7.6pt;">000</td>
+                                <td class="total-box" style="width: 6.3%; font-size: 7.6pt; font-weight: bold;"><t t-out="'{:,.0f}'.format(total_wage)"/></td>
+                                <td style="width: 38.8%; border: none;"></td>
+                            </tr>
+                        </table>
+                    </t>
+
+                    <!-- Footer Declaration & Signatures -->
+                    <div style="margin-top: 20px; page-break-inside: avoid;">
+                        <div style="border-top: 1px solid #000; width: 100%; margin-bottom: 8px;"></div>
+                        
+                        <div style="font-size: 10.5pt; font-weight: bold; text-align: right; margin-bottom: 8px; color: #000;">
+                            إقرار: أقر بأن البيانات أعلاه صحيحة وأتحمل مسؤولية ما يخالف ذلك """"
+                        </div>
+
+                        <table style="width: 100%; border-collapse: collapse; font-size: 10.5pt; font-weight: bold; margin-bottom: 12px;">
+                            <tr>
+                                <td style="width: 40%; text-align: right; vertical-align: top;">
+                                    <div>اسم ضابط الارتباط المفوض بالتوقيع</div>
+                                    <div style="border-bottom: 1px solid #000; width: 85%; margin-top: 10px;"></div>
+                                </td>
+                                <td style="width: 30%; text-align: center; vertical-align: top;">
+                                    <div>التاريخ: &#160;&#160;&#160;&#160; / &#160;&#160;&#160;&#160; / &#160;&#160;&#160;&#160;</div>
+                                    <div style="border-bottom: 1px solid #000; width: 70%; margin: 10px auto 0 auto;"></div>
+                                </td>
+                                <td style="width: 30%; text-align: left; vertical-align: top;">
+                                    <div style="text-align: right; padding-right: 25px;">ختم المنشأة</div>
+                                    <div style="border-bottom: 1px solid #000; width: 70%; margin-top: 10px;"></div>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <div style="border-top: 1px solid #000; width: 100%; margin-bottom: 8px;"></div>
+
+                        <div style="font-size: 10.5pt; font-weight: bold; text-align: right; margin-bottom: 8px; color: #000;">
+                            لاستعمال المؤسسة
+                        </div>
+
+                        <table style="width: 100%; border-collapse: collapse; font-size: 10.5pt; font-weight: bold;">
+                            <tr>
+                                <td style="width: 40%; text-align: right; vertical-align: top;">
+                                    <div>اسم مستلم البيانات وتوقيعه / ختم الوارد</div>
+                                    <div style="border-bottom: 1px solid #000; width: 85%; margin-top: 10px;"></div>
+                                </td>
+                                <td style="width: 35%; text-align: center; vertical-align: top;">
+                                    <div>اسم المدخل وتوقيعه / ختم الإدخال</div>
+                                    <div style="border-bottom: 1px solid #000; width: 75%; margin: 10px auto 0 auto;"></div>
+                                </td>
+                                <td style="width: 25%; text-align: left; vertical-align: top;">
+                                    <div style="text-align: right; padding-right: 15px;">اسم المدقق وتوقيعه</div>
+                                    <div style="border-bottom: 1px solid #000; width: 75%; margin-top: 10px;"></div>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+
+                </div>
+            </t>
+        </t>
+    </template>
+</odoo>
