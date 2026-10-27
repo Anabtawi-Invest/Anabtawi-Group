@@ -32,18 +32,14 @@ class AccountMove(models.Model):
         }
 
     def _prepare_deferred_expense_models_on_lines(self):
-        """Ensure deferred models are applied before deferral generation (bills + JE)."""
+        """Link deferred models on lines before deferral generation (dates stay manual)."""
         for move in self.filtered(
             lambda m: m.is_purchase_document(include_receipts=True) or m.is_entry()
         ):
             for line in move.line_ids.filtered(lambda l: not l.display_type):
                 model = line._get_deferred_expense_model()
-                if not model:
-                    continue
-                if not line.deferred_expense_model_id:
+                if model and not line.deferred_expense_model_id:
                     line.deferred_expense_model_id = model
-                if not line.deferred_start_date:
-                    line._apply_deferred_expense_model(model)
 
     def _post(self, soft=True):
         self._prepare_deferred_expense_models_on_lines()

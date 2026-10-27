@@ -6,7 +6,6 @@
         <field name="arch" type="xml">
             <list>
                 <field name="name"/>
-                <field name="recognition_months"/>
                 <field name="deferred_expense_account_id"/>
                 <field name="expense_account_id"/>
                 <field name="journal_id"/>
@@ -22,6 +21,15 @@
         <field name="arch" type="xml">
             <form string="Deferred Expense Model">
                 <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_open_entries"
+                                type="object"
+                                class="oe_stat_button"
+                                icon="fa-bars"
+                                invisible="entry_count == 0">
+                            <field name="entry_count" widget="statinfo" string="Entries"/>
+                        </button>
+                    </div>
                     <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
                     <div class="oe_title">
                         <label for="name"/>
@@ -30,14 +38,6 @@
                         </h1>
                     </div>
                     <group>
-                        <group string="Depreciation Method">
-                            <label for="recognition_months"/>
-                            <div class="o_row">
-                                <field name="recognition_months" class="oe_inline"/>
-                                <span>Months</span>
-                            </div>
-                            <field name="prorata_temporis"/>
-                        </group>
                         <group string="Accounting">
                             <field name="deferred_expense_account_id"/>
                             <field name="expense_account_id"/>
@@ -74,8 +74,9 @@
                 Create a deferred expense model
             </p>
             <p>
-                Define prepaid and expense accounts plus the number of recognition months,
-                then assign the model on products used on vendor bills.
+                Define prepaid and expense accounts (and optional journal/analytic),
+                then select the model on journal entries or products.
+                Enter the deferred period dates directly on the journal entry line.
             </p>
         </field>
     </record>
