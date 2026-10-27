@@ -6,6 +6,7 @@
     "license": "LGPL-3",
     "depends": ["hr_payroll"],
     "data": [
+        "data/report_paperformat.xml",
         "views/report_payslip_templates.xml",
     ],
     "installable": True,
