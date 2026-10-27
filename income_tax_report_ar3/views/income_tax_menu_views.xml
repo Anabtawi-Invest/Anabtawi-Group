@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Menu Item under Employees > Reporting -->
+    <menuitem id="menu_income_tax_report_ar3"
+              name="Income TAX report (AR/3)"
+              parent="hr.hr_menu_hr_reports"
+              action="action_income_tax_report_wizard"
+              sequence="20"/>
+
+</odoo>
