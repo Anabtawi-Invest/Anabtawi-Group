@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_deferred_expense_model_readonly,deferred.expense.model readonly,model_deferred_expense_model,account.group_account_readonly,1,0,0,0
+access_deferred_expense_model_manager,deferred.expense.model manager,model_deferred_expense_model,account.group_account_manager,1,1,1,1
