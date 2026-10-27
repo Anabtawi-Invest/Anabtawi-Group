@@ -44,6 +44,33 @@ class AccountMoveLine(models.Model):
             return True
         return super()._has_deferred_compatible_account()
 
+    def _deferred_expense_model_for_account(self):
+        """The single active model whose expense account is this line's account."""
+        self.ensure_one()
+        if not self.account_id:
+            return self.env["deferred.expense.model"]
+        company = self.company_id or self.move_id.company_id or self.env.company
+        matches = self.env["deferred.expense.model"].search([
+            ("expense_account_id", "=", self.account_id.id),
+            ("company_id", "=", company.id),
+        ])
+        return matches if len(matches) == 1 else self.env["deferred.expense.model"]
+
+    @api.onchange("account_id")
+    def _onchange_account_id_deferred_expense_model(self):
+        for line in self:
+            if not line._can_apply_deferred_expense_model():
+                continue
+            model = line._deferred_expense_model_for_account()
+            if model:
+                if line.deferred_expense_model_id != model:
+                    line.deferred_expense_model_id = model
+            elif (
+                line.deferred_expense_model_id
+                and line.deferred_expense_model_id.expense_account_id != line.account_id
+            ):
+                line.deferred_expense_model_id = False
+
     @api.onchange("product_id")
     def _onchange_product_id_deferred_expense_model(self):
         for line in self:
