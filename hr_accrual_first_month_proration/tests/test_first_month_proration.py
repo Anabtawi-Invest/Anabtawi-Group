@@ -34,10 +34,13 @@ class TestFirstMonthProration(TransactionCase):
             'accrual_plan_id': plan.id,
             'date_from': date(2026, 8, 18),
         })
+        alloc._get_contract_start_date = lambda: date(2026, 8, 18)
         start, end = date(2026, 7, 30), date(2026, 8, 30)
         self.assertFalse(alloc._is_first_month_proration_due(level, start, end))  # opt-in off
         plan.prorate_first_month = True
         self.assertTrue(alloc._is_first_month_proration_due(level, start, end))
+        # only the period holding the contract start, never another month
+        self.assertFalse(alloc._is_first_month_proration_due(level, date(2026, 8, 30), date(2026, 9, 30)))
         alloc.first_month_prorated = True
         self.assertFalse(alloc._is_first_month_proration_due(level, start, end))  # once only
 

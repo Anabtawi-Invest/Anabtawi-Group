@@ -23,20 +23,32 @@ class HrLeaveAllocation(models.Model):
         days_in_month = calendar.monthrange(ref_date.year, ref_date.month)[1]
         return (days_in_month - ref_date.day + 1) / days_in_month
 
+    def _get_contract_start_date(self):
+        """First day of employment: the contract active at the allocation start, else the earliest contract.
+
+        Independent of the plan's milestone reference, so the first month is only ever prorated
+        for the month in which the employee actually joined.
+        """
+        self.ensure_one()
+        employee = self.employee_id.sudo()
+        contract_start, _contract_end = employee._get_contract_dates(self.date_from)
+        if contract_start:
+            return contract_start
+        periods = employee._get_all_contract_dates()
+        return min(date_from for date_from, _date_to in periods) if periods else False
+
     def _is_first_month_proration_due(self, level, period_start, period_end):
+        """True only for the single monthly period that contains the contract start date."""
         self.ensure_one()
         plan = self.accrual_plan_id
         if not plan.prorate_first_month or self.first_month_prorated:
             return False
         if level.frequency != 'monthly' or plan.is_based_on_worked_time:
             return False
-        if self.number_of_days or self.yearly_accrued_amount:
+        join_date = self._get_contract_start_date()
+        if not join_date or join_date.day == 1:
             return False
-        ref_date = self._get_accrual_reference_date()
-        if not ref_date or ref_date.day == 1:
-            return False
-        # Only the period containing the joining date, never a backdated one.
-        return period_start <= ref_date <= period_end
+        return period_start <= join_date < period_end
 
     def _get_contract_end_date(self):
         """Last day of employment, or False while any contract is open-ended."""
@@ -62,7 +74,7 @@ class HrLeaveAllocation(models.Model):
         if not first_due and not contract_end:
             return None
 
-        month_date = self._get_accrual_reference_date() if first_due else period_end - timedelta(days=1)
+        month_date = self._get_contract_start_date() if first_due else period_end - timedelta(days=1)
         days_in_month = calendar.monthrange(month_date.year, month_date.month)[1]
         first_day = month_date.day if first_due else 1
         last_day = days_in_month
@@ -92,9 +104,9 @@ class HrLeaveAllocation(models.Model):
             maximum_leave_yearly = current_level.maximum_leave_yearly
             if current_level.added_value_type == 'hour':
                 maximum_leave_yearly = maximum_leave_yearly / self.employee_id._get_hours_per_day(self.nextcall or self.date_from)
-            days_to_add = min(days_to_add, maximum_leave_yearly - self.yearly_accrued_amount)
+            days_to_add = min(days_to_add, max(0.0, maximum_leave_yearly - self.yearly_accrued_amount))
         if current_level.cap_accrued_time:
-            days_to_add = min(days_to_add, leaves_taken + current_level_maximum_leave - self.number_of_days)
+            days_to_add = min(days_to_add, max(0.0, leaves_taken + current_level_maximum_leave - self.number_of_days))
 
         self.number_of_days += days_to_add
         self.yearly_accrued_amount += days_to_add
