@@ -719,7 +719,12 @@ class HrPayslipRun(models.Model):
                 lateness_hrs = summary["lateness_hrs"]
                 out_of_contract_days = summary["out_of_contract_days"]
                 worked_hrs = sum(worked_days.mapped("number_of_hours"))
-                ot_hrs = sum(worked_days.filtered(lambda wd: "overtime" in (wd.code or "").lower() or "ot" in (wd.code or "").lower() or "extra" in (wd.code or "").lower()).mapped("number_of_hours"))
+                ot_hrs = sum(worked_days.filtered(
+                    lambda wd: any(
+                        key in payslip._xlsx_entry_code(wd).lower()
+                        for key in ("overtime", "ot", "extra")
+                    )
+                ).mapped("number_of_hours"))
 
                 # Gather notes
                 input_notes = []

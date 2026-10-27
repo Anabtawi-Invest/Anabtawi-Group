@@ -56,12 +56,27 @@ class HrPayslip(models.Model):
     # ------------------------------------------------------------------
     # Worked days helpers (one definition shared by the payslip and pay run exports)
     # ------------------------------------------------------------------
+    def _xlsx_work_entry_type(self, wd):
+        """Type linked on a worked-day line the payroll user is already allowed to export.
+
+        hr.work.entry.type read is limited to HR officers, and a global country
+        rule can hide the type even from admin. The audit only needs code, name
+        and pay percent.
+        """
+        return wd.work_entry_type_id.sudo()
+
+    def _xlsx_entry_code(self, wd):
+        return (self._xlsx_work_entry_type(wd).code or "").strip()
+
+    def _xlsx_entry_name(self, wd):
+        return (self._xlsx_work_entry_type(wd).name or "").strip()
+
     def _xlsx_classify_worked_day(self, wd):
         """'absent' | 'lateness' | 'out_of_contract' | 'ignore' (unpaid / overtime) | 'paid'.
         'paid' covers Attendance, Public Holiday, Annual, Sick, Paid Time Off, Travel, Work Injury..."""
-        code = (wd.work_entry_type_id.code or wd.code or "").strip().upper()
+        code = self._xlsx_entry_code(wd).upper()
         name = (wd.name or "").strip().lower()
-        type_name = (wd.work_entry_type_id.name or "").strip().lower()
+        type_name = self._xlsx_entry_name(wd).lower()
         text = f"{name} {type_name}"
 
         if code in ("ABS", "ABSENT") or any(k in text for k in ("absent", "absence", "غياب")):
@@ -80,7 +95,8 @@ class HrPayslip(models.Model):
 
     def _xlsx_pay_factor(self, wd):
         """Share of the day that is paid (e.g. Work Injury = 7.5%), from the work entry type."""
-        pct = getattr(wd.work_entry_type_id, "pfr_pay_percent", None)
+        wet = self._xlsx_work_entry_type(wd)
+        pct = wet.pfr_pay_percent if "pfr_pay_percent" in wet._fields else None
         return 1.0 if pct is None else pct / 100.0
 
     def _xlsx_daily_wage(self):
@@ -95,8 +111,8 @@ class HrPayslip(models.Model):
 
     def _xlsx_is_travel_suspension(self, wd):
         """Travel Suspension Deduction (code TSD) lines are excluded from Attendance Days."""
-        code = (wd.work_entry_type_id.code or wd.code or "").strip().upper()
-        text = f"{wd.name or ''} {wd.work_entry_type_id.name or ''}".lower()
+        code = self._xlsx_entry_code(wd).upper()
+        text = f"{wd.name or ''} {self._xlsx_entry_name(wd)}".lower()
         return code == "TSD" or "travel suspension" in text
 
     def _xlsx_attendance_summary(self):
@@ -258,7 +274,9 @@ class HrPayslip(models.Model):
                     sheet.write(row, col, header, label_fmt)
                 row += 1
 
-                worked_lines = payslip.worked_days_line_ids.filtered(lambda wd: wd.code != "OUT")
+                worked_lines = payslip.worked_days_line_ids.filtered(
+                    lambda wd: payslip._xlsx_entry_code(wd).upper() != "OUT"
+                )
                 daily_wage = payslip._xlsx_daily_wage()
                 paid_amount = 0.0
                 for line in worked_lines:
