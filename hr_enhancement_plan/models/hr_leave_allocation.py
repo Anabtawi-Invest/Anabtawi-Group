@@ -280,9 +280,7 @@ class HrLeaveAllocation(models.Model):
                     allocation.nextcall = date_to
                     force_period = False
 
-            # `already_accrued` is True when this period's start-of-period gain was already granted (days != 0)
-            # and no new period was entered in the loop above; without this guard every run adds it again.
-            if allocation.accrual_plan_id.accrued_gain_time == 'start' and not allocation.already_accrued:
+            if allocation.accrual_plan_id.accrued_gain_time == 'start':
                 ref_date_start = allocation._get_accrual_reference_date()
                 level_start = {
                     level._get_level_transition_date(ref_date_start): level
