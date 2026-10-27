@@ -174,9 +174,9 @@
                     <t t-set="c_start" t-value="version.contract_date_start if (version and 'contract_date_start' in version._fields and version.contract_date_start) else (o.contract_id.date_start if (o.contract_id and 'date_start' in o.contract_id._fields and o.contract_id.date_start) else False)"/>
                     <t t-set="svc_years" t-value="(o.date_to.year - c_start.year - (1 if (o.date_to.month, o.date_to.day) &lt; (c_start.month, c_start.day) else 0)) if c_start else 0"/>
                     <t t-set="accrual_rate" t-value="1.75 if svc_years &gt;= 5 else 1.17"/>
-                    <t t-set="dim_accrual" t-value="month_total_days if (month_total_days and month_total_days &gt; 0) else 30.0"/>
+                    <t t-set="dim_accrual" t-value="30.0"/>
                     <t t-set="rule_accrued_line" t-value="lines.filtered(lambda l: l.code in ('ACCRUED_ANNUAL', 'ACCRUAL_ANNUAL', 'LEAVE_ACCRUAL', 'CLEAR_ACCRUAL') or ('accrual' in (l.name or '').lower() and 'leave' in (l.name or '').lower()))[:1]"/>
-                    <t t-set="calc_accrued" t-value="round(accrual_rate * o.date_to.day / dim_accrual, 2)"/>
+                    <t t-set="calc_accrued" t-value="round(accrual_rate * min(o.date_to.day, 30) / dim_accrual, 2)"/>
                     <t t-set="termination_accrued_days" t-value="(rule_accrued_line.quantity if (rule_accrued_line and 'quantity' in rule_accrued_line._fields and rule_accrued_line.quantity) else False) or calc_accrued"/>
                 </t>
                 <t t-set="annual_days" t-value="round(existing_annual_days + termination_accrued_days, 2)"/>
