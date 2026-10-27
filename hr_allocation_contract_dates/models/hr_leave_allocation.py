@@ -1,13 +1,38 @@
 # -*- coding: utf-8 -*-
 import logging
 
-from odoo import api, models
+from odoo import api, fields, models
 
 _logger = logging.getLogger(__name__)
 
 
 class HrLeaveAllocation(models.Model):
     _inherit = 'hr.leave.allocation'
+
+    accrued_period_keys = fields.Char(
+        string='Accrued periods', copy=False, readonly=True,
+        help='Accrual periods already granted to this allocation. A period is granted at most once, '
+             'however many times the accrual runs (cron, manual run, recompute).')
+
+    def _add_days_to_allocation(self, current_level, current_level_maximum_leave, leaves_taken,
+                                period_start, period_end):
+        """Safeguard: grant any given period only once per allocation."""
+        if not (isinstance(self.id, int) and self.id):
+            return super()._add_days_to_allocation(
+                current_level, current_level_maximum_leave, leaves_taken, period_start, period_end)
+        self.ensure_one()
+        key = '%s|%s' % (period_start, period_end)
+        done = set(filter(None, (self.accrued_period_keys or '').split(',')))
+        if key in done:
+            _logger.info("[hr_allocation_contract_dates] allocation %s: period %s already accrued, skipped",
+                         self.id, key)
+            return None
+        result = super()._add_days_to_allocation(
+            current_level, current_level_maximum_leave, leaves_taken, period_start, period_end)
+        done.add(key)
+        self.sudo().with_context(tracking_disable=True, mail_notrack=True).write(
+            {'accrued_period_keys': ','.join(sorted(done))})
+        return result
 
     def _get_contract_period(self):
         """(first contract start, last day of employment or False while any contract is open-ended)."""
