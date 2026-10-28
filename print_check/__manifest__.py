@@ -1,6 +1,6 @@
 {
     'name': 'Print Bank Cheque - Jordan & Arab Countries',
-    'version': '19.0.2.10.0',
+    'version': '19.0.2.11.0',
     'description': """
 Print Bank Cheque Module
 ========================

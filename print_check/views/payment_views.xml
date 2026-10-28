@@ -24,9 +24,6 @@
                 <attribute name="readonly">state not in ['draft']</attribute>
             </xpath>
 
-            <xpath expr="//group[@name='group1']/field[@name='date']" position="attributes">
-                <attribute name="invisible">is_check_payment</attribute>
-            </xpath>
             <xpath expr="//group[@name='group1']/field[@name='date']" position="after">
                 <field name="is_check_payment" invisible="1"/>
                 <field name="check_date"

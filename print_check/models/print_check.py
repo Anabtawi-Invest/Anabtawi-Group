@@ -17,8 +17,7 @@ class AccountPaymentMethodLine(models.Model):
 
     is_check_payment = fields.Boolean(
         string='Check Payment',
-        help='Payments using this method keep their Date set to today while in draft '
-             'and use the Check Date field for the printed cheque.',
+        help='Payments using this method show a Check Date, which is the date printed on the cheque.',
     )
 
 
@@ -47,10 +46,13 @@ class AccountPayment(models.Model):
 
     @api.onchange('payment_method_line_id')
     def _onchange_check_payment_date(self):
-        if self.is_check_payment and self.state == 'draft':
-            self.date = fields.Date.context_today(self)
-            if not self.check_date:
-                self.check_date = self.date
+        """Copy the current accounting date into Check Date once.
+
+        Forcing the accounting date to today is handled by check_payment_entry_date.
+        This runs safely either before or after that module: it only fills an empty Check Date.
+        """
+        if self.is_check_payment and self.state == 'draft' and not self.check_date:
+            self.check_date = self.date
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -60,12 +62,9 @@ class AccountPayment(models.Model):
         )
         check_line_ids = set(method_lines.filtered('is_check_payment').ids)
         for vals in vals_list:
-            if vals.get('payment_method_line_id') in check_line_ids:
-                vals['check_date'] = vals.get('check_date') or vals.get('date') or today
-                vals['date'] = today
-        payments = super().create(vals_list)
-        payments._force_check_payment_date()
-        return payments
+            if vals.get('payment_method_line_id') in check_line_ids and not vals.get('check_date'):
+                vals['check_date'] = vals.get('date') or today
+        return super().create(vals_list)
 
     def write(self, vals):
         moved = self.filtered(lambda p: p.check_number_confirmed and (
@@ -76,12 +75,9 @@ class AccountPayment(models.Model):
         res = super().write(vals)
         if moved:
             moved.check_number_confirmed = False
-        if not self.env.context.get('skip_check_payment_date'):
-            self._force_check_payment_date()
         return res
 
     def action_post(self):
-        self._force_check_payment_date()
         keep = self.filtered(
             lambda p: p.check_number_confirmed and p.check_number and p.state == 'draft'
         )
@@ -111,14 +107,6 @@ class AccountPayment(models.Model):
             and p.payment_method_code == 'check_printing'
             and p.journal_id.check_manual_sequencing
         ).check_number_confirmed = True
-
-    def _force_check_payment_date(self):
-        today = fields.Date.context_today(self)
-        to_fix = self.filtered(
-            lambda p: p.is_check_payment and p.state == 'draft' and p.date != today
-        )
-        if to_fix:
-            to_fix.with_context(skip_check_payment_date=True).write({'date': today})
 
     def _get_cheque_memo(self):
         """Return memo/reference text for cheque printing (Odoo 19: memo, not ref)."""
