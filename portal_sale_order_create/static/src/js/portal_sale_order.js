@@ -61,6 +61,7 @@ async function fetchPaymentTerms() {
 }
 
 function initCreatePage(root) {
+    const vanMode = root.dataset.vanMode === "1";
     const state = {
         partner: null,
         paymentTermId: null,
@@ -69,6 +70,8 @@ function initCreatePage(root) {
         productOffset: 0,
         productTerm: "",
         productTotal: 0,
+        vanAddressId: null,
+        vanAddressMode: "existing", // existing | new
     };
 
     const partnerSearch = qs("#partner_search", root);
@@ -77,6 +80,8 @@ function initCreatePage(root) {
     const selectedLabel = qs("#selected_partner_label", root);
     const paymentTermWrap = qs("#payment_term_wrap", root);
     const paymentTermSelect = qs("#payment_term_id", root);
+    const vanAddressSelect = qs("#van_address_id", root);
+    const vanAddressNew = qs("#van_address_new", root);
     const cartBody = qs("#cart_body", root);
     const cartEmpty = qs("#cart_empty", root);
     const cartWrap = qs("#cart_table_wrap", root);
@@ -96,9 +101,44 @@ function initCreatePage(root) {
     let productTimer = null;
     let searchSeq = 0;
 
-    if (!partnerSearch || !partnerResults) {
+    if (!vanMode && (!partnerSearch || !partnerResults)) {
         console.error("portal_sale_order_create: partner search elements missing");
         return;
+    }
+
+    if (vanMode) {
+        const defaultTerm = parseInt(root.dataset.vanDefaultPaymentTermId || "", 10);
+        state.partner = {
+            id: parseInt(root.dataset.vanCustomerId, 10),
+            name: root.dataset.vanCustomerName || "",
+            portal_allow_payment_term: root.dataset.vanAllowPaymentTerm === "1",
+            default_payment_term_id: defaultTerm || false,
+        };
+    }
+
+    function syncVanAddressMode() {
+        if (!vanAddressSelect) {
+            return;
+        }
+        const value = vanAddressSelect.value;
+        if (value === "__new__") {
+            state.vanAddressMode = "new";
+            state.vanAddressId = null;
+            vanAddressNew?.classList.remove("d-none");
+        } else if (value) {
+            state.vanAddressMode = "existing";
+            state.vanAddressId = parseInt(value, 10);
+            vanAddressNew?.classList.add("d-none");
+        } else {
+            state.vanAddressMode = "existing";
+            state.vanAddressId = null;
+            vanAddressNew?.classList.add("d-none");
+        }
+    }
+
+    if (vanAddressSelect) {
+        vanAddressSelect.addEventListener("change", syncVanAddressMode);
+        syncVanAddressMode();
     }
 
     function openModal() {
@@ -199,11 +239,15 @@ function initCreatePage(root) {
             .map((item) => {
                 const sub = item.price * item.qty;
                 total += sub;
+                const maxAttr =
+                    item.qty_available != null
+                        ? ` max="${item.qty_available}"`
+                        : "";
                 return `<tr data-id="${item.id}">
                     <td>${escapeHtml(item.name)}</td>
                     <td class="text-end">${money(item.price)}</td>
                     <td class="text-center">
-                        <input type="number" min="0.01" step="1" class="form-control form-control-sm cart-qty" value="${item.qty}"/>
+                        <input type="number" min="0.01" step="1" class="form-control form-control-sm cart-qty" value="${item.qty}"${maxAttr}/>
                     </td>
                     <td class="text-end">${money(sub)}</td>
                     <td class="text-end">
@@ -217,7 +261,12 @@ function initCreatePage(root) {
         qsa(".cart-qty", cartBody).forEach((input) => {
             input.addEventListener("change", () => {
                 const id = input.closest("tr").dataset.id;
-                const qty = parseFloat(input.value) || 0;
+                let qty = parseFloat(input.value) || 0;
+                const maxQty = state.cart[id]?.qty_available;
+                if (maxQty != null && qty > maxQty) {
+                    qty = maxQty;
+                    input.value = String(maxQty);
+                }
                 if (qty <= 0) {
                     delete state.cart[id];
                 } else {
@@ -317,13 +366,40 @@ function initCreatePage(root) {
     }
 
     function bindProductCard(card, product) {
+        const qtyInput = qs(".product-qty", card);
+        const maxQty = product.qty_available != null && product.qty_available !== false
+            ? Number(product.qty_available)
+            : null;
+        if (qtyInput && maxQty != null) {
+            qtyInput.max = String(maxQty);
+            qtyInput.addEventListener("change", () => {
+                let qty = parseFloat(qtyInput.value) || 1;
+                if (qty > maxQty) {
+                    qty = maxQty;
+                    qtyInput.value = String(maxQty);
+                }
+                if (qty < 1) {
+                    qtyInput.value = "1";
+                }
+            });
+        }
         qs(".product-add", card).addEventListener("click", () => {
-            const qty = parseFloat(qs(".product-qty", card).value) || 1;
+            let qty = parseFloat(qs(".product-qty", card).value) || 1;
+            if (maxQty != null) {
+                if (maxQty <= 0) {
+                    return;
+                }
+                if (qty > maxQty) {
+                    qty = maxQty;
+                    qs(".product-qty", card).value = String(maxQty);
+                }
+            }
             state.cart[product.id] = {
                 id: product.id,
                 name: product.name,
                 price: product.price,
                 qty,
+                qty_available: maxQty,
             };
             renderCart();
             const addBtn = qs(".product-add", card);
@@ -335,12 +411,19 @@ function initCreatePage(root) {
 
     function productCardHtml(p) {
         const inCart = state.cart[p.id];
+        const hasStockInfo = p.qty_available != null && p.qty_available !== false;
+        const stockLine = hasStockInfo
+            ? `<div class="o_product_stock text-success small">Available: ${escapeHtml(p.qty_available_display || String(p.qty_available))}</div>`
+            : "";
+        const maxAttr = hasStockInfo ? ` max="${p.qty_available}"` : "";
+        const startQty = inCart ? inCart.qty : 1;
         return `<div class="o_portal_product_card" data-id="${p.id}">
             <img src="${p.image_url}" alt="" loading="lazy"/>
             <div class="o_product_name">${escapeHtml(p.name)}</div>
             <div class="o_product_price">${escapeHtml(p.price_display)}</div>
+            ${stockLine}
             <div class="o_qty_row">
-                <input type="number" min="1" step="1" value="${inCart ? inCart.qty : 1}" class="form-control form-control-sm product-qty"/>
+                <input type="number" min="1" step="1" value="${startQty}"${maxAttr} class="form-control form-control-sm product-qty"/>
                 <button type="button" class="btn btn-sm ${inCart ? "btn-success" : "btn-primary"} product-add">
                     ${inCart ? "Added" : "Add"}
                 </button>
@@ -408,16 +491,23 @@ function initCreatePage(root) {
         updateProductMeta(hasMore);
     }
 
-    partnerSearch.addEventListener("input", schedulePartnerSearch);
-    partnerSearch.addEventListener("keyup", schedulePartnerSearch);
-    partnerSearch.addEventListener("compositionend", schedulePartnerSearch);
-    partnerSearch.addEventListener("focus", schedulePartnerSearch);
+    if (!vanMode && partnerSearch) {
+        partnerSearch.addEventListener("input", schedulePartnerSearch);
+        partnerSearch.addEventListener("keyup", schedulePartnerSearch);
+        partnerSearch.addEventListener("compositionend", schedulePartnerSearch);
+        partnerSearch.addEventListener("focus", schedulePartnerSearch);
 
-    qs("#btn_clear_partner", root).addEventListener("click", () => {
-        state.partner = null;
-        selectedBox.classList.add("d-none");
-        hidePaymentTerms();
-    });
+        qs("#btn_clear_partner", root)?.addEventListener("click", () => {
+            state.partner = null;
+            selectedBox?.classList.add("d-none");
+            hidePaymentTerms();
+        });
+    }
+
+    // Defer van payment-terms UI until helpers exist
+    if (vanMode && state.partner?.portal_allow_payment_term) {
+        showPaymentTerms(state.partner);
+    }
 
     if (paymentTermSelect) {
         paymentTermSelect.addEventListener("change", () => {
@@ -475,6 +565,24 @@ function initCreatePage(root) {
             showError(confirmError, "Please select a customer.");
             return;
         }
+        if (vanMode) {
+            if (state.vanAddressMode === "existing" && !state.vanAddressId) {
+                showError(confirmError, "Please select a delivery address or add a new one.");
+                return;
+            }
+            if (state.vanAddressMode === "new") {
+                const name = (qs("#addr_name", root)?.value || "").trim();
+                const street = (qs("#addr_street", root)?.value || "").trim();
+                const city = (qs("#addr_city", root)?.value || "").trim();
+                if (!name || !street || !city) {
+                    showError(
+                        confirmError,
+                        "Please fill place/person name, street and city for the new address."
+                    );
+                    return;
+                }
+            }
+        }
         if (state.partner.portal_allow_payment_term && !state.paymentTermId) {
             showError(confirmError, "Please select payment terms.");
             return;
@@ -484,6 +592,15 @@ function initCreatePage(root) {
             showError(confirmError, "Please add at least one product.");
             return;
         }
+        for (const item of Object.values(state.cart)) {
+            if (item.qty_available != null && item.qty > item.qty_available) {
+                showError(
+                    confirmError,
+                    `Not enough stock for ${item.name}. Available: ${item.qty_available}.`
+                );
+                return;
+            }
+        }
         const btn = qs("#btn_confirm_order", root);
         btn.disabled = true;
         try {
@@ -491,6 +608,18 @@ function initCreatePage(root) {
                 partner_id: state.partner.id,
                 lines,
             };
+            if (vanMode) {
+                if (state.vanAddressMode === "existing") {
+                    payload.address_id = state.vanAddressId;
+                } else {
+                    payload.address = {
+                        name: (qs("#addr_name", root)?.value || "").trim(),
+                        street: (qs("#addr_street", root)?.value || "").trim(),
+                        city: (qs("#addr_city", root)?.value || "").trim(),
+                        phone: (qs("#addr_phone", root)?.value || "").trim(),
+                    };
+                }
+            }
             if (state.partner.portal_allow_payment_term) {
                 payload.payment_term_id = state.paymentTermId;
             }

@@ -16,6 +16,8 @@
                             <field name="login" placeholder="van12@example.com"/>
                             <field name="phone"/>
                             <field name="company_id"/>
+                            <field name="van_customer_id"
+                                      placeholder="Commercial customer for van sales"/>
                         </group>
                         <group string="Access">
                             <field name="password" password="True"

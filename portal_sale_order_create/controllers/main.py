@@ -23,23 +23,180 @@ class PortalSaleOrderCreate(http.Controller):
 
     def _is_draft_portal_user(self):
         return request.env.user.has_group(GROUP_DRAFT_XMLID)
+
     def _get_my_order(self, order_id):
         order = request.env["sale.order"].sudo().browse(order_id).exists()
         if not order or order.create_uid.id != request.env.user.id:
             raise AccessError(_("Order not found or access denied."))
         return order
 
+    def _get_van_stock_location(self):
+        """Van Stock location for the logged-in portal user (not transit)."""
+        user = request.env.user.sudo()
+        if "van_warehouse_id" in user._fields and user.van_warehouse_id:
+            stock = user.van_warehouse_id.lot_stock_id
+            if stock and stock.active:
+                return stock
+        if "portal.transfer.location.map" in request.env:
+            mapping = (
+                request.env["portal.transfer.location.map"]
+                .sudo()
+                .search(
+                    [("user_id", "=", user.id), ("active", "=", True)],
+                    limit=1,
+                )
+            )
+            if mapping.stock_location_id and mapping.stock_location_id.active:
+                return mapping.stock_location_id
+        return request.env["stock.location"]
+
+    def _get_van_warehouse(self):
+        user = request.env.user.sudo()
+        if "van_warehouse_id" in user._fields and user.van_warehouse_id:
+            return user.van_warehouse_id
+        return request.env["stock.warehouse"]
+
+    def _get_van_customer(self):
+        user = request.env.user.sudo()
+        if "van_customer_id" in user._fields and user.van_customer_id:
+            return user.van_customer_id
+        return request.env["res.partner"]
+
+    def _serialize_address(self, partner):
+        return {
+            "id": partner.id,
+            "name": partner.name or "",
+            "street": partner.street or "",
+            "city": partner.city or "",
+            "phone": partner.phone or "",
+            "display": self._address_display(partner),
+        }
+
+    def _address_display(self, partner):
+        parts = [
+            partner.name or "",
+            partner.street or "",
+            partner.city or "",
+            partner.phone or "",
+        ]
+        return " — ".join(p for p in parts if p)
+
+    def _get_van_delivery_addresses(self, customer):
+        if not customer:
+            return request.env["res.partner"]
+        return (
+            request.env["res.partner"]
+            .sudo()
+            .search(
+                [
+                    ("parent_id", "=", customer.id),
+                    ("type", "=", "delivery"),
+                    ("active", "=", True),
+                ],
+                order="name, id",
+            )
+        )
+
+    def _resolve_van_shipping_address(self, customer, address_id=None, address=None):
+        Partner = request.env["res.partner"].sudo()
+        if address_id:
+            shipping = Partner.browse(int(address_id)).exists()
+            if (
+                not shipping
+                or shipping.parent_id.id != customer.id
+                or shipping.type != "delivery"
+            ):
+                raise ValidationError(_("Invalid delivery address selected."))
+            return shipping
+
+        address = address or {}
+        name = (address.get("name") or "").strip()
+        street = (address.get("street") or "").strip()
+        city = (address.get("city") or "").strip()
+        phone = (address.get("phone") or "").strip()
+        if not name:
+            raise ValidationError(_("Please enter the place / person name."))
+        if not street:
+            raise ValidationError(_("Please enter the street."))
+        if not city:
+            raise ValidationError(_("Please enter the city."))
+
+        return Partner.create(
+            {
+                "name": name,
+                "street": street,
+                "city": city,
+                "phone": phone or False,
+                "type": "delivery",
+                "parent_id": customer.id,
+                "company_id": customer.company_id.id or request.env.company.id,
+            }
+        )
+
+    def _available_qty_by_product(self, location, product_ids=None):
+        """Map product_id -> available qty (on hand - reserved) in location tree."""
+        if not location:
+            return {}
+        domain = [
+            ("location_id", "child_of", location.id),
+            ("product_id.active", "=", True),
+        ]
+        if product_ids is not None:
+            if not product_ids:
+                return {}
+            domain.append(("product_id", "in", list(product_ids)))
+        groups = (
+            request.env["stock.quant"]
+            .sudo()
+            .read_group(
+                domain,
+                ["product_id", "quantity:sum", "reserved_quantity:sum"],
+                ["product_id"],
+                lazy=False,
+            )
+        )
+        result = {}
+        for group in groups:
+            if not group.get("product_id"):
+                continue
+            product_id = group["product_id"][0]
+            available = (group.get("quantity") or 0.0) - (group.get("reserved_quantity") or 0.0)
+            if available > 0:
+                result[product_id] = available
+        return result
+
     @http.route("/my/sales/create", type="http", auth="user", website=True)
     def portal_sale_create(self, **kwargs):
         self._ensure_sales_portal()
+        van_customer = self._get_van_customer()
+        addresses = self._get_van_delivery_addresses(van_customer) if van_customer else []
         return request.render(
             "portal_sale_order_create.portal_sale_create",
             {
                 "page_name": "portal_sale_create",
                 "currency": request.env.company.currency_id,
                 "draft_mode": self._is_draft_portal_user(),
+                "van_customer": van_customer,
+                "van_addresses": addresses,
             },
         )
+
+    @http.route("/my/sales/api/addresses", type="jsonrpc", auth="user", website=True)
+    def api_addresses(self, **kwargs):
+        self._ensure_sales_portal()
+        van_customer = self._get_van_customer()
+        if not van_customer:
+            return {"customer": False, "addresses": []}
+        addresses = self._get_van_delivery_addresses(van_customer)
+        return {
+            "customer": {
+                "id": van_customer.id,
+                "name": van_customer.display_name or van_customer.name,
+                "portal_allow_payment_term": bool(van_customer.portal_allow_payment_term),
+                "default_payment_term_id": van_customer.property_payment_term_id.id or False,
+            },
+            "addresses": [self._serialize_address(a) for a in addresses],
+        }
 
     @http.route(["/my/sales/orders", "/my/sales/orders/page/<int:page>"], type="http", auth="user", website=True)
     def portal_sale_orders(self, page=1, **kwargs):
@@ -141,6 +298,7 @@ class PortalSaleOrderCreate(http.Controller):
         except (TypeError, ValueError):
             limit = 60
 
+        van_location = self._get_van_stock_location()
         domain = [("sale_ok", "=", True), ("active", "=", True)]
         if term:
             domain += [
@@ -150,13 +308,31 @@ class PortalSaleOrderCreate(http.Controller):
                 ("default_code", "ilike", term),
                 ("barcode", "ilike", term),
             ]
+
         Product = request.env["product.product"].sudo()
+        available_map = {}
+        if van_location:
+            available_map = self._available_qty_by_product(van_location)
+            if not available_map:
+                return {
+                    "products": [],
+                    "total": 0,
+                    "offset": offset,
+                    "limit": limit,
+                    "has_more": False,
+                    "van_stock_location": van_location.complete_name or van_location.name,
+                }
+            domain.append(("id", "in", list(available_map.keys())))
+
         total = Product.search_count(domain)
-        products = Product.search(domain, limit=limit, offset=offset, order="default_code, name, id")
+        products = Product.search(
+            domain, limit=limit, offset=offset, order="default_code, name, id"
+        )
         currency = request.env.company.currency_id
         result = []
         for product in products:
             price = product.lst_price
+            qty_available = available_map.get(product.id) if van_location else False
             result.append(
                 {
                     "id": product.id,
@@ -165,6 +341,12 @@ class PortalSaleOrderCreate(http.Controller):
                     "price_display": f"{price:.2f} {currency.symbol}",
                     "image_url": f"/web/image/product.product/{product.id}/image_128",
                     "uom": product.uom_id.name,
+                    "qty_available": qty_available,
+                    "qty_available_display": (
+                        f"{qty_available:g} {product.uom_id.name}"
+                        if qty_available is not False
+                        else False
+                    ),
                 }
             )
         return {
@@ -173,6 +355,9 @@ class PortalSaleOrderCreate(http.Controller):
             "offset": offset,
             "limit": limit,
             "has_more": offset + len(result) < total,
+            "van_stock_location": (
+                van_location.complete_name or van_location.name if van_location else False
+            ),
         }
 
     @http.route("/my/sales/api/payment_terms", type="jsonrpc", auth="user", website=True)
@@ -209,17 +394,31 @@ class PortalSaleOrderCreate(http.Controller):
         return [{"id": term.id, "name": term.display_name or term.name} for term in terms]
 
     @http.route("/my/sales/api/confirm", type="jsonrpc", auth="user", website=True)
-    def api_confirm(self, partner_id=None, lines=None, payment_term_id=None, **kwargs):
+    def api_confirm(
+        self,
+        partner_id=None,
+        lines=None,
+        payment_term_id=None,
+        address_id=None,
+        address=None,
+        **kwargs,
+    ):
         self._ensure_sales_portal()
-        if not partner_id:
-            raise ValidationError(_("Please select a customer."))
         lines = lines or []
         if not lines:
             raise ValidationError(_("Please add at least one product."))
 
-        partner = request.env["res.partner"].sudo().browse(int(partner_id)).exists()
-        if not partner:
-            raise ValidationError(_("Customer not found."))
+        van_customer = self._get_van_customer()
+        shipping = request.env["res.partner"]
+        if van_customer:
+            partner = van_customer
+            shipping = self._resolve_van_shipping_address(van_customer, address_id, address)
+        else:
+            if not partner_id:
+                raise ValidationError(_("Please select a customer."))
+            partner = request.env["res.partner"].sudo().browse(int(partner_id)).exists()
+            if not partner:
+                raise ValidationError(_("Customer not found."))
 
         payment_term = False
         if partner.portal_allow_payment_term:
@@ -236,6 +435,12 @@ class PortalSaleOrderCreate(http.Controller):
             if payment_term.company_id and payment_term.company_id != request.env.company:
                 raise ValidationError(_("Invalid payment terms selected."))
 
+        van_location = self._get_van_stock_location()
+        van_warehouse = self._get_van_warehouse()
+        available_map = (
+            self._available_qty_by_product(van_location) if van_location else {}
+        )
+
         order_lines = []
         for line in lines:
             product_id = int(line.get("product_id") or 0)
@@ -245,6 +450,26 @@ class PortalSaleOrderCreate(http.Controller):
             product = request.env["product.product"].sudo().browse(product_id).exists()
             if not product or not product.sale_ok:
                 raise ValidationError(_("Invalid product selected."))
+            if van_location:
+                available = available_map.get(product.id, 0.0)
+                if available <= 0:
+                    raise ValidationError(
+                        _("Product %(product)s is not available in your van stock.")
+                        % {"product": product.display_name}
+                    )
+                if qty > available:
+                    raise ValidationError(
+                        _(
+                            "Not enough stock for %(product)s. "
+                            "Available: %(available)s %(uom)s, requested: %(qty)s."
+                        )
+                        % {
+                            "product": product.display_name,
+                            "available": available,
+                            "uom": product.uom_id.name,
+                            "qty": qty,
+                        }
+                    )
             order_lines.append(
                 (
                     0,
@@ -258,17 +483,17 @@ class PortalSaleOrderCreate(http.Controller):
         if not order_lines:
             raise ValidationError(_("Please add at least one product with quantity."))
 
-        order = (
-            request.env["sale.order"]
-            .sudo()
-            .create(
-                {
-                    "partner_id": partner.id,
-                    "user_id": request.env.user.id,
-                    "order_line": order_lines,
-                }
-            )
-        )
+        order_vals = {
+            "partner_id": partner.id,
+            "user_id": request.env.user.id,
+            "order_line": order_lines,
+        }
+        if shipping:
+            order_vals["partner_shipping_id"] = shipping.id
+        if van_warehouse:
+            order_vals["warehouse_id"] = van_warehouse.id
+
+        order = request.env["sale.order"].sudo().create(order_vals)
         if payment_term:
             order.payment_term_id = payment_term.id
 

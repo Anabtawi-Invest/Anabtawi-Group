@@ -45,7 +45,12 @@
 
     <template id="portal_sale_create" name="Create Sale Order">
         <t t-call="portal.portal_layout">
-            <div class="container o_portal_sale_create py-4">
+            <div class="container o_portal_sale_create py-4"
+                 t-att-data-van-mode="'1' if van_customer else '0'"
+                 t-att-data-van-customer-id="van_customer.id if van_customer else ''"
+                 t-att-data-van-customer-name="van_customer.display_name if van_customer else ''"
+                 t-att-data-van-allow-payment-term="'1' if van_customer and van_customer.portal_allow_payment_term else '0'"
+                 t-att-data-van-default-payment-term-id="van_customer.property_payment_term_id.id if van_customer and van_customer.property_payment_term_id else ''">
                 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
                     <h3 class="mb-0">Create Sale Order</h3>
                     <a href="/my/sales/orders" class="btn btn-secondary">My Sale Orders</a>
@@ -54,25 +59,73 @@
                 <div class="card mb-3 o_portal_sale_section">
                     <div class="card-header fw-bold">1. Customer</div>
                     <div class="card-body">
-                        <div class="row g-2 align-items-end">
-                            <div class="col-md-8">
-                                <label class="form-label">Search customer</label>
-                                <div class="o_portal_partner_autocomplete">
-                                    <input type="text" class="form-control" id="partner_search"
-                                           placeholder="Type name, phone or email..."
-                                           autocomplete="off"/>
-                                    <div id="partner_results" class="o_portal_partner_results list-group mt-2"></div>
-                                </div>
-                                <div class="form-text">
-                                    New customers must be requested from the Customer Request portal card.
+                        <t t-if="van_customer">
+                            <div class="alert alert-success mb-3">
+                                <strong>Customer:</strong>
+                                <span t-esc="van_customer.display_name"/>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label" for="van_address_id">Delivery address</label>
+                                <select class="form-select" id="van_address_id">
+                                    <option value="">— Select existing address —</option>
+                                    <t t-foreach="van_addresses" t-as="addr">
+                                        <option t-att-value="addr.id"
+                                                t-att-data-name="addr.name or ''"
+                                                t-att-data-street="addr.street or ''"
+                                                t-att-data-city="addr.city or ''"
+                                                t-att-data-phone="addr.phone or ''">
+                                            <t t-esc="addr.name or ''"/>
+                                            <t t-if="addr.street"> — <t t-esc="addr.street"/></t>
+                                            <t t-if="addr.city"> — <t t-esc="addr.city"/></t>
+                                            <t t-if="addr.phone"> — <t t-esc="addr.phone"/></t>
+                                        </option>
+                                    </t>
+                                    <option value="__new__">+ Add new address</option>
+                                </select>
+                            </div>
+                            <div id="van_address_new" class="border rounded p-3 d-none">
+                                <div class="fw-semibold mb-2">New delivery address</div>
+                                <div class="row g-2">
+                                    <div class="col-md-6">
+                                        <label class="form-label" for="addr_name">Place / person name</label>
+                                        <input type="text" class="form-control" id="addr_name"/>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label" for="addr_phone">Phone</label>
+                                        <input type="text" class="form-control" id="addr_phone"/>
+                                    </div>
+                                    <div class="col-md-8">
+                                        <label class="form-label" for="addr_street">Street</label>
+                                        <input type="text" class="form-control" id="addr_street"/>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label" for="addr_city">City</label>
+                                        <input type="text" class="form-control" id="addr_city"/>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                        <div id="selected_partner" class="alert alert-success mt-3 d-none mb-0">
-                            <strong>Selected:</strong>
-                            <span id="selected_partner_label"/>
-                            <button type="button" class="btn btn-sm btn-link" id="btn_clear_partner">Change</button>
-                        </div>
+                        </t>
+                        <t t-else="">
+                            <div class="row g-2 align-items-end">
+                                <div class="col-md-8">
+                                    <label class="form-label">Search customer</label>
+                                    <div class="o_portal_partner_autocomplete">
+                                        <input type="text" class="form-control" id="partner_search"
+                                               placeholder="Type name, phone or email..."
+                                               autocomplete="off"/>
+                                        <div id="partner_results" class="o_portal_partner_results list-group mt-2"></div>
+                                    </div>
+                                    <div class="form-text">
+                                        New customers must be requested from the Customer Request portal card.
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="selected_partner" class="alert alert-success mt-3 d-none mb-0">
+                                <strong>Selected:</strong>
+                                <span id="selected_partner_label"/>
+                                <button type="button" class="btn btn-sm btn-link" id="btn_clear_partner">Change</button>
+                            </div>
+                        </t>
                         <div id="payment_term_wrap" class="mt-3 d-none">
                             <label class="form-label" for="payment_term_id">Payment Terms <span class="text-danger">*</span></label>
                             <select class="form-select" id="payment_term_id">

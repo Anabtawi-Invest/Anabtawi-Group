@@ -35,6 +35,10 @@
     font-weight: 600;
 }
 
+.o_portal_product_card .o_product_stock {
+    font-weight: 500;
+}
+
 .o_portal_product_card .o_qty_row {
     display: flex;
     gap: 0.35rem;

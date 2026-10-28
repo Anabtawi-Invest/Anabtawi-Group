@@ -30,6 +30,12 @@ class PortalVanUserCreate(models.TransientModel):
         default=False,
         help="Send the standard portal set-password invitation email.",
     )
+    van_customer_id = fields.Many2one(
+        "res.partner",
+        string="Van Customer",
+        help="Fixed commercial customer for this van. Portal sales use this partner; "
+        "delivery addresses are created under it.",
+    )
 
     @api.constrains("login")
     def _check_login(self):
@@ -96,14 +102,15 @@ class PortalVanUserCreate(models.TransientModel):
         group_cmds = [(4, group_portal.id)]
         if group_public:
             group_cmds.append((3, group_public.id))
-        user.write(
-            {
-                "active": True,
-                "company_id": company.id,
-                "company_ids": [(6, 0, [company.id])],
-                "group_ids": group_cmds,
-            }
-        )
+        user_vals = {
+            "active": True,
+            "company_id": company.id,
+            "company_ids": [(6, 0, [company.id])],
+            "group_ids": group_cmds,
+        }
+        if self.van_customer_id:
+            user_vals["van_customer_id"] = self.van_customer_id.id
+        user.write(user_vals)
 
         if self.password:
             user._change_password(self.password)

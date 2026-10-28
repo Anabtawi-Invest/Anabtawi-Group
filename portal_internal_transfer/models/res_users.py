@@ -30,6 +30,14 @@ class ResUsers(models.Model):
         copy=False,
         check_company=False,
     )
+    van_customer_id = fields.Many2one(
+        "res.partner",
+        string="Van Customer",
+        copy=False,
+        check_company=False,
+        help="Fixed commercial customer for this van portal user. "
+        "Portal sales use this customer; delivery addresses are children under it.",
+    )
 
     @api.model_create_multi
     def create(self, vals_list):

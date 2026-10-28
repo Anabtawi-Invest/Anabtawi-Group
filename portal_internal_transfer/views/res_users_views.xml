@@ -29,6 +29,9 @@
                                     confirm="Create warehouse, transit, push route and portal mapping for this portal user?"/>
                             <field name="van_warehouse_id" invisible="not van_warehouse_id"/>
                             <field name="van_transit_location_id" invisible="not van_transit_location_id"/>
+                            <field name="van_customer_id"
+                                      options="{'no_create': False}"
+                                      placeholder="Commercial customer for van sales"/>
                         </group>
                     </group>
                 </page>
