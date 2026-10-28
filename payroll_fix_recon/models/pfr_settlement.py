@@ -283,8 +283,10 @@ class PfrSettlement(models.AbstractModel):
         if remaining > 0.01 and total_pto > 0.01 and emp.allow_pto_lateness_deduction:  # step 2
             covered_pto = round(min(remaining, math.floor(total_pto * 100) / 100.0), 2)
             remaining = round(remaining - covered_pto, 2)
-        # leftover earned PH/rest / 1.5; prior PTO 1:1
-        remaining_pto_real = remaining_real_hours(prior_pto, pto_earned, covered_pto, U.PH_RATE)
+        # Stored bank and total_pto are weighted (x1.5). The remaining balance
+        # displays REAL physical hours (divided by 1.5).
+        net_pto_weighted = max(0.0, total_pto - covered_pto)
+        remaining_pto_real = round(net_pto_weighted / U.PH_RATE, 2)
 
         covered_annual = 0.0
         if remaining > 0.01 and emp.allow_annual_leave_lateness_deduction:        # step 3

@@ -73,11 +73,12 @@ class HrPayslip(models.Model):
             annual = round(annual - (slip.lateness_covered_by_annual_leave or 0.0) / U.DAILY_HOURS, 4)
             slip._pfr_set_input('CLEAR_ANNUAL', annual, round(annual * daily, 3))
 
-            # Full PTO days (entered already x1.5) — amount uses this quantity.
+            # Remaining PTO balance is in real hours (divided by 1.5).
+            # The termination settlement amount is multiplied by 1.5 (U.PH_RATE).
             if 'remaining_pto_balance' in slip._fields:
                 pto = max(0.0, round((slip.remaining_pto_balance or 0.0) / U.DAILY_HOURS, 4))
             else:
                 pto = slip._pfr_leave_balance_days(types['pto'], bal)
                 covered = getattr(slip, 'lateness_covered_by_pto', 0.0) or 0.0
                 pto = max(0.0, round(pto - covered / U.DAILY_HOURS, 4))
-            slip._pfr_set_input('CLEAR_PTO', pto, round(pto * daily, 3))
+            slip._pfr_set_input('CLEAR_PTO', pto, round(pto * U.PH_RATE * daily, 3))
