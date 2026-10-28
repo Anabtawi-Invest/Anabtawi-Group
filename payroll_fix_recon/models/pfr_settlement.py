@@ -298,6 +298,7 @@ class PfrSettlement(models.AbstractModel):
             'overtime_holiday_hours': ph_ot,
             'overtime_regular_hours': reg_ot,
             'overtime_rest_hours': rest_ot,
+            'overtime_pto_hours': pto_earned,
             'rest_days_taken': rest_taken,
             'attendance_gross_undertime': gross_ut,
             'attendance_net_reconciled': round(gross_ot - gross_ut, 2),
