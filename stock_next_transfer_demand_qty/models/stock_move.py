@@ -10,13 +10,19 @@ class StockMove(models.Model):
         Standard Odoo leaves quantity at 0 if reservation fails. Business wants
         the next transfer to still show Demand as the default Done quantity.
         """
-        moves = self.filtered(
-            lambda m: m.move_orig_ids
-            and m.state not in ("draft", "done", "cancel")
-            and not m.picked
-            and m.product_uom_qty
-            and m.uom_id.compare(m.quantity, m.product_uom_qty) < 0
-        )
+        def _need_force(m):
+            if not (
+                m.move_orig_ids
+                and m.state not in ("draft", "done", "cancel")
+                and not m.picked
+                and m.product_uom_qty
+            ):
+                return False
+            # Odoo 19 core renamed product_uom -> uom_id; staging still has product_uom
+            uom = m.product_uom if "product_uom" in m._fields else m.uom_id
+            return uom.compare(m.quantity, m.product_uom_qty) < 0
+
+        moves = self.filtered(_need_force)
         for move in moves:
             move.quantity = move.product_uom_qty
 
