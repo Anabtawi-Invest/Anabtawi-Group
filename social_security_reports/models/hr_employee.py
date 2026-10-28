@@ -107,6 +107,46 @@ class HrEmployee(models.Model):
                 return True
         return False
 
+    def has_ssc_deduction_in_period(self, start_date, end_date):
+        """
+        Check if employee has social security deduction in their payslip(s) for the specified period.
+        Rules checked:
+        - SSC Company Contribution (code: SSC)
+        - SSC Employee Contribution (code: SSE)
+        """
+        self.ensure_one()
+        if 'hr.payslip' not in self.env:
+            return False
+
+        payslips = self.env['hr.payslip'].search([
+            ('employee_id', '=', self.id),
+            ('state', '!=', 'cancel'),
+            ('date_from', '<=', end_date),
+            ('date_to', '>=', start_date),
+        ])
+        if not payslips:
+            return False
+
+        for slip in payslips:
+            for line in slip.line_ids:
+                code = (line.code or '').strip().upper()
+                rule_code = (line.salary_rule_id.code or '').strip().upper() if line.salary_rule_id else ''
+                line_name = (line.name or '')
+
+                is_ssc = (
+                    code in ('SSC', 'SSE')
+                    or rule_code in ('SSC', 'SSE')
+                    or 'SSC' in code
+                    or 'SSE' in code
+                    or 'SSC' in line_name.upper()
+                    or 'SSE' in line_name.upper()
+                    or 'الضمان الاجتماعي' in line_name
+                )
+                if is_ssc and (abs(line.total) > 0.001 or abs(line.amount) > 0.001):
+                    return True
+
+        return False
+
     def get_arabic_name_parts(self):
         """
         Split the Arabic full name into 4 parts: (First, Father, Grandfather, Family)

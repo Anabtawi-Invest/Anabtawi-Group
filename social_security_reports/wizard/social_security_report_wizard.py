@@ -166,8 +166,16 @@ class SocialSecurityReportWizard(models.TransientModel):
                     if days_total >= 16:
                         included = True
 
-            if included:
-                matched_employees.append(emp)
+            if not included:
+                continue
+
+            # Check payslip for the selected month (start_date to end_date):
+            # If the employee already has social security deduction in that month's payslip -> exclude him.
+            # If they do not have social security deduction (or have no payslip) -> include him.
+            if hasattr(emp, 'has_ssc_deduction_in_period') and emp.has_ssc_deduction_in_period(start_date, end_date):
+                continue
+
+            matched_employees.append(emp)
 
         # Sort by start date, then employee_number
         matched_employees.sort(key=lambda e: (e.get_ssc_start_date() or date.min, e.employee_number or ''))
@@ -204,6 +212,12 @@ class SocialSecurityReportWizard(models.TransientModel):
                 continue
 
             if start_date <= ed <= end_date:
+                # Check payslip for the selected month (start_date to end_date):
+                # If the employee already has social security deduction in that month's payslip -> exclude him.
+                # If they do not have social security deduction (or have no payslip) -> include him.
+                if hasattr(emp, 'has_ssc_deduction_in_period') and emp.has_ssc_deduction_in_period(start_date, end_date):
+                    continue
+
                 matched_employees.append(emp)
 
         # Sort by termination date, then employee_number
