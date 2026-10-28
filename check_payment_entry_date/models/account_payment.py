@@ -2,8 +2,20 @@
 from odoo import api, fields, models
 
 
+class AccountPaymentMethodLine(models.Model):
+    _inherit = 'account.payment.method.line'
+
+    is_check_payment = fields.Boolean(
+        string='Check Payment',
+        help='Payments using this method keep their accounting date set to today while in draft.',
+    )
+
+
 class AccountPayment(models.Model):
     _inherit = 'account.payment'
+
+    is_check_payment = fields.Boolean(related='payment_method_line_id.is_check_payment')
+    check_date = fields.Date(string='Check Date', tracking=True, copy=False)
 
     @api.onchange('payment_method_line_id')
     def _onchange_check_payment_entry_date(self):
