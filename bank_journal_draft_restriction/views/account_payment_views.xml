@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_account_payment_form_bank_draft_restriction" model="ir.ui.view">
+        <field name="name">account.payment.form.bank.draft.restriction</field>
+        <field name="model">account.payment</field>
+        <field name="inherit_id" ref="account.view_account_payment_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//button[@name='action_draft']" position="before">
+                <field name="bank_draft_restricted" invisible="1"/>
+            </xpath>
+            <xpath expr="//button[@name='action_draft']" position="attributes">
+                <attribute name="invisible">state in ('draft') or bank_draft_restricted</attribute>
+            </xpath>
+        </field>
+    </record>
+</odoo>
