@@ -249,6 +249,7 @@ class HrPayslip(models.Model):
             self.env.flush_all()
             slips._compute_attendance_reconciliation_fields()
             slips._pfr_apply_termination_inputs()
+            slips.mapped('struct_id')._pfr_ensure_rules()   # picks up newly added rules without a reinstall
             for slip in slips:
                 slip.worked_days_line_ids = [(5, 0, 0)] + [(0, 0, v) for v in slip._get_worked_day_lines()]
         res = super().compute_sheet()

@@ -84,6 +84,26 @@ RULES = [
         ),
     },
     {
+        'code': 'TERM_EXTRA', 'name': 'Termination: Extra Hours Settlement', 'category': 'hr_payroll.ALW',
+        'sequence': 80, 'appears_on_payslip': True, 'condition_select': 'python',
+        'condition_python': "result = 'CLEAR_EXTRA' in inputs and inputs['CLEAR_EXTRA'].amount > 0\n",
+        'amount_python_compute': "result = round(inputs['CLEAR_EXTRA'].amount, 3)\n",
+    },
+    {
+        'code': 'TERM_PTO', 'name': 'Termination: Paid Time Off Settlement', 'category': 'hr_payroll.ALW',
+        'sequence': 81, 'appears_on_payslip': True, 'condition_select': 'python',
+        'condition_python': "result = 'CLEAR_PTO' in inputs and inputs['CLEAR_PTO'].amount > 0\n",
+        'amount_python_compute': "result = round(inputs['CLEAR_PTO'].amount, 3)\n",
+    },
+    {
+        'code': 'TERM_ANNUAL', 'name': 'Termination: Annual Leave Settlement', 'category': 'hr_payroll.ALW',
+        'sequence': 82, 'appears_on_payslip': True, 'condition_select': 'python',
+        'condition_python': "result = 'CLEAR_ANNUAL' in inputs and inputs['CLEAR_ANNUAL'].amount > 0\n",
+        'amount_python_compute': (
+            "# negative balances are handled by DED_ANNUAL_LEAVE\n"
+            "result = round(inputs['CLEAR_ANNUAL'].amount, 3)\n"),
+    },
+    {
         'code': 'ACTUAL', 'name': 'Actual Salary', 'category': 'hr_payroll.NET',
         'sequence': 90, 'appears_on_payslip': True, 'condition_select': 'none',
         'amount_python_compute': (

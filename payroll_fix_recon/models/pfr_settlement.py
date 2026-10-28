@@ -268,8 +268,10 @@ class PfrSettlement(models.AbstractModel):
 
         covered_extra = round(min(gross_ut, total_avail), 2)                       # step 1
         remaining = round(gross_ut - covered_extra, 2)
-        # Time Off banks REAL hours: leftover earned OT / 1.25; prior leave 1:1
-        remaining_extra_real = remaining_real_hours(prev_extra, reg_ot, covered_extra, U.OT_RATE)
+        # Stored bank and total_avail are weighted (x1.25). The remaining balance
+        # displays REAL physical hours (divided by 1.25).
+        net_extra_weighted = max(0.0, total_avail - covered_extra)
+        remaining_extra_real = round(net_extra_weighted / U.OT_RATE, 2)
 
         # PTO = previous bank + public holiday (x1.5) + unused rest days (12h)
         current_pto_recon = max((slip.pto_allocated_days or 0.0) * 8.0,

@@ -64,9 +64,10 @@ class HrPayslip(models.Model):
             types = settlement.leave_types(slip.company_id)
             bal = settlement.balance_hours([slip.employee_id.id], (types['annual'] | types['pto']).ids)
 
-            # Full Extra Hours bank (already x1.25 in storage) — amount uses this quantity.
+            # Remaining Extra Hours balance is in real hours (divided by 1.25).
+            # The termination settlement amount is multiplied by 1.25 (U.OT_RATE).
             extra = max(0.0, round(slip.remaining_extra_hours_balance or 0.0, 2))
-            slip._pfr_set_input('CLEAR_EXTRA', extra, round(extra * hourly, 3))
+            slip._pfr_set_input('CLEAR_EXTRA', extra, round(extra * U.OT_RATE * hourly, 3))
 
             annual = slip._pfr_leave_balance_days(types['annual'], bal)
             annual = round(annual - (slip.lateness_covered_by_annual_leave or 0.0) / U.DAILY_HOURS, 4)
