@@ -118,8 +118,9 @@
                     <div class="card-header fw-bold">3. Confirm</div>
                     <div class="card-body">
                         <p class="text-muted mb-3">
-                            Confirming will create the internal transfer and confirm it.
-                            Destination location is fixed from your portal mapping.
+                            Confirming validates the transfer into your transit location.
+                            A second transfer to van stock is created automatically and left
+                            waiting for warehouse validation (same as branches).
                         </p>
                         <button type="button" class="btn btn-success btn-lg" id="btn_confirm_transfer"
                                 t-att-disabled="not dest_location">

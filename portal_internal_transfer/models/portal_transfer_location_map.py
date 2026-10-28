@@ -19,9 +19,17 @@ class PortalTransferLocationMap(models.Model):
     )
     location_id = fields.Many2one(
         "stock.location",
-        string="Destination Location",
+        string="Transit / Portal Destination",
         required=True,
         ondelete="restrict",
+        help="First transfer destination (transit). After validation, the push "
+        "rule creates a second transfer from here to the van stock location.",
+    )
+    stock_location_id = fields.Many2one(
+        "stock.location",
+        string="Van Stock Location",
+        ondelete="restrict",
+        help="Final stock location after the push transfer (for reference).",
     )
     company_id = fields.Many2one(
         "res.company",

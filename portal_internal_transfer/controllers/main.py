@@ -56,8 +56,24 @@ class PortalInternalTransfer(http.Controller):
             )
         return location
 
-    def _get_internal_picking_type(self):
+    def _get_internal_picking_type(self, source_location=None):
+        """Prefer the source warehouse INT type so push routes on that WH apply."""
         PickingType = request.env["stock.picking.type"].sudo()
+        if source_location:
+            warehouse = source_location.warehouse_id
+            if not warehouse and source_location.company_id:
+                warehouse = (
+                    request.env["stock.warehouse"]
+                    .sudo()
+                    .search(
+                        [("company_id", "=", source_location.company_id.id)],
+                        order="id asc",
+                        limit=1,
+                    )
+                )
+            if warehouse and warehouse.int_type_id:
+                return warehouse.int_type_id
+
         company = request.env.company
         picking_type = PickingType.search(
             [
@@ -70,6 +86,31 @@ class PortalInternalTransfer(http.Controller):
         if not picking_type:
             raise UserError(_("No internal transfer operation type is configured."))
         return picking_type
+
+    def _validate_picking_fully(self, picking):
+        """Confirm, set done qty, validate so push rules create the next transfer."""
+        if picking.state == "draft":
+            picking.action_confirm()
+        if picking.state in ("confirmed", "assigned", "waiting"):
+            picking.action_assign()
+        for move in picking.move_ids.filtered(lambda m: m.state not in ("done", "cancel")):
+            if move.product_uom_qty and not move.quantity:
+                move.quantity = move.product_uom_qty
+        picking.move_ids.filtered(lambda m: m.state not in ("done", "cancel")).picked = True
+        result = picking.with_context(
+            skip_backorder=True,
+            skip_sms=True,
+            skip_sanity_check=True,
+        ).button_validate()
+        if isinstance(result, dict):
+            # Unexpected wizard — force done path when possible
+            picking.with_context(
+                skip_backorder=True,
+                cancel_backorder=True,
+                skip_sms=True,
+                skip_sanity_check=True,
+            )._action_done()
+        return picking
 
     # ------------------------------------------------------------------
     # Pages
@@ -255,7 +296,7 @@ class PortalInternalTransfer(http.Controller):
         if not move_commands:
             raise ValidationError(_("Please add at least one product with quantity."))
 
-        picking_type = self._get_internal_picking_type()
+        picking_type = self._get_internal_picking_type(source)
         picking = (
             request.env["stock.picking"]
             .sudo()
@@ -269,10 +310,13 @@ class PortalInternalTransfer(http.Controller):
                 }
             )
         )
-        picking.action_confirm()
+        # Validate first leg so push creates second INT (transit → van stock) as assigned
+        self._validate_picking_fully(picking)
+        next_pickings = picking.move_ids.move_dest_ids.picking_id
         return {
             "picking_id": picking.id,
             "picking_name": picking.name,
+            "next_picking_names": next_pickings.mapped("name"),
             "redirect_url": f"/my/transfers/{picking.id}",
         }
 

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_users_form_portal_van_setup" model="ir.ui.view">
+        <field name="name">res.users.form.portal.van.setup</field>
+        <field name="model">res.users</field>
+        <field name="inherit_id" ref="base.view_users_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook" position="inside">
+                <page string="Van Stock Setup" name="portal_van_setup_page"
+                      groups="stock.group_stock_manager">
+                    <group>
+                        <group string="Auto Configuration">
+                            <div class="text-muted" colspan="2">
+                                Prefer: Inventory → Configuration → Create Van Portal User.
+                                That creates the portal user and all van stock setup in one step.
+                            </div>
+                            <field name="portal_van_setup"
+                                     readonly="van_warehouse_id"
+                                     invisible="van_warehouse_id"/>
+                            <div class="text-muted" colspan="2" invisible="van_warehouse_id">
+                                Checkbox works only when creating a new user from this form.
+                                For an existing portal user, use the button below.
+                            </div>
+                            <button name="action_create_van_stock_configuration"
+                                    type="object"
+                                    string="Create Van Warehouse Setup Now"
+                                    class="btn-primary"
+                                    invisible="van_warehouse_id or not share"
+                                    confirm="Create warehouse, transit, push route and portal mapping for this portal user?"/>
+                            <field name="van_warehouse_id" invisible="not van_warehouse_id"/>
+                            <field name="van_transit_location_id" invisible="not van_transit_location_id"/>
+                        </group>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>

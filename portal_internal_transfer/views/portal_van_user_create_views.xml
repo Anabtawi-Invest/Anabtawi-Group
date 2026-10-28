@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_portal_van_user_create_form" model="ir.ui.view">
+        <field name="name">portal.van.user.create.form</field>
+        <field name="model">portal.van.user.create</field>
+        <field name="arch" type="xml">
+            <form string="Create Van Portal User">
+                <sheet>
+                    <div class="alert alert-info" role="alert">
+                        Creates a portal user and automatically builds the van warehouse,
+                        transit location, push route (like branches), and portal destination mapping.
+                    </div>
+                    <group>
+                        <group string="User">
+                            <field name="name" placeholder="e.g. Van 12 / Driver name"/>
+                            <field name="login" placeholder="van12@example.com"/>
+                            <field name="phone"/>
+                            <field name="company_id"/>
+                        </group>
+                        <group string="Access">
+                            <field name="password" password="True"
+                                     placeholder="Optional — leave empty to invite later"/>
+                            <field name="send_invitation"/>
+                        </group>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_create" type="object" string="Create Van User"
+                            class="btn-primary" data-hotkey="q"/>
+                    <button string="Cancel" special="cancel" data-hotkey="x"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_portal_van_user_create" model="ir.actions.act_window">
+        <field name="name">Create Van Portal User</field>
+        <field name="res_model">portal.van.user.create</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <menuitem id="menu_portal_van_user_create"
+              name="Create Van Portal User"
+              parent="stock.menu_warehouse_config"
+              action="action_portal_van_user_create"
+              groups="stock.group_stock_manager"
+              sequence="91"/>
+</odoo>

@@ -7,6 +7,7 @@
             <list editable="bottom">
                 <field name="user_id"/>
                 <field name="location_id"/>
+                <field name="stock_location_id" optional="show"/>
                 <field name="company_id" groups="base.group_multi_company" optional="show"/>
                 <field name="active" optional="hide"/>
             </list>
@@ -22,6 +23,7 @@
                     <group>
                         <field name="user_id"/>
                         <field name="location_id"/>
+                        <field name="stock_location_id"/>
                         <field name="company_id" groups="base.group_multi_company"/>
                         <field name="active"/>
                     </group>
@@ -39,7 +41,8 @@
                 Map each portal user to a fixed destination location.
             </p>
             <p>
-                When a portal user creates an internal transfer, the destination location is taken from this mapping.
+                Portal destination should be the transit location. After the portal validates the first
+                transfer, the push rule creates a second transfer to the van stock location (left assigned).
             </p>
         </field>
     </record>
