@@ -29,6 +29,7 @@ export class PosExpenseReportingDashboard extends Component {
             kpis: {},
             accounts: [],
         });
+        this._requestId = 0;
 
         onWillStart(async () => {
             await this.fetchDashboardData();
@@ -44,6 +45,9 @@ export class PosExpenseReportingDashboard extends Component {
     }
 
     async fetchDashboardData() {
+        const requestId = ++this._requestId;
+        const strFrom = this.state.date_from;
+        const strTo = this.state.date_to;
         this.state.loading = true;
         try {
             const res = await this.orm.call(
@@ -51,18 +55,25 @@ export class PosExpenseReportingDashboard extends Component {
                 "get_expense_dashboard_data",
                 [],
                 {
-                    date_from: this.state.date_from,
-                    date_to: this.state.date_to,
+                    date_from: strFrom,
+                    date_to: strTo,
                 }
             );
-            this.data.date_from = res.date_from || this.state.date_from;
-            this.data.date_to = res.date_to || this.state.date_to;
+            if (requestId !== this._requestId) {
+                return;
+            }
+            this.data.date_from = res.date_from || strFrom;
+            this.data.date_to = res.date_to || strTo;
+            this.state.date_from = this.data.date_from;
+            this.state.date_to = this.data.date_to;
             this.data.kpis = res.kpis || {};
             this.data.accounts = res.accounts || [];
         } catch (error) {
             console.error("Failed to load Expenses dashboard data", error);
         } finally {
-            this.state.loading = false;
+            if (requestId === this._requestId) {
+                this.state.loading = false;
+            }
         }
     }
 
@@ -115,6 +126,32 @@ export class PosExpenseReportingDashboard extends Component {
 
         this.state.date_from = this._formatLocalDate(fromDate);
         this.state.date_to = this._formatLocalDate(toDate);
+        this.fetchDashboardData();
+    }
+
+    onDateChange(field, ev) {
+        const value = (ev.target.value || "").slice(0, 10);
+        if (!value || value === this.state[field]) {
+            return;
+        }
+        this.state.period = "custom";
+        this.state[field] = value;
+        this.fetchDashboardData();
+    }
+
+    applyFilters(ev) {
+        const bar = ev.currentTarget.closest(".o_dashboard_filters");
+        const inputs = bar ? bar.querySelectorAll("input[type='date']") : [];
+        const fromValue = (inputs[0]?.value || this.state.date_from || "").slice(0, 10);
+        const toValue = (inputs[1]?.value || this.state.date_to || "").slice(0, 10);
+        if (fromValue && fromValue !== this.state.date_from) {
+            this.state.date_from = fromValue;
+            this.state.period = "custom";
+        }
+        if (toValue && toValue !== this.state.date_to) {
+            this.state.date_to = toValue;
+            this.state.period = "custom";
+        }
         this.fetchDashboardData();
     }
 

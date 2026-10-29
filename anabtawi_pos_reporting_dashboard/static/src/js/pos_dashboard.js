@@ -61,7 +61,9 @@ export class PosReportingDashboard extends Component {
             global_totals: {},
             channels: [],
             trends: [],
+            error: "",
         });
+        this._requestId = 0;
 
         onWillStart(async () => {
             await this.fetchDashboardData();
@@ -77,11 +79,12 @@ export class PosReportingDashboard extends Component {
     }
 
     async fetchDashboardData() {
+        const requestId = ++this._requestId;
+        const strFrom = this.state.date_from;
+        const strTo = this.state.date_to;
+        const configIds = [...(this.state.config_ids || [])];
         this.state.loading = true;
         try {
-            const strFrom = this.state.date_from;
-            const strTo = this.state.date_to;
-
             const res = await this.orm.call(
                 "pos.reporting.dashboard",
                 "get_dashboard_data",
@@ -89,22 +92,31 @@ export class PosReportingDashboard extends Component {
                 {
                     date_from: strFrom,
                     date_to: strTo,
-                    config_ids: this.state.config_ids,
+                    config_ids: configIds,
                 }
             );
+            if (requestId !== this._requestId) {
+                return;
+            }
 
             this.data.date_from = res.date_from || strFrom;
             this.data.date_to = res.date_to || strTo;
+            this.state.date_from = this.data.date_from;
+            this.state.date_to = this.data.date_to;
             this.data.kpis = res.kpis || {};
             this.data.branches = res.branches || [];
             this.data.all_branches = res.all_branches || [];
             this.data.global_totals = res.global_totals || {};
             this.data.channels = res.channels || [];
             this.data.trends = res.trends || [];
+            this.data.error = "";
         } catch (error) {
             console.error("Failed to load POS dashboard data", error);
+            this.data.error = "This period did not load. The totals on screen are still the previous period.";
         } finally {
-            this.state.loading = false;
+            if (requestId === this._requestId) {
+                this.state.loading = false;
+            }
         }
     }
 
@@ -178,6 +190,32 @@ export class PosReportingDashboard extends Component {
 
         this.state.date_from = this._formatLocalDate(fromDate);
         this.state.date_to = this._formatLocalDate(toDate);
+        this.fetchDashboardData();
+    }
+
+    onDateChange(field, ev) {
+        const value = (ev.target.value || "").slice(0, 10);
+        if (!value || value === this.state[field]) {
+            return;
+        }
+        this.state.period = "custom";
+        this.state[field] = value;
+        this.fetchDashboardData();
+    }
+
+    applyFilters(ev) {
+        const bar = ev.currentTarget.closest(".o_dashboard_filters");
+        const inputs = bar ? bar.querySelectorAll("input[type='date']") : [];
+        const fromValue = (inputs[0]?.value || this.state.date_from || "").slice(0, 10);
+        const toValue = (inputs[1]?.value || this.state.date_to || "").slice(0, 10);
+        if (fromValue && fromValue !== this.state.date_from) {
+            this.state.date_from = fromValue;
+            this.state.period = "custom";
+        }
+        if (toValue && toValue !== this.state.date_to) {
+            this.state.date_to = toValue;
+            this.state.period = "custom";
+        }
         this.fetchDashboardData();
     }
 
