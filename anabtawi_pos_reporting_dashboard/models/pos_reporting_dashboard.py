@@ -5,7 +5,6 @@ from collections import defaultdict
 from datetime import datetime, time, timedelta
 
 from odoo import _, api, fields, models
-from odoo.tools import SQL
 from odoo.addons.pos_ameen_daily_operation.models.pos_daily_ops_engine import DELIVERY_CHANNELS
 
 _logger = logging.getLogger(__name__)
@@ -183,10 +182,6 @@ class PosReportingDashboard(models.TransientModel):
     def _channel_untaxed_key(self, payment_method):
         """Branch key that receives the untaxed share of an income payment."""
         bucket = self.env["pos.daily.ops.engine"]._get_bucket(payment_method)
-        return self._channel_untaxed_key_from_bucket(bucket)
-
-    @staticmethod
-    def _channel_untaxed_key_from_bucket(bucket):
         if bucket == "cash":
             return "cash_untaxed"
         if bucket == "visa":
@@ -196,106 +191,6 @@ class PosReportingDashboard(models.TransientModel):
         if bucket in DELIVERY_CHANNELS:
             return "online_sales_untaxed"
         return "other_sales_untaxed"
-
-    def _accumulate_order_metrics(self, sessions, branch_data):
-        """Tax, discounts, gifts and order counts for the period's sessions.
-
-        One month is already tens of thousands of orders. Walking every payment
-        and every line in Python makes a longer range hit the worker time limit,
-        so the request never returns and the screen keeps the previous period.
-        """
-        if not sessions:
-            return
-        session_ids = tuple(sessions.ids)
-        excluded = ("hospitality", "advance_applied")
-        self.env["pos.payment"].flush_model(["amount", "session_id", "pos_order_id", "payment_method_id"])
-        self.env["pos.order"].flush_model(["config_id", "session_id", "state", "amount_total", "amount_tax"])
-        self.env["pos.order.line"].flush_model(["order_id", "price_unit", "qty", "discount", "is_gift"])
-        self.env["pos.payment.method"].flush_model(["daily_ops_report_type"])
-        self.env["pos.session"].flush_model(["config_id"])
-
-        self.env.cr.execute(SQL("""
-            SELECT sess.config_id,
-                   COALESCE(pm.daily_ops_report_type, 'none') AS bucket,
-                   SUM(
-                       CASE
-                           WHEN ord.amount_total IS NULL OR ord.amount_total = 0 THEN pay.amount
-                           ELSE pay.amount - (COALESCE(ord.amount_tax, 0) * pay.amount / ord.amount_total)
-                       END
-                   ) AS untaxed,
-                   SUM(
-                       CASE
-                           WHEN ord.amount_total IS NULL OR ord.amount_total = 0 THEN 0
-                           ELSE COALESCE(ord.amount_tax, 0) * pay.amount / ord.amount_total
-                       END
-                   ) AS tax
-              FROM pos_payment pay
-              JOIN pos_session sess ON sess.id = pay.session_id
-              LEFT JOIN pos_order ord ON ord.id = pay.pos_order_id
-              LEFT JOIN pos_payment_method pm ON pm.id = pay.payment_method_id
-             WHERE pay.session_id IN %(session_ids)s
-               AND COALESCE(pm.daily_ops_report_type, 'none') NOT IN %(excluded)s
-             GROUP BY sess.config_id, COALESCE(pm.daily_ops_report_type, 'none')
-        """, session_ids=session_ids, excluded=excluded))
-        for config_id, bucket, untaxed, tax in self.env.cr.fetchall():
-            if not config_id:
-                continue
-            branch = branch_data[config_id]
-            branch["untaxed_sales"] += float(untaxed or 0.0)
-            branch["tax_amount"] += float(tax or 0.0)
-            branch[self._channel_untaxed_key_from_bucket(bucket)] += float(untaxed or 0.0)
-
-        self.env.cr.execute(SQL("""
-            SELECT ord.config_id, COUNT(*)
-              FROM pos_order ord
-              JOIN (
-                    SELECT pay.pos_order_id AS order_id
-                      FROM pos_payment pay
-                      LEFT JOIN pos_payment_method pm ON pm.id = pay.payment_method_id
-                     WHERE pay.session_id IN %(session_ids)s
-                       AND pay.pos_order_id IS NOT NULL
-                       AND COALESCE(pm.daily_ops_report_type, 'none') NOT IN %(excluded)s
-                     GROUP BY pay.pos_order_id
-                    HAVING SUM(pay.amount) > 0.0005
-              ) inc ON inc.order_id = ord.id
-             GROUP BY ord.config_id
-        """, session_ids=session_ids, excluded=excluded))
-        for config_id, count in self.env.cr.fetchall():
-            if config_id:
-                branch_data[config_id]["paying_order_count"] += count or 0
-
-        self.env.cr.execute(SQL("""
-            SELECT ord.config_id,
-                   COUNT(DISTINCT ord.id) AS order_count,
-                   COALESCE(SUM(
-                       CASE
-                           WHEN line.is_gift IS NOT TRUE AND COALESCE(line.discount, 0) != 0
-                           THEN COALESCE(line.price_unit, 0) * COALESCE(line.qty, 0) * line.discount / 100.0
-                           ELSE 0
-                       END
-                   ), 0) AS discount_amount,
-                   COALESCE(SUM(
-                       CASE
-                           WHEN line.is_gift IS TRUE
-                           THEN COALESCE(line.price_unit, 0) * COALESCE(line.qty, 0)
-                           ELSE 0
-                       END
-                   ), 0) AS gift_amount,
-                   COALESCE(SUM(CASE WHEN line.is_gift IS TRUE THEN 1 ELSE 0 END), 0) AS gift_line_count
-              FROM pos_order ord
-              LEFT JOIN pos_order_line line ON line.order_id = ord.id
-             WHERE ord.session_id IN %(session_ids)s
-               AND ord.state IN ('paid', 'done', 'invoiced')
-             GROUP BY ord.config_id
-        """, session_ids=session_ids))
-        for config_id, order_count, discount_amount, gift_amount, gift_line_count in self.env.cr.fetchall():
-            if not config_id:
-                continue
-            branch = branch_data[config_id]
-            branch["order_count"] += order_count or 0
-            branch["discount_amount"] += float(discount_amount or 0.0)
-            branch["gift_amount"] += float(gift_amount or 0.0)
-            branch["gift_line_count"] += gift_line_count or 0
 
     def _get_paying_orders(self, sessions):
         """{pos.order: income} for orders whose income payments are above zero
@@ -516,9 +411,29 @@ class PosReportingDashboard(models.TransientModel):
         for cfg_id, values in figures.items():
             branch_data[cfg_id].update(values)
 
-        # Tax, discounts, gifts and order counts. Same rules as the old per-record
-        # loops, aggregated in SQL so a range longer than a month still returns.
-        self._accumulate_order_metrics(sessions, branch_data)
+        # --- A-D. Untaxed / tax from the income payments, so they add up to Total POS Income
+        # (hospitality, advance applied and cash rounding are left out like in the income).
+        # Channel untaxed shares feed the Cash / Visa / Online / Debt cards (excl. VAT).
+        for pay in engine._get_payments(sessions):
+            if not engine._is_in_sales(pay.payment_method_id):
+                continue
+            branch = branch_data[pay.session_id.config_id.id]
+            untaxed_amt, tax_amt = self._payment_tax_split(pay)
+            branch["untaxed_sales"] += untaxed_amt
+            branch["tax_amount"] += tax_amt
+            branch[self._channel_untaxed_key(pay.payment_method_id)] += untaxed_amt
+
+        for order in self._get_paying_orders(sessions):
+            branch_data[order.config_id.id]["paying_order_count"] += 1
+
+        # POS Orders of the period's sessions (discounts, gifts, order count)
+        for order in engine._get_orders(sessions):
+            branch = branch_data[order.config_id.id]
+            branch["discount_amount"] += self._order_discount(order)
+            gift_lines = self._order_gift_lines(order)
+            branch["gift_amount"] += sum(self._gift_line_value(line) for line in gift_lines)
+            branch["gift_line_count"] += len(gift_lines)
+            branch["order_count"] += 1
 
         # Open time of the sessions; a session still open counts until now.
         now = fields.Datetime.now()

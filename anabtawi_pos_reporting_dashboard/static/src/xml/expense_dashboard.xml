@@ -20,10 +20,10 @@
                         <button type="button" class="btn btn-outline-primary" t-att-class="{'active': state.period === 'this_month'}" t-on-click="() => this.setPeriod('this_month')">This Month</button>
                     </div>
                     <div class="d-flex align-items-center gap-2">
-                        <input type="date" class="form-control filter_input" t-att-value="state.date_from" t-on-change="(ev) => this.onDateChange('date_from', ev)"/>
+                        <input type="date" class="form-control filter_input" t-model="state.date_from"/>
                         <span class="text-muted">to</span>
-                        <input type="date" class="form-control filter_input" t-att-value="state.date_to" t-on-change="(ev) => this.onDateChange('date_to', ev)"/>
-                        <button type="button" class="btn btn-primary" t-on-click="applyFilters">
+                        <input type="date" class="form-control filter_input" t-model="state.date_to"/>
+                        <button class="btn btn-primary" t-on-click="fetchDashboardData">
                             <i class="fa fa-refresh me-1"/> Apply
                         </button>
                         <button class="btn btn-outline-secondary" t-on-click="openAccountConfig" title="Configure expense accounts">
