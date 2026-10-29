@@ -70,8 +70,21 @@ class PortalSaleOrderCreate(http.Controller):
     def _get_van_customer(self):
         user = request.env.user.sudo()
         if "van_customer_id" in user._fields and user.van_customer_id:
-            # Always use the commercial partner so addresses nest under the main customer
-            return user.van_customer_id.commercial_partner_id
+            mapped = user.van_customer_id
+            # Addresses must hang under a Company for the Contacts tab to show them.
+            parent = mapped if mapped.is_company else mapped.commercial_partner_id
+            _logger.info(
+                "portal_sale van_customer user=%s mapped_id=%s mapped_name=%r "
+                "mapped_is_company=%s commercial_id=%s parent_used_id=%s parent_used_name=%r",
+                user.id,
+                mapped.id,
+                mapped.display_name,
+                mapped.is_company,
+                mapped.commercial_partner_id.id,
+                parent.id,
+                parent.display_name,
+            )
+            return parent
         return request.env["res.partner"]
 
     def _serialize_address(self, partner):
@@ -96,8 +109,8 @@ class PortalSaleOrderCreate(http.Controller):
     def _get_van_delivery_addresses(self, customer):
         if not customer:
             return request.env["res.partner"]
-        parent = customer.commercial_partner_id
-        return (
+        parent = customer if customer.is_company else customer.commercial_partner_id
+        addresses = (
             request.env["res.partner"]
             .sudo()
             .search(
@@ -109,12 +122,41 @@ class PortalSaleOrderCreate(http.Controller):
                 order="name, id",
             )
         )
+        _logger.info(
+            "portal_sale list addresses parent_id=%s count=%s ids=%s",
+            parent.id,
+            len(addresses),
+            addresses.ids,
+        )
+        return addresses
 
     def _resolve_van_shipping_address(self, customer, address_id=None, address=None):
         Partner = request.env["res.partner"].sudo()
-        parent = customer.commercial_partner_id
+        parent = customer if customer.is_company else customer.commercial_partner_id
+        _logger.info(
+            "portal_sale resolve address parent_id=%s parent_name=%r is_company=%s "
+            "address_id=%s address_payload=%r",
+            parent.id,
+            parent.display_name,
+            parent.is_company,
+            address_id,
+            address,
+        )
+        if not parent.is_company:
+            _logger.warning(
+                "portal_sale address parent %s is not a Company; Contacts tab may hide children. "
+                "Set Van Customer to a Company partner.",
+                parent.id,
+            )
         if address_id:
             shipping = Partner.browse(int(address_id)).exists()
+            _logger.info(
+                "portal_sale existing address id=%s parent_id=%s type=%s active=%s",
+                shipping.id if shipping else None,
+                shipping.parent_id.id if shipping else None,
+                shipping.type if shipping else None,
+                shipping.active if shipping else None,
+            )
             if (
                 not shipping
                 or shipping.parent_id.id != parent.id
@@ -149,7 +191,28 @@ class PortalSaleOrderCreate(http.Controller):
             vals["company_id"] = parent.company_id.id
         else:
             vals["company_id"] = False
-        return Partner.create(vals)
+
+        _logger.info("portal_sale creating delivery address vals=%r", vals)
+        shipping = Partner.create(vals)
+        # Re-read to confirm parent stuck (some automations may rewrite parent_id)
+        shipping.invalidate_recordset()
+        _logger.info(
+            "portal_sale created address id=%s name=%r parent_id=%s type=%s "
+            "company_id=%s child_ids_on_parent=%s",
+            shipping.id,
+            shipping.name,
+            shipping.parent_id.id,
+            shipping.type,
+            shipping.company_id.id,
+            parent.child_ids.ids,
+        )
+        if shipping.parent_id.id != parent.id:
+            _logger.error(
+                "portal_sale address parent mismatch after create: expected=%s got=%s",
+                parent.id,
+                shipping.parent_id.id,
+            )
+        return shipping
 
     def _available_qty_by_product(self, location, product_ids=None):
         """Map product_id -> available qty (on hand - reserved) in location tree."""
