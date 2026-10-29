@@ -2,7 +2,7 @@
 {
     "name": "Portal Sale Order Create",
     "summary": "Sales Portal: create sale orders, auto-invoice, print/email/WhatsApp, cancel & list own orders",
-    "version": "19.0.1.3.2",
+    "version": "19.0.1.3.3",
     "category": "Sales/Portal",
     "author": "Anabtawi",
     "license": "LGPL-3",
