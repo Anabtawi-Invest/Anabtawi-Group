@@ -70,7 +70,8 @@ class PortalSaleOrderCreate(http.Controller):
     def _get_van_customer(self):
         user = request.env.user.sudo()
         if "van_customer_id" in user._fields and user.van_customer_id:
-            return user.van_customer_id
+            # Always use the commercial partner so addresses nest under the main customer
+            return user.van_customer_id.commercial_partner_id
         return request.env["res.partner"]
 
     def _serialize_address(self, partner):
@@ -95,13 +96,14 @@ class PortalSaleOrderCreate(http.Controller):
     def _get_van_delivery_addresses(self, customer):
         if not customer:
             return request.env["res.partner"]
+        parent = customer.commercial_partner_id
         return (
             request.env["res.partner"]
             .sudo()
             .search(
                 [
-                    ("parent_id", "=", customer.id),
-                    ("type", "=", "delivery"),
+                    ("parent_id", "=", parent.id),
+                    ("type", "in", ("delivery", "other")),
                     ("active", "=", True),
                 ],
                 order="name, id",
@@ -110,12 +112,13 @@ class PortalSaleOrderCreate(http.Controller):
 
     def _resolve_van_shipping_address(self, customer, address_id=None, address=None):
         Partner = request.env["res.partner"].sudo()
+        parent = customer.commercial_partner_id
         if address_id:
             shipping = Partner.browse(int(address_id)).exists()
             if (
                 not shipping
-                or shipping.parent_id.id != customer.id
-                or shipping.type != "delivery"
+                or shipping.parent_id.id != parent.id
+                or shipping.type not in ("delivery", "other")
             ):
                 raise ValidationError(_("Invalid delivery address selected."))
             return shipping
@@ -132,17 +135,21 @@ class PortalSaleOrderCreate(http.Controller):
         if not city:
             raise ValidationError(_("Please enter the city."))
 
-        return Partner.create(
-            {
-                "name": name,
-                "street": street,
-                "city": city,
-                "phone": phone or False,
-                "type": "delivery",
-                "parent_id": customer.id,
-                "company_id": customer.company_id.id or request.env.company.id,
-            }
-        )
+        vals = {
+            "name": name,
+            "street": street,
+            "city": city,
+            "phone": phone or False,
+            "type": "delivery",
+            "parent_id": parent.id,
+            "is_company": False,
+        }
+        # Keep same company as parent (False if parent is shared)
+        if parent.company_id:
+            vals["company_id"] = parent.company_id.id
+        else:
+            vals["company_id"] = False
+        return Partner.create(vals)
 
     def _available_qty_by_product(self, location, product_ids=None):
         """Map product_id -> available qty (on hand - reserved) in location tree."""
