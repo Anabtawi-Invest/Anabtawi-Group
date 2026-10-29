@@ -479,6 +479,54 @@ class PortalSaleOrderCreate(http.Controller):
         )
         return [{"id": term.id, "name": term.display_name or term.name} for term in terms]
 
+    def _get_immediate_payment_term(self):
+        term = request.env.ref(
+            "account.account_payment_term_immediate",
+            raise_if_not_found=False,
+        )
+        if term:
+            return term.sudo()
+        company = request.env.company
+        return (
+            request.env["account.payment.term"]
+            .sudo()
+            .search(
+                [
+                    "|",
+                    ("company_id", "=", False),
+                    ("company_id", "=", company.id),
+                ],
+                order="id asc",
+                limit=1,
+            )
+        )
+
+    def _resolve_payment_term(self, partner, payment_term_id=None):
+        """Selected term, else partner default, else Immediate Payment."""
+        Term = request.env["account.payment.term"].sudo()
+        payment_term = Term
+        if partner.portal_allow_payment_term:
+            if not payment_term_id:
+                raise ValidationError(_("Please select payment terms."))
+            payment_term = Term.browse(int(payment_term_id)).exists()
+            if not payment_term:
+                raise ValidationError(_("Invalid payment terms selected."))
+            if payment_term.company_id and payment_term.company_id != request.env.company:
+                raise ValidationError(_("Invalid payment terms selected."))
+            return payment_term
+
+        if payment_term_id:
+            payment_term = Term.browse(int(payment_term_id)).exists()
+        if not payment_term and partner.property_payment_term_id:
+            payment_term = partner.property_payment_term_id
+        if not payment_term:
+            payment_term = self._get_immediate_payment_term()
+        if not payment_term:
+            raise ValidationError(
+                _("No payment terms found. Please configure Immediate Payment.")
+            )
+        return payment_term
+
     @http.route("/my/sales/api/confirm", type="jsonrpc", auth="user", website=True)
     def api_confirm(
         self,
@@ -506,20 +554,7 @@ class PortalSaleOrderCreate(http.Controller):
             if not partner:
                 raise ValidationError(_("Customer not found."))
 
-        payment_term = False
-        if partner.portal_allow_payment_term:
-            if not payment_term_id:
-                raise ValidationError(_("Please select payment terms."))
-            payment_term = (
-                request.env["account.payment.term"]
-                .sudo()
-                .browse(int(payment_term_id))
-                .exists()
-            )
-            if not payment_term:
-                raise ValidationError(_("Invalid payment terms selected."))
-            if payment_term.company_id and payment_term.company_id != request.env.company:
-                raise ValidationError(_("Invalid payment terms selected."))
+        payment_term = self._resolve_payment_term(partner, payment_term_id)
 
         van_location = self._get_van_stock_location()
         van_warehouse = self._get_van_warehouse()
@@ -573,6 +608,7 @@ class PortalSaleOrderCreate(http.Controller):
         order_vals = {
             "partner_id": partner.id,
             "user_id": request.env.user.id,
+            "payment_term_id": payment_term.id,
             "order_line": order_lines,
         }
         if shipping:
@@ -583,8 +619,6 @@ class PortalSaleOrderCreate(http.Controller):
             order_vals["pricelist_id"] = van_pricelist.id
 
         order = request.env["sale.order"].sudo().create(order_vals)
-        if payment_term:
-            order.payment_term_id = payment_term.id
 
         if self._is_draft_portal_user():
             return {
