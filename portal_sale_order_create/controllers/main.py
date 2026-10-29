@@ -479,6 +479,50 @@ class PortalSaleOrderCreate(http.Controller):
         )
         return [{"id": term.id, "name": term.display_name or term.name} for term in terms]
 
+    def _validate_sale_deliveries(self, order):
+        """Validate outgoing deliveries so van stock on-hand decreases immediately."""
+        pickings = order.picking_ids.filtered(
+            lambda p: p.state not in ("done", "cancel")
+            and p.picking_type_id.code == "outgoing"
+        )
+        _logger.info(
+            "portal_sale validate deliveries order=%s warehouse=%s pickings=%s",
+            order.name,
+            order.warehouse_id.display_name,
+            pickings.mapped("name"),
+        )
+        for picking in pickings:
+            if picking.state == "draft":
+                picking.action_confirm()
+            if picking.state in ("confirmed", "assigned", "waiting"):
+                picking.action_assign()
+            for move in picking.move_ids.filtered(
+                lambda m: m.state not in ("done", "cancel")
+            ):
+                if move.product_uom_qty and not move.quantity:
+                    move.quantity = move.product_uom_qty
+            picking.move_ids.filtered(
+                lambda m: m.state not in ("done", "cancel")
+            ).picked = True
+            result = picking.with_context(
+                skip_backorder=True,
+                skip_sms=True,
+                skip_sanity_check=True,
+            ).button_validate()
+            if isinstance(result, dict):
+                picking.with_context(
+                    skip_backorder=True,
+                    cancel_backorder=True,
+                    skip_sms=True,
+                    skip_sanity_check=True,
+                )._action_done()
+            _logger.info(
+                "portal_sale delivery %s state=%s src=%s",
+                picking.name,
+                picking.state,
+                picking.location_id.complete_name,
+            )
+
     def _get_immediate_payment_term(self):
         term = request.env.ref(
             "account.account_payment_term_immediate",
@@ -619,6 +663,14 @@ class PortalSaleOrderCreate(http.Controller):
             order_vals["pricelist_id"] = van_pricelist.id
 
         order = request.env["sale.order"].sudo().create(order_vals)
+        # Ensure van warehouse sticks (compute may reset it on create)
+        if van_warehouse and order.warehouse_id != van_warehouse:
+            order.warehouse_id = van_warehouse.id
+            _logger.info(
+                "portal_sale forced warehouse_id=%s on order %s",
+                van_warehouse.id,
+                order.name,
+            )
 
         if self._is_draft_portal_user():
             return {
@@ -631,6 +683,7 @@ class PortalSaleOrderCreate(http.Controller):
             }
 
         order.action_confirm()
+        self._validate_sale_deliveries(order)
         invoices = order._create_invoices()
         invoices.action_post()
         invoice = invoices[:1]
