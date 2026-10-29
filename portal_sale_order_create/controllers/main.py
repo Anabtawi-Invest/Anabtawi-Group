@@ -56,6 +56,17 @@ class PortalSaleOrderCreate(http.Controller):
             return user.van_warehouse_id
         return request.env["stock.warehouse"]
 
+    def _get_van_pricelist(self):
+        user = request.env.user.sudo()
+        if "van_pricelist_id" in user._fields and user.van_pricelist_id:
+            return user.van_pricelist_id
+        return request.env["product.pricelist"]
+
+    def _product_portal_price(self, product, pricelist=None):
+        if pricelist:
+            return pricelist._get_product_price(product, 1.0)
+        return product.lst_price
+
     def _get_van_customer(self):
         user = request.env.user.sudo()
         if "van_customer_id" in user._fields and user.van_customer_id:
@@ -328,10 +339,11 @@ class PortalSaleOrderCreate(http.Controller):
         products = Product.search(
             domain, limit=limit, offset=offset, order="default_code, name, id"
         )
-        currency = request.env.company.currency_id
+        pricelist = self._get_van_pricelist()
+        currency = (pricelist.currency_id if pricelist else request.env.company.currency_id)
         result = []
         for product in products:
-            price = product.lst_price
+            price = self._product_portal_price(product, pricelist)
             qty_available = available_map.get(product.id) if van_location else False
             result.append(
                 {
@@ -483,6 +495,7 @@ class PortalSaleOrderCreate(http.Controller):
         if not order_lines:
             raise ValidationError(_("Please add at least one product with quantity."))
 
+        van_pricelist = self._get_van_pricelist()
         order_vals = {
             "partner_id": partner.id,
             "user_id": request.env.user.id,
@@ -492,6 +505,8 @@ class PortalSaleOrderCreate(http.Controller):
             order_vals["partner_shipping_id"] = shipping.id
         if van_warehouse:
             order_vals["warehouse_id"] = van_warehouse.id
+        if van_pricelist:
+            order_vals["pricelist_id"] = van_pricelist.id
 
         order = request.env["sale.order"].sudo().create(order_vals)
         if payment_term:

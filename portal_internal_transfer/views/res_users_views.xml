@@ -32,6 +32,8 @@
                             <field name="van_customer_id"
                                       options="{'no_create': False}"
                                       placeholder="Commercial customer for van sales"/>
+                            <field name="van_pricelist_id"
+                                      placeholder="Pricelist for transfers &amp; sales prices"/>
                         </group>
                     </group>
                 </page>

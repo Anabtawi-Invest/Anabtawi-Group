@@ -233,6 +233,18 @@ class PortalInternalTransfer(http.Controller):
             ("active", "=", True),
             ("is_storable", "=", True),
         ]
+        user = request.env.user.sudo()
+        if "van_pricelist_id" in user._fields and user.van_pricelist_id:
+            pricelist_product_ids = user._get_van_pricelist_product_ids()
+            if not pricelist_product_ids:
+                return {
+                    "products": [],
+                    "total": 0,
+                    "offset": offset,
+                    "limit": limit,
+                    "has_more": False,
+                }
+            domain.append(("id", "in", pricelist_product_ids))
         if term:
             domain += [
                 "|",
@@ -275,6 +287,11 @@ class PortalInternalTransfer(http.Controller):
         if not source or source.usage != "internal" or not source.active:
             raise ValidationError(_("Invalid source location."))
 
+        user = request.env.user.sudo()
+        allowed_product_ids = False
+        if "van_pricelist_id" in user._fields and user.van_pricelist_id:
+            allowed_product_ids = set(user._get_van_pricelist_product_ids() or [])
+
         lines = lines or []
         move_commands = []
         for line in lines:
@@ -285,6 +302,11 @@ class PortalInternalTransfer(http.Controller):
             product = request.env["product.product"].sudo().browse(product_id).exists()
             if not product or not product.is_storable:
                 raise ValidationError(_("Invalid product selected."))
+            if allowed_product_ids is not False and product.id not in allowed_product_ids:
+                raise ValidationError(
+                    _("Product %(product)s is not allowed on your van pricelist.")
+                    % {"product": product.display_name}
+                )
             move_vals = {
                 "product_id": product.id,
                 "product_uom_qty": qty,

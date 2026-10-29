@@ -38,6 +38,33 @@ class ResUsers(models.Model):
         help="Fixed commercial customer for this van portal user. "
         "Portal sales use this customer; delivery addresses are children under it.",
     )
+    van_pricelist_id = fields.Many2one(
+        "product.pricelist",
+        string="Van Pricelist",
+        copy=False,
+        check_company=False,
+        help="Pricelist for this van. Portal internal transfers only show these products. "
+        "Portal sales use it as the order pricelist and for prices.",
+    )
+
+    def _get_van_pricelist_product_ids(self):
+        """Product variants covered by the van pricelist item lines."""
+        self.ensure_one()
+        pricelist = self.van_pricelist_id
+        if not pricelist:
+            return False
+        product_ids = set()
+        Product = self.env["product.product"].sudo()
+        for item in pricelist.item_ids:
+            if item.product_id:
+                product_ids.add(item.product_id.id)
+            elif item.product_tmpl_id:
+                product_ids.update(item.product_tmpl_id.product_variant_ids.ids)
+            elif item.categ_id:
+                product_ids.update(
+                    Product.search([("categ_id", "child_of", item.categ_id.id)]).ids
+                )
+        return list(product_ids)
 
     @api.model_create_multi
     def create(self, vals_list):
