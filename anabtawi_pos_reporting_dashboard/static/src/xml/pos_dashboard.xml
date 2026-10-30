@@ -90,6 +90,17 @@
                         </div>
                     </div>
 
+                    <!-- Sessions included in this search -->
+                    <div class="o_kpi_card card-sessions clickable_kpi" t-on-click="() => this.onKpiClick('sessions')" title="Click to open the POS sessions included in this search">
+                        <div class="kpi_icon"><i class="fa fa-clock-o text-secondary"/></div>
+                        <div class="kpi_title">POS Sessions</div>
+                        <div class="kpi_value"><t t-esc="data.kpis.session_count"/></div>
+                        <div class="kpi_subtext d-flex justify-content-between align-items-center">
+                            <span class="badge bg-secondary badge_sub">Included in this search</span>
+                            <span class="drill_badge"><i class="fa fa-search-plus me-1"/>Drill Down</span>
+                        </div>
+                    </div>
+
                     <!-- Average Orders Per Hour -->
                     <div class="o_kpi_card card-opm">
                         <div class="kpi_icon"><i class="fa fa-tachometer text-warning"/></div>

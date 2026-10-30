@@ -355,6 +355,34 @@ class PosReportingDashboard(models.TransientModel):
             "context": {"create": False, "delete": False},
         }
 
+    def _open_session_drilldown(self, period, configs):
+        """Open the pos.session records the dashboard search included."""
+        list_view = self.env.ref("point_of_sale.view_pos_session_tree", raise_if_not_found=False)
+        form_view = self.env.ref("point_of_sale.view_pos_session_form", raise_if_not_found=False)
+        views = []
+        if list_view:
+            views.append((list_view.id, "list"))
+        if form_view:
+            views.append((form_view.id, "form"))
+        if configs:
+            domain = [
+                ("start_at", ">=", period["session_start"]),
+                ("start_at", "<=", period["session_end"]),
+                ("config_id", "in", configs.ids),
+            ]
+        else:
+            domain = [("id", "=", 0)]
+        return {
+            "name": _("POS Sessions"),
+            "type": "ir.actions.act_window",
+            "res_model": "pos.session",
+            "view_mode": "list,form",
+            "views": views if views else [(False, "list"), (False, "form")],
+            "domain": domain,
+            "target": "current",
+            "context": {"create": False, "delete": False},
+        }
+
     @staticmethod
     def _orders_per_hour(values):
         if values["open_hours"] <= 0:
@@ -783,6 +811,7 @@ class PosReportingDashboard(models.TransientModel):
                 "advance_pending_count": global_totals["advance_pending_count"],
                 "delivery_amount": global_totals["delivery_amount"],
                 "order_count": global_totals["order_count"],
+                "session_count": len(sessions),
                 "orders_per_hour": global_totals["orders_per_hour"],
                 "avg_basket": global_totals["avg_basket"],
                 "paying_order_count": global_totals["paying_order_count"],
@@ -817,6 +846,10 @@ class PosReportingDashboard(models.TransientModel):
         configs = self._get_report_configs(config_ids)
         active_config_ids = set(configs.ids)
         sessions = engine._get_sessions(period, configs)
+
+        # Sessions the search included: opened on a selected branch inside the period.
+        if metric_type == "sessions":
+            return self._open_session_drilldown(period, configs)
 
         # Open native POS Expenses list/form (type, status, amount) instead of unified report.
         if metric_type == "expense_amount":
