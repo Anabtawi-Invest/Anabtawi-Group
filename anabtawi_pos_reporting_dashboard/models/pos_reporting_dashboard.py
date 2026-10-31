@@ -853,23 +853,35 @@ class PosReportingDashboard(models.TransientModel):
         return products - self._excluded_pos_helper_products(configs)
 
     def _product_sales_stats(self, sessions):
-        """{product_id: stats} for paid lines in these sessions, gifts excluded."""
+        """{product_id: stats} for paid lines in these sessions, gifts excluded.
+
+        A line that already has ``total_cost`` keeps that cost. A line that
+        does not uses the product's current Cost (``standard_price``) times
+        the quantity, converted into the order currency.
+        """
         if not sessions:
             return {}
         self.env["pos.order.line"].flush_model([
             "product_id", "qty", "price_subtotal", "total_cost", "is_total_cost_computed", "order_id", "is_gift",
         ])
-        self.env["pos.order"].flush_model(["session_id", "state"])
+        self.env["pos.order"].flush_model(["session_id", "state", "company_id", "currency_rate"])
+        self.env["product.product"].flush_model(["standard_price"])
         self.env.cr.execute(SQL("""
             SELECT line.product_id,
                    COALESCE(SUM(line.qty), 0) AS qty,
                    COALESCE(SUM(line.price_subtotal), 0) AS sales,
-                   COALESCE(SUM(CASE WHEN line.is_total_cost_computed THEN line.total_cost ELSE 0 END), 0) AS cost,
-                   COALESCE(SUM(CASE WHEN line.is_total_cost_computed THEN line.price_subtotal ELSE 0 END), 0) AS sales_with_cost,
-                   BOOL_OR(line.is_total_cost_computed IS NOT TRUE) AS cost_missing,
+                   COALESCE(SUM(
+                       CASE
+                           WHEN line.is_total_cost_computed THEN line.total_cost
+                           ELSE line.qty
+                                * COALESCE((pp.standard_price ->> (ord.company_id::varchar))::numeric, 0)
+                                * COALESCE(NULLIF(ord.currency_rate, 0), 1)
+                       END
+                   ), 0) AS cost,
                    COUNT(DISTINCT line.order_id) AS order_count
               FROM pos_order_line line
               JOIN pos_order ord ON ord.id = line.order_id
+              JOIN product_product pp ON pp.id = line.product_id
              WHERE ord.session_id IN %(session_ids)s
                AND ord.state IN ('paid', 'done', 'invoiced')
                AND line.product_id IS NOT NULL
@@ -877,13 +889,11 @@ class PosReportingDashboard(models.TransientModel):
              GROUP BY line.product_id
         """, session_ids=tuple(sessions.ids)))
         stats = {}
-        for product_id, qty, sales, cost, sales_with_cost, cost_missing, order_count in self.env.cr.fetchall():
+        for product_id, qty, sales, cost, order_count in self.env.cr.fetchall():
             stats[product_id] = {
                 "qty": float(qty or 0.0),
                 "sales": float(sales or 0.0),
                 "cost": float(cost or 0.0),
-                "sales_with_cost": float(sales_with_cost or 0.0),
-                "cost_missing": bool(cost_missing),
                 "order_count": int(order_count or 0),
             }
         return stats
@@ -919,11 +929,10 @@ class PosReportingDashboard(models.TransientModel):
             stat = stats.get(product.id, {})
             qty = stat.get("qty", 0.0)
             sales = stat.get("sales", 0.0)
-            sales_with_cost = stat.get("sales_with_cost", 0.0)
             cost = stat.get("cost", 0.0)
-            has_cost = bool(stat) and not stat.get("cost_missing") and sales_with_cost != 0
-            profit = (sales_with_cost - cost) if has_cost else None
-            margin = (profit / sales_with_cost) if has_cost and sales_with_cost else None
+            sold = bool(stat)
+            profit = (sales - cost) if sold else None
+            margin = (profit / sales) if sold and sales else None
             category = product.pos_categ_ids[:1]
             rows.append({
                 "product_id": product.id,
@@ -931,11 +940,11 @@ class PosReportingDashboard(models.TransientModel):
                 "category": category.display_name if category else _("No POS category"),
                 "qty": round(qty, 3),
                 "sales": round(sales, 3),
-                "cost": round(cost, 3) if has_cost else None,
+                "cost": round(cost, 3) if sold else None,
                 "profit": round(profit, 3) if profit is not None else None,
                 "margin": round(margin * 100.0, 1) if margin is not None else None,
                 "order_count": stat.get("order_count", 0),
-                "cost_missing": bool(stat.get("cost_missing")),
+                "cost_missing": False,
             })
 
         sellers = [row for row in rows if row["qty"] > 0]
