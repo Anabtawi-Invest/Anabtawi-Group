@@ -23,7 +23,6 @@ def pre_init_hook(env):
 
 
 def post_init_hook(env):
-    env['hr.payroll.structure'].sudo().search([])._pfr_ensure_rules()
     # Work Injury days are paid at 7.5% of the daily wage
     injury = env['hr.work.entry.type'].sudo().search([('name', 'ilike', 'work injury'), ('pfr_pay_percent', '=', 100.0)])
     injury.write({'pfr_pay_percent': 7.5})
