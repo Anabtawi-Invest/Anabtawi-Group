@@ -3,6 +3,7 @@
 import { Component, useState, onWillStart } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
+import { useSetupAction } from "@web/search/action_hook";
 
 export class PosReportingDashboard extends Component {
     static template = "anabtawi_pos_reporting_dashboard.PosReportingDashboard";
@@ -33,6 +34,29 @@ export class PosReportingDashboard extends Component {
             sortKey: "sales",
             sortOrder: "desc",
         });
+        const saved = this.props.state && this.props.state.dashboard;
+        if (saved) {
+            Object.assign(this.state, saved);
+        }
+
+        useSetupAction({
+            getLocalState: () => ({
+                dashboard: {
+                    period: this.state.period,
+                    date_from: this.state.date_from,
+                    date_to: this.state.date_to,
+                    config_ids: [...(this.state.config_ids || [])],
+                    view: this.state.view,
+                    productFilter: this.state.productFilter,
+                    productSearch: this.state.productSearch,
+                    productSortKey: this.state.productSortKey,
+                    productSortOrder: this.state.productSortOrder,
+                    sortKey: this.state.sortKey,
+                    sortOrder: this.state.sortOrder,
+                },
+            }),
+        });
+
         this.products = useState({
             loadedKey: "",
             summary: {},
