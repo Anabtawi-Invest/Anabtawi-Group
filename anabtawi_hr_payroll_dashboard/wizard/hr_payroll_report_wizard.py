@@ -76,15 +76,25 @@ class HrPayrollReportWizard(models.TransientModel):
                 ("date_to", ">=", self.date_from),
             ])
 
+        all_target_dep_ids_set = set()
         if self.department_ids:
-            all_target_dep_ids = self.env["hr.department"].search([("id", "child_of", self.department_ids.ids)]).ids
+            all_target_dep_ids = self.env["hr.department"].sudo().search([("id", "child_of", self.department_ids.ids)]).ids
+            all_target_dep_ids_set = set(all_target_dep_ids)
             slip_domain.extend([
                 "|",
-                ("department_id", "in", all_target_dep_ids),
                 ("employee_id.department_id", "in", all_target_dep_ids),
+                ("department_id", "in", all_target_dep_ids),
             ])
 
-        payslips = self.env["hr.payslip"].search(slip_domain, order="department_id, employee_id")
+        raw_payslips = self.env["hr.payslip"].search(slip_domain, order="department_id, employee_id")
+        if all_target_dep_ids_set:
+            payslips = raw_payslips.filtered(
+                lambda s: (
+                    ((s.employee_id and s.employee_id.department_id) or s.department_id).id in all_target_dep_ids_set
+                ) if ((s.employee_id and s.employee_id.department_id) or s.department_id) else False
+            )
+        else:
+            payslips = raw_payslips
         if not payslips:
             raise UserError(_("No payslip records found for the selected criteria."))
 
@@ -162,13 +172,24 @@ class HrPayrollReportWizard(models.TransientModel):
 
             for slip in payslips:
                 emp = slip.employee_id
-                dept_name = (slip.department_id or emp.department_id).name or _("Unassigned")
-                branch_name = getattr(emp, "work_location_id", False) and emp.work_location_id.name or dept_name
-                division_name = getattr(emp.department_id, "parent_id", False) and emp.department_id.parent_id.name or dept_name
+                dep = (emp and emp.department_id) or slip.department_id or (getattr(slip, "version_id", False) and slip.version_id.department_id)
+                full_dept_path = (dep.complete_name or dep.name) if dep else _("Unassigned")
+                path_parts = [p.strip() for p in full_dept_path.split("/") if p.strip()]
+                division_name = path_parts[0] if len(path_parts) >= 1 else _("Unassigned")
+                dept_name = " / ".join(path_parts[1:-1]) if len(path_parts) >= 3 else (path_parts[1] if len(path_parts) == 2 else division_name)
+                branch_name = path_parts[-1] if len(path_parts) >= 1 else (getattr(emp, "work_location_id", False) and emp.work_location_id.name or division_name)
 
-                basic_w = getattr(slip, "basic_wage", 0.0) or getattr(slip, "wage", 0.0) or (slip.contract_id and slip.contract_id.wage) or (slip.version_id and getattr(slip.version_id, "contract_wage", 0.0)) or 0.0
-                actual_w = basic_w
-                due_w = basic_w
+                contract_w = (
+                    (emp and getattr(emp, "wage", 0.0))
+                    or getattr(slip, "basic_wage", 0.0)
+                    or getattr(slip, "wage", 0.0)
+                    or (slip.contract_id and slip.contract_id.wage)
+                    or (slip.version_id and getattr(slip.version_id, "contract_wage", 0.0))
+                    or 0.0
+                )
+                basic_w = 0.0
+                actual_w = 0.0
+                due_w = 0.0
 
                 alw_takleef = 0.0
                 alw_bonus = 0.0
@@ -191,8 +212,8 @@ class HrPayrollReportWizard(models.TransientModel):
                 ded_hours = 0.0
                 ded_other = 0.0
 
-                gross_val = getattr(slip, "gross_wage", 0.0) or basic_w
-                net_val = getattr(slip, "net_wage", 0.0) or basic_w
+                gross_val = getattr(slip, "gross_wage", 0.0) or 0.0
+                net_val = getattr(slip, "net_wage", 0.0) or 0.0
 
                 if hasattr(slip, "line_ids") and slip.line_ids:
                     for l in slip.line_ids:
@@ -200,14 +221,19 @@ class HrPayrollReportWizard(models.TransientModel):
                         c_name = (l.name or "").lower()
                         amt = l.total or 0.0
 
+                        is_actual = c_code in ("FULL_WAGE", "ACTUAL_SALARY", "ACTUAL") or "actual salary" in c_name or "الراتب الفعلي" in c_name
+                        is_basic = c_code in ("BASIC", "SALARY", "BASE", "WAGE") and not is_actual
+
                         if c_code == "NET": net_val = amt
-                        elif c_code in ["GROSS", "GRS"]: gross_val = amt
+                        elif c_code in ["GROSS", "GRS", "TOTAL_GROSS"]: gross_val = amt
+                        elif is_basic: basic_w += amt
+                        elif is_actual: actual_w += amt
                         elif "تكليف" in c_name: alw_takleef += amt
                         elif "مكافأة" in c_name or "مكافاه" in c_name: alw_bonus += amt
-                        elif "إضافي" in c_name or "اضافي" in c_name or "OT" in c_code: alw_ot += amt
+                        elif "إضافي" in c_name or "اضافي" in c_name or "OT" in c_code or c_code in ("OT_NET", "ETH_NET", "RD-S", "TERM_EXTRA"): alw_ot += amt
                         elif "تنقل" in c_name or "مواصلات" in c_name: alw_trans += amt
                         elif "عائد ضمان" in c_name: alw_ss += amt
-                        elif (l.category_id and l.category_id.code in ["ALW", "ALLOWANCE"]) and c_code not in ["NET", "GROSS", "BASIC"]:
+                        elif (l.category_id and l.category_id.code in ["ALW", "ALLOWANCE"]) and c_code not in ["NET", "GROSS", "BASIC", "ACTUAL", "FULL_WAGE"]:
                             alw_other += amt
                         
                         elif "دفعة اولى" in c_name or "دفعة 1" in c_name: ded_pay1 += abs(amt)
@@ -218,16 +244,21 @@ class HrPayrollReportWizard(models.TransientModel):
                         elif "وطني" in c_name: ded_nat += abs(amt)
                         elif "تأمين" in c_name or "تامين" in c_name: ded_ins += abs(amt)
                         elif "عقوبات" in c_name or "غرامات" in c_name: ded_pen += abs(amt)
-                        elif "ضمان" in c_name or "SS" in c_code or "SSC" in c_code: ded_ss += abs(amt)
+                        elif ("ضمان" in c_name or "SS" in c_code or "SSC" in c_code) and c_code not in ("SSC", "SSCC", "SSC_COMP", "SOC_SEC_COMP") and "شركة" not in c_name:
+                            ded_ss += abs(amt)
                         elif "ضريبة" in c_name or "TAX" in c_code: ded_tax += abs(amt)
                         elif "مخالفات" in c_name: ded_viol += abs(amt)
-                        elif "خصم ساعات" in c_name or "تأخير" in c_name or "LATE" in c_code: ded_hours += abs(amt)
+                        elif "خصم ساعات" in c_name or "تأخير" in c_name or "LATE" in c_code or c_code == "DED_UNDERTIME": ded_hours += abs(amt)
                         elif (l.category_id and l.category_id.code in ["DED", "DEDUCTION"]) and c_code not in ["NET", "GROSS"]:
                             ded_other += abs(amt)
 
+                if not basic_w: basic_w = contract_w
+                if not actual_w: actual_w = basic_w
+                due_w = actual_w
+
                 tot_alw = alw_takleef + alw_bonus + alw_ot + alw_trans + alw_ss + alw_other
                 tot_ded = ded_pay1 + ded_pay2 + ded_diff + ded_loan + ded_city + ded_nat + ded_ins + ded_pen + ded_ss + ded_tax + ded_viol + ded_hours + ded_other
-                if not gross_val: gross_val = basic_w + tot_alw
+                if not gross_val: gross_val = actual_w + tot_alw
                 if not net_val: net_val = gross_val - tot_ded
 
                 daily_rate = round((gross_val + (ded_ss * 1.9)) / float(cal_days), 3)
@@ -327,17 +358,24 @@ class HrPayrollReportWizard(models.TransientModel):
             ot_row = 6
             for slip in payslips:
                 emp = slip.employee_id
-                dept_name = (slip.department_id or emp.department_id).name or ""
-                basic_w = getattr(slip, "basic_wage", 0.0) or getattr(slip, "wage", 0.0) or 0.0
+                dep = (emp and emp.department_id) or slip.department_id
+                dept_name = (dep.complete_name or dep.name) if dep else ""
+                basic_w = (emp and getattr(emp, "wage", 0.0)) or getattr(slip, "basic_wage", 0.0) or getattr(slip, "wage", 0.0) or 0.0
+                if hasattr(slip, "line_ids") and slip.line_ids:
+                    b_lines = slip.line_ids.filtered(lambda l: (l.code or "").upper() in ("BASIC", "SALARY", "BASE", "WAGE"))
+                    if b_lines:
+                        basic_w = sum(b_lines.mapped("total")) or basic_w
                 pay_rate = round(basic_w / 240.0, 3) if basic_w else 0.0
 
-                ot_hours = 0.0
+                ot_hours = float(getattr(slip, "attendance_gross_overtime", 0.0) or getattr(slip, "extra_hours_R", 0.0) or 0.0)
                 ot_amt = 0.0
                 if hasattr(slip, "worked_days_line_ids") and slip.worked_days_line_ids:
-                    ot_hours = sum(wd.number_of_hours for wd in slip.worked_days_line_ids if "OT" in (wd.code or "").upper() or "EXTRA" in (wd.code or "").upper() or "اضافي" in (wd.name or ""))
+                    wd_ot_hrs = sum(wd.number_of_hours for wd in slip.worked_days_line_ids if "OT" in (wd.code or "").upper() or "EXTRA" in (wd.code or "").upper() or "اضافي" in (wd.name or "") or "إضافي" in (wd.name or ""))
+                    if wd_ot_hrs > ot_hours:
+                        ot_hours = wd_ot_hrs
                 
                 if hasattr(slip, "line_ids") and slip.line_ids:
-                    ot_amt = sum(l.total for l in slip.line_ids if "OT" in (l.code or "").upper() or "OVERTIME" in (l.code or "").upper() or "اضافي" in (l.name or ""))
+                    ot_amt = sum(l.total for l in slip.line_ids if (l.code or "").upper() in ("OT_NET", "ETH_NET", "RD-S", "TERM_EXTRA", "OVERTIME", "OT") or "OT" in (l.code or "").upper() or "OVERTIME" in (l.code or "").upper() or "اضافي" in (l.name or "") or "إضافي" in (l.name or ""))
                 
                 if not ot_amt and ot_hours:
                     ot_amt = round(ot_hours * pay_rate * 1.25, 3)
@@ -468,7 +506,8 @@ class HrPayrollReportWizard(models.TransientModel):
             att_row = 5
             for slip in payslips:
                 emp = slip.employee_id
-                dept_name = (slip.department_id or emp.department_id).name or ""
+                dep = (emp and emp.department_id) or slip.department_id
+                dept_name = (dep.complete_name or dep.name) if dep else ""
 
                 w_days = 0.0
                 sched_hrs = 0.0
@@ -493,6 +532,13 @@ class HrPayrollReportWizard(models.TransientModel):
                             if code not in ["OUT"]:
                                 w_days += days
                                 sched_hrs += hrs if hrs > 0 else (days * 8.0)
+
+                pfr_ot_hrs = float(getattr(slip, "attendance_gross_overtime", 0.0) or getattr(slip, "extra_hours_R", 0.0) or 0.0)
+                pfr_late_hrs = float(getattr(slip, "attendance_gross_undertime", 0.0) or getattr(slip, "lateness_deducted_cash", 0.0) or 0.0)
+                if pfr_ot_hrs > ot_hrs:
+                    ot_hrs = pfr_ot_hrs
+                if pfr_late_hrs > late_hrs:
+                    late_hrs = pfr_late_hrs
 
                 if not sched_hrs:
                     sched_hrs = (w_days * 8.0) if w_days else 240.0

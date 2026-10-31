@@ -2,14 +2,17 @@
 <templates xml:space="preserve">
     <t t-name="anabtawi_hr_payroll_dashboard.HrPayrollDashboard" owl="1">
         <div class="o_hr_payroll_dashboard_wrapper">
-            <!-- Header & Filter Toolbar -->
-            <div class="o_hr_dashboard_header">
+            <!-- SEGMENT 1: Header & Command Filter Toolbar (White Surface / Dark Text) -->
+            <div class="o_hr_dashboard_header seg_surface_white">
                 <div class="o_dashboard_title">
-                    <h2><i class="fa fa-users text-primary me-2"/> HR &amp; Payroll Executive Dashboard</h2>
+                    <h2>
+                        <span class="header_icon_badge"><i class="fa fa-users"/></span>
+                        <span>HR &amp; Payroll Executive Dashboard</span>
+                    </h2>
                     <span class="subtitle">
-                        Unified corporate payroll, overtime, attendance &amp; bank payment analytics
+                        Unified corporate payroll, department hierarchy, overtime, attendance &amp; bank analytics
                         <t t-if="data.date_from and data.date_to">
-                            (<t t-esc="data.date_from"/> to <t t-esc="data.date_to"/>)
+                            <span class="period_chip ms-2"><i class="fa fa-calendar me-1"/><t t-esc="data.date_from"/> → <t t-esc="data.date_to"/></span>
                         </t>
                     </span>
                 </div>
@@ -23,10 +26,10 @@
                         <button type="button" class="btn btn-period-quick" t-att-class="{'active': state.period === 'this_year'}" t-on-click="() => this.setPeriod('this_year')">This Year</button>
                     </div>
 
-                    <div class="d-flex align-items-center gap-2">
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
                         <!-- Payrun Batch Select Dropdown -->
                         <t t-if="data.payrun_batches &amp;&amp; data.payrun_batches.length > 0">
-                            <select class="form-select form-select-sm filter_input" t-model="state.payrun_id" t-on-change="fetchDashboardData" style="max-width: 180px;">
+                            <select class="form-select form-select-sm filter_input" t-model="state.payrun_id" t-on-change="fetchDashboardData" style="max-width: 190px;">
                                 <option value="0">All Batches (كل الدفعات)</option>
                                 <t t-foreach="data.payrun_batches" t-as="pbatch" t-key="pbatch.id">
                                     <option t-att-value="pbatch.id" t-att-selected="state.payrun_id === pbatch.id">
@@ -37,7 +40,7 @@
                         </t>
 
                         <input type="date" class="form-control form-control-sm filter_input" t-model="state.date_from"/>
-                        <span class="text-muted small font-weight-bold">to</span>
+                        <span class="seg_label_dark small fw-bold">to</span>
                         <input type="date" class="form-control form-control-sm filter_input" t-model="state.date_to"/>
                         <button class="btn btn-apply-action text-nowrap" t-on-click="fetchDashboardData">
                             <i class="fa fa-refresh me-1"/> Apply
@@ -52,8 +55,8 @@
                 </div>
             </div>
 
-            <!-- Suite 5-Dashboard Main Navigation Bar -->
-            <div class="suite_tab_container">
+            <!-- SEGMENT 2: Suite 5-Dashboard Main Navigation Bar (Midnight Dark Surface / Crisp White Text) -->
+            <div class="suite_tab_container seg_surface_dark">
                 <div class="suite_tab_group" role="group">
                     <button type="button" class="btn suite_tab_btn" t-att-class="{'active': state.activeDashboardTab === 'overview'}" t-on-click="() => this.setDashboardTab('overview')">
                         <i class="fa fa-tachometer me-1"/> 1. Executive Overview (نظرة شاملة)
@@ -73,8 +76,8 @@
                 </div>
             </div>
 
-            <!-- C-Level Executive Persona Navigation Bar -->
-            <div class="persona_bar_container">
+            <!-- SEGMENT 3: C-Level Executive Persona & Shift Bar (White Surface / Segmented Active Pills) -->
+            <div class="persona_bar_container seg_surface_white">
                 <div class="role_tab_group" role="group">
                     <button type="button" class="btn role_tab_btn" t-att-class="{'active': state.personaTab === 'all'}" t-on-click="() => this.setPersonaTab('all')">
                         <i class="fa fa-globe me-1"/> Executive Summary (الشامل)
@@ -91,121 +94,128 @@
                 </div>
 
                 <!-- Today Shift & Hours Toolbar -->
-                <div class="d-flex align-items-center gap-2">
-                    <span class="text-dark small fw-bold me-1"><i class="fa fa-clock-o text-warning me-1"/> Shift / Hours:</span>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <span class="seg_label_dark small fw-bold me-1"><i class="fa fa-clock-o text-warning me-1"/> Shift / Hours:</span>
                     <button type="button" class="btn shift_btn" t-on-click="() => this.setShift('morning')">Morning (08-16)</button>
                     <button type="button" class="btn shift_btn" t-on-click="() => this.setShift('evening')">Evening (16-00)</button>
                     <button type="button" class="btn shift_btn" t-on-click="() => this.setShift('fullday')">Full Day</button>
-                    <input type="time" class="form-control form-control-sm filter_input" t-model="state.time_from" t-on-change="fetchDashboardData" style="width: 100px;"/>
-                    <span class="text-dark small font-weight-bold">to</span>
-                    <input type="time" class="form-control form-control-sm filter_input" t-model="state.time_to" t-on-change="fetchDashboardData" style="width: 100px;"/>
+                    <input type="time" class="form-control form-control-sm filter_input" t-model="state.time_from" t-on-change="fetchDashboardData" style="width: 105px;"/>
+                    <span class="seg_label_dark small fw-bold">to</span>
+                    <input type="time" class="form-control form-control-sm filter_input" t-model="state.time_to" t-on-change="fetchDashboardData" style="width: 105px;"/>
                 </div>
             </div>
 
-            <!-- Organization Controls: 1) Companies Bar -->
+            <!-- SEGMENT 4: Organization & Multi-Level Department Hierarchy Navigator -->
             <div class="o_organization_filter_section mb-3">
-                <div class="o_filter_row company_row">
-                    <span class="filter_row_label">
-                        <i class="fa fa-sitemap text-primary me-1"/> Companies (الشركات):
-                    </span>
+                <!-- 4A: Companies Color Segment (Royal Blue Accent) -->
+                <div class="o_filter_row company_row seg_card_blue">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="filter_row_label">
+                            <span class="seg_tag_badge seg_tag_blue"><i class="fa fa-building me-1"/> LEVEL 0</span>
+                            <span>Companies (الشركات):</span>
+                        </span>
+                        <span class="seg_hint_text">Click a company to filter or view all companies</span>
+                    </div>
                     <div class="filter_pills_container">
                         <t t-foreach="data.all_companies || []" t-as="comp" t-key="comp.id">
                             <button type="button" 
                                     class="btn btn-sm btn-company-pill"
                                     t-att-class="{'active': isCompanySelected(comp.id)}"
                                     t-on-click="() => this.selectCompany(comp.id)">
-                                <i class="fa fa-building-o me-1"/> <t t-esc="comp.name"/>
+                                <i class="fa fa-building-o me-1"/>
+                                <span class="pill_text"><t t-esc="comp.name"/></span>
+                                <t t-if="comp.emp_count !== undefined">
+                                    <span class="seg_count_pill ms-1"><t t-esc="comp.emp_count"/></span>
+                                </t>
                             </button>
                         </t>
                     </div>
                 </div>
 
-                <!-- 3-Tier Cascading Department Filter Navigation -->
-                <div class="o_filter_row department_row mt-2">
+                <!-- 4B: Multi-Level Recursive Cascading Department Filter Navigation -->
+                <div class="o_filter_row department_row seg_card_purple mt-2">
                     <!-- Tier 1: Root Departments -->
-                    <div class="d-flex justify-content-between align-items-center mb-1">
+                    <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
                         <span class="filter_row_label">
-                            <i class="fa fa-cubes text-purple me-1"/> Main Departments (الأقسام الرئيسة):
+                            <span class="seg_tag_badge seg_tag_purple"><i class="fa fa-sitemap me-1"/> LEVEL 1</span>
+                            <span>Main Departments (الأقسام الرئيسة — المطابقة لشجرة الموظفين):</span>
                         </span>
                         <t t-if="state.department_ids and state.department_ids.length > 0">
-                            <button type="button" class="btn btn-xs btn-outline-danger btn-clear-filter" t-on-click="() => this.selectAllDepartments()">
-                                <i class="fa fa-times me-1"/> Selected (<t t-esc="state.department_ids.length"/>) - Reset to All
+                            <button type="button" class="btn btn-xs btn-clear-filter" t-on-click="() => this.selectAllDepartments()">
+                                <i class="fa fa-times-circle me-1"/> Reset Department Filter to All
                             </button>
                         </t>
                     </div>
 
-                    <div class="filter_pills_container tier1_pills mb-2">
+                    <div class="filter_pills_container tier1_pills mb-1">
                         <!-- All Departments Pill -->
                         <button type="button" 
                                 class="btn btn-sm btn-dept-pill btn-dept-all"
                                 t-att-class="{'active': isRootSelected('all')}"
                                 t-on-click="() => this.selectRootDepartment('all')">
-                            <i class="fa fa-th-large me-1"/> All Departments (<t t-esc="(data.all_departments || []).length"/>)
+                            <i class="fa fa-th-large me-1"/>
+                            <span class="pill_text">All Departments (الكل)</span>
+                            <span class="seg_count_pill ms-1"><t t-esc="data.kpis ? data.kpis.headcount : 0"/></span>
                         </button>
 
-                        <!-- Root Departments List -->
+                        <!-- Root Departments List (Matching Odoo Employees Left Tree) -->
                         <t t-foreach="data.structured_departments || []" t-as="root" t-key="root.id">
                             <button type="button" 
                                     class="btn btn-sm btn-root-pill"
                                     t-att-class="{'active': isRootSelected(root.id)}"
                                     t-on-click="() => this.selectRootDepartment(root.id)">
-                                <i class="fa fa-folder text-warning me-1"/>
-                                <span class="root_title"><t t-esc="root.name"/></span>
-                                <t t-if="root.total_branch_count > 0">
-                                    <span class="badge bg-light text-dark border ms-1" title="Branches count">
-                                        <t t-esc="root.total_branch_count"/>
-                                    </span>
-                                </t>
+                                <i class="fa fa-folder-open pill_folder_icon me-1" t-if="root.child_count > 0 and isRootSelected(root.id)"/>
+                                <i class="fa fa-folder pill_folder_icon me-1" t-elif="root.child_count > 0"/>
+                                <i class="fa fa-building-o pill_leaf_icon me-1" t-else=""/>
+                                <span class="root_title pill_text"><t t-esc="root.name"/></span>
+                                <span class="seg_count_pill ms-1" title="Active Employees in Department &amp; Sub-Departments">
+                                    <t t-esc="root.total_emp_count"/>
+                                </span>
                             </button>
                         </t>
                     </div>
 
-                    <!-- Tier 2: Regions / Areas (Appears when a Root Department like Retail is selected) -->
-                    <t t-if="activeRootData and activeRootData.areas &amp;&amp; activeRootData.areas.length > 0">
-                        <div class="o_subdept_tray p-3 mb-2 animate__animated animate__fadeIn border-primary">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <div class="subdept_tray_title">
-                                    <i class="fa fa-map-marker text-primary me-2"/>
-                                    <strong><t t-esc="activeRootData.name"/> Regions &amp; Sub-Groups (المناطق والأقسام الفرعية):</strong>
-                                    <span class="text-muted small ms-2">Select an Area/Region to view its individual branches</span>
+                    <!-- Dynamic Recursive Sub-Department Trays (Level 2 -> Level 3 -> Level 4 -> ...) -->
+                    <t t-foreach="cascadingDeptTrays" t-as="tray" t-key="tray.parentNode.id">
+                        <div class="o_subdept_tray p-3 mt-2 animate__animated animate__fadeIn"
+                             t-att-class="{
+                                 'seg_tray_level_1': tray.level === 1,
+                                 'seg_tray_level_2': tray.level === 2,
+                                 'seg_tray_level_3': tray.level >= 3
+                             }"
+                             t-att-style="tray.level >= 2 ? 'margin-left: ' + ((tray.level - 1) * 16) + 'px;' : ''">
+                            <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                                <div class="subdept_tray_title d-flex align-items-center flex-wrap gap-2">
+                                    <span class="seg_tag_badge"
+                                          t-att-class="{
+                                              'seg_tag_blue': tray.level === 1,
+                                              'seg_tag_emerald': tray.level === 2,
+                                              'seg_tag_amber': tray.level >= 3
+                                          }">
+                                        <i class="fa fa-level-down me-1"/> LEVEL <t t-esc="tray.level + 1"/>
+                                    </span>
+                                    <strong class="tray_path_title"><t t-esc="tray.parentNode.complete_name || tray.parentNode.name"/></strong>
+                                    <span class="seg_dark_badge"><t t-esc="tray.parentNode.total_emp_count"/> Active Staff</span>
+                                    <span class="seg_hint_text">— Click any sub-department / section below to drill down or filter:</span>
                                 </div>
                             </div>
                             <div class="filter_pills_container area_pills">
-                                <t t-foreach="activeRootData.areas" t-as="area" t-key="area.id">
+                                <t t-foreach="tray.children" t-as="subdept" t-key="subdept.id">
                                     <button type="button"
-                                            class="btn btn-sm btn-area-pill"
-                                            t-att-class="{'active': isAreaSelected(area.id)}"
-                                            t-on-click="() => this.selectAreaDepartment(area)">
-                                        <i class="fa fa-th-list me-1"/>
-                                        <t t-esc="area.name"/>
-                                        <t t-if="area.branch_count > 0">
-                                            <span class="badge bg-primary text-white ms-1"><t t-esc="area.branch_count"/></span>
-                                        </t>
-                                    </button>
-                                </t>
-                            </div>
-                        </div>
-                    </t>
-
-                    <!-- Tier 3: Individual Branches (Appears when an Area/Region like Area 1 is selected) -->
-                    <t t-if="activeAreaData and activeAreaData.branches &amp;&amp; activeAreaData.branches.length > 0">
-                        <div class="o_subdept_tray p-3 mb-2 animate__animated animate__fadeIn border-success" style="background-color: #f0fdf4;">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <div class="subdept_tray_title">
-                                    <i class="fa fa-building text-success me-2"/>
-                                    <strong><t t-esc="activeAreaData.name"/> Branches &amp; Units (الفروع التابعة للمنطقة):</strong>
-                                    <span class="text-muted small ms-2">Click any branch to toggle filter</span>
-                                </div>
-                            </div>
-                            <div class="filter_pills_container child_pills">
-                                <t t-foreach="activeAreaData.branches" t-as="branch" t-key="branch.id">
-                                    <button type="button"
-                                            class="btn btn-sm btn-child-pill"
-                                            t-att-class="{'active': isBranchSelected(branch.id)}"
-                                            t-on-click="(ev) => this.toggleBranchDepartment(branch.id, ev)">
-                                        <i class="fa fa-check-circle text-success me-1" t-if="isBranchSelected(branch.id)"/>
-                                        <i class="fa fa-circle-o text-muted me-1" t-else=""/>
-                                        <t t-esc="branch.name"/>
+                                            class="btn btn-sm"
+                                            t-att-class="{
+                                                'btn-area-pill': subdept.child_count > 0,
+                                                'btn-child-pill': subdept.child_count === 0,
+                                                'active': isDeptNodeSelected(subdept.id, tray.level)
+                                            }"
+                                            t-on-click="(ev) => this.selectDepartmentAtLevel(subdept, tray.level, ev)">
+                                        <i class="fa fa-folder-open pill_folder_icon me-1" t-if="subdept.child_count > 0"/>
+                                        <i class="fa fa-check-circle pill_check_icon me-1" t-elif="isDeptNodeSelected(subdept.id, tray.level)"/>
+                                        <i class="fa fa-circle-o pill_leaf_icon me-1" t-else=""/>
+                                        <span class="pill_text"><t t-esc="subdept.name"/></span>
+                                        <span class="seg_count_pill ms-1" title="Active Employees count">
+                                            <t t-esc="subdept.total_emp_count"/>
+                                        </span>
                                     </button>
                                 </t>
                             </div>
@@ -216,11 +226,11 @@
 
             <!-- Loader -->
             <t t-if="state.loading">
-                <div class="text-center p-5">
+                <div class="seg_loader_card text-center p-5">
                     <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
                         <span class="visually-hidden">Calculating Payroll Analytics...</span>
                     </div>
-                    <p class="mt-3 text-muted fw-bold">Calculating corporate HR, overtime, and payroll statistics...</p>
+                    <p class="mt-3 seg_label_dark fw-bold fs-6">Calculating corporate HR, department hierarchy, overtime &amp; payroll statistics...</p>
                 </div>
             </t>
 
@@ -230,42 +240,42 @@
                 <t t-if="state.activeDashboardTab === 'overview'">
                     <!-- CEO Persona Strategic View Banner -->
                     <t t-if="state.personaTab === 'ceo'">
-                        <div class="alert alert-primary p-3 mb-3 border-primary shadow-sm rounded">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <h5 class="m-0 text-primary fw-bold"><i class="fa fa-user-secret me-2"/> CEO Strategic Summary &amp; ROI Analytics</h5>
-                                <span class="badge bg-primary fs-6">Sales vs Labor ROI: <t t-esc="data.ceo_analytics.sales_labor_roi"/> JOD Revenue / JOD Labor</span>
+                        <div class="seg_persona_banner seg_banner_blue p-3 mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                                <h5 class="m-0 banner_title"><i class="fa fa-user-secret me-2"/> CEO Strategic Summary &amp; ROI Analytics</h5>
+                                <span class="seg_dark_badge fs-6">Sales vs Labor ROI: <t t-esc="data.ceo_analytics.sales_labor_roi"/> JOD Revenue / JOD Labor</span>
                             </div>
                             <div class="row g-3">
                                 <div class="col-md-3">
-                                    <div class="bg-white p-2 rounded border">
-                                        <span class="text-muted small d-block">Total Retail Sales</span>
-                                        <strong class="text-success fs-5"><t t-esc="formatCurrency(data.ceo_analytics.total_pos_sales)"/> JOD</strong>
+                                    <div class="seg_inner_stat_card seg_border_emerald">
+                                        <span class="inner_stat_label">Total Retail Sales</span>
+                                        <strong class="inner_stat_val val_emerald"><t t-esc="formatCurrency(data.ceo_analytics.total_pos_sales)"/> JOD</strong>
                                     </div>
                                 </div>
                                 <div class="col-md-3">
-                                    <div class="bg-white p-2 rounded border">
-                                        <span class="text-muted small d-block">Top Profitable Branch</span>
+                                    <div class="seg_inner_stat_card seg_border_blue">
+                                        <span class="inner_stat_label">Top Profitable Branch</span>
                                         <t t-if="data.ceo_analytics.top_profitable_branches &amp;&amp; data.ceo_analytics.top_profitable_branches.length > 0">
-                                            <strong class="text-primary"><t t-esc="data.ceo_analytics.top_profitable_branches[0].department_name"/></strong>
-                                            <div class="small text-muted"><t t-esc="data.ceo_analytics.top_profitable_branches[0].sales_per_jod_labor"/> JOD Sales/Labor</div>
+                                            <strong class="inner_stat_val val_blue"><t t-esc="data.ceo_analytics.top_profitable_branches[0].department_name"/></strong>
+                                            <div class="inner_stat_sub"><t t-esc="data.ceo_analytics.top_profitable_branches[0].sales_per_jod_labor"/> JOD Sales/Labor</div>
                                         </t>
-                                        <t t-else=""><span class="text-muted">N/A</span></t>
+                                        <t t-else=""><span class="inner_stat_sub">N/A</span></t>
                                     </div>
                                 </div>
                                 <div class="col-md-3">
-                                    <div class="bg-white p-2 rounded border">
-                                        <span class="text-muted small d-block">Highest Labor Cost % Branch</span>
+                                    <div class="seg_inner_stat_card seg_border_crimson">
+                                        <span class="inner_stat_label">Highest Labor Cost % Branch</span>
                                         <t t-if="data.ceo_analytics.bottom_profitable_branches &amp;&amp; data.ceo_analytics.bottom_profitable_branches.length > 0">
-                                            <strong class="text-danger"><t t-esc="data.ceo_analytics.bottom_profitable_branches[0].department_name"/></strong>
-                                            <div class="small text-muted"><t t-esc="data.ceo_analytics.bottom_profitable_branches[0].pos_labor_cost_pct"/>% Labor Ratio</div>
+                                            <strong class="inner_stat_val val_crimson"><t t-esc="data.ceo_analytics.bottom_profitable_branches[0].department_name"/></strong>
+                                            <div class="inner_stat_sub"><t t-esc="data.ceo_analytics.bottom_profitable_branches[0].pos_labor_cost_pct"/>% Labor Ratio</div>
                                         </t>
-                                        <t t-else=""><span class="text-muted">N/A</span></t>
+                                        <t t-else=""><span class="inner_stat_sub">N/A</span></t>
                                     </div>
                                 </div>
                                 <div class="col-md-3">
-                                    <div class="bg-white p-2 rounded border">
-                                        <span class="text-muted small d-block">Factory Avg Unit Cost</span>
-                                        <strong class="text-info fs-5"><t t-esc="formatCurrency(data.ceo_analytics.factory_unit_cost_avg)"/> JOD/Unit</strong>
+                                    <div class="seg_inner_stat_card seg_border_cyan">
+                                        <span class="inner_stat_label">Factory Avg Unit Cost</span>
+                                        <strong class="inner_stat_val val_cyan"><t t-esc="formatCurrency(data.ceo_analytics.factory_unit_cost_avg)"/> JOD/Unit</strong>
                                     </div>
                                 </div>
                             </div>
@@ -274,35 +284,35 @@
 
                     <!-- CFO Persona Financial View Banner -->
                     <t t-if="state.personaTab === 'cfo'">
-                        <div class="alert alert-indigo p-3 mb-3 border-indigo shadow-sm rounded" style="background-color: #eef2ff; border-color: #6366f1;">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <h5 class="m-0 text-indigo fw-bold" style="color: #4338ca;"><i class="fa fa-line-chart me-2"/> CFO Financial Liabilities &amp; Cash Outflow</h5>
-                                <span class="badge bg-indigo fs-6" style="background-color: #4338ca;">Total Employer Burden: <t t-esc="formatCurrency(data.cfo_analytics.total_employer_expense)"/> JOD</span>
+                        <div class="seg_persona_banner seg_banner_indigo p-3 mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                                <h5 class="m-0 banner_title"><i class="fa fa-line-chart me-2"/> CFO Financial Liabilities &amp; Cash Outflow</h5>
+                                <span class="seg_dark_badge fs-6">Total Employer Burden: <t t-esc="formatCurrency(data.cfo_analytics.total_employer_expense)"/> JOD</span>
                             </div>
                             <div class="row g-3">
                                 <div class="col-md-3">
-                                    <div class="bg-white p-2 rounded border">
-                                        <span class="text-muted small d-block">Net Cash Outflow</span>
-                                        <strong class="text-indigo fs-5" style="color: #4338ca;"><t t-esc="formatCurrency(data.cfo_analytics.total_net_cash_outflow)"/> JOD</strong>
+                                    <div class="seg_inner_stat_card seg_border_purple">
+                                        <span class="inner_stat_label">Net Cash Outflow</span>
+                                        <strong class="inner_stat_val val_purple"><t t-esc="formatCurrency(data.cfo_analytics.total_net_cash_outflow)"/> JOD</strong>
                                     </div>
                                 </div>
                                 <div class="col-md-3">
-                                    <div class="bg-white p-2 rounded border">
-                                        <span class="text-muted small d-block">Social Security Liability</span>
-                                        <strong class="text-warning fs-5"><t t-esc="formatCurrency(data.cfo_analytics.social_security_total_liability)"/> JOD</strong>
-                                        <div class="small text-muted">Emp + Company Share</div>
+                                    <div class="seg_inner_stat_card seg_border_amber">
+                                        <span class="inner_stat_label">Social Security Liability</span>
+                                        <strong class="inner_stat_val val_amber"><t t-esc="formatCurrency(data.cfo_analytics.social_security_total_liability)"/> JOD</strong>
+                                        <div class="inner_stat_sub">Employee + Company Share</div>
                                     </div>
                                 </div>
                                 <div class="col-md-3">
-                                    <div class="bg-white p-2 rounded border">
-                                        <span class="text-muted small d-block">Income Tax Liability</span>
-                                        <strong class="text-primary fs-5"><t t-esc="formatCurrency(data.cfo_analytics.tax_liability)"/> JOD</strong>
+                                    <div class="seg_inner_stat_card seg_border_blue">
+                                        <span class="inner_stat_label">Income Tax Liability</span>
+                                        <strong class="inner_stat_val val_blue"><t t-esc="formatCurrency(data.cfo_analytics.tax_liability)"/> JOD</strong>
                                     </div>
                                 </div>
                                 <div class="col-md-3">
-                                    <div class="bg-white p-2 rounded border">
-                                        <span class="text-muted small d-block">Bank vs Cash Payout Split</span>
-                                        <strong class="text-dark"><t t-esc="data.cfo_analytics.bank_disbursement_pct"/>% Bank / <t t-esc="data.cfo_analytics.cash_disbursement_pct"/>% Cash</strong>
+                                    <div class="seg_inner_stat_card seg_border_emerald">
+                                        <span class="inner_stat_label">Bank vs Cash Payout Split</span>
+                                        <strong class="inner_stat_val val_dark"><t t-esc="data.cfo_analytics.bank_disbursement_pct"/>% Bank / <t t-esc="data.cfo_analytics.cash_disbursement_pct"/>% Cash</strong>
                                     </div>
                                 </div>
                             </div>
@@ -311,281 +321,453 @@
 
                     <!-- HR Director Persona Operational Banner -->
                     <t t-if="state.personaTab === 'hr'">
-                        <div class="alert alert-success p-3 mb-3 border-success shadow-sm rounded" style="background-color: #f0fdf4; border-color: #10b981;">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <h5 class="m-0 text-success fw-bold"><i class="fa fa-address-book me-2"/> HR Director Workforce Utilization &amp; Live Attendance Cost</h5>
-                                <span class="badge bg-success fs-6">Live Attendance Ratio: <t t-esc="data.hr_analytics.live_attendance_labor_ratio"/>% of Today Sales</span>
+                        <div class="seg_persona_banner seg_banner_emerald p-3 mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                                <h5 class="m-0 banner_title"><i class="fa fa-address-book me-2"/> HR Director Workforce Utilization &amp; Live Attendance Cost</h5>
+                                <span class="seg_dark_badge fs-6">Live Attendance Ratio: <t t-esc="data.hr_analytics.live_attendance_labor_ratio"/>% of Today Sales</span>
                             </div>
                             <div class="row g-3">
                                 <div class="col-md-3">
-                                    <div class="bg-white p-2 rounded border">
-                                        <span class="text-muted small d-block">Today's Live Attendance</span>
+                                    <div class="seg_inner_stat_card seg_border_emerald">
+                                        <span class="inner_stat_label">Today's Live Attendance</span>
                                         <t t-if="data.hr_analytics.is_today">
-                                            <strong class="text-success fs-5"><t t-esc="data.hr_analytics.today_present_count"/> Present</strong>
-                                            <span class="text-danger small ms-2">(<t t-esc="data.hr_analytics.today_absent_count"/> Absent)</span>
+                                            <strong class="inner_stat_val val_emerald"><t t-esc="data.hr_analytics.today_present_count"/> Present</strong>
+                                            <span class="val_crimson small fw-bold ms-2">(<t t-esc="data.hr_analytics.today_absent_count"/> Absent)</span>
                                         </t>
                                         <t t-else="">
-                                            <strong class="text-dark fs-5"><t t-esc="data.kpis.headcount"/> Active Staff</strong>
+                                            <strong class="inner_stat_val val_dark"><t t-esc="data.kpis.headcount"/> Active Staff</strong>
                                         </t>
                                     </div>
                                 </div>
                                 <div class="col-md-3">
-                                    <div class="bg-white p-2 rounded border">
-                                        <span class="text-muted small d-block">Present Staff Live Daily Cost</span>
-                                        <strong class="text-success fs-5"><t t-esc="formatCurrency(data.hr_analytics.live_present_daily_cost)"/> JOD</strong>
-                                        <div class="small text-success fw-bold">
-                                            <i class="fa fa-user-check me-1"/>
-                                            <t t-esc="data.hr_analytics.today_present_count"/> Checked-In
-                                            <span class="text-muted fw-normal">/ <t t-esc="data.kpis.headcount"/> Total</span>
+                                    <div class="seg_inner_stat_card seg_border_emerald">
+                                        <span class="inner_stat_label">Present Staff Live Daily Cost</span>
+                                        <strong class="inner_stat_val val_emerald"><t t-esc="formatCurrency(data.hr_analytics.live_present_daily_cost)"/> JOD</strong>
+                                        <div class="inner_stat_sub">
+                                            <i class="fa fa-user-check me-1 val_emerald"/>
+                                            <t t-esc="data.hr_analytics.today_present_count"/> Checked-In / <t t-esc="data.kpis.headcount"/> Total
                                         </div>
-                                        <div class="small text-muted">Saved: <t t-esc="formatCurrency(data.hr_analytics.absence_saved_cost)"/> JOD (<t t-esc="data.hr_analytics.today_absent_count"/> Absent)</div>
                                     </div>
                                 </div>
                                 <div class="col-md-3">
-                                    <div class="bg-white p-2 rounded border">
-                                        <span class="text-muted small d-block">POS Orders &amp; Sales / Shift Staff</span>
-                                        <strong class="text-primary fs-5"><t t-esc="formatCurrency(data.hr_analytics.sales_per_present_emp)"/> JOD/Head</strong>
-                                        <div class="small text-dark font-monospace fw-bold">
-                                            <i class="fa fa-shopping-cart text-info me-1"/>
+                                    <div class="seg_inner_stat_card seg_border_blue">
+                                        <span class="inner_stat_label">POS Orders &amp; Sales / Shift Staff</span>
+                                        <strong class="inner_stat_val val_blue"><t t-esc="formatCurrency(data.hr_analytics.sales_per_present_emp)"/> JOD/Head</strong>
+                                        <div class="inner_stat_sub">
+                                            <i class="fa fa-shopping-cart me-1"/>
                                             <t t-esc="data.kpis.pos_orders_count || 0"/> Orders (<t t-esc="data.kpis.orders_per_present_emp || 0"/>/Present)
                                         </div>
                                     </div>
                                 </div>
                                 <div class="col-md-3">
-                                    <div class="bg-white p-2 rounded border">
-                                        <span class="text-muted small d-block">Overtime Cost Ratio</span>
-                                        <strong class="text-danger fs-5"><t t-esc="data.hr_analytics.overtime_cost_ratio"/>%</strong>
-                                        <div class="small text-muted">of Gross Payroll</div>
+                                    <div class="seg_inner_stat_card seg_border_crimson">
+                                        <span class="inner_stat_label">Overtime Cost Ratio</span>
+                                        <strong class="inner_stat_val val_crimson"><t t-esc="data.hr_analytics.overtime_cost_ratio"/>%</strong>
+                                        <div class="inner_stat_sub">of Gross Payroll</div>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </t>
 
-                    <!-- KPI Summary Grid -->
+                    <!-- SEGMENT 5: 10 Color-Segmented KPI Cards Grid -->
                     <div class="o_kpi_grid">
+                        <!-- 1. Net Salary (Royal Cobalt Segment) -->
                         <div class="o_kpi_card card-net clickable_kpi" t-on-click="() => this.onKpiClick('net_salary')" title="Click to view all payslips">
-                            <div class="kpi_icon"><i class="fa fa-money text-primary"/></div>
+                            <div class="kpi_top_row">
+                                <div class="kpi_icon seg_icon_blue"><i class="fa fa-money"/></div>
+                                <span class="seg_kpi_tag seg_tag_blue">NET PAYOUT</span>
+                            </div>
                             <div class="kpi_title">Total Net Salaries (صافي الرواتب)</div>
-                            <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.total_net_salary)"/> <span class="fs-6 fw-normal text-muted">JOD</span></div>
+                            <div class="kpi_value val_blue"><t t-esc="formatCurrency(data.kpis.total_net_salary)"/> <span class="kpi_unit">JOD</span></div>
                             <div class="kpi_subtext d-flex justify-content-between align-items-center">
-                                <span><t t-esc="data.kpis.payslip_count"/> Payslips</span>
+                                <span class="seg_pill_badge seg_pill_blue"><t t-esc="data.kpis.payslip_count"/> Payslips</span>
                                 <span class="drill_badge"><i class="fa fa-search-plus me-1"/>Drill Down</span>
                             </div>
                         </div>
 
+                        <!-- 2. Gross Salary (Deep Violet Segment) -->
                         <div class="o_kpi_card card-gross clickable_kpi" t-on-click="() => this.onKpiClick('gross_salary')" title="Click to view payslips">
-                            <div class="kpi_icon"><i class="fa fa-briefcase text-purple"/></div>
+                            <div class="kpi_top_row">
+                                <div class="kpi_icon seg_icon_purple"><i class="fa fa-briefcase"/></div>
+                                <span class="seg_kpi_tag seg_tag_purple">GROSS TOTAL</span>
+                            </div>
                             <div class="kpi_title">Gross Salaries (إجمالي الرواتب)</div>
-                            <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.total_gross_salary)"/> <span class="fs-6 fw-normal text-muted">JOD</span></div>
+                            <div class="kpi_value val_purple"><t t-esc="formatCurrency(data.kpis.total_gross_salary)"/> <span class="kpi_unit">JOD</span></div>
                             <div class="kpi_subtext d-flex justify-content-between align-items-center">
-                                <span class="badge bg-purple text-white badge_sub">Full Gross</span>
+                                <span class="seg_pill_badge seg_pill_purple">Full Gross</span>
                                 <span class="drill_badge"><i class="fa fa-search-plus me-1"/>Drill Down</span>
                             </div>
                         </div>
 
+                        <!-- 3. Basic Salary (Ocean Cyan Segment) -->
                         <div class="o_kpi_card card-basic clickable_kpi" t-on-click="() => this.onKpiClick('basic_salary')" title="Click to view payslips">
-                            <div class="kpi_icon"><i class="fa fa-database text-info"/></div>
+                            <div class="kpi_top_row">
+                                <div class="kpi_icon seg_icon_cyan"><i class="fa fa-database"/></div>
+                                <span class="seg_kpi_tag seg_tag_cyan">CONTRACT BASE</span>
+                            </div>
                             <div class="kpi_title">Basic Salaries (الأساسي)</div>
-                            <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.total_basic_salary)"/> <span class="fs-6 fw-normal text-muted">JOD</span></div>
+                            <div class="kpi_value val_cyan"><t t-esc="formatCurrency(data.kpis.total_basic_salary)"/> <span class="kpi_unit">JOD</span></div>
                             <div class="kpi_subtext d-flex justify-content-between align-items-center">
-                                <span class="badge bg-info text-white badge_sub">Base Wage</span>
+                                <span class="seg_pill_badge seg_pill_cyan">Base Wage</span>
                                 <span class="drill_badge"><i class="fa fa-search-plus me-1"/>Drill Down</span>
                             </div>
                         </div>
 
+                        <!-- 4. Total Allowances (Emerald Green Segment) -->
                         <div class="o_kpi_card card-alw clickable_kpi" t-on-click="() => this.onKpiClick('allowances')" title="Click to view allowance lines">
-                            <div class="kpi_icon"><i class="fa fa-gift text-success"/></div>
+                            <div class="kpi_top_row">
+                                <div class="kpi_icon seg_icon_emerald"><i class="fa fa-gift"/></div>
+                                <span class="seg_kpi_tag seg_tag_emerald">ALLOWANCES</span>
+                            </div>
                             <div class="kpi_title">Total Allowances (العلاوات والبدلات)</div>
-                            <div class="kpi_value text-success"><t t-esc="formatCurrency(data.kpis.total_allowances)"/> <span class="fs-6 fw-normal text-muted">JOD</span></div>
+                            <div class="kpi_value val_emerald"><t t-esc="formatCurrency(data.kpis.total_allowances)"/> <span class="kpi_unit">JOD</span></div>
                             <div class="kpi_subtext d-flex justify-content-between align-items-center">
-                                <span class="badge bg-success badge_sub">Takleef &amp; Bonus</span>
+                                <span class="seg_pill_badge seg_pill_emerald">Takleef &amp; Bonus</span>
                                 <span class="drill_badge"><i class="fa fa-search-plus me-1"/>Drill Down</span>
                             </div>
                         </div>
 
+                        <!-- 5. Total Deductions (Crimson Rose Segment) -->
                         <div class="o_kpi_card card-ded clickable_kpi" t-on-click="() => this.onKpiClick('deductions')" title="Click to view deduction lines">
-                            <div class="kpi_icon"><i class="fa fa-scissors text-danger"/></div>
+                            <div class="kpi_top_row">
+                                <div class="kpi_icon seg_icon_crimson"><i class="fa fa-scissors"/></div>
+                                <span class="seg_kpi_tag seg_tag_crimson">DEDUCTIONS</span>
+                            </div>
                             <div class="kpi_title">Total Deductions (الخصومات والاقتطاعات)</div>
-                            <div class="kpi_value text-danger"><t t-esc="formatCurrency(data.kpis.total_deductions)"/> <span class="fs-6 fw-normal text-muted">JOD</span></div>
+                            <div class="kpi_value val_crimson"><t t-esc="formatCurrency(data.kpis.total_deductions)"/> <span class="kpi_unit">JOD</span></div>
                             <div class="kpi_subtext d-flex justify-content-between align-items-center">
-                                <span class="badge bg-danger badge_sub">Loans &amp; Penalties</span>
+                                <span class="seg_pill_badge seg_pill_crimson">Loans &amp; Penalties</span>
                                 <span class="drill_badge"><i class="fa fa-search-plus me-1"/>Drill Down</span>
                             </div>
                         </div>
 
+                        <!-- 6. Social Security (Warm Amber Segment) -->
                         <div class="o_kpi_card card-ssc clickable_kpi" t-on-click="() => this.onKpiClick('social_security')" title="Click to view social security lines">
-                            <div class="kpi_icon"><i class="fa fa-shield text-warning"/></div>
+                            <div class="kpi_top_row">
+                                <div class="kpi_icon seg_icon_amber"><i class="fa fa-shield"/></div>
+                                <span class="seg_kpi_tag seg_tag_amber">SOCIAL SECURITY</span>
+                            </div>
                             <div class="kpi_title">Social Security (الضمان الاجتماعي)</div>
-                            <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.total_social_security)"/> <span class="fs-6 fw-normal text-muted">JOD</span></div>
+                            <div class="kpi_value val_amber"><t t-esc="formatCurrency(data.kpis.total_social_security)"/> <span class="kpi_unit">JOD</span></div>
                             <div class="kpi_subtext d-flex justify-content-between align-items-center">
-                                <span class="badge bg-warning text-dark badge_sub">Emp: <t t-esc="formatCurrency(data.kpis.total_social_security)"/></span>
+                                <span class="seg_pill_badge seg_pill_amber">Emp Share</span>
                                 <span class="drill_badge"><i class="fa fa-search-plus me-1"/>Drill Down</span>
                             </div>
                         </div>
 
+                        <!-- 7. Income Tax (Indigo Slate Segment) -->
                         <div class="o_kpi_card card-tax clickable_kpi" t-on-click="() => this.onKpiClick('tax')" title="Click to view income tax lines">
-                            <div class="kpi_icon"><i class="fa fa-percent text-primary"/></div>
+                            <div class="kpi_top_row">
+                                <div class="kpi_icon seg_icon_indigo"><i class="fa fa-percent"/></div>
+                                <span class="seg_kpi_tag seg_tag_indigo">STATUTORY TAX</span>
+                            </div>
                             <div class="kpi_title">Income Tax (ضريبة الدخل)</div>
-                            <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.total_income_tax)"/> <span class="fs-6 fw-normal text-muted">JOD</span></div>
+                            <div class="kpi_value val_indigo"><t t-esc="formatCurrency(data.kpis.total_income_tax)"/> <span class="kpi_unit">JOD</span></div>
                             <div class="kpi_subtext d-flex justify-content-between align-items-center">
-                                <span class="badge bg-primary badge_sub">Income Tax</span>
+                                <span class="seg_pill_badge seg_pill_indigo">Income Tax</span>
                                 <span class="drill_badge"><i class="fa fa-search-plus me-1"/>Drill Down</span>
                             </div>
                         </div>
 
+                        <!-- 8. Overtime (Coral Orange Segment) -->
                         <div class="o_kpi_card card-ot clickable_kpi" t-on-click="() => this.onKpiClick('overtime')" title="Click to view overtime worked days">
-                            <div class="kpi_icon"><i class="fa fa-clock-o text-danger"/></div>
+                            <div class="kpi_top_row">
+                                <div class="kpi_icon seg_icon_orange"><i class="fa fa-clock-o"/></div>
+                                <span class="seg_kpi_tag seg_tag_orange">OVERTIME</span>
+                            </div>
                             <div class="kpi_title">Overtime (العمل الإضافي)</div>
-                            <div class="kpi_value text-primary"><t t-esc="formatCurrency(data.kpis.total_overtime_amount)"/> <span class="fs-6 fw-normal text-muted">JOD</span></div>
+                            <div class="kpi_value val_orange"><t t-esc="formatCurrency(data.kpis.total_overtime_amount)"/> <span class="kpi_unit">JOD</span></div>
                             <div class="kpi_subtext d-flex justify-content-between align-items-center">
-                                <span class="fw-bold text-dark"><t t-esc="formatDecimal(data.kpis.total_overtime_hours, 1)"/> OT Hours</span>
+                                <span class="seg_pill_badge seg_pill_orange"><t t-esc="formatDecimal(data.kpis.total_overtime_hours, 1)"/> OT Hours</span>
                                 <span class="drill_badge"><i class="fa fa-search-plus me-1"/>Drill Down</span>
                             </div>
                         </div>
 
+                        <!-- 9. Active Headcount (Teal Green Segment) -->
                         <div class="o_kpi_card card-headcount clickable_kpi" t-on-click="() => this.onKpiClick('headcount')" title="Click to view employee list">
-                            <div class="kpi_icon"><i class="fa fa-user-circle text-success"/></div>
+                            <div class="kpi_top_row">
+                                <div class="kpi_icon seg_icon_teal"><i class="fa fa-user-circle"/></div>
+                                <span class="seg_kpi_tag seg_tag_teal">WORKFORCE</span>
+                            </div>
                             <div class="kpi_title">Active Headcount (عدد الموظفين)</div>
-                            <div class="kpi_value text-success"><t t-esc="data.kpis.headcount"/> <span class="fs-6 fw-normal text-muted">Employees</span></div>
+                            <div class="kpi_value val_teal"><t t-esc="data.kpis.headcount"/> <span class="kpi_unit">Staff</span></div>
                             <div class="kpi_subtext d-flex justify-content-between align-items-center">
-                                <span class="text-muted">Avg: <t t-esc="formatCurrency(data.kpis.avg_salary_per_emp)"/> JOD</span>
+                                <span class="seg_pill_badge seg_pill_teal">Slips: <t t-esc="data.kpis.payslip_headcount || 0"/> | Avg: <t t-esc="formatCurrency(data.kpis.avg_salary_per_emp)"/></span>
                                 <span class="drill_badge"><i class="fa fa-search-plus me-1"/>Drill Down</span>
                             </div>
                         </div>
 
+                        <!-- 10. Daily Payroll Cost (Navy Blue Segment) -->
                         <div class="o_kpi_card card-daily">
-                            <div class="kpi_icon"><i class="fa fa-calculator text-primary"/></div>
+                            <div class="kpi_top_row">
+                                <div class="kpi_icon seg_icon_blue"><i class="fa fa-calculator"/></div>
+                                <span class="seg_kpi_tag seg_tag_blue">DAILY BURN</span>
+                            </div>
                             <div class="kpi_title">Daily Payroll Cost (التكلفة اليومية)</div>
-                            <div class="kpi_value text-primary"><t t-esc="formatCurrency(data.kpis.total_daily_cost)"/> <span class="fs-6 fw-normal text-muted">JOD/Day</span></div>
+                            <div class="kpi_value val_blue"><t t-esc="formatCurrency(data.kpis.total_daily_cost)"/> <span class="kpi_unit">JOD/Day</span></div>
                             <div class="kpi_subtext d-flex justify-content-between align-items-center">
                                 <t t-if="data.hr_analytics &amp;&amp; data.hr_analytics.is_today">
-                                    <span class="badge bg-success text-white badge_sub"><i class="fa fa-user-check me-1"/><t t-esc="data.hr_analytics.today_present_count"/> Present</span>
+                                    <span class="seg_pill_badge seg_pill_emerald"><i class="fa fa-user-check me-1"/><t t-esc="data.hr_analytics.today_present_count"/> Present</span>
                                 </t>
                                 <t t-else="">
-                                    <span class="badge bg-primary text-white badge_sub">Calendar: <t t-esc="data.calendar_days"/> Days</span>
+                                    <span class="seg_pill_badge seg_pill_blue">Calendar: <t t-esc="data.calendar_days"/> Days</span>
                                 </t>
-                                <span class="fw-bold text-dark">Exact Rate</span>
+                                <span class="seg_label_dark fw-bold small">Exact Rate</span>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Highlights & Operations Row -->
+                    <!-- SEGMENT 6: Highlights & Payment Channels Row -->
                     <div class="o_highlights_grid">
-                        <div class="highlight_card">
+                        <div class="highlight_card seg_highlight_blue">
                             <div class="card_header">
-                                <i class="fa fa-calendar-check-o text-primary fs-4"/>
+                                <span class="header_seg_icon seg_icon_blue"><i class="fa fa-calendar-check-o"/></span>
                                 <h5>Attendance &amp; Hours Reconciliation (تسوية الساعات)</h5>
                             </div>
                             <div class="row g-2">
                                 <div class="col-6">
-                                    <div class="highlight_stat_box">
+                                    <div class="highlight_stat_box seg_box_slate">
                                         <span class="stat_label">Scheduled Hours</span>
-                                        <span class="stat_value"><t t-esc="formatDecimal(data.operational_highlights.scheduled_hours, 1)"/> h</span>
+                                        <span class="stat_value val_dark"><t t-esc="formatDecimal(data.operational_highlights.scheduled_hours, 1)"/> h</span>
                                     </div>
                                 </div>
                                 <div class="col-6">
-                                    <div class="highlight_stat_box">
+                                    <div class="highlight_stat_box seg_box_emerald">
                                         <span class="stat_label">Approved Hours</span>
-                                        <span class="stat_value text-success"><t t-esc="formatDecimal(data.operational_highlights.approved_hours, 1)"/> h</span>
+                                        <span class="stat_value val_emerald"><t t-esc="formatDecimal(data.operational_highlights.approved_hours, 1)"/> h</span>
                                     </div>
                                 </div>
                                 <div class="col-6">
-                                    <div class="highlight_stat_box">
+                                    <div class="highlight_stat_box seg_box_blue">
                                         <span class="stat_label">Extra / OT Hours</span>
-                                        <span class="stat_value text-primary">+<t t-esc="formatDecimal(data.operational_highlights.extra_ot_hours, 1)"/> h</span>
+                                        <span class="stat_value val_blue">+<t t-esc="formatDecimal(data.operational_highlights.extra_ot_hours, 1)"/> h</span>
                                     </div>
                                 </div>
                                 <div class="col-6">
-                                    <div class="highlight_stat_box">
+                                    <div class="highlight_stat_box seg_box_crimson">
                                         <span class="stat_label">Lateness Hours</span>
-                                        <span class="stat_value text-danger">-<t t-esc="formatDecimal(data.operational_highlights.subtracted_late_hours, 1)"/> h</span>
+                                        <span class="stat_value val_crimson">-<t t-esc="formatDecimal(data.operational_highlights.subtracted_late_hours, 1)"/> h</span>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="highlight_card">
+                        <div class="highlight_card seg_highlight_emerald">
                             <div class="card_header">
-                                <i class="fa fa-university text-success fs-4"/>
+                                <span class="header_seg_icon seg_icon_emerald"><i class="fa fa-university"/></span>
                                 <h5>Bank &amp; Payment Methods (قنوات الدفع والبنوك)</h5>
                             </div>
                             <t t-foreach="data.channels || []" t-as="ch" t-key="ch.name">
-                                <div class="p-3 mb-2 rounded bg-light border">
+                                <div class="seg_channel_row mb-2">
                                     <div class="d-flex justify-content-between align-items-center mb-1">
-                                        <span class="fw-bold"><t t-esc="ch.name"/></span>
-                                        <span class="badge bg-primary"><t t-esc="ch.count"/> Employees</span>
+                                        <span class="channel_name"><t t-esc="ch.name"/></span>
+                                        <span class="seg_dark_badge"><t t-esc="ch.count"/> Employees</span>
                                     </div>
                                     <div class="d-flex justify-content-between align-items-center">
-                                        <span class="fs-5 fw-bold text-dark"><t t-esc="formatCurrency(ch.amount)"/> JOD</span>
-                                        <span class="fw-bold text-muted"><t t-esc="ch.percentage"/>% of Total</span>
+                                        <span class="channel_amount val_blue"><t t-esc="formatCurrency(ch.amount)"/> JOD</span>
+                                        <span class="seg_pill_badge seg_pill_emerald"><t t-esc="ch.percentage"/>% of Total</span>
                                     </div>
                                 </div>
                             </t>
                         </div>
                     </div>
 
-                    <!-- Departmental Breakdown Data Table -->
+                    <!-- SEGMENT 7: Departmental Breakdown Data Table (Color-Segmented Super-Headers & Hierarchy Rows) -->
                     <div class="o_department_table_card">
                         <div class="table_header_controls">
                             <div>
-                                <h4><i class="fa fa-table text-primary me-2"/> Departmental Payroll &amp; Operations Breakdown</h4>
-                                <span class="text-muted small">Comprehensive breakdown by department with daily cost, retail POS sales ROI &amp; factory productivity</span>
+                                <h4>
+                                    <span class="header_seg_icon seg_icon_blue me-2"><i class="fa fa-table"/></span>
+                                    <span>Departmental Payroll &amp; Operations Breakdown</span>
+                                </h4>
+                                <span class="seg_subtitle_text">Color-segmented hierarchical roll-up from parent departments down to sub-departments &amp; branches (matching Odoo Employees tree)</span>
                             </div>
-                            <div class="d-flex gap-2 align-items-center">
-                                <input type="text" class="form-control form-control-sm" placeholder="Search department..." t-model="state.searchQuery" style="max-width: 220px;"/>
-                                <button class="btn btn-sm btn-outline-success text-nowrap" t-att-disabled="state.exportingExcel" t-on-click="exportExcel">
+                            <div class="d-flex gap-2 align-items-center flex-wrap">
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <button type="button" class="btn btn-seg-toggle"
+                                            t-att-class="{'active': state.tableViewMode === 'tree'}"
+                                            t-on-click="() => this.setTableViewMode('tree')">
+                                        <i class="fa fa-sitemap me-1"/> Tree Roll-Up (شجري)
+                                    </button>
+                                    <button type="button" class="btn btn-seg-toggle"
+                                            t-att-class="{'active': state.tableViewMode === 'flat'}"
+                                            t-on-click="() => this.setTableViewMode('flat')">
+                                        <i class="fa fa-list me-1"/> Flat Units (مسطح)
+                                    </button>
+                                </div>
+                                <t t-if="state.tableViewMode === 'tree'">
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <button type="button" class="btn btn-seg-secondary" t-on-click="() => this.expandAllTableDepts()" title="Expand All Sub-Departments">
+                                            <i class="fa fa-plus-square-o me-1"/> Expand All
+                                        </button>
+                                        <button type="button" class="btn btn-seg-secondary" t-on-click="() => this.collapseAllTableDepts()" title="Collapse to Root Departments">
+                                            <i class="fa fa-minus-square-o me-1"/> Collapse
+                                        </button>
+                                    </div>
+                                </t>
+                                <input type="text" class="form-control form-control-sm filter_input" placeholder="Search department / path..." t-model="state.searchQuery" style="max-width: 220px;"/>
+                                <button class="btn btn-sm btn-excel-action text-nowrap" t-att-disabled="state.exportingExcel" t-on-click="exportExcel">
                                     <i class="fa fa-file-excel-o me-1"/> Export to Excel
                                 </button>
                             </div>
                         </div>
 
                         <div class="table-responsive">
-                            <table class="o_dashboard_table table table-hover">
+                            <table class="o_dashboard_table table">
                                 <thead>
-                                    <tr>
-                                        <th t-on-click="() => this.sortBy('department_name')">Department / Branch <i class="fa fa-sort ms-1"/></th>
-                                        <th class="text-center" t-on-click="() => this.sortBy('headcount')">Headcount <i class="fa fa-sort ms-1"/></th>
-                                        <th class="text-end" t-on-click="() => this.sortBy('daily_cost')">Daily Cost (JOD/Day) <i class="fa fa-sort ms-1"/></th>
-                                        <th class="text-end" t-on-click="() => this.sortBy('avg_daily_cost_per_emp')">Avg Cost/Emp <i class="fa fa-sort ms-1"/></th>
-                                        <th class="text-end" t-on-click="() => this.sortBy('basic_salary')">Basic Wage <i class="fa fa-sort ms-1"/></th>
-                                        <th class="text-end" t-on-click="() => this.sortBy('allowances')">Allowances <i class="fa fa-sort ms-1"/></th>
-                                        <th class="text-end" t-on-click="() => this.sortBy('overtime_amount')">Overtime (OT) <i class="fa fa-sort ms-1"/></th>
-                                        <th class="text-end" t-on-click="() => this.sortBy('gross_salary')">Gross Salary <i class="fa fa-sort ms-1"/></th>
-                                        <th class="text-end" t-on-click="() => this.sortBy('social_security_comp')">Company SS <i class="fa fa-sort ms-1"/></th>
-                                        <th class="text-end" t-on-click="() => this.sortBy('net_salary')">Net Salary <i class="fa fa-sort ms-1"/></th>
-                                        <th class="text-end" t-on-click="() => this.sortBy('pos_sales')">POS Sales / Output <i class="fa fa-sort ms-1"/></th>
+                                    <!-- Tier 1: Color-Segmented Super-Headers (Dark Background / Crisp White Text) -->
+                                    <tr class="seg_super_header_row">
+                                        <th colspan="3" class="seg_super_th seg_th_org">
+                                            <i class="fa fa-sitemap me-1"/> 1. ORGANIZATION &amp; WORKFORCE
+                                        </th>
+                                        <th colspan="5" class="seg_super_th seg_th_earn">
+                                            <i class="fa fa-plus-circle me-1"/> 2. EARNINGS, ALLOWANCES &amp; GROSS
+                                        </th>
+                                        <th colspan="2" class="seg_super_th seg_th_ded">
+                                            <i class="fa fa-minus-circle me-1"/> 3. DEDUCTIONS &amp; STATUTORY
+                                        </th>
+                                        <th colspan="2" class="seg_super_th seg_th_net">
+                                            <i class="fa fa-check-circle me-1"/> 4. NET PAYOUT &amp; OUTPUT ROI
+                                        </th>
+                                    </tr>
+                                    <!-- Tier 2: Column Headers -->
+                                    <tr class="seg_sub_header_row">
+                                        <th class="seg_sub_th seg_sub_org" t-on-click="() => this.sortBy('department_name')">Department / Full Path <i class="fa fa-sort ms-1"/></th>
+                                        <th class="seg_sub_th seg_sub_org text-center" t-on-click="() => this.sortBy('headcount')">Staff (Active / Slips) <i class="fa fa-sort ms-1"/></th>
+                                        <th class="seg_sub_th seg_sub_org text-end" t-on-click="() => this.sortBy('daily_cost')">Daily Cost (JOD/Day) <i class="fa fa-sort ms-1"/></th>
+                                        <th class="seg_sub_th seg_sub_earn text-end" t-on-click="() => this.sortBy('basic_salary')">Basic Wage <i class="fa fa-sort ms-1"/></th>
+                                        <th class="seg_sub_th seg_sub_earn text-end" t-on-click="() => this.sortBy('actual_salary')">Actual Wage <i class="fa fa-sort ms-1"/></th>
+                                        <th class="seg_sub_th seg_sub_earn text-end" t-on-click="() => this.sortBy('allowances')">Allowances <i class="fa fa-sort ms-1"/></th>
+                                        <th class="seg_sub_th seg_sub_earn text-end" t-on-click="() => this.sortBy('overtime_amount')">Overtime (OT) <i class="fa fa-sort ms-1"/></th>
+                                        <th class="seg_sub_th seg_sub_earn text-end" t-on-click="() => this.sortBy('gross_salary')">Gross Salary <i class="fa fa-sort ms-1"/></th>
+                                        <th class="seg_sub_th seg_sub_ded text-end" t-on-click="() => this.sortBy('deductions')">Deductions <i class="fa fa-sort ms-1"/></th>
+                                        <th class="seg_sub_th seg_sub_ded text-end" t-on-click="() => this.sortBy('social_security_comp')">Company SS <i class="fa fa-sort ms-1"/></th>
+                                        <th class="seg_sub_th seg_sub_net text-end" t-on-click="() => this.sortBy('net_salary')">Net Salary <i class="fa fa-sort ms-1"/></th>
+                                        <th class="seg_sub_th seg_sub_net text-end" t-on-click="() => this.sortBy('pos_sales')">POS Sales / Output <i class="fa fa-sort ms-1"/></th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <t t-foreach="sortedDepartments" t-as="d" t-key="d.department_id">
-                                        <tr>
-                                            <td class="fw-bold text-dark"><i class="fa fa-folder-open-o text-muted me-2"/><t t-esc="d.department_name"/></td>
-                                            <td class="text-center"><span class="badge badge-headcount px-2 py-1"><i class="fa fa-user-check me-1 text-success"/><t t-esc="d.present_headcount || 0"/> / <t t-esc="d.headcount"/></span></td>
-                                            <td class="text-end fw-bold text-info"><t t-esc="formatCurrency(d.daily_cost)"/></td>
-                                            <td class="text-end text-teal fw-bold"><t t-esc="formatCurrency(d.avg_daily_cost_per_emp)"/></td>
-                                            <td class="text-end"><t t-esc="formatCurrency(d.basic_salary)"/></td>
-                                            <td class="text-end text-success"><t t-esc="formatCurrency(d.allowances)"/></td>
-                                            <td class="text-end text-primary"><t t-esc="formatCurrency(d.overtime_amount)"/><div class="small text-muted"><t t-esc="formatDecimal(d.overtime_hours, 1)"/> hrs</div></td>
-                                            <td class="text-end fw-bold"><t t-esc="formatCurrency(d.gross_salary)"/></td>
-                                            <td class="text-end text-warning"><t t-esc="formatCurrency(d.social_security_comp)"/></td>
-                                            <td class="text-end fw-bold text-primary fs-6"><t t-esc="formatCurrency(d.net_salary)"/></td>
-                                            <td class="text-end fw-bold">
+                                        <tr t-att-class="{
+                                                'seg_row_level_0': state.tableViewMode === 'tree' and d.level === 0 and d.has_children,
+                                                'seg_row_level_1': state.tableViewMode === 'tree' and d.level === 1 and d.has_children,
+                                                'seg_row_level_2': state.tableViewMode === 'tree' and d.level >= 2 and d.has_children,
+                                                'seg_row_leaf': !d.has_children or state.tableViewMode === 'flat'
+                                            }">
+                                            <td class="seg_col_org" t-att-style="'padding-left: ' + ((state.tableViewMode === 'tree' ? (d.level || 0) * 24 : 0) + 14) + 'px;'">
+                                                <div class="d-flex align-items-center justify-content-between">
+                                                    <div>
+                                                        <t t-if="state.tableViewMode === 'tree' and d.has_children">
+                                                            <button type="button" class="btn-tree-expander me-2"
+                                                                    t-on-click="(ev) => this.toggleTableDeptExpand(d.department_id, ev)"
+                                                                    title="Expand / Collapse Sub-Departments">
+                                                                <i class="fa fa-minus" t-if="isTableDeptExpanded(d.department_id)"/>
+                                                                <i class="fa fa-plus" t-else=""/>
+                                                            </button>
+                                                            <i class="fa fa-folder-open val_amber me-2" t-if="isTableDeptExpanded(d.department_id)"/>
+                                                            <i class="fa fa-folder val_amber me-2" t-else=""/>
+                                                        </t>
+                                                        <t t-else="">
+                                                            <i class="fa fa-building-o val_slate me-2 ms-2"/>
+                                                        </t>
+                                                        <span class="dept_row_title"><t t-esc="d.short_name || d.department_name"/></span>
+                                                        <t t-if="d.has_children and state.tableViewMode === 'tree'">
+                                                            <span class="seg_level_chip ms-2">L<t t-esc="(d.level || 0) + 1"/> Group</span>
+                                                        </t>
+                                                        <t t-if="d.complete_name and d.complete_name !== d.short_name">
+                                                            <div class="dept_row_path ms-4">
+                                                                <t t-esc="d.complete_name"/>
+                                                            </div>
+                                                        </t>
+                                                    </div>
+                                                    <t t-if="d.department_id > 0">
+                                                        <button type="button" class="btn-row-filter ms-2"
+                                                                t-on-click="(ev) => this.filterByDepartmentFromTable(d, ev)"
+                                                                title="Filter dashboard by this department">
+                                                            <i class="fa fa-filter"/>
+                                                        </button>
+                                                    </t>
+                                                </div>
+                                            </td>
+                                            <td class="seg_col_org text-center">
+                                                <span class="badge-headcount" title="Active Employees in Department (Odoo Employees Count)">
+                                                    <i class="fa fa-users me-1"/>
+                                                    <t t-esc="d.headcount"/> Staff
+                                                </span>
+                                                <div class="cell_sub_meta mt-1">
+                                                    Slips: <strong><t t-esc="d.payslip_headcount || 0"/></strong>
+                                                    <t t-if="d.present_headcount > 0">
+                                                        | Present: <strong class="val_emerald"><t t-esc="d.present_headcount"/></strong>
+                                                    </t>
+                                                </div>
+                                            </td>
+                                            <td class="seg_col_org text-end fw-bold val_cyan">
+                                                <t t-esc="formatCurrency(d.daily_cost)"/>
+                                                <div class="cell_sub_meta">Avg: <t t-esc="formatCurrency(d.avg_daily_cost_per_emp)"/></div>
+                                            </td>
+                                            <td class="seg_col_earn text-end val_dark"><t t-esc="formatCurrency(d.basic_salary)"/></td>
+                                            <td class="seg_col_earn text-end fw-bold val_dark"><t t-esc="formatCurrency(d.actual_salary)"/></td>
+                                            <td class="seg_col_earn text-end fw-bold val_emerald"><t t-esc="formatCurrency(d.allowances)"/></td>
+                                            <td class="seg_col_earn text-end fw-bold val_orange">
+                                                <t t-esc="formatCurrency(d.overtime_amount)"/>
+                                                <div class="cell_sub_meta"><t t-esc="formatDecimal(d.overtime_hours, 1)"/> hrs</div>
+                                            </td>
+                                            <td class="seg_col_earn seg_col_gross_highlight text-end fw-bold val_purple"><t t-esc="formatCurrency(d.gross_salary)"/></td>
+                                            <td class="seg_col_ded text-end fw-bold val_crimson">
+                                                <t t-esc="formatCurrency(d.deductions)"/>
+                                                <t t-if="d.social_security > 0 or d.income_tax > 0">
+                                                    <div class="cell_sub_meta">SS: <t t-esc="formatCurrency(d.social_security)"/> | Tax: <t t-esc="formatCurrency(d.income_tax)"/></div>
+                                                </t>
+                                            </td>
+                                            <td class="seg_col_ded text-end fw-bold val_amber"><t t-esc="formatCurrency(d.social_security_comp)"/></td>
+                                            <td class="seg_col_net seg_col_net_highlight text-end fw-bold val_blue fs-6"><t t-esc="formatCurrency(d.net_salary)"/></td>
+                                            <td class="seg_col_net text-end fw-bold">
                                                 <t t-if="d.pos_sales > 0">
-                                                    <span class="text-success"><t t-esc="formatCurrency(d.pos_sales)"/> JOD</span>
-                                                    <div class="small text-dark font-monospace"><i class="fa fa-shopping-cart text-info me-1"/><t t-esc="d.pos_orders || 0"/> Orders (<t t-esc="d.orders_per_present_emp || 0"/>/Present)</div>
-                                                    <div class="small text-primary font-monospace"><i class="fa fa-line-chart me-1"/><t t-esc="formatCurrency(d.sales_per_present_emp || 0)"/> JOD/Present Emp</div>
-                                                    <div class="small text-muted"><t t-esc="d.pos_labor_cost_pct"/>% Labor Ratio</div>
+                                                    <span class="val_emerald"><t t-esc="formatCurrency(d.pos_sales)"/> JOD</span>
+                                                    <div class="cell_sub_meta"><i class="fa fa-shopping-cart val_cyan me-1"/><t t-esc="d.pos_orders || 0"/> Orders (<t t-esc="d.orders_per_present_emp || 0"/>/Present)</div>
+                                                    <div class="cell_sub_meta val_blue"><i class="fa fa-line-chart me-1"/><t t-esc="formatCurrency(d.sales_per_present_emp || 0)"/> JOD/Present</div>
+                                                    <div class="cell_sub_meta"><t t-esc="d.pos_labor_cost_pct"/>% Labor Ratio</div>
                                                 </t>
                                                 <t t-elif="d.mrp_qty > 0">
-                                                    <span class="text-primary"><t t-esc="formatDecimal(d.mrp_qty, 1)"/> Output</span>
-                                                    <div class="small text-muted"><t t-esc="formatCurrency(d.labor_cost_per_unit)"/> JOD/Unit</div>
+                                                    <span class="val_blue"><t t-esc="formatDecimal(d.mrp_qty, 1)"/> Output</span>
+                                                    <div class="cell_sub_meta"><t t-esc="formatCurrency(d.labor_cost_per_unit)"/> JOD/Unit</div>
                                                 </t>
-                                                <t t-else=""><span class="text-muted small">N/A</span></t>
+                                                <t t-else=""><span class="cell_sub_meta">—</span></t>
                                             </td>
                                         </tr>
                                     </t>
                                 </tbody>
+                                <!-- Grand Total Sticky Dark Footer (Dark Surface / Crisp White Text) -->
+                                <tfoot>
+                                    <tr class="seg_table_footer_row">
+                                        <td>
+                                            <i class="fa fa-calculator me-2"/> GRAND TOTAL (الإجمالي الكلي)
+                                        </td>
+                                        <td class="text-center">
+                                            <span class="footer_pill"><t t-esc="tableSummaryTotals.headcount"/> Staff</span>
+                                            <span class="footer_sub d-block">Slips: <t t-esc="tableSummaryTotals.payslip_headcount"/></span>
+                                        </td>
+                                        <td class="text-end"><t t-esc="formatCurrency(tableSummaryTotals.daily_cost)"/></td>
+                                        <td class="text-end"><t t-esc="formatCurrency(tableSummaryTotals.basic_salary)"/></td>
+                                        <td class="text-end"><t t-esc="formatCurrency(tableSummaryTotals.actual_salary)"/></td>
+                                        <td class="text-end footer_emerald"><t t-esc="formatCurrency(tableSummaryTotals.allowances)"/></td>
+                                        <td class="text-end footer_amber">
+                                            <t t-esc="formatCurrency(tableSummaryTotals.overtime_amount)"/>
+                                            <span class="footer_sub d-block"><t t-esc="formatDecimal(tableSummaryTotals.overtime_hours, 1)"/> hrs</span>
+                                        </td>
+                                        <td class="text-end"><t t-esc="formatCurrency(tableSummaryTotals.gross_salary)"/></td>
+                                        <td class="text-end footer_rose"><t t-esc="formatCurrency(tableSummaryTotals.deductions)"/></td>
+                                        <td class="text-end footer_amber"><t t-esc="formatCurrency(tableSummaryTotals.social_security_comp)"/></td>
+                                        <td class="text-end footer_cyan fs-6"><t t-esc="formatCurrency(tableSummaryTotals.net_salary)"/> JOD</td>
+                                        <td class="text-end footer_emerald">
+                                            <t t-if="tableSummaryTotals.pos_sales > 0">
+                                                <t t-esc="formatCurrency(tableSummaryTotals.pos_sales)"/> JOD
+                                            </t>
+                                            <t t-else="">—</t>
+                                        </td>
+                                    </tr>
+                                </tfoot>
                             </table>
                         </div>
                     </div>
@@ -593,58 +775,60 @@
 
                 <!-- TAB 2: PAYROLL & ACCRUAL ENGINE -->
                 <t t-if="state.activeDashboardTab === 'payroll'">
-                    <div class="tab_header_banner d-flex justify-content-between align-items-center">
+                    <div class="tab_header_banner seg_surface_dark d-flex justify-content-between align-items-center flex-wrap gap-2">
                         <div>
-                            <h4 class="m-0 fw-bold"><i class="fa fa-money text-success me-2"/> Payroll &amp; Accrual Engine</h4>
+                            <h4 class="m-0 fw-bold"><i class="fa fa-money me-2"/> Payroll &amp; Accrual Engine</h4>
                             <span class="small subtitle">Live daily accruals vs post-payroll approved summary</span>
                         </div>
                         <div class="btn-group" role="group">
-                            <button type="button" class="btn btn-sm btn-outline-danger fw-bold" t-att-class="{'active': state.dashboardMode === 'live'}" t-on-click="() => this.setDashboardMode('live')">
+                            <button type="button" class="btn btn-sm btn-mode-toggle" t-att-class="{'active_live': state.dashboardMode === 'live'}" t-on-click="() => this.setDashboardMode('live')">
                                 🔴 LIVE ACCRUAL MODE
                             </button>
-                            <button type="button" class="btn btn-sm btn-outline-success fw-bold" t-att-class="{'active': state.dashboardMode === 'post_payroll'}" t-on-click="() => this.setDashboardMode('post_payroll')">
+                            <button type="button" class="btn btn-sm btn-mode-toggle" t-att-class="{'active_post': state.dashboardMode === 'post_payroll'}" t-on-click="() => this.setDashboardMode('post_payroll')">
                                 ✅ POST-PAYROLL MODE
                             </button>
                         </div>
                     </div>
 
                     <t t-if="state.dashboardMode === 'live'">
-                        <div class="alert alert-info p-3 mb-3">
-                            <strong class="d-block text-dark"><i class="fa fa-clock-o me-1"/> Pre-Payroll Live Accrual Tracking</strong>
-                            <span class="text-dark">Real-time payroll cost burn calculated dynamically from attendance logs and active contracts.</span>
+                        <div class="seg_persona_banner seg_banner_blue p-3 mb-3">
+                            <strong class="d-block banner_title"><i class="fa fa-clock-o me-1"/> Pre-Payroll Live Accrual Tracking</strong>
+                            <span class="seg_label_dark">Real-time payroll cost burn calculated dynamically from attendance logs and active contracts.</span>
                         </div>
                     </t>
                     <t t-else="">
-                        <div class="alert alert-success p-3 mb-3">
-                            <strong class="d-block text-dark"><i class="fa fa-check-circle me-1"/> Final Approved Payroll Ledger</strong>
-                            <span class="text-dark">Posted and approved payroll slips summary for the active period.</span>
+                        <div class="seg_persona_banner seg_banner_emerald p-3 mb-3">
+                            <strong class="d-block banner_title"><i class="fa fa-check-circle me-1"/> Final Approved Payroll Ledger</strong>
+                            <span class="seg_label_dark">Posted and approved payroll slips summary for the active period.</span>
                         </div>
                     </t>
 
                     <div class="o_department_table_card">
-                        <h5><i class="fa fa-list text-primary me-2"/> Payroll Accrual Table by Department</h5>
+                        <div class="table_header_controls">
+                            <h4><span class="header_seg_icon seg_icon_emerald me-2"><i class="fa fa-list"/></span> Payroll Accrual Table by Department</h4>
+                        </div>
                         <div class="table-responsive">
                             <table class="o_dashboard_table table">
                                 <thead>
-                                    <tr>
-                                        <th>Department / Branch</th>
-                                        <th class="text-center">Active Headcount</th>
-                                        <th class="text-end">Daily Rate (JOD)</th>
-                                        <th class="text-end">Accrued MTD (JOD)</th>
-                                        <th class="text-end">Projected Month-End</th>
-                                        <th class="text-center">RAG Status</th>
+                                    <tr class="seg_sub_header_row">
+                                        <th class="seg_sub_th seg_sub_org">Department / Branch</th>
+                                        <th class="seg_sub_th seg_sub_org text-center">Active Headcount</th>
+                                        <th class="seg_sub_th seg_sub_earn text-end">Daily Rate (JOD)</th>
+                                        <th class="seg_sub_th seg_sub_earn text-end">Accrued MTD (JOD)</th>
+                                        <th class="seg_sub_th seg_sub_net text-end">Projected Month-End</th>
+                                        <th class="seg_sub_th seg_sub_net text-center">RAG Status</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <t t-foreach="sortedDepartments" t-as="d" t-key="d.department_id">
-                                        <tr>
-                                            <td class="fw-bold"><t t-esc="d.department_name"/></td>
-                                            <td class="text-center"><t t-esc="d.headcount"/></td>
-                                            <td class="text-end"><t t-esc="formatCurrency(d.daily_cost)"/></td>
-                                            <td class="text-end text-primary font-monospace fw-bold"><t t-esc="formatCurrency(d.daily_cost * 23)"/></td>
-                                            <td class="text-end font-monospace"><t t-esc="formatCurrency(d.gross_salary)"/></td>
-                                            <td class="text-center">
-                                                <span class="badge bg-success text-white px-2 py-1">On Track</span>
+                                        <tr class="seg_row_leaf">
+                                            <td class="seg_col_org fw-bold val_dark"><t t-esc="d.department_name"/></td>
+                                            <td class="seg_col_org text-center"><span class="badge-headcount"><t t-esc="d.headcount"/> Staff</span></td>
+                                            <td class="seg_col_earn text-end val_cyan fw-bold"><t t-esc="formatCurrency(d.daily_cost)"/></td>
+                                            <td class="seg_col_earn text-end val_blue fw-bold"><t t-esc="formatCurrency(d.daily_cost * 23)"/></td>
+                                            <td class="seg_col_net text-end val_purple fw-bold"><t t-esc="formatCurrency(d.gross_salary)"/></td>
+                                            <td class="seg_col_net text-center">
+                                                <span class="seg_dark_badge seg_bg_emerald">On Track</span>
                                             </td>
                                         </tr>
                                     </t>
@@ -656,46 +840,48 @@
 
                 <!-- TAB 3: WORKFORCE INTELLIGENCE -->
                 <t t-if="state.activeDashboardTab === 'workforce'">
-                    <div class="tab_header_banner">
+                    <div class="tab_header_banner seg_surface_dark">
                         <div>
-                            <h4 class="m-0 fw-bold"><i class="fa fa-users text-info me-2"/> Workforce Intelligence &amp; Attendance Heatmap</h4>
+                            <h4 class="m-0 fw-bold"><i class="fa fa-users me-2"/> Workforce Intelligence &amp; Attendance Heatmap</h4>
                             <span class="small subtitle">Demographics, 30-Day Attendance Heatmap Calendar &amp; OT Risk Flags</span>
                         </div>
                     </div>
 
                     <div class="row g-3 mb-3">
                         <div class="col-md-6">
-                            <div class="highlight_card">
+                            <div class="highlight_card seg_highlight_emerald">
                                 <div class="card_header">
-                                    <i class="fa fa-calendar text-success fs-4"/>
+                                    <span class="header_seg_icon seg_icon_emerald"><i class="fa fa-calendar"/></span>
                                     <h5>30-Day Attendance RAG Heatmap Calendar</h5>
                                 </div>
-                                <div class="p-3 text-center bg-light rounded border">
-                                    <span class="badge bg-success me-2 px-2 py-1">🟢 &gt;95% Attendance</span>
-                                    <span class="badge bg-warning text-dark me-2 px-2 py-1">🟡 85-95% Attendance</span>
-                                    <span class="badge bg-danger me-2 px-2 py-1">🔴 &lt;85% Attendance</span>
-                                    <p class="mt-3 text-dark small font-weight-bold">Corporate Average Attendance: <strong class="text-success fs-6">94.2%</strong></p>
+                                <div class="seg_inner_stat_card seg_border_emerald text-center p-4">
+                                    <div class="d-flex justify-content-center gap-2 flex-wrap mb-3">
+                                        <span class="seg_dark_badge seg_bg_emerald">🟢 &gt;95% Attendance</span>
+                                        <span class="seg_dark_badge seg_bg_amber">🟡 85-95% Attendance</span>
+                                        <span class="seg_dark_badge seg_bg_crimson">🔴 &lt;85% Attendance</span>
+                                    </div>
+                                    <p class="m-0 seg_label_dark fw-bold">Corporate Average Attendance: <strong class="val_emerald fs-5">94.2%</strong></p>
                                 </div>
                             </div>
                         </div>
                         <div class="col-md-6">
-                            <div class="highlight_card">
+                            <div class="highlight_card seg_highlight_blue">
                                 <div class="card_header">
-                                    <i class="fa fa-exclamation-triangle text-warning fs-4"/>
+                                    <span class="header_seg_icon seg_icon_amber"><i class="fa fa-exclamation-triangle"/></span>
                                     <h5>Leave Liabilities &amp; OT Risk Panel</h5>
                                 </div>
-                                <div class="space-y-2">
-                                    <div class="p-2 bg-light rounded border d-flex justify-content-between align-items-center mb-2">
-                                        <span class="text-dark font-weight-bold">Employees with &gt;15 Unused Leave Days:</span>
-                                        <span class="badge bg-warning text-dark fs-6">28 Staff</span>
+                                <div class="d-flex flex-column gap-2">
+                                    <div class="seg_channel_row d-flex justify-content-between align-items-center">
+                                        <span class="channel_name">Employees with &gt;15 Unused Leave Days:</span>
+                                        <span class="seg_dark_badge seg_bg_amber">28 Staff</span>
                                     </div>
-                                    <div class="p-2 bg-light rounded border d-flex justify-content-between align-items-center mb-2">
-                                        <span class="text-dark font-weight-bold">OT High Consumers (&gt;20% Basic Salary):</span>
-                                        <span class="badge bg-danger fs-6">12 Staff</span>
+                                    <div class="seg_channel_row d-flex justify-content-between align-items-center">
+                                        <span class="channel_name">OT High Consumers (&gt;20% Basic Salary):</span>
+                                        <span class="seg_dark_badge seg_bg_crimson">12 Staff</span>
                                     </div>
-                                    <div class="p-2 bg-light rounded border d-flex justify-content-between align-items-center">
-                                        <span class="text-dark font-weight-bold">1-Year New Hire Retention Rate:</span>
-                                        <span class="badge bg-success fs-6">88.5%</span>
+                                    <div class="seg_channel_row d-flex justify-content-between align-items-center">
+                                        <span class="channel_name">1-Year New Hire Retention Rate:</span>
+                                        <span class="seg_dark_badge seg_bg_emerald">88.5%</span>
                                     </div>
                                 </div>
                             </div>
@@ -705,43 +891,43 @@
 
                 <!-- TAB 4: OPERATIONS & 23 RETAIL BRANCHES -->
                 <t t-if="state.activeDashboardTab === 'operations'">
-                    <div class="tab_header_banner d-flex justify-content-between align-items-center">
+                    <div class="tab_header_banner seg_surface_dark d-flex justify-content-between align-items-center flex-wrap gap-2">
                         <div>
-                            <h4 class="m-0 fw-bold"><i class="fa fa-cogs text-warning me-2"/> Operations HR — Main Factory &amp; 23 Retail Branches</h4>
+                            <h4 class="m-0 fw-bold"><i class="fa fa-cogs me-2"/> Operations HR — Main Factory &amp; 23 Retail Branches</h4>
                             <span class="small subtitle">Factory line labor splitting &amp; master branch comparison table</span>
                         </div>
-                        <button type="button" class="btn btn-sm btn-outline-warning" t-on-click="() => this.state.isBenchmarkMode = !this.state.isBenchmarkMode">
+                        <button type="button" class="btn btn-sm btn-mode-toggle active_post" t-on-click="() => this.state.isBenchmarkMode = !this.state.isBenchmarkMode">
                             <i class="fa fa-columns me-1"/> Branch Benchmarking Mode
                         </button>
                     </div>
 
                     <div class="o_department_table_card">
                         <div class="table-responsive">
-                            <table class="o_dashboard_table table table-hover">
+                            <table class="o_dashboard_table table">
                                 <thead>
-                                    <tr>
-                                        <th>Branch / Unit Name</th>
-                                        <th class="text-center">Headcount</th>
-                                        <th class="text-end">Daily Cost</th>
-                                        <th class="text-end">Overtime Hours</th>
-                                        <th class="text-end">POS Sales Revenue</th>
-                                        <th class="text-center">Attendance %</th>
-                                        <th class="text-center">RAG Status</th>
+                                    <tr class="seg_sub_header_row">
+                                        <th class="seg_sub_th seg_sub_org">Branch / Unit Name</th>
+                                        <th class="seg_sub_th seg_sub_org text-center">Headcount</th>
+                                        <th class="seg_sub_th seg_sub_earn text-end">Daily Cost</th>
+                                        <th class="seg_sub_th seg_sub_earn text-end">Overtime Hours</th>
+                                        <th class="seg_sub_th seg_sub_net text-end">POS Sales Revenue</th>
+                                        <th class="seg_sub_th seg_sub_net text-center">Attendance %</th>
+                                        <th class="seg_sub_th seg_sub_net text-center">RAG Status</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <t t-foreach="sortedDepartments" t-as="d" t-key="d.department_id">
-                                        <tr>
-                                            <td class="fw-bold text-dark"><i class="fa fa-building-o me-2 text-primary"/><t t-esc="d.department_name"/></td>
-                                            <td class="text-center"><t t-esc="d.headcount"/></td>
-                                            <td class="text-end"><t t-esc="formatCurrency(d.daily_cost)"/></td>
-                                            <td class="text-end text-warning"><t t-esc="formatDecimal(d.overtime_hours, 1)"/> hrs</td>
-                                            <td class="text-end text-success font-bold"><t t-esc="formatCurrency(d.pos_sales)"/> JOD</td>
-                                            <td class="text-center">
-                                                <span class="badge bg-success px-2 py-1">96.5%</span>
+                                        <tr class="seg_row_leaf">
+                                            <td class="seg_col_org fw-bold val_dark"><i class="fa fa-building-o me-2 val_blue"/><t t-esc="d.department_name"/></td>
+                                            <td class="seg_col_org text-center"><span class="badge-headcount"><t t-esc="d.headcount"/> Staff</span></td>
+                                            <td class="seg_col_earn text-end val_cyan fw-bold"><t t-esc="formatCurrency(d.daily_cost)"/></td>
+                                            <td class="seg_col_earn text-end val_orange fw-bold"><t t-esc="formatDecimal(d.overtime_hours, 1)"/> hrs</td>
+                                            <td class="seg_col_net text-end val_emerald fw-bold"><t t-esc="formatCurrency(d.pos_sales)"/> JOD</td>
+                                            <td class="seg_col_net text-center">
+                                                <span class="seg_pill_badge seg_pill_emerald">96.5%</span>
                                             </td>
-                                            <td class="text-center">
-                                                <span class="badge bg-emerald text-white px-2 py-1" style="background-color: #10b981;">Optimal</span>
+                                            <td class="seg_col_net text-center">
+                                                <span class="seg_dark_badge seg_bg_emerald">Optimal</span>
                                             </td>
                                         </tr>
                                     </t>
@@ -753,36 +939,36 @@
 
                 <!-- TAB 5: SALES & COMMISSION HR -->
                 <t t-if="state.activeDashboardTab === 'sales'">
-                    <div class="tab_header_banner">
+                    <div class="tab_header_banner seg_surface_dark">
                         <div>
-                            <h4 class="m-0 fw-bold"><i class="fa fa-line-chart text-info me-2"/> Sales Team HR &amp; Commission Analytics (Export + Local)</h4>
+                            <h4 class="m-0 fw-bold"><i class="fa fa-line-chart me-2"/> Sales Team HR &amp; Commission Analytics (Export + Local)</h4>
                             <span class="small subtitle">Daily commission accrual tracker, variable pay exposure &amp; earners leaderboard</span>
                         </div>
                     </div>
 
                     <div class="row g-3 mb-3">
                         <div class="col-md-3">
-                            <div class="bg-white p-3 rounded border shadow-sm">
-                                <span class="text-dark fw-bold small d-block mb-1">Export Commission MTD</span>
-                                <strong class="text-primary fs-4">14,250 JOD</strong>
+                            <div class="seg_inner_stat_card seg_border_blue">
+                                <span class="inner_stat_label">Export Commission MTD</span>
+                                <strong class="inner_stat_val val_blue">14,250 JOD</strong>
                             </div>
                         </div>
                         <div class="col-md-3">
-                            <div class="bg-white p-3 rounded border shadow-sm">
-                                <span class="text-dark fw-bold small d-block mb-1">Local Sales Commission MTD</span>
-                                <strong class="text-success fs-4">18,900 JOD</strong>
+                            <div class="seg_inner_stat_card seg_border_emerald">
+                                <span class="inner_stat_label">Local Sales Commission MTD</span>
+                                <strong class="inner_stat_val val_emerald">18,900 JOD</strong>
                             </div>
                         </div>
                         <div class="col-md-3">
-                            <div class="bg-white p-3 rounded border shadow-sm">
-                                <span class="text-dark fw-bold small d-block mb-1">Max Variable Pay Exposure</span>
-                                <strong class="text-warning fs-4">48,500 JOD</strong>
+                            <div class="seg_inner_stat_card seg_border_amber">
+                                <span class="inner_stat_label">Max Variable Pay Exposure</span>
+                                <strong class="inner_stat_val val_amber">48,500 JOD</strong>
                             </div>
                         </div>
                         <div class="col-md-3">
-                            <div class="bg-white p-3 rounded border shadow-sm">
-                                <span class="text-dark fw-bold small d-block mb-1">Payroll % of Revenue</span>
-                                <strong class="text-info fs-4">11.4%</strong>
+                            <div class="seg_inner_stat_card seg_border_cyan">
+                                <span class="inner_stat_label">Payroll % of Revenue</span>
+                                <strong class="inner_stat_val val_cyan">11.4%</strong>
                             </div>
                         </div>
                     </div>
