@@ -40,6 +40,7 @@ export class HrPayrollDashboard extends Component {
             sortOrder: "desc",
             loading: true,
             exportingExcel: false,
+            exportingPptx: false,
             printingPdf: false,
             isBenchmarkMode: false,
             benchmarkBranches: [],
@@ -724,10 +725,12 @@ export class HrPayrollDashboard extends Component {
         const targetScope = (typeof reportType === "string" && reportType) ? reportType : "all";
 
         if (this.notification) {
+            const msgMap = {
+                labor_cost: "Generating 6-Sheet Employee Cost & Headcount Excel Report...",
+                board_pptx: "Generating 10-Slide Executive Board PowerPoint (.pptx) with Charts & Pies...",
+            };
             this.notification.add(
-                targetScope === "labor_cost"
-                    ? "Generating 6-Sheet Employee Cost & Headcount Excel Report..."
-                    : "Generating unified HR & Payroll Excel package...",
+                msgMap[targetScope] || "Generating unified HR & Payroll Excel package...",
                 { type: "info" }
             );
         }
@@ -751,9 +754,10 @@ export class HrPayrollDashboard extends Component {
             const wizardRes = await this.orm.create("hr.payroll.report.wizard", [wizardVals]);
             const wizardId = Array.isArray(wizardRes) ? wizardRes[0] : wizardRes;
 
+            const methodName = targetScope === "board_pptx" ? "action_export_pptx" : "action_export_xlsx";
             const action = await this.orm.call(
                 "hr.payroll.report.wizard",
-                "action_export_xlsx",
+                methodName,
                 [wizardId]
             );
 
@@ -761,7 +765,9 @@ export class HrPayrollDashboard extends Component {
                 window.location.href = action.url;
                 if (this.notification) {
                     this.notification.add(
-                        "Excel file exported successfully.",
+                        targetScope === "board_pptx"
+                            ? "10-Slide Board PowerPoint (.pptx) downloaded successfully."
+                            : "Excel file exported successfully.",
                         { type: "success" }
                     );
                 }
@@ -772,7 +778,7 @@ export class HrPayrollDashboard extends Component {
                 await this.actionService.doAction(action);
             }
         } catch (error) {
-            console.error("Failed to export unified HR & Payroll Excel report", error);
+            console.error("Failed to export HR & Payroll report", error);
             if (this.notification) {
                 this.notification.add(
                     "Export failed: " + (error.data?.message || error.message || error),
@@ -782,6 +788,10 @@ export class HrPayrollDashboard extends Component {
         } finally {
             this.state.exportingExcel = false;
         }
+    }
+
+    async exportBoardPptx() {
+        return this.exportExcel("board_pptx");
     }
 }
 

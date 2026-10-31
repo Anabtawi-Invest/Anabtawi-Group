@@ -375,6 +375,24 @@
         }
     }
 
+    .btn-pptx-action {
+        background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%) !important;
+        color: #ffffff !important;
+        font-weight: 700 !important;
+        font-size: 0.82rem !important;
+        padding: 7px 15px !important;
+        border-radius: 8px !important;
+        border: 1px solid #4c1d95 !important;
+        box-shadow: 0 2px 6px rgba(124, 58, 237, 0.28);
+
+        i, span { color: #ffffff !important; }
+
+        &:hover {
+            background: linear-gradient(135deg, #6d28d9 0%, #4c1d95 100%) !important;
+            color: #ffffff !important;
+        }
+    }
+
     // ========================================================================
     // SEGMENT 2: SUITE 5-DASHBOARD NAVIGATION BAR (MIDNIGHT DARK / WHITE TEXT)
     // ========================================================================

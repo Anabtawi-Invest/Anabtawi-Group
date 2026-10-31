@@ -2156,10 +2156,29 @@ class HrPayrollDashboard(models.AbstractModel):
         vol_mom_txt, vol_rag = _mom_badge(tot_vol_share_pct, m1_agg["voluntary_share_pct"], lower_is_better=True, is_pct_points=True)
         crit_mom_txt, crit_rag = _mom_badge(tot_crit_seps, m1_agg["critical_departures"], lower_is_better=True)
 
+        m2_rep_avg = round(m2_summary["total_workforce_cost"] / m2_agg["ending_hc"], 2) if m2_agg["ending_hc"] > 0 else 0.0
+        m1_rep_avg = round(m1_summary["total_workforce_cost"] / m1_agg["ending_hc"], 2) if m1_agg["ending_hc"] > 0 else 0.0
+        m0_rep_avg = round(tot_wf_cost / tot_end_hc, 2) if tot_end_hc > 0 else 0.0
+        m2_ot_pct = round((m2_summary["overtime_amount"] / m2_summary["total_workforce_cost"] * 100.0), 2) if m2_summary["total_workforce_cost"] > 0 else 0.0
+        m1_ot_pct = round((m1_summary["overtime_amount"] / m1_summary["total_workforce_cost"] * 100.0), 2) if m1_summary["total_workforce_cost"] > 0 else 0.0
+
         three_month_trend = {
             "m2_label": m2_start.strftime("%b %Y"),
             "m1_label": m1_start.strftime("%b %Y"),
             "m0_label": m0_start.strftime("%b %Y"),
+            "series_3m": {
+                "beg_hc": [m2_agg["beginning_hc"], m1_agg["beginning_hc"], tot_beg_hc],
+                "end_hc": [m2_agg["ending_hc"], m1_agg["ending_hc"], tot_end_hc],
+                "hires": [m2_agg["new_hires"], m1_agg["new_hires"], tot_hires],
+                "seps": [m2_agg["separations"], m1_agg["separations"], tot_seps],
+                "rep_cost": [m2_summary["total_workforce_cost"], m1_summary["total_workforce_cost"], tot_wf_cost],
+                "eos_cost": [m2_summary["eos_amount"], m1_summary["eos_amount"], tot_eos_cost],
+                "und_cost": [m2_summary["underlying_workforce_cost"], m1_summary["underlying_workforce_cost"], tot_und_cost],
+                "rep_avg": [m2_rep_avg, m1_rep_avg, m0_rep_avg],
+                "und_avg": [m2_agg["avg_underlying_cost"], m1_agg["avg_underlying_cost"], tot_avg_und],
+                "ot_cost": [m2_summary["overtime_amount"], m1_summary["overtime_amount"], m0_summary["overtime_amount"]],
+                "ot_pct": [m2_ot_pct, m1_ot_pct, tot_ot_pct],
+            },
             "rows": [
                 {
                     "kpi": "Ending Headcount (عدد الموظفين نهاية الشهر)",

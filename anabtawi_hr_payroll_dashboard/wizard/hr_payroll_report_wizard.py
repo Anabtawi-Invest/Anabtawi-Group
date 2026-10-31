@@ -6,6 +6,7 @@ from datetime import datetime, date, timedelta
 
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError
+from .hr_payroll_pptx_generator import build_board_pptx_bytes
 
 _logger = logging.getLogger(__name__)
 
@@ -29,6 +30,7 @@ class HrPayrollReportWizard(models.TransientModel):
     report_type = fields.Selection([
         ("all", "Complete HR & Payroll Package (All Sheets)"),
         ("labor_cost", "0. Employee Cost & Headcount Report (تقرير تكاليف القوى العاملة - 6 Sheets)"),
+        ("board_pptx", "Board Presentation Deck (عرض مجلس الإدارة - 10-Slide PowerPoint .pptx)"),
         ("payroll", "1. Monthly Payroll List"),
         ("overtime", "2. Monthly Overtime Analysis"),
         ("bank", "3. Bank Transfer File"),
@@ -37,8 +39,34 @@ class HrPayrollReportWizard(models.TransientModel):
 
     company_source_account = fields.Char(string="Company Bank Account Number", default="0126046919500", help="Used in Bank Transfer file (BT/LBT)")
 
-    excel_file = fields.Binary(string="Excel File", readonly=True)
+    excel_file = fields.Binary(string="Excel / Presentation File", readonly=True)
     file_name = fields.Char(string="File Name")
+
+    def action_export_pptx(self):
+        """Generates the 10-Slide Executive Board PowerPoint (.pptx) presentation
+        with native vector Bar/Column Charts, Stacked Charts, Pie/Doughnut Charts,
+        and Corporate Workforce Cost & Headcount Bridge tables."""
+        self.ensure_one()
+        dash_data = self.env["hr.payroll.dashboard"].get_dashboard_data(
+            date_from=str(self.date_from) if self.date_from else False,
+            date_to=str(self.date_to) if self.date_to else False,
+            payrun_id=self.payrun_id.id if self.payrun_id else False,
+            company_id=self.company_id.id if self.company_id else False,
+            department_ids=self.department_ids.ids if self.department_ids else [],
+        )
+        pptx_bytes = build_board_pptx_bytes(dash_data)
+        file_data = base64.b64encode(pptx_bytes)
+        period_slug = (self.date_to or fields.Date.today()).strftime("%B_%Y")
+        file_name = f"HR_Dashboard_{period_slug}.pptx"
+        self.write({
+            "excel_file": file_data,
+            "file_name": file_name,
+        })
+        return {
+            "type": "ir.actions.act_url",
+            "url": f"/web/content/?model=hr.payroll.report.wizard&id={self.id}&field=excel_file&download=true&filename={file_name}",
+            "target": "self",
+        }
 
     def _get_emp_code(self, emp):
         if not emp:
@@ -58,6 +86,8 @@ class HrPayrollReportWizard(models.TransientModel):
 
     def action_export_xlsx(self):
         self.ensure_one()
+        if self.report_type == "board_pptx":
+            return self.action_export_pptx()
         if not openpyxl:
             raise UserError(_("The openpyxl Python library is required for generating Excel reports."))
 

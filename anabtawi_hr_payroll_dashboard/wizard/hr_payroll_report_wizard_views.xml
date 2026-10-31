@@ -58,6 +58,7 @@
                 </sheet>
                 <footer>
                     <button name="action_export_xlsx" string="Generate &amp; Download Excel (.xlsx)" type="object" class="btn-success" icon="fa-download"/>
+                    <button name="action_export_pptx" string="Generate Board PowerPoint (.pptx)" type="object" class="btn-primary" icon="fa-television"/>
                     <button string="Cancel" class="btn-secondary" special="cancel"/>
                 </footer>
             </form>

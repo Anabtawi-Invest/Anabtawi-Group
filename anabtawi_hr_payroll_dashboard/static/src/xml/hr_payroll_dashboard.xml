@@ -51,6 +51,9 @@
                         <button class="btn btn-excel-action text-nowrap" t-att-disabled="state.exportingExcel" t-on-click="() => this.exportExcel('all')">
                             <i class="fa fa-file-excel-o me-1"/> Full Excel Package
                         </button>
+                        <button class="btn btn-pptx-action text-nowrap" t-att-disabled="state.exportingExcel" t-on-click="exportBoardPptx" title="Export 10-Slide Executive Board PowerPoint (.pptx) with Charts, Pies &amp; SBU Matrix">
+                            <i class="fa fa-television me-1"/> Board PowerPoint (.pptx)
+                        </button>
                         <button class="btn btn-pdf-action text-nowrap" t-att-disabled="state.printingPdf" t-on-click="printExecutivePdf">
                             <i class="fa fa-file-pdf-o me-1"/> Board PDF Briefing
                         </button>
@@ -1082,6 +1085,11 @@
                                         <span>3-Month Rolling Board Trend &amp; MoM Comparison (<t t-esc="data.three_month_trend.m2_label"/> — <t t-esc="data.three_month_trend.m0_label"/>)</span>
                                     </h4>
                                     <span class="seg_subtitle_text">Consolidated 3-month view of headcount movement, cost structure (Headline vs. Underlying Excl. EOS), overtime, and turnover</span>
+                                </div>
+                                <div>
+                                    <button type="button" class="btn btn-sm btn-pptx-action" t-att-disabled="state.exportingExcel" t-on-click="exportBoardPptx">
+                                        <i class="fa fa-television me-1"/> Download 10-Slide Board PowerPoint (.pptx)
+                                    </button>
                                 </div>
                             </div>
                             <div class="table-responsive">
