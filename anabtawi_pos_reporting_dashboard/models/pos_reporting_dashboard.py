@@ -1024,11 +1024,14 @@ class PosReportingDashboard(models.TransientModel):
         configs = self._get_report_configs(config_ids)
         sessions = engine._get_sessions(period, configs)
         product = self.env["product.product"].browse(product_id).exists()
+        list_view = self.env.ref("point_of_sale.view_pos_order_line")
+        form_view = self.env.ref("point_of_sale.view_pos_order_line_form")
         return {
             "name": product.display_name if product else _("Product sales"),
             "type": "ir.actions.act_window",
             "res_model": "pos.order.line",
             "view_mode": "list,form",
+            "views": [(list_view.id, "list"), (form_view.id, "form")],
             "domain": [
                 ("product_id", "=", product_id),
                 ("order_id.session_id", "in", sessions.ids or [0]),
