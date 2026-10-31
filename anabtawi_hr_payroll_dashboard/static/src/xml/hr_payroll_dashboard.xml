@@ -45,8 +45,11 @@
                         <button class="btn btn-apply-action text-nowrap" t-on-click="fetchDashboardData">
                             <i class="fa fa-refresh me-1"/> Apply
                         </button>
-                        <button class="btn btn-excel-action text-nowrap" t-att-disabled="state.exportingExcel" t-on-click="exportExcel">
-                            <i class="fa fa-file-excel-o me-1"/> Excel Package
+                        <button class="btn btn-excel-action text-nowrap" t-att-disabled="state.exportingExcel" t-on-click="() => this.exportExcel('labor_cost')" title="Export 6-Sheet Employee Cost &amp; Headcount Report (تقرير تكاليف القوى العاملة)">
+                            <i class="fa fa-table me-1"/> Employee Cost (6 Sheets)
+                        </button>
+                        <button class="btn btn-excel-action text-nowrap" t-att-disabled="state.exportingExcel" t-on-click="() => this.exportExcel('all')">
+                            <i class="fa fa-file-excel-o me-1"/> Full Excel Package
                         </button>
                         <button class="btn btn-pdf-action text-nowrap" t-att-disabled="state.printingPdf" t-on-click="printExecutivePdf">
                             <i class="fa fa-file-pdf-o me-1"/> Board PDF Briefing
@@ -573,6 +576,176 @@
                         </div>
                     </div>
 
+                    <!-- SEGMENT 6B: Workforce Cost Bridge (Slide 4: Reported vs EOS vs Underlying Operating Cost) -->
+                    <t t-if="data.cost_bridge">
+                        <div class="seg_persona_banner seg_banner_indigo p-3 mb-4">
+                            <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                                <div>
+                                    <h5 class="m-0 banner_title">
+                                        <i class="fa fa-balance-scale me-2 val_purple"/>
+                                        Workforce Cost Bridge — Look Beyond the Headline (فصل تكلفة المخالصات عن التكلفة التشغيلية)
+                                    </h5>
+                                    <span class="seg_subtitle_text">Separates one-time End-of-Service / Termination settlements (EOS) from true recurring operating labor cost</span>
+                                </div>
+                                <span class="seg_dark_badge seg_bg_purple">
+                                    Avg Underlying Cost / Emp: <t t-esc="formatCurrency(data.cost_bridge.underlying_avg_cost_per_emp)"/> JOD
+                                    (<t t-esc="data.cost_bridge.avg_cost_mom_pct &gt;= 0 ? '+' : ''"/><t t-esc="data.cost_bridge.avg_cost_mom_pct"/>% MoM)
+                                </span>
+                            </div>
+                            <div class="row g-3">
+                                <div class="col-md-3">
+                                    <div class="seg_inner_stat_card seg_border_purple">
+                                        <span class="inner_stat_label">1. Reported Workforce Cost (الإجمالي المعلن)</span>
+                                        <strong class="inner_stat_val val_purple"><t t-esc="formatCurrency(data.cost_bridge.reported_workforce_cost)"/> JOD</strong>
+                                        <div class="inner_stat_sub">Headline figure including all components &amp; EOS</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="seg_inner_stat_card seg_border_crimson clickable_kpi" t-on-click="() => this.onKpiClick('eos')" title="Click to drill down into End-of-Service &amp; Termination Payslips">
+                                        <span class="inner_stat_label">2. Less: End-of-Service / EOS (مستحقات نهاية الخدمة)</span>
+                                        <strong class="inner_stat_val val_crimson">− <t t-esc="formatCurrency(data.cost_bridge.eos_settlement_cost)"/> JOD</strong>
+                                        <div class="inner_stat_sub d-flex justify-content-between align-items-center">
+                                            <span><t t-esc="data.cost_bridge.eos_slip_count || 0"/> Termination Slips (<t t-esc="data.cost_bridge.eos_pct_of_reported || 0"/>%)</span>
+                                            <span class="seg_pill_badge seg_pill_crimson"><i class="fa fa-search-plus me-1"/>Drill</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="seg_inner_stat_card seg_border_emerald">
+                                        <span class="inner_stat_label">3. Underlying Workforce Cost (التكلفة التشغيلية الحقيقية)</span>
+                                        <strong class="inner_stat_val val_emerald">= <t t-esc="formatCurrency(data.cost_bridge.underlying_workforce_cost)"/> JOD</strong>
+                                        <div class="inner_stat_sub">True recurring operating labor cost (Excl. EOS)</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="seg_inner_stat_card seg_border_blue">
+                                        <span class="inner_stat_label">4. Avg Operating Cost / Employee (متوسط تكلفة الموظف)</span>
+                                        <strong class="inner_stat_val val_blue"><t t-esc="formatCurrency(data.cost_bridge.underlying_avg_cost_per_emp)"/> JOD</strong>
+                                        <div class="inner_stat_sub">
+                                            Prev Month: <t t-esc="formatCurrency(data.cost_bridge.prev_underlying_avg_cost_per_emp)"/> JOD
+                                            (Headline Avg: <t t-esc="formatCurrency(data.cost_bridge.reported_avg_cost_per_emp)"/>)
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+
+                    <!-- SEGMENT 6C: Corporate Labor Cost & Headcount Report by Business Unit (Matching Employee Cost.xlsx Sheet 1) -->
+                    <t t-if="data.labor_cost_report &amp;&amp; data.labor_cost_report.length &gt; 0">
+                        <div class="o_department_table_card mb-4">
+                            <div class="table_header_controls">
+                                <div>
+                                    <h4>
+                                        <span class="header_seg_icon seg_icon_emerald me-2"><i class="fa fa-building"/></span>
+                                        <span>Corporate Workforce Labor Cost &amp; Headcount Bridge (تقرير تكاليف القوى العاملة حسب وحدات الأعمال)</span>
+                                    </h4>
+                                    <span class="seg_subtitle_text">Exact 15-column Board Labor Cost Model across the 5 Strategic Business Units (United, Delta Factory, HO Admin, Retail Amman, Retail Alhadaf)</span>
+                                </div>
+                                <button class="btn btn-sm btn-excel-action text-nowrap" t-att-disabled="state.exportingExcel" t-on-click="() => this.exportExcel('labor_cost')">
+                                    <i class="fa fa-file-excel-o me-1"/> Export 6-Sheet Employee Cost.xlsx
+                                </button>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="o_dashboard_table table">
+                                    <thead>
+                                        <tr class="seg_super_header_row">
+                                            <th colspan="5" class="seg_super_th seg_th_org">
+                                                <i class="fa fa-users me-1"/> 1. BUSINESS UNIT &amp; HEADCOUNT MOVEMENT (حركة الموظفين)
+                                            </th>
+                                            <th colspan="3" class="seg_super_th seg_th_earn">
+                                                <i class="fa fa-money me-1"/> 2. DIRECT PAYROLL (الرواتب والعلاوات والإضافي)
+                                            </th>
+                                            <th colspan="3" class="seg_super_th seg_th_ded">
+                                                <i class="fa fa-shield me-1"/> 3. EMPLOYER CONTRIBUTIONS &amp; EOS (مساهمات الشركة ونهاية الخدمة)
+                                            </th>
+                                            <th colspan="3" class="seg_super_th seg_th_net">
+                                                <i class="fa fa-calculator me-1"/> 4. TOTAL &amp; UNDERLYING WORKFORCE COST (إجمالي ومتوسط التكلفة)
+                                            </th>
+                                        </tr>
+                                        <tr class="seg_sub_header_row">
+                                            <th class="seg_sub_th seg_sub_org">Business Unit (الشركة / الوحدة)</th>
+                                            <th class="seg_sub_th seg_sub_org text-center">Beg. HC (بداية الشهر)</th>
+                                            <th class="seg_sub_th seg_sub_org text-center">New Hires (تعيينات)</th>
+                                            <th class="seg_sub_th seg_sub_org text-center">Separations (إنهاء خدمات)</th>
+                                            <th class="seg_sub_th seg_sub_org text-center">End HC (نهاية الشهر)</th>
+                                            <th class="seg_sub_th seg_sub_earn text-end">Basic Salaries (الأساسي)</th>
+                                            <th class="seg_sub_th seg_sub_earn text-end">Allowances (العلاوات)</th>
+                                            <th class="seg_sub_th seg_sub_earn text-end">Overtime (الإضافي)</th>
+                                            <th class="seg_sub_th seg_sub_ded text-end">Co. Health Ins (تأمين صحي)</th>
+                                            <th class="seg_sub_th seg_sub_ded text-end">Co. Social Sec (ضمان شركة)</th>
+                                            <th class="seg_sub_th seg_sub_ded text-end">EOS / Term. (نهاية خدمة)</th>
+                                            <th class="seg_sub_th seg_sub_net text-end">Total Cost (إجمالي التكلفة)</th>
+                                            <th class="seg_sub_th seg_sub_net text-end">Avg Cost Excl. EOS (متوسط بدون EOS)</th>
+                                            <th class="seg_sub_th seg_sub_net text-center">OT % (نسبة الإضافي)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <t t-foreach="data.labor_cost_report" t-as="sbu" t-key="sbu.sbu_key">
+                                            <tr class="seg_row_leaf">
+                                                <td class="seg_col_org fw-bold val_dark">
+                                                    <i class="fa fa-industry me-2 val_blue" t-if="sbu.sbu_key === 'delta_factory'"/>
+                                                    <i class="fa fa-shopping-bag me-2 val_emerald" t-elif="sbu.sbu_key === 'retail_amman' or sbu.sbu_key === 'retail_alhadaf'"/>
+                                                    <i class="fa fa-building me-2 val_purple" t-else=""/>
+                                                    <span class="dept_row_title"><t t-esc="sbu.sbu_name_ar"/></span>
+                                                    <div class="dept_row_path"><t t-esc="sbu.sbu_name_en"/></div>
+                                                </td>
+                                                <td class="seg_col_org text-center fw-bold val_dark"><t t-esc="sbu.beginning_hc"/></td>
+                                                <td class="seg_col_org text-center">
+                                                    <span class="seg_pill_badge seg_pill_emerald">+<t t-esc="sbu.new_hires"/></span>
+                                                </td>
+                                                <td class="seg_col_org text-center">
+                                                    <span class="seg_pill_badge seg_pill_crimson">−<t t-esc="sbu.separations"/></span>
+                                                </td>
+                                                <td class="seg_col_org text-center">
+                                                    <span class="badge-headcount"><t t-esc="sbu.ending_hc"/> Staff</span>
+                                                    <div class="cell_sub_meta">
+                                                        Net:
+                                                        <strong t-att-class="sbu.net_movement &lt; 0 ? 'val_crimson' : (sbu.net_movement &gt; 0 ? 'val_emerald' : 'val_dark')">
+                                                            <t t-esc="sbu.net_movement &gt; 0 ? '+' + sbu.net_movement : sbu.net_movement"/>
+                                                        </strong>
+                                                    </div>
+                                                </td>
+                                                <td class="seg_col_earn text-end fw-bold val_dark"><t t-esc="formatCurrency(sbu.basic_salary)"/></td>
+                                                <td class="seg_col_earn text-end fw-bold val_emerald"><t t-esc="formatCurrency(sbu.allowances)"/></td>
+                                                <td class="seg_col_earn text-end fw-bold val_orange"><t t-esc="formatCurrency(sbu.overtime_amount)"/></td>
+                                                <td class="seg_col_ded text-end val_cyan fw-bold"><t t-esc="formatCurrency(sbu.health_ins_comp)"/></td>
+                                                <td class="seg_col_ded text-end val_amber fw-bold"><t t-esc="formatCurrency(sbu.social_security_comp)"/></td>
+                                                <td class="seg_col_ded text-end val_crimson fw-bold"><t t-esc="formatCurrency(sbu.eos_amount)"/></td>
+                                                <td class="seg_col_net seg_col_net_highlight text-end fw-bold val_purple fs-6"><t t-esc="formatCurrency(sbu.total_workforce_cost)"/></td>
+                                                <td class="seg_col_net text-end fw-bold val_blue"><t t-esc="formatCurrency(sbu.underlying_avg_cost_per_emp)"/></td>
+                                                <td class="seg_col_net text-center">
+                                                    <span class="seg_pill_badge seg_pill_orange"><t t-esc="sbu.overtime_cost_pct"/>%</span>
+                                                </td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                    <tfoot t-if="data.labor_cost_totals">
+                                        <tr class="seg_table_footer_row">
+                                            <td><i class="fa fa-calculator me-2"/> الإجمالي الكلي (GRAND TOTAL)</td>
+                                            <td class="text-center"><t t-esc="data.labor_cost_totals.beginning_hc"/></td>
+                                            <td class="text-center footer_emerald">+<t t-esc="data.labor_cost_totals.new_hires"/></td>
+                                            <td class="text-center footer_rose">−<t t-esc="data.labor_cost_totals.separations"/></td>
+                                            <td class="text-center">
+                                                <span class="footer_pill"><t t-esc="data.labor_cost_totals.ending_hc"/> Staff</span>
+                                                <span class="footer_sub d-block">Net: <t t-esc="data.labor_cost_totals.net_movement"/></span>
+                                            </td>
+                                            <td class="text-end"><t t-esc="formatCurrency(data.labor_cost_totals.basic_salary)"/></td>
+                                            <td class="text-end footer_emerald"><t t-esc="formatCurrency(data.labor_cost_totals.allowances)"/></td>
+                                            <td class="text-end footer_amber"><t t-esc="formatCurrency(data.labor_cost_totals.overtime_amount)"/></td>
+                                            <td class="text-end footer_cyan"><t t-esc="formatCurrency(data.labor_cost_totals.health_ins_comp)"/></td>
+                                            <td class="text-end footer_amber"><t t-esc="formatCurrency(data.labor_cost_totals.social_security_comp)"/></td>
+                                            <td class="text-end footer_rose"><t t-esc="formatCurrency(data.labor_cost_totals.eos_amount)"/></td>
+                                            <td class="text-end footer_cyan fs-6"><t t-esc="formatCurrency(data.labor_cost_totals.total_workforce_cost)"/> JOD</td>
+                                            <td class="text-end footer_emerald"><t t-esc="formatCurrency(data.labor_cost_totals.underlying_avg_cost_per_emp)"/> JOD</td>
+                                            <td class="text-center footer_amber"><t t-esc="data.labor_cost_totals.overtime_cost_pct"/>%</td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+                    </t>
+
                     <!-- SEGMENT 7: Departmental Breakdown Data Table (Color-Segmented Super-Headers & Hierarchy Rows) -->
                     <div class="o_department_table_card">
                         <div class="table_header_controls">
@@ -838,55 +1011,239 @@
                     </div>
                 </t>
 
-                <!-- TAB 3: WORKFORCE INTELLIGENCE -->
+                <!-- TAB 3: WORKFORCE INTELLIGENCE (FULL BOARD MOVEMENT, 3-MONTH TREND & TURNOVER SUITE) -->
                 <t t-if="state.activeDashboardTab === 'workforce'">
-                    <div class="tab_header_banner seg_surface_dark">
+                    <div class="tab_header_banner seg_surface_dark d-flex justify-content-between align-items-center flex-wrap gap-2">
                         <div>
-                            <h4 class="m-0 fw-bold"><i class="fa fa-users me-2"/> Workforce Intelligence &amp; Attendance Heatmap</h4>
-                            <span class="small subtitle">Demographics, 30-Day Attendance Heatmap Calendar &amp; OT Risk Flags</span>
+                            <h4 class="m-0 fw-bold"><i class="fa fa-users me-2"/> Workforce Intelligence, 3-Month Trend &amp; Turnover Risk Matrix</h4>
+                            <span class="small subtitle">Consultant-grade review of headcount movement, voluntary vs. critical exits, and 3-month rolling trends across all Business Units</span>
                         </div>
+                        <button class="btn btn-sm btn-excel-action text-nowrap" t-att-disabled="state.exportingExcel" t-on-click="() => this.exportExcel('labor_cost')">
+                            <i class="fa fa-file-excel-o me-1"/> Export Employee Cost &amp; Headcount Report
+                        </button>
                     </div>
 
-                    <div class="row g-3 mb-3">
-                        <div class="col-md-6">
-                            <div class="highlight_card seg_highlight_emerald">
-                                <div class="card_header">
-                                    <span class="header_seg_icon seg_icon_emerald"><i class="fa fa-calendar"/></span>
-                                    <h5>30-Day Attendance RAG Heatmap Calendar</h5>
-                                </div>
-                                <div class="seg_inner_stat_card seg_border_emerald text-center p-4">
-                                    <div class="d-flex justify-content-center gap-2 flex-wrap mb-3">
-                                        <span class="seg_dark_badge seg_bg_emerald">🟢 &gt;95% Attendance</span>
-                                        <span class="seg_dark_badge seg_bg_amber">🟡 85-95% Attendance</span>
-                                        <span class="seg_dark_badge seg_bg_crimson">🔴 &lt;85% Attendance</span>
-                                    </div>
-                                    <p class="m-0 seg_label_dark fw-bold">Corporate Average Attendance: <strong class="val_emerald fs-5">94.2%</strong></p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="highlight_card seg_highlight_blue">
-                                <div class="card_header">
-                                    <span class="header_seg_icon seg_icon_amber"><i class="fa fa-exclamation-triangle"/></span>
-                                    <h5>Leave Liabilities &amp; OT Risk Panel</h5>
-                                </div>
-                                <div class="d-flex flex-column gap-2">
-                                    <div class="seg_channel_row d-flex justify-content-between align-items-center">
-                                        <span class="channel_name">Employees with &gt;15 Unused Leave Days:</span>
-                                        <span class="seg_dark_badge seg_bg_amber">28 Staff</span>
-                                    </div>
-                                    <div class="seg_channel_row d-flex justify-content-between align-items-center">
-                                        <span class="channel_name">OT High Consumers (&gt;20% Basic Salary):</span>
-                                        <span class="seg_dark_badge seg_bg_crimson">12 Staff</span>
-                                    </div>
-                                    <div class="seg_channel_row d-flex justify-content-between align-items-center">
-                                        <span class="channel_name">1-Year New Hire Retention Rate:</span>
-                                        <span class="seg_dark_badge seg_bg_emerald">88.5%</span>
+                    <!-- 3A: 4 Workforce Movement & Turnover KPI Cards -->
+                    <t t-if="data.workforce_movement">
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-3">
+                                <div class="seg_inner_stat_card seg_border_blue clickable_kpi" t-on-click="() => this.onKpiClick('headcount')">
+                                    <span class="inner_stat_label">Headcount Movement (حركة الكادر)</span>
+                                    <strong class="inner_stat_val val_blue">
+                                        <t t-esc="data.workforce_movement.beginning_hc"/> → <t t-esc="data.workforce_movement.ending_hc"/> Staff
+                                    </strong>
+                                    <div class="inner_stat_sub">
+                                        Net Movement:
+                                        <strong t-att-class="data.workforce_movement.net_movement &lt; 0 ? 'val_crimson' : 'val_emerald'">
+                                            <t t-esc="data.workforce_movement.net_movement &gt; 0 ? '+' + data.workforce_movement.net_movement : data.workforce_movement.net_movement"/> Employees
+                                        </strong>
                                     </div>
                                 </div>
                             </div>
+                            <div class="col-md-3">
+                                <div class="seg_inner_stat_card seg_border_emerald clickable_kpi" t-on-click="() => this.onKpiClick('new_hires')" title="Click to view New Hires">
+                                    <span class="inner_stat_label">New Hires in Period (تعيينات جديدة)</span>
+                                    <strong class="inner_stat_val val_emerald">+<t t-esc="data.workforce_movement.new_hires"/> Joined</strong>
+                                    <div class="inner_stat_sub d-flex justify-content-between align-items-center">
+                                        <span>Onboarding &amp; Recruitment</span>
+                                        <span class="seg_pill_badge seg_pill_emerald"><i class="fa fa-search-plus me-1"/>Drill</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="seg_inner_stat_card seg_border_crimson clickable_kpi" t-on-click="() => this.onKpiClick('separations')" title="Click to view Separations / Exits">
+                                    <span class="inner_stat_label">Separations / Exits (إنهاء خدمات / مغادرين)</span>
+                                    <strong class="inner_stat_val val_crimson">−<t t-esc="data.workforce_movement.separations"/> Exited</strong>
+                                    <div class="inner_stat_sub d-flex justify-content-between align-items-center">
+                                        <span>Overall Turnover: <strong><t t-esc="data.workforce_movement.turnover_rate"/>%</strong></span>
+                                        <span class="seg_pill_badge seg_pill_crimson"><i class="fa fa-search-plus me-1"/>Drill</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="seg_inner_stat_card seg_border_amber">
+                                    <span class="inner_stat_label">Voluntary &amp; Critical Exits (الاستقالات والكفاءات)</span>
+                                    <strong class="inner_stat_val val_amber"><t t-esc="data.workforce_movement.voluntary_share_pct"/>% Voluntary</strong>
+                                    <div class="inner_stat_sub">
+                                        Critical Role Departures: <strong class="val_crimson"><t t-esc="data.workforce_movement.critical_departures"/> Staff</strong>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                    </div>
+                    </t>
+
+                    <!-- 3B: 3-Month Rolling Board Trend & MoM Comparison Table (Slides 1, 5, 7, 10) -->
+                    <t t-if="data.three_month_trend &amp;&amp; data.three_month_trend.rows &amp;&amp; data.three_month_trend.rows.length &gt; 0">
+                        <div class="o_department_table_card mb-4">
+                            <div class="table_header_controls">
+                                <div>
+                                    <h4>
+                                        <span class="header_seg_icon seg_icon_blue me-2"><i class="fa fa-line-chart"/></span>
+                                        <span>3-Month Rolling Board Trend &amp; MoM Comparison (<t t-esc="data.three_month_trend.m2_label"/> — <t t-esc="data.three_month_trend.m0_label"/>)</span>
+                                    </h4>
+                                    <span class="seg_subtitle_text">Consolidated 3-month view of headcount movement, cost structure (Headline vs. Underlying Excl. EOS), overtime, and turnover</span>
+                                </div>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="o_dashboard_table table">
+                                    <thead>
+                                        <tr class="seg_sub_header_row">
+                                            <th class="seg_sub_th seg_sub_org">Board Executive KPI (المؤشر التنفيذي)</th>
+                                            <th class="seg_sub_th seg_sub_earn text-center"><t t-esc="data.three_month_trend.m2_label"/></th>
+                                            <th class="seg_sub_th seg_sub_earn text-center"><t t-esc="data.three_month_trend.m1_label"/></th>
+                                            <th class="seg_sub_th seg_sub_net text-center"><t t-esc="data.three_month_trend.m0_label"/> (Current)</th>
+                                            <th class="seg_sub_th seg_sub_ded text-center">MoM Change &amp; RAG Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <t t-foreach="data.three_month_trend.rows" t-as="tr_row" t-key="tr_row.kpi">
+                                            <tr class="seg_row_leaf">
+                                                <td class="seg_col_org fw-bold val_dark"><t t-esc="tr_row.kpi"/></td>
+                                                <td class="seg_col_earn text-center fw-bold val_slate"><t t-esc="tr_row.m2"/></td>
+                                                <td class="seg_col_earn text-center fw-bold val_dark"><t t-esc="tr_row.m1"/></td>
+                                                <td class="seg_col_net seg_col_net_highlight text-center fw-bold val_blue fs-6"><t t-esc="tr_row.m0"/></td>
+                                                <td class="seg_col_ded text-center">
+                                                    <span class="seg_dark_badge"
+                                                          t-att-class="{
+                                                              'seg_bg_emerald': tr_row.rag === 'green',
+                                                              'seg_bg_crimson': tr_row.rag === 'red',
+                                                              'seg_bg_amber': tr_row.rag === 'amber'
+                                                          }">
+                                                        <t t-if="tr_row.rag === 'green'">🟢 </t>
+                                                        <t t-elif="tr_row.rag === 'red'">🔴 </t>
+                                                        <t t-else="">🟡 </t>
+                                                        <t t-esc="tr_row.mom"/>
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </t>
+
+                    <!-- 3C: Business Unit Headcount Movement & Turnover Risk Matrix (Slides 2, 3, 9) -->
+                    <t t-if="data.labor_cost_report &amp;&amp; data.labor_cost_report.length &gt; 0">
+                        <div class="o_department_table_card mb-4">
+                            <div class="table_header_controls">
+                                <div>
+                                    <h4>
+                                        <span class="header_seg_icon seg_icon_amber me-2"><i class="fa fa-sitemap"/></span>
+                                        <span>Where Is Headcount Moving? Business Unit Movement &amp; Turnover Risk Profile</span>
+                                    </h4>
+                                    <span class="seg_subtitle_text">Tracks Beginning HC, New Hires, Separations, Ending HC, Voluntary Resignation %, Critical Role Exits &amp; Risk Assessment per SBU</span>
+                                </div>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="o_dashboard_table table">
+                                    <thead>
+                                        <tr class="seg_sub_header_row">
+                                            <th class="seg_sub_th seg_sub_org">Business Unit (وحدة الأعمال)</th>
+                                            <th class="seg_sub_th seg_sub_org text-center">Beginning HC</th>
+                                            <th class="seg_sub_th seg_sub_earn text-center">New Hires (+)</th>
+                                            <th class="seg_sub_th seg_sub_ded text-center">Separations (−)</th>
+                                            <th class="seg_sub_th seg_sub_org text-center">Ending HC</th>
+                                            <th class="seg_sub_th seg_sub_net text-center">Net Movement</th>
+                                            <th class="seg_sub_th seg_sub_ded text-center">Turnover %</th>
+                                            <th class="seg_sub_th seg_sub_ded text-center">Voluntary %</th>
+                                            <th class="seg_sub_th seg_sub_ded text-center">Critical Exits</th>
+                                            <th class="seg_sub_th seg_sub_net text-center">Risk Assessment</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <t t-foreach="data.labor_cost_report" t-as="sbu" t-key="sbu.sbu_key">
+                                            <tr class="seg_row_leaf">
+                                                <td class="seg_col_org fw-bold val_dark">
+                                                    <span class="dept_row_title"><t t-esc="sbu.sbu_name_ar"/></span>
+                                                    <div class="dept_row_path"><t t-esc="sbu.sbu_name_en"/></div>
+                                                </td>
+                                                <td class="seg_col_org text-center fw-bold val_dark"><t t-esc="sbu.beginning_hc"/></td>
+                                                <td class="seg_col_earn text-center"><span class="seg_pill_badge seg_pill_emerald">+<t t-esc="sbu.new_hires"/></span></td>
+                                                <td class="seg_col_ded text-center"><span class="seg_pill_badge seg_pill_crimson">−<t t-esc="sbu.separations"/></span></td>
+                                                <td class="seg_col_org text-center"><span class="badge-headcount"><t t-esc="sbu.ending_hc"/> Staff</span></td>
+                                                <td class="seg_col_net text-center fw-bold">
+                                                    <span t-att-class="sbu.net_movement &lt; 0 ? 'val_crimson' : (sbu.net_movement &gt; 0 ? 'val_emerald' : 'val_dark')">
+                                                        <t t-esc="sbu.net_movement &gt; 0 ? '+' + sbu.net_movement : sbu.net_movement"/>
+                                                    </span>
+                                                </td>
+                                                <td class="seg_col_ded text-center fw-bold val_crimson"><t t-esc="sbu.turnover_rate"/>%</td>
+                                                <td class="seg_col_ded text-center fw-bold val_amber"><t t-esc="sbu.voluntary_share_pct"/>%</td>
+                                                <td class="seg_col_ded text-center fw-bold val_purple"><t t-esc="sbu.critical_departures"/></td>
+                                                <td class="seg_col_net text-center">
+                                                    <span class="seg_dark_badge"
+                                                          t-att-class="{
+                                                              'seg_bg_crimson': sbu.rag_status === 'critical',
+                                                              'seg_bg_amber': sbu.rag_status === 'monitor',
+                                                              'seg_bg_emerald': sbu.rag_status === 'optimal'
+                                                          }">
+                                                        <t t-if="sbu.rag_status === 'critical'">🔴 </t>
+                                                        <t t-elif="sbu.rag_status === 'monitor'">🟠 </t>
+                                                        <t t-else="">🟢 </t>
+                                                        <t t-esc="sbu.rag_label"/>
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </t>
+
+                    <!-- 3D: Executive Conclusion, Positives, Attention Points & Priorities (Slides 6 & 8) -->
+                    <t t-if="data.executive_insights">
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-4">
+                                <div class="highlight_card seg_highlight_emerald h-100">
+                                    <div class="card_header">
+                                        <span class="header_seg_icon seg_icon_emerald"><i class="fa fa-check-circle"/></span>
+                                        <h5>🟢 Key Positives &amp; Achievements</h5>
+                                    </div>
+                                    <div class="d-flex flex-column gap-2">
+                                        <t t-foreach="data.executive_insights.positives || []" t-as="pos_item" t-key="pos_item_index">
+                                            <div class="seg_channel_row">
+                                                <i class="fa fa-check val_emerald me-2"/>
+                                                <span class="seg_label_dark fw-bold small"><t t-esc="pos_item"/></span>
+                                            </div>
+                                        </t>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="highlight_card seg_highlight_blue h-100" style="border-top-color: #b91c1c !important;">
+                                    <div class="card_header">
+                                        <span class="header_seg_icon seg_icon_amber"><i class="fa fa-exclamation-triangle"/></span>
+                                        <h5>🔴 Requires Executive Attention</h5>
+                                    </div>
+                                    <div class="d-flex flex-column gap-2">
+                                        <t t-foreach="data.executive_insights.attention_points || []" t-as="att_item" t-key="att_item_index">
+                                            <div class="seg_channel_row" style="border-left-color: #b91c1c !important;">
+                                                <i class="fa fa-warning val_crimson me-2"/>
+                                                <span class="seg_label_dark fw-bold small"><t t-esc="att_item"/></span>
+                                            </div>
+                                        </t>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="highlight_card seg_highlight_blue h-100">
+                                    <div class="card_header">
+                                        <span class="header_seg_icon seg_icon_blue"><i class="fa fa-bullseye"/></span>
+                                        <h5>🎯 Recommended Board Priorities</h5>
+                                    </div>
+                                    <div class="d-flex flex-column gap-2">
+                                        <t t-foreach="data.executive_insights.priorities || []" t-as="prio_item" t-key="prio_item_index">
+                                            <div class="seg_channel_row" style="border-left-color: #1d4ed8 !important;">
+                                                <i class="fa fa-arrow-circle-right val_blue me-2"/>
+                                                <span class="seg_label_dark fw-bold small"><t t-esc="prio_item"/></span>
+                                            </div>
+                                        </t>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
                 </t>
 
                 <!-- TAB 4: OPERATIONS & 23 RETAIL BRANCHES -->

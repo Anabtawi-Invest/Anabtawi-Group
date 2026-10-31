@@ -27,7 +27,8 @@ class HrPayrollReportWizard(models.TransientModel):
     company_id = fields.Many2one("res.company", string="Company", default=lambda self: self.env.company, required=False)
     department_ids = fields.Many2many("hr.department", string="Departments")
     report_type = fields.Selection([
-        ("all", "Complete HR & Payroll Package (All 4 Sheets)"),
+        ("all", "Complete HR & Payroll Package (All Sheets)"),
+        ("labor_cost", "0. Employee Cost & Headcount Report (تقرير تكاليف القوى العاملة - 6 Sheets)"),
         ("payroll", "1. Monthly Payroll List"),
         ("overtime", "2. Monthly Overtime Analysis"),
         ("bank", "3. Bank Transfer File"),
@@ -123,6 +124,260 @@ class HrPayrollReportWizard(models.TransientModel):
         align_right = Alignment(horizontal="right", vertical="center")
 
         period_title = self.payrun_id.name if self.payrun_id else f"{self.date_from.strftime('%m/%Y')}"
+
+        # -------------------------------------------------------------
+        # SHEET 0: Labor Cost Report + 5 SBU Employee Cost Sheets (Matching Employee Cost.xlsx)
+        # -------------------------------------------------------------
+        if self.report_type in ["all", "labor_cost"]:
+            dash_model = self.env["hr.payroll.dashboard"].sudo()
+            dash_data = dash_model.get_dashboard_data(
+                date_from=str(self.date_from),
+                date_to=str(self.date_to),
+                payrun_id=self.payrun_id.id if self.payrun_id else 0,
+                company_id=self.company_id.id if self.company_id else 0,
+                department_ids=self.department_ids.ids if self.department_ids else [],
+            )
+            lc_rows = dash_data.get("labor_cost_report", [])
+
+            ws_lc = wb.create_sheet(title="Labor Cost Report")
+            ws_lc.views.sheetView[0].showGridLines = True
+            ws_lc.sheet_view.rightToLeft = True
+
+            ws_lc.cell(row=1, column=1, value=f"تقرير تكاليف القوى العاملة  {period_title}").font = font_header_title
+
+            lc_headers = [
+                "الشركة",
+                "عدد الموظفين بداية الشهر",
+                "تعيينات جديدة",
+                "إنهاء خدمات",
+                "عدد الموظفين نهاية الشهر",
+                "الرواتب الأساسية",
+                "العلاوات والبدلات",
+                "العمل الإضافي",
+                "مساهمة الشركة تأمين صحي",
+                "مساهمة الشركة ضمان اجتماعي",
+                "مستحقات نهاية خدمة",
+                "تسويات / مكافآت أخرى",
+                "إجمالي تكلفة القوى العاملة",
+                "متوسط تكلفة الموظف (بدون مستحقات نهاية الخدمة)",
+                "نسبة العمل الإضافي",
+            ]
+            for c_i, h_text in enumerate(lc_headers, start=1):
+                h_cell = ws_lc.cell(row=3, column=c_i, value=h_text)
+                h_cell.font = font_col_header
+                h_cell.fill = fill_primary_header
+                h_cell.alignment = align_center
+                h_cell.border = border_all
+
+            r_idx = 4
+            for sbu_r in lc_rows:
+                row_vals = [
+                    sbu_r.get("sbu_name_ar") or sbu_r.get("sbu_display_name"),
+                    sbu_r.get("beginning_hc", 0),
+                    sbu_r.get("new_hires", 0),
+                    sbu_r.get("separations", 0),
+                    f"=B{r_idx}+C{r_idx}-D{r_idx}",
+                    round(sbu_r.get("basic_salary", 0.0), 3),
+                    round(sbu_r.get("allowances", 0.0), 3),
+                    round(sbu_r.get("overtime_amount", 0.0), 3),
+                    round(sbu_r.get("health_ins_comp", 0.0), 3),
+                    round(sbu_r.get("social_security_comp", 0.0), 3),
+                    round(sbu_r.get("eos_amount", 0.0), 3),
+                    round(sbu_r.get("other_adjustments", 0.0), 3),
+                    f"=SUM(F{r_idx}:L{r_idx})",
+                    f"=IF(E{r_idx}=0,0,(M{r_idx}-K{r_idx})/E{r_idx})",
+                    f"=IF(M{r_idx}=0,0,H{r_idx}/M{r_idx})",
+                ]
+                for c_i, val in enumerate(row_vals, start=1):
+                    c = ws_lc.cell(row=r_idx, column=c_i, value=val)
+                    c.font = font_data
+                    c.border = border_all
+                    if c_i == 1:
+                        c.alignment = align_left
+                    elif c_i in (2, 3, 4, 5):
+                        c.alignment = align_center
+                        c.number_format = "#,##0"
+                    elif c_i == 15:
+                        c.alignment = align_right
+                        c.number_format = "0.00%"
+                    else:
+                        c.alignment = align_right
+                        c.number_format = "#,##0.000"
+                r_idx += 1
+
+            # Grand Total Row (Row 9)
+            tot_row = r_idx
+            ws_lc.cell(row=tot_row, column=1, value="الإجمالي").font = font_total
+            ws_lc.cell(row=tot_row, column=1).fill = fill_grand_total
+            ws_lc.cell(row=tot_row, column=1).border = double_bottom
+            for c_i in range(2, 16):
+                c_let = get_column_letter(c_i)
+                if c_i <= 13:
+                    f_val = f"=SUM({c_let}4:{c_let}{tot_row-1})"
+                elif c_i == 14:
+                    f_val = f"=IF(E{tot_row}=0,0,(M{tot_row}-K{tot_row})/E{tot_row})"
+                else:
+                    f_val = f"=IF(M{tot_row}=0,0,H{tot_row}/M{tot_row})"
+                t_c = ws_lc.cell(row=tot_row, column=c_i, value=f_val)
+                t_c.font = font_total
+                t_c.fill = fill_grand_total
+                t_c.border = double_bottom
+                t_c.alignment = align_center if c_i in (2, 3, 4, 5) else align_right
+                t_c.number_format = "#,##0" if c_i in (2, 3, 4, 5) else ("0.00%" if c_i == 15 else "#,##0.000")
+
+            for col in ws_lc.columns:
+                max_len = max(len(str(cell.value or "")) for cell in col)
+                c_let = get_column_letter(col[0].column)
+                ws_lc.column_dimensions[c_let].width = max(max_len + 4, 15)
+
+            # Build the 5 SBU Employee Details Sheets (Matching Employee Cost.xlsx)
+            sbu_sheets_cfg = [
+                ("admin", "Employee Details-HO"),
+                ("delta_factory", "Employee Details-Delta"),
+                ("united", "Employee Details - United"),
+                ("retail_amman", "Retail Amman"),
+                ("retail_alhadaf", "Retail Aqaba"),
+            ]
+            slips_by_sbu = {k: [] for k, _ in sbu_sheets_cfg}
+            for slip in payslips:
+                emp = slip.employee_id
+                dep = (emp and emp.department_id) or slip.department_id
+                comp = (emp and emp.company_id) or slip.company_id
+                sk = dash_model._classify_sbu_key(emp=emp, dep=dep, comp=comp)
+                if sk in slips_by_sbu:
+                    slips_by_sbu[sk].append(slip)
+
+            for sk, sh_title in sbu_sheets_cfg:
+                s_list = slips_by_sbu.get(sk, [])
+                if not s_list and self.report_type != "labor_cost":
+                    continue
+                ws_sbu = wb.create_sheet(title=sh_title)
+                ws_sbu.views.sheetView[0].showGridLines = True
+                ws_sbu.sheet_view.rightToLeft = True
+
+                sbu_headers = [
+                    "الرقم الوظيفي",
+                    "اسم الموظف",
+                    "الإدارة",
+                    "القسم",
+                    "الوحدة / الفرع",
+                    "الراتب الأساسي",
+                    "العلاوات",
+                    "العمل الاضافي",
+                    "التأمين الصحي",
+                    "الضمان الاجتماعي",
+                    "إجمالي تكلفة الموظف",
+                ]
+                for c_i, h_t in enumerate(sbu_headers, start=1):
+                    hc = ws_sbu.cell(row=1, column=c_i, value=h_t)
+                    hc.font = font_col_header
+                    hc.fill = fill_primary_header
+                    hc.alignment = align_center
+                    hc.border = border_all
+
+                sr = 2
+                for slip in s_list:
+                    emp = slip.employee_id
+                    dep = (emp and emp.department_id) or slip.department_id
+                    full_path = (dep.complete_name or dep.name) if dep else ""
+                    parts = [p.strip() for p in full_path.split("/") if p.strip()]
+                    d_lvl1 = parts[0] if len(parts) >= 1 else ""
+                    d_lvl2 = parts[1] if len(parts) >= 2 else d_lvl1
+                    d_lvl3 = " / ".join(parts[2:]) if len(parts) >= 3 else (parts[-1] if parts else "")
+
+                    c_wage = (emp and getattr(emp, "wage", 0.0)) or getattr(slip, "basic_wage", 0.0) or 0.0
+                    b_sal = 0.0
+                    alw_sal = 0.0
+                    ot_sal = 0.0
+                    med_comp = 0.0
+                    has_med = False
+                    ssc_emp = 0.0
+                    ssc_comp = 0.0
+
+                    for l in getattr(slip, "line_ids", []):
+                        cc = (l.code or "").upper().strip()
+                        cat_c = (l.category_id.code or "").upper().strip() if l.category_id else ""
+                        nm = (l.name or "").lower().strip()
+                        amt = l.total or 0.0
+
+                        if cc in ("NET", "GROSS", "GRS", "TOTAL_GROSS") or cat_c in ("NET", "GROSS"):
+                            continue
+                        if cc in ("FULL_WAGE", "ACTUAL_SALARY", "ACTUAL") or "actual salary" in nm or "الراتب الفعلي" in nm:
+                            continue
+                        if cc in ("BASIC", "SALARY", "BASE", "WAGE") or cat_c == "BASIC":
+                            b_sal += amt
+                            continue
+                        if (
+                            cc in ("OT_NET", "ETH_NET", "RD-S", "OVERTIME", "GROSS_ATT", "OT_COMP", "EXTRA_HOURS", "TERM_EXTRA", "OT")
+                            or any(k in cc for k in ["OT", "OVERTIME", "EXTRA"])
+                            or any(k in nm for k in ["اضافي", "إضافي", "عمل إضافي", "عمل اضافي"])
+                        ) and cat_c not in ("DED", "DEDUCTION"):
+                            ot_sal += amt
+                            continue
+                        if cc in ("MED_COMP", "INS_COMP", "HEALTH_COMP") or ("تأمين صحي" in nm and ("شركة" in nm or "صاحب العمل" in nm)):
+                            med_comp += abs(amt)
+                            continue
+                        if cc == "INS" or "تأمين صحي" in nm or "تامين صحي" in nm:
+                            if abs(amt) > 0:
+                                has_med = True
+                        is_ss_e = cc in ("SSE", "SSCE", "SSC_EMP", "SOC_SEC_EMP") or ("ضمان" in nm and "موظف" in nm)
+                        is_ss_c = cc in ("SSC", "SSCC", "SSC_COMP", "SOC_SEC_COMP") or ("ضمان" in nm and ("شركة" in nm or "صاحب العمل" in nm))
+                        if is_ss_e or is_ss_c or any(k in cc for k in ["SS", "SSC", "GOSI"]) or "ضمان" in nm:
+                            if is_ss_c or any(k in cc for k in ["COMP", "COMPANY", "ER", "SSCCO", "SSCP"]):
+                                ssc_comp += abs(amt)
+                            else:
+                                ssc_emp += abs(amt)
+                            continue
+                        if cat_c in ("ALW", "ALLOWANCE", "ALW_RECURRING") or any(k in nm for k in ["علاوة", "مكافأة", "مكافاه", "بدل", "تكليف", "تنقل"]):
+                            alw_sal += amt
+
+                    if not b_sal:
+                        b_sal = c_wage
+                    if not med_comp and has_med:
+                        med_comp = 13.0
+                    if not ssc_comp and ssc_emp > 0:
+                        ssc_comp = round(ssc_emp * (14.25 / 7.5), 3)
+
+                    s_vals = [
+                        self._get_emp_code(emp),
+                        emp.name if emp else "",
+                        d_lvl1,
+                        d_lvl2,
+                        d_lvl3,
+                        round(b_sal, 3),
+                        round(alw_sal, 3),
+                        round(ot_sal, 3),
+                        round(med_comp, 3),
+                        round(ssc_comp, 3),
+                        f"=SUM(F{sr}:J{sr})",
+                    ]
+                    for c_i, v in enumerate(s_vals, start=1):
+                        sc = ws_sbu.cell(row=sr, column=c_i, value=v)
+                        sc.font = font_data
+                        sc.border = border_all
+                        if c_i <= 5:
+                            sc.alignment = align_center if c_i == 1 else align_left
+                        else:
+                            sc.alignment = align_right
+                            sc.number_format = "#,##0.000"
+                    sr += 1
+
+                if sr > 2:
+                    ws_sbu.cell(row=sr, column=1, value="Property Total").font = font_total
+                    ws_sbu.cell(row=sr, column=1).fill = fill_grand_total
+                    for c_i in range(6, 12):
+                        c_let = get_column_letter(c_i)
+                        tc = ws_sbu.cell(row=sr, column=c_i, value=f"=SUM({c_let}2:{c_let}{sr-1})")
+                        tc.font = font_total
+                        tc.fill = fill_grand_total
+                        tc.border = double_bottom
+                        tc.alignment = align_right
+                        tc.number_format = "#,##0.000"
+
+                for col in ws_sbu.columns:
+                    max_len = max(len(str(cell.value or "")) for cell in col)
+                    c_let = get_column_letter(col[0].column)
+                    ws_sbu.column_dimensions[c_let].width = max(max_len + 4, 14)
 
         # -------------------------------------------------------------
         # SHEET 1: Monthly Payroll List

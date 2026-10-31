@@ -61,6 +61,12 @@ export class HrPayrollDashboard extends Component {
             ceo_analytics: {},
             cfo_analytics: {},
             hr_analytics: {},
+            labor_cost_report: [],
+            labor_cost_totals: {},
+            cost_bridge: {},
+            three_month_trend: { m2_label: "M-2", m1_label: "M-1", m0_label: "Current", rows: [] },
+            workforce_movement: {},
+            executive_insights: { positives: [], attention_points: [], priorities: [] },
             kpis: {},
             departments: [],
             department_tree_rows: [],
@@ -712,13 +718,16 @@ export class HrPayrollDashboard extends Component {
         }
     }
 
-    async exportExcel() {
+    async exportExcel(reportType = "all") {
         if (this.state.exportingExcel) return;
         this.state.exportingExcel = true;
+        const targetScope = (typeof reportType === "string" && reportType) ? reportType : "all";
 
         if (this.notification) {
             this.notification.add(
-                "Generating unified HR & Payroll Excel package...",
+                targetScope === "labor_cost"
+                    ? "Generating 6-Sheet Employee Cost & Headcount Excel Report..."
+                    : "Generating unified HR & Payroll Excel package...",
                 { type: "info" }
             );
         }
@@ -727,7 +736,7 @@ export class HrPayrollDashboard extends Component {
             const wizardVals = {
                 date_from: this.state.date_from,
                 date_to: this.state.date_to,
-                report_type: "all",
+                report_type: targetScope,
             };
             if (this.state.payrun_id) {
                 wizardVals.payrun_id = this.state.payrun_id;

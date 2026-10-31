@@ -268,6 +268,9 @@ class HrPayrollDashboard(models.AbstractModel):
         total_scheduled_hours = 0.0
         total_working_days = 0.0
         total_daily_cost = 0.0
+        total_eos_amount = 0.0
+        total_health_ins_comp = 0.0
+        eos_slip_count = 0
 
         bank_count = 0
         bank_amount = 0.0
@@ -403,6 +406,8 @@ class HrPayrollDashboard(models.AbstractModel):
                 "income_tax": 0.0,
                 "working_days": 0.0,
                 "daily_cost": 0.0,
+                "eos_amount": 0.0,
+                "health_ins_comp": 0.0,
             }
 
         # Pre-initialize buckets for all departments in filter scope that have active employees, POS sales, or MRP output
@@ -477,6 +482,16 @@ class HrPayrollDashboard(models.AbstractModel):
             slip_tax = 0.0
             slip_ot_amount = 0.0
             slip_late_amount = 0.0
+            slip_eos_amount = 0.0
+            slip_health_ins_comp = 0.0
+            slip_has_med_ins = False
+
+            struct_name_low = ((slip.struct_id and slip.struct_id.name) or "").lower()
+            is_termination_slip = (
+                "termination" in struct_name_low
+                or "مخالصة" in struct_name_low
+                or bool(getattr(slip, "is_termination", False))
+            )
 
             # Worked Days & payroll_fix_recon Attendance Analysis (Exact Hours)
             slip_days = 0.0
@@ -602,6 +617,26 @@ class HrPayrollDashboard(models.AbstractModel):
                         slip_tax += abs(amt)
                         continue
 
+                    # End of Service / Termination Settlements (EOS / مخالصة)
+                    is_eos_line = (
+                        code in ("EOS", "EOSB", "END_OF_SERVICE", "INDEMNITY", "TERM_PTO", "TERM_ANNUAL", "CLEAR_ANNUAL", "CLEAR_PTO")
+                        or any(k in code for k in ["EOS", "INDEMNITY", "TERM_"])
+                        or any(k in name for k in ["نهاية الخدمة", "نهاية خدمة", "مخالصة", "termination", "end of service"])
+                    )
+                    if is_eos_line and cat_code not in ("DED", "DEDUCTION"):
+                        slip_eos_amount += abs(amt)
+                        slip_allowances += amt
+                        continue
+
+                    # Company Medical Insurance Share
+                    is_med_comp = (
+                        code in ("MED_COMP", "INS_COMP", "HEALTH_COMP")
+                        or ("تأمين صحي" in name and ("شركة" in name or "صاحب العمل" in name))
+                    )
+                    if is_med_comp:
+                        slip_health_ins_comp += abs(amt)
+                        continue
+
                     # Allowances (ALW category or allowance rules, excluding BASIC/ACTUAL/OT/GROSS/NET)
                     is_alw = (
                         cat_code in ("ALW", "ALLOWANCE", "ALW_RECURRING")
@@ -614,6 +649,9 @@ class HrPayrollDashboard(models.AbstractModel):
                         continue
 
                     # Deductions (DED category or deduction rules/attachments, excluding SS and Tax which are tracked above)
+                    if code == "INS" or "تأمين صحي" in name or "تامين صحي" in name or "medical" in name or "health" in name:
+                        if abs(amt) > 0:
+                            slip_has_med_ins = True
                     is_ded = (
                         cat_code in ("DED", "DEDUCTION")
                         or "deduction" in cat_name
@@ -630,6 +668,17 @@ class HrPayrollDashboard(models.AbstractModel):
                 slip_basic = contract_wage
             if not slip_actual:
                 slip_actual = slip_basic
+
+            if not slip_health_ins_comp and slip_has_med_ins:
+                slip_health_ins_comp = 13.0
+
+            if is_termination_slip:
+                eos_slip_count += 1
+                if not slip_eos_amount:
+                    # On a termination slip, any extra settlement beyond normal actual salary is termination/EOS settlement
+                    slip_eos_amount = max(slip_allowances + slip_ot_amount, 0.0)
+            elif slip_eos_amount > 0:
+                eos_slip_count += 1
 
             # Fallbacks for Overtime Amount if rule didn't compute an amount
             hourly_rate = (slip_basic / 240.0) if slip_basic else 0.0
@@ -684,6 +733,8 @@ class HrPayrollDashboard(models.AbstractModel):
             total_scheduled_hours += p_sched_hours
             total_working_days += p_working_days
             total_daily_cost += slip_daily_cost
+            total_eos_amount += slip_eos_amount
+            total_health_ins_comp += slip_health_ins_comp
 
             # Bank vs Cash Payment analysis
             has_bank = False
@@ -716,6 +767,8 @@ class HrPayrollDashboard(models.AbstractModel):
             dep_row["lateness_amount"] += p_late_amount
             dep_row["working_days"] += p_working_days
             dep_row["daily_cost"] += slip_daily_cost
+            dep_row["eos_amount"] += slip_eos_amount
+            dep_row["health_ins_comp"] += slip_health_ins_comp
 
         # Live Attendance & Attendance-Based Live Labor Cost calculation
         today_present_count = 0
@@ -806,6 +859,8 @@ class HrPayrollDashboard(models.AbstractModel):
                 "income_tax": round(row["income_tax"], 3),
                 "working_days": round(row["working_days"], 1),
                 "daily_cost": round(row["daily_cost"], 3),
+                "eos_amount": round(row.get("eos_amount", 0.0), 3),
+                "health_ins_comp": round(row.get("health_ins_comp", 0.0), 3),
                 "pos_sales": round(pos_sales_by_dept.get(d_id, 0.0), 3),
                 "pos_orders": pos_orders_by_dept.get(d_id, 0),
                 "mrp_qty": round(mrp_qty_by_dept.get(d_id, 0.0), 2),
@@ -878,6 +933,8 @@ class HrPayrollDashboard(models.AbstractModel):
                 "income_tax": round(sum(direct_metrics_by_id[cid]["income_tax"] for cid in desc_ids), 3),
                 "working_days": round(sum(direct_metrics_by_id[cid]["working_days"] for cid in desc_ids), 1),
                 "daily_cost": round(sum(direct_metrics_by_id[cid]["daily_cost"] for cid in desc_ids), 3),
+                "eos_amount": round(sum(direct_metrics_by_id[cid].get("eos_amount", 0.0) for cid in desc_ids), 3),
+                "health_ins_comp": round(sum(direct_metrics_by_id[cid].get("health_ins_comp", 0.0) for cid in desc_ids), 3),
                 "pos_sales": round(sum(direct_metrics_by_dept_val for direct_metrics_by_dept_val in (direct_metrics_by_id[cid]["pos_sales"] for cid in desc_ids)), 3),
                 "pos_orders": sum(direct_metrics_by_id[cid]["pos_orders"] for cid in desc_ids),
                 "mrp_qty": round(sum(direct_metrics_by_id[cid]["mrp_qty"] for cid in desc_ids), 2),
@@ -1020,6 +1077,26 @@ class HrPayrollDashboard(models.AbstractModel):
             "avg_salary_per_emp": round(total_net_salary / payslip_emp_total_count, 3) if payslip_emp_total_count else 0.0,
         }
 
+        # Board Workforce Movement, SBU Labor Cost Report, Cost Bridge (Excl. EOS), and 3-Month Rolling Trend
+        wf_analytics = self._compute_workforce_and_labor_cost_analytics(
+            start_date=start_date,
+            end_date=end_date,
+            target_company_id=target_company_id,
+            user_companies=user_companies,
+            all_target_dep_ids_set=all_target_dep_ids_set,
+            current_payslips=payslips,
+            filtered_active_emps=filtered_active_emps,
+            total_basic_salary=total_basic_salary,
+            total_allowances=total_allowances,
+            total_overtime_amount=total_overtime_amount,
+            total_social_security_emp=total_social_security_emp,
+            total_social_security_comp=total_social_security_comp,
+            total_health_ins_comp=total_health_ins_comp,
+            total_eos_amount=total_eos_amount,
+            eos_slip_count=eos_slip_count,
+            effective_kpi_headcount=effective_kpi_headcount,
+        )
+
         data = {
             "date_from": str(start_date),
             "date_to": str(end_date),
@@ -1043,6 +1120,12 @@ class HrPayrollDashboard(models.AbstractModel):
             },
             "cfo_analytics": cfo_metrics,
             "hr_analytics": hr_metrics,
+            "labor_cost_report": wf_analytics["labor_cost_report"],
+            "labor_cost_totals": wf_analytics["labor_cost_totals"],
+            "cost_bridge": wf_analytics["cost_bridge"],
+            "three_month_trend": wf_analytics["three_month_trend"],
+            "workforce_movement": wf_analytics["workforce_movement"],
+            "executive_insights": wf_analytics["executive_insights"],
             "kpis": {
                 "total_net_salary": round(total_net_salary, 3),
                 "total_gross_salary": round(total_gross_salary, 3),
@@ -1058,6 +1141,11 @@ class HrPayrollDashboard(models.AbstractModel):
                 "total_lateness_hours": round(total_lateness_hours, 2),
                 "total_lateness_amount": round(total_lateness_amount, 3),
                 "total_working_days": round(total_working_days, 1),
+                "total_eos_amount": round(wf_analytics["cost_bridge"]["eos_settlement_cost"], 3),
+                "total_health_ins_company": round(wf_analytics["labor_cost_totals"]["health_ins_comp"], 3),
+                "underlying_workforce_cost": round(wf_analytics["cost_bridge"]["underlying_workforce_cost"], 3),
+                "underlying_avg_cost_per_emp": round(wf_analytics["cost_bridge"]["underlying_avg_cost_per_emp"], 3),
+                "eos_slip_count": wf_analytics["cost_bridge"]["eos_slip_count"],
                 "headcount": effective_kpi_headcount,
                 "active_headcount": active_emp_total_count,
                 "payslip_headcount": payslip_emp_total_count,
@@ -1282,6 +1370,57 @@ class HrPayrollDashboard(models.AbstractModel):
                 "target": "current",
             }
 
+        elif metric_type == "eos":
+            eos_slip_ids = payslips.filtered(
+                lambda s: (
+                    "termination" in ((s.struct_id and s.struct_id.name) or "").lower()
+                    or "مخالصة" in ((s.struct_id and s.struct_id.name) or "").lower()
+                    or bool(getattr(s, "is_termination", False))
+                    or any(
+                        (l.code or "").upper() in ("EOS", "EOSB", "END_OF_SERVICE", "INDEMNITY", "TERM_PTO", "TERM_ANNUAL", "CLEAR_ANNUAL", "CLEAR_PTO")
+                        or "نهاية الخدمة" in (l.name or "")
+                        or "مخالصة" in (l.name or "")
+                        for l in getattr(s, "line_ids", [])
+                    )
+                )
+            ).ids
+            return {
+                "name": _("End-of-Service & Termination Payslips (%s)") % len(eos_slip_ids),
+                "type": "ir.actions.act_window",
+                "res_model": "hr.payslip",
+                "view_mode": "list,kanban,form",
+                "views": [[False, "list"], [False, "kanban"], [False, "form"]],
+                "domain": [("id", "in", eos_slip_ids)],
+                "context": {"create": False},
+                "target": "current",
+            }
+
+        elif metric_type in ["new_hires", "separations"]:
+            all_emps_unfiltered = self.env["hr.employee"].with_context(active_test=False).sudo().search(
+                [("company_id", "=", target_company_id)] if target_company_id > 0 else [("company_id", "in", user_companies.ids)]
+            )
+            if all_target_dep_ids:
+                t_set = set(all_target_dep_ids)
+                all_emps_unfiltered = all_emps_unfiltered.filtered(lambda e: e.department_id and e.department_id.id in t_set)
+            matched_ids = []
+            for e in all_emps_unfiltered:
+                info = self._get_emp_hire_and_sep_info(e)
+                if metric_type == "new_hires" and info["hire_date"] and start_date <= info["hire_date"] <= end_date:
+                    matched_ids.append(e.id)
+                elif metric_type == "separations" and info["sep_date"] and start_date <= info["sep_date"] <= end_date:
+                    matched_ids.append(e.id)
+            title = _("New Hires (%s)") % len(matched_ids) if metric_type == "new_hires" else _("Separations / Exits (%s)") % len(matched_ids)
+            return {
+                "name": title,
+                "type": "ir.actions.act_window",
+                "res_model": "hr.employee",
+                "view_mode": "list,kanban,form",
+                "views": [[False, "list"], [False, "kanban"], [False, "form"]],
+                "domain": [("id", "in", matched_ids)],
+                "context": {"active_test": False, "create": False},
+                "target": "current",
+            }
+
         elif metric_type == "bank_transfers":
             bank_slip_ids = payslips.filtered(
                 lambda s: bool(s.employee_id.bank_account_id or getattr(s.employee_id, "bank_account_ids", False))
@@ -1306,6 +1445,876 @@ class HrPayrollDashboard(models.AbstractModel):
             "domain": [("id", "in", slip_ids)],
             "context": {"create": False},
             "target": "current",
+        }
+
+    # =========================================================================
+    # BOARD WORKFORCE MOVEMENT, SBU LABOR COST & 3-MONTH ROLLING TREND ENGINE
+    # =========================================================================
+    @api.model
+    def _classify_sbu_key(self, emp=None, dep=None, comp=None):
+        """
+        Classifies an employee/department/company into one of the 5 Strategic Business Units
+        from `Employee Cost.xlsx` and `HR Dashboard July-2026.pptx`:
+          1. 'united'        -> شركة الوحدة (United)
+          2. 'delta_factory' -> شركة دلتا (المصنع) (Delta Factory)
+          3. 'admin'         -> الادارة (Head Office / Administration)
+          4. 'retail_amman'  -> Retail Amman (فروع عمان والمحافظات)
+          5. 'retail_alhadaf'-> Retail Alhadaf / Aqaba (فروع العقبة - الهدف)
+        """
+        if not dep and emp:
+            dep = emp.department_id
+        if not comp and emp:
+            comp = emp.company_id
+        if not comp and dep:
+            comp = dep.company_id
+
+        comp_name = ((comp and comp.name) or "").lower()
+        dep_path = ((dep and (dep.complete_name or dep.name)) or "").lower()
+
+        # 1. United Company
+        if any(k in comp_name for k in ["united", "الوحدة", "متحدة", "المتحدة"]):
+            return "united"
+
+        # 2. Retail Alhadaf / Aqaba (Company Al Hadaf OR Region 5 / Aqaba branches)
+        if any(k in comp_name for k in ["hadaf", "الهدف", "هدف"]) or any(
+            k in dep_path for k in ["منطقة 5", "العقبة", "ايلا", "aqaba", "hadaf", "الهدف"]
+        ):
+            return "retail_alhadaf"
+
+        # 3. Retail Amman (Branches Admin / الفروع / Retail / Regions 1-4)
+        is_retail_branch = any(
+            k in dep_path
+            for k in [
+                "branches admin",
+                "ادارة الفروع",
+                "إدارة الفروع",
+                "الفروع",
+                "فرع",
+                "منطقة 1",
+                "منطقة 2",
+                "منطقة 3",
+                "منطقة 4",
+                "retail",
+            ]
+        )
+        if is_retail_branch and not any(
+            k in dep_path
+            for k in ["المالية", "الموارد البشرية", "تكنولوجيا المعلومات", "القانونية", "تطوير الاعمال", "الادارة العليا"]
+        ):
+            return "retail_amman"
+
+        # 4. Head Office / Administration (الادارة / المالية / الموارد البشرية / تكنولوجيا المعلومات / الادارة العليا / التسويق / التصدير)
+        is_admin = any(
+            k in dep_path
+            for k in [
+                "الادارة",
+                "الإدارة",
+                "administration",
+                "المالية",
+                "accounting",
+                "الموارد البشرية",
+                "تكنولوجيا المعلومات",
+                "القانونية",
+                "تطوير الاعمال",
+                "الادارة العليا",
+                "التسويق",
+                "marketing",
+                "التصدير",
+                "exports",
+                "e-commerce",
+                "local sales",
+                "مبيعات",
+            ]
+        )
+        if is_admin and "المصنع" not in dep_path and "الانتاج" not in dep_path:
+            return "admin"
+
+        # 5. Delta Factory (المصنع / Factory / الانتاج / الصيانة / سلسلة التزويد)
+        if any(
+            k in dep_path
+            for k in ["المصنع", "الانتاج", "الإنتاج", "الصيانة", "سلسلة التزويد", "الخدمات العامة", "research", "factory"]
+        ):
+            return "delta_factory"
+
+        # Fallback by company name
+        if any(k in comp_name for k in ["najeeb", "نجيب", "delta", "دلتا", "factory"]):
+            return "delta_factory"
+        if any(k in comp_name for k in ["invest", "استثمار"]):
+            return "retail_amman"
+        return "delta_factory"
+
+    @api.model
+    def _get_emp_hire_and_sep_info(self, emp):
+        """Extracts hire_date, sep_date, is_voluntary, and is_critical_role safely across Odoo 19 hr.employee & hr.version."""
+        hire_date = (
+            getattr(emp, "contract_date_start", False)
+            or getattr(emp, "first_contract_date", False)
+            or (getattr(emp, "version_id", False) and getattr(emp.version_id, "contract_date_start", False))
+            or (getattr(emp, "contract_id", False) and getattr(emp.contract_id, "date_start", False))
+        )
+        if not hire_date and getattr(emp, "create_date", False):
+            hire_date = emp.create_date.date() if isinstance(emp.create_date, datetime) else emp.create_date
+
+        sep_date = (
+            getattr(emp, "departure_date", False)
+            or (not emp.active and getattr(emp, "contract_date_end", False))
+            or (
+                getattr(emp, "version_id", False)
+                and not emp.active
+                and getattr(emp.version_id, "contract_date_end", False)
+            )
+            or (
+                getattr(emp, "contract_id", False)
+                and not emp.active
+                and getattr(emp.contract_id, "date_end", False)
+            )
+        )
+        # Also check contract_date_end if employment status/departure reason is set
+        if not sep_date and getattr(emp, "departure_reason_id", False):
+            sep_date = (
+                getattr(emp, "contract_date_end", False)
+                or (getattr(emp, "version_id", False) and getattr(emp.version_id, "contract_date_end", False))
+            )
+
+        dep_reason = ((getattr(emp, "departure_reason_id", False) and emp.departure_reason_id.name) or "").lower()
+        is_voluntary = True
+        if dep_reason and any(k in dep_reason for k in ["fired", "dismiss", "فصل", "انهاء", "إنهاء", "retire", "تقاعد", "end of contract"]):
+            if "resign" not in dep_reason and "استقال" not in dep_reason:
+                is_voluntary = False
+
+        job_name = (
+            ((getattr(emp, "job_id", False) and emp.job_id.name) or getattr(emp, "job_title", "") or "")
+        ).lower()
+        wage = (
+            getattr(emp, "wage", 0.0)
+            or (getattr(emp, "version_id", False) and getattr(emp.version_id, "wage", 0.0))
+            or (getattr(emp, "contract_id", False) and getattr(emp.contract_id, "wage", 0.0))
+            or 0.0
+        )
+        is_critical = bool(
+            wage >= 600.0
+            or any(
+                k in job_name
+                for k in [
+                    "manager",
+                    "director",
+                    "head",
+                    "supervisor",
+                    "chief",
+                    "lead",
+                    "specialist",
+                    "engineer",
+                    "مدير",
+                    "رئيس",
+                    "مشرف",
+                    "مسؤول",
+                    "شيف",
+                    "مهندس",
+                    "محاسب رئيسي",
+                ]
+            )
+        )
+        return {
+            "hire_date": hire_date,
+            "sep_date": sep_date,
+            "is_voluntary": is_voluntary,
+            "is_critical": is_critical,
+            "wage": float(wage or 0.0),
+        }
+
+    @api.model
+    def _summarize_period_slips(self, p_start, p_end, target_company_id, user_companies, all_target_dep_ids_set):
+        """Fast helper to summarize a month's payslip costs (Basic, Allowances, OT, Health Ins, Co. SS, EOS, Total Cost)."""
+        dom = [
+            ("state", "not in", ["cancel"]),
+            ("date_from", "<=", p_end),
+            ("date_to", ">=", p_start),
+        ]
+        if target_company_id > 0:
+            dom.append(("company_id", "=", target_company_id))
+        else:
+            dom.append(("company_id", "in", user_companies.ids))
+
+        if all_target_dep_ids_set:
+            t_list = list(all_target_dep_ids_set)
+            dom.extend(["|", ("employee_id.department_id", "in", t_list), ("department_id", "in", t_list)])
+
+        slips = self.env["hr.payslip"].sudo().search(dom)
+        if all_target_dep_ids_set:
+            slips = slips.filtered(
+                lambda s: (
+                    ((s.employee_id and s.employee_id.department_id) or s.department_id).id in all_target_dep_ids_set
+                )
+                if ((s.employee_id and s.employee_id.department_id) or s.department_id)
+                else False
+            )
+
+        if slips:
+            try:
+                slips.mapped("line_ids")
+            except Exception:
+                pass
+
+        sbu_defs = [
+            ("united", "شركة الوحدة", "United Company"),
+            ("delta_factory", "شركة دلتا (المصنع)", "Delta Factory"),
+            ("admin", "الادارة", "Administration (HO)"),
+            ("retail_amman", "Retail Amman", "Retail Amman"),
+            ("retail_alhadaf", "Retail Alhadaf", "Retail Alhadaf (Aqaba)"),
+        ]
+        sbu_buckets = {
+            k: {
+                "sbu_key": k,
+                "sbu_name_ar": ar,
+                "sbu_name_en": en,
+                "sbu_display_name": f"{ar} ({en})" if ar != en else ar,
+                "basic_salary": 0.0,
+                "allowances": 0.0,
+                "overtime_amount": 0.0,
+                "health_ins_comp": 0.0,
+                "social_security_comp": 0.0,
+                "eos_amount": 0.0,
+                "other_adjustments": 0.0,
+                "total_workforce_cost": 0.0,
+                "underlying_workforce_cost": 0.0,
+                "slip_emp_ids": set(),
+                "term_emp_ids": set(),
+            }
+            for k, ar, en in sbu_defs
+        }
+
+        tot_basic = 0.0
+        tot_alw = 0.0
+        tot_ot = 0.0
+        tot_med = 0.0
+        tot_ssc = 0.0
+        tot_eos = 0.0
+        eos_slips_cnt = 0
+
+        for slip in slips:
+            emp = slip.employee_id
+            dep = (emp and emp.department_id) or slip.department_id
+            comp = (emp and emp.company_id) or slip.company_id
+            sbu_k = self._classify_sbu_key(emp=emp, dep=dep, comp=comp)
+            bkt = sbu_buckets[sbu_k]
+            if emp:
+                bkt["slip_emp_ids"].add(emp.id)
+
+            struct_name_low = ((slip.struct_id and slip.struct_id.name) or "").lower()
+            is_term_slip = (
+                "termination" in struct_name_low
+                or "مخالصة" in struct_name_low
+                or bool(getattr(slip, "is_termination", False))
+            )
+            if is_term_slip and emp:
+                bkt["term_emp_ids"].add(emp.id)
+
+            c_wage = (
+                (emp and getattr(emp, "wage", 0.0))
+                or getattr(slip, "basic_wage", 0.0)
+                or getattr(slip, "wage", 0.0)
+                or 0.0
+            )
+            s_basic = 0.0
+            s_alw = 0.0
+            s_ot = 0.0
+            s_ssc_emp = 0.0
+            s_ssc_comp = 0.0
+            s_med_comp = 0.0
+            s_has_med = False
+            s_eos = 0.0
+
+            for line in getattr(slip, "line_ids", []):
+                code = (line.code or "").upper().strip()
+                cat_code = (line.category_id.code or "").upper().strip() if line.category_id else ""
+                name = (line.name or "").lower().strip()
+                amt = line.total or 0.0
+
+                if code in ("NET", "GROSS", "GRS", "TOTAL_GROSS") or cat_code in ("NET", "GROSS"):
+                    continue
+                is_actual = code in ("FULL_WAGE", "ACTUAL_SALARY", "ACTUAL") or "actual salary" in name or "الراتب الفعلي" in name
+                if is_actual:
+                    continue
+                if code in ("BASIC", "SALARY", "BASE", "WAGE") or cat_code == "BASIC":
+                    s_basic += amt
+                    continue
+
+                is_ot = (
+                    code in ("OT_NET", "ETH_NET", "RD-S", "OVERTIME", "GROSS_ATT", "OT_COMP", "EXTRA_HOURS", "TERM_EXTRA", "OT")
+                    or any(k in code for k in ["OT", "OVERTIME", "EXTRA"])
+                    or any(k in name for k in ["اضافي", "إضافي", "عمل إضافي", "عمل اضافي", "extra hours"])
+                )
+                if is_ot and cat_code not in ("DED", "DEDUCTION"):
+                    s_ot += amt
+                    continue
+
+                is_eos = (
+                    code in ("EOS", "EOSB", "END_OF_SERVICE", "INDEMNITY", "TERM_PTO", "TERM_ANNUAL", "CLEAR_ANNUAL", "CLEAR_PTO")
+                    or any(k in code for k in ["EOS", "INDEMNITY", "TERM_"])
+                    or any(k in name for k in ["نهاية الخدمة", "نهاية خدمة", "مخالصة", "termination", "end of service"])
+                )
+                if is_eos and cat_code not in ("DED", "DEDUCTION"):
+                    s_eos += abs(amt)
+                    continue
+
+                is_med_c = code in ("MED_COMP", "INS_COMP", "HEALTH_COMP") or ("تأمين صحي" in name and ("شركة" in name or "صاحب العمل" in name))
+                if is_med_c:
+                    s_med_comp += abs(amt)
+                    continue
+
+                if code == "INS" or "تأمين صحي" in name or "تامين صحي" in name:
+                    if abs(amt) > 0:
+                        s_has_med = True
+
+                is_ss_emp = code in ("SSE", "SSCE", "SSC_EMP", "SOC_SEC_EMP") or ("ضمان" in name and "موظف" in name)
+                is_ss_comp = code in ("SSC", "SSCC", "SSC_COMP", "SOC_SEC_COMP") or ("ضمان" in name and ("شركة" in name or "صاحب العمل" in name))
+                is_ss_gen = any(k in code for k in ["SS", "SSC", "GOSI"]) or "ضمان" in name
+                if is_ss_emp or is_ss_comp or is_ss_gen:
+                    if is_ss_comp or any(k in code for k in ["COMP", "COMPANY", "ER", "SSCCO", "SSCP"]):
+                        s_ssc_comp += abs(amt)
+                    else:
+                        s_ssc_emp += abs(amt)
+                    continue
+
+                is_alw = (
+                    cat_code in ("ALW", "ALLOWANCE", "ALW_RECURRING")
+                    or code in ("ALW", "BONUS", "COMMISSION", "ALLW", "TAKLEEF", "TAKLEF", "TRANS", "HOUSING")
+                    or any(k in name for k in ["علاوة", "مكافأة", "مكافاه", "بدل", "تكليف", "تنقل"])
+                )
+                if is_alw:
+                    s_alw += amt
+
+            if not s_basic:
+                s_basic = c_wage
+            if not s_med_comp and s_has_med:
+                s_med_comp = 13.0
+            # Employer Social Security Share (14.25% in Jordan = 1.9 * 7.5% employee share if SSC line not explicitly on slip)
+            if not s_ssc_comp and s_ssc_emp > 0:
+                s_ssc_comp = round(s_ssc_emp * (14.25 / 7.5), 3)
+
+            if is_term_slip:
+                eos_slips_cnt += 1
+                if not s_eos:
+                    s_eos = max(s_alw + s_ot, 0.0)
+                    s_alw = 0.0
+                    s_ot = 0.0
+            elif s_eos > 0:
+                eos_slips_cnt += 1
+
+            bkt["basic_salary"] += s_basic
+            bkt["allowances"] += s_alw
+            bkt["overtime_amount"] += s_ot
+            bkt["health_ins_comp"] += s_med_comp
+            bkt["social_security_comp"] += s_ssc_comp
+            bkt["eos_amount"] += s_eos
+
+            tot_basic += s_basic
+            tot_alw += s_alw
+            tot_ot += s_ot
+            tot_med += s_med_comp
+            tot_ssc += s_ssc_comp
+            tot_eos += s_eos
+
+        tot_wf_cost = tot_basic + tot_alw + tot_ot + tot_med + tot_ssc + tot_eos
+        tot_underlying_cost = tot_wf_cost - tot_eos
+
+        for bkt in sbu_buckets.values():
+            bkt["total_workforce_cost"] = round(
+                bkt["basic_salary"]
+                + bkt["allowances"]
+                + bkt["overtime_amount"]
+                + bkt["health_ins_comp"]
+                + bkt["social_security_comp"]
+                + bkt["eos_amount"]
+                + bkt["other_adjustments"],
+                3,
+            )
+            bkt["underlying_workforce_cost"] = round(bkt["total_workforce_cost"] - bkt["eos_amount"], 3)
+
+        return {
+            "sbu_buckets": sbu_buckets,
+            "basic_salary": round(tot_basic, 3),
+            "allowances": round(tot_alw, 3),
+            "overtime_amount": round(tot_ot, 3),
+            "health_ins_comp": round(tot_med, 3),
+            "social_security_comp": round(tot_ssc, 3),
+            "eos_amount": round(tot_eos, 3),
+            "total_workforce_cost": round(tot_wf_cost, 3),
+            "underlying_workforce_cost": round(tot_underlying_cost, 3),
+            "eos_slip_count": eos_slips_cnt,
+            "slip_emp_count": len(set().union(*(b["slip_emp_ids"] for b in sbu_buckets.values()))),
+        }
+
+    @api.model
+    def _compute_workforce_and_labor_cost_analytics(
+        self,
+        start_date,
+        end_date,
+        target_company_id,
+        user_companies,
+        all_target_dep_ids_set,
+        current_payslips,
+        filtered_active_emps,
+        total_basic_salary,
+        total_allowances,
+        total_overtime_amount,
+        total_social_security_emp,
+        total_social_security_comp,
+        total_health_ins_comp,
+        total_eos_amount,
+        eos_slip_count,
+        effective_kpi_headcount,
+    ):
+        """
+        Computes:
+          1. `labor_cost_report` & `labor_cost_totals` (Exact 15-col `Employee Cost.xlsx` model)
+          2. `cost_bridge` (Slide 4: Headline Workforce Cost vs EOS vs Underlying Cost)
+          3. `workforce_movement` (Slides 2, 3, 7, 8, 9: Beginning HC, Hires, Separations, Ending HC, Voluntary %, Critical Exits)
+          4. `three_month_trend` (Slides 1, 5, 7, 10: Month-2, Month-1, Current Month + MoM % + RAG)
+          5. `executive_insights` (Slides 6 & 8: Auto-generated Positives, Attention Points, Priorities)
+        """
+        # Fetch all employees (active + archived) in company/department filter scope for accurate historical movement
+        emp_dom = [("company_id", "=", target_company_id)] if target_company_id > 0 else [("company_id", "in", user_companies.ids)]
+        if all_target_dep_ids_set:
+            emp_dom.append(("department_id", "in", list(all_target_dep_ids_set)))
+        all_emps_with_archived = self.env["hr.employee"].with_context(active_test=False).sudo().search(emp_dom)
+
+        emp_records_meta = []
+        for e in all_emps_with_archived:
+            info = self._get_emp_hire_and_sep_info(e)
+            sbu_k = self._classify_sbu_key(emp=e, dep=e.department_id, comp=e.company_id)
+            emp_records_meta.append({
+                "id": e.id,
+                "active": e.active,
+                "sbu_key": sbu_k,
+                "hire_date": info["hire_date"],
+                "sep_date": info["sep_date"],
+                "is_voluntary": info["is_voluntary"],
+                "is_critical": info["is_critical"],
+            })
+
+        def _compute_hc_movement_for_window(w_start, w_end, term_emp_ids_by_sbu=None):
+            sbu_keys = ["united", "delta_factory", "admin", "retail_amman", "retail_alhadaf"]
+            m_by_sbu = {
+                k: {
+                    "beginning_hc": 0,
+                    "new_hires": 0,
+                    "separations": 0,
+                    "ending_hc": 0,
+                    "net_movement": 0,
+                    "voluntary_separations": 0,
+                    "critical_departures": 0,
+                }
+                for k in sbu_keys
+            }
+            for em in emp_records_meta:
+                sk = em["sbu_key"]
+                h_dt = em["hire_date"]
+                s_dt = em["sep_date"]
+                in_term_slips = bool(term_emp_ids_by_sbu and em["id"] in term_emp_ids_by_sbu.get(sk, set()))
+
+                # Active at start of window: hired before w_start and not separated before w_start
+                hired_before = (not h_dt) or (h_dt < w_start)
+                not_left_before = (not s_dt and em["active"]) or (s_dt and s_dt >= w_start)
+                if hired_before and not_left_before:
+                    m_by_sbu[sk]["beginning_hc"] += 1
+
+                # Hired during window
+                if h_dt and (w_start <= h_dt <= w_end):
+                    m_by_sbu[sk]["new_hires"] += 1
+
+                # Separated during window (either departure_date in window or termination slip in window)
+                left_in_window = (s_dt and (w_start <= s_dt <= w_end)) or (not s_dt and in_term_slips)
+                if left_in_window:
+                    m_by_sbu[sk]["separations"] += 1
+                    if em["is_voluntary"]:
+                        m_by_sbu[sk]["voluntary_separations"] += 1
+                    if em["is_critical"]:
+                        m_by_sbu[sk]["critical_departures"] += 1
+
+            for sk, mv in m_by_sbu.items():
+                mv["ending_hc"] = max(mv["beginning_hc"] + mv["new_hires"] - mv["separations"], 0)
+                mv["net_movement"] = mv["new_hires"] - mv["separations"]
+            return m_by_sbu
+
+        # Determine the 3 rolling monthly windows: M-2, M-1, M0 (Current)
+        m0_start = start_date.replace(day=1)
+        m0_next = (m0_start + timedelta(days=32)).replace(day=1)
+        m0_end = end_date if (end_date - start_date).days >= 20 else (m0_next - timedelta(days=1))
+
+        m1_end = m0_start - timedelta(days=1)
+        m1_start = m1_end.replace(day=1)
+
+        m2_end = m1_start - timedelta(days=1)
+        m2_start = m2_end.replace(day=1)
+
+        # Summarize payslips for M0, M-1, M-2
+        m0_summary = self._summarize_period_slips(start_date, end_date, target_company_id, user_companies, all_target_dep_ids_set)
+        m1_summary = self._summarize_period_slips(m1_start, m1_end, target_company_id, user_companies, all_target_dep_ids_set)
+        m2_summary = self._summarize_period_slips(m2_start, m2_end, target_company_id, user_companies, all_target_dep_ids_set)
+
+        m0_term_by_sbu = {k: b["term_emp_ids"] for k, b in m0_summary["sbu_buckets"].items()}
+        m1_term_by_sbu = {k: b["term_emp_ids"] for k, b in m1_summary["sbu_buckets"].items()}
+        m2_term_by_sbu = {k: b["term_emp_ids"] for k, b in m2_summary["sbu_buckets"].items()}
+
+        m0_hc_sbu = _compute_hc_movement_for_window(start_date, end_date, m0_term_by_sbu)
+        m1_hc_sbu = _compute_hc_movement_for_window(m1_start, m1_end, m1_term_by_sbu)
+        m2_hc_sbu = _compute_hc_movement_for_window(m2_start, m2_end, m2_term_by_sbu)
+
+        # Build the 5 SBU rows for `labor_cost_report` (Matching `Employee Cost.xlsx` Sheet 1)
+        sbu_order = ["united", "delta_factory", "admin", "retail_amman", "retail_alhadaf"]
+        labor_cost_report = []
+
+        tot_beg_hc = 0
+        tot_hires = 0
+        tot_seps = 0
+        tot_end_hc = 0
+        tot_vol_seps = 0
+        tot_crit_seps = 0
+
+        for sk in sbu_order:
+            bkt = m0_summary["sbu_buckets"][sk]
+            mv = m0_hc_sbu[sk]
+            beg_hc = mv["beginning_hc"]
+            hires = mv["new_hires"]
+            seps = mv["separations"]
+            end_hc = mv["ending_hc"]
+            if end_hc == 0 and len(bkt["slip_emp_ids"]) > 0:
+                end_hc = len(bkt["slip_emp_ids"])
+                beg_hc = max(end_hc - hires + seps, 0)
+
+            net_mv = hires - seps
+            wf_cost = bkt["total_workforce_cost"]
+            eos_cost = bkt["eos_amount"]
+            und_cost = bkt["underlying_workforce_cost"]
+            avg_und_cost = round(und_cost / end_hc, 3) if end_hc > 0 else 0.0
+            ot_pct = round((bkt["overtime_amount"] / wf_cost * 100.0), 2) if wf_cost > 0 else 0.0
+            turnover_pct = round((seps / beg_hc * 100.0), 2) if beg_hc > 0 else 0.0
+            vol_share_pct = round((mv["voluntary_separations"] / seps * 100.0), 1) if seps > 0 else 0.0
+
+            if turnover_pct >= 5.0 or mv["critical_departures"] >= 2 or net_mv <= -5:
+                rag_status = "critical"
+                rag_label = "Critical Risk"
+            elif turnover_pct >= 2.5 or seps > 0 or net_mv < 0:
+                rag_status = "monitor"
+                rag_label = "Monitor"
+            else:
+                rag_status = "optimal"
+                rag_label = "Optimal / Stable"
+
+            labor_cost_report.append({
+                "sbu_key": sk,
+                "sbu_name_ar": bkt["sbu_name_ar"],
+                "sbu_name_en": bkt["sbu_name_en"],
+                "sbu_display_name": bkt["sbu_display_name"],
+                "beginning_hc": beg_hc,
+                "new_hires": hires,
+                "separations": seps,
+                "ending_hc": end_hc,
+                "net_movement": net_mv,
+                "basic_salary": round(bkt["basic_salary"], 3),
+                "allowances": round(bkt["allowances"], 3),
+                "overtime_amount": round(bkt["overtime_amount"], 3),
+                "health_ins_comp": round(bkt["health_ins_comp"], 3),
+                "social_security_comp": round(bkt["social_security_comp"], 3),
+                "eos_amount": round(eos_cost, 3),
+                "other_adjustments": round(bkt["other_adjustments"], 3),
+                "total_workforce_cost": round(wf_cost, 3),
+                "underlying_workforce_cost": round(und_cost, 3),
+                "underlying_avg_cost_per_emp": avg_und_cost,
+                "overtime_cost_pct": ot_pct,
+                "turnover_rate": turnover_pct,
+                "voluntary_separations": mv["voluntary_separations"],
+                "voluntary_share_pct": vol_share_pct,
+                "critical_departures": mv["critical_departures"],
+                "rag_status": rag_status,
+                "rag_label": rag_label,
+            })
+
+            tot_beg_hc += beg_hc
+            tot_hires += hires
+            tot_seps += seps
+            tot_end_hc += end_hc
+            tot_vol_seps += mv["voluntary_separations"]
+            tot_crit_seps += mv["critical_departures"]
+
+        if tot_end_hc == 0 and effective_kpi_headcount > 0:
+            tot_end_hc = effective_kpi_headcount
+            tot_beg_hc = max(tot_end_hc - tot_hires + tot_seps, 0)
+
+        tot_wf_cost = m0_summary["total_workforce_cost"]
+        tot_eos_cost = m0_summary["eos_amount"]
+        tot_und_cost = m0_summary["underlying_workforce_cost"]
+        tot_avg_und = round(tot_und_cost / tot_end_hc, 3) if tot_end_hc > 0 else 0.0
+        tot_ot_pct = round((m0_summary["overtime_amount"] / tot_wf_cost * 100.0), 2) if tot_wf_cost > 0 else 0.0
+        tot_turnover_pct = round((tot_seps / tot_beg_hc * 100.0), 2) if tot_beg_hc > 0 else 0.0
+        tot_vol_share_pct = round((tot_vol_seps / tot_seps * 100.0), 1) if tot_seps > 0 else 0.0
+
+        labor_cost_totals = {
+            "sbu_name_ar": "الإجمالي الكلي",
+            "sbu_display_name": "الإجمالي (Grand Total)",
+            "beginning_hc": tot_beg_hc,
+            "new_hires": tot_hires,
+            "separations": tot_seps,
+            "ending_hc": tot_end_hc,
+            "net_movement": tot_hires - tot_seps,
+            "basic_salary": m0_summary["basic_salary"],
+            "allowances": m0_summary["allowances"],
+            "overtime_amount": m0_summary["overtime_amount"],
+            "health_ins_comp": m0_summary["health_ins_comp"],
+            "social_security_comp": m0_summary["social_security_comp"],
+            "eos_amount": tot_eos_cost,
+            "other_adjustments": 0.0,
+            "total_workforce_cost": tot_wf_cost,
+            "underlying_workforce_cost": tot_und_cost,
+            "underlying_avg_cost_per_emp": tot_avg_und,
+            "overtime_cost_pct": tot_ot_pct,
+            "turnover_rate": tot_turnover_pct,
+            "voluntary_separations": tot_vol_seps,
+            "voluntary_share_pct": tot_vol_share_pct,
+            "critical_departures": tot_crit_seps,
+        }
+
+        # Aggregate M-1 and M-2 headcount totals for the 3-Month Trend table
+        def _agg_hc_window(hc_sbu_map, slip_summary):
+            b_hc = sum(v["beginning_hc"] for v in hc_sbu_map.values())
+            n_hr = sum(v["new_hires"] for v in hc_sbu_map.values())
+            s_ep = sum(v["separations"] for v in hc_sbu_map.values())
+            e_hc = sum(v["ending_hc"] for v in hc_sbu_map.values())
+            if e_hc == 0 and slip_summary["slip_emp_count"] > 0:
+                e_hc = slip_summary["slip_emp_count"]
+                b_hc = max(e_hc - n_hr + s_ep, 0)
+            v_sep = sum(v["voluntary_separations"] for v in hc_sbu_map.values())
+            c_dep = sum(v["critical_departures"] for v in hc_sbu_map.values())
+            t_rate = round((s_ep / b_hc * 100.0), 2) if b_hc > 0 else 0.0
+            v_share = round((v_sep / s_ep * 100.0), 1) if s_ep > 0 else 0.0
+            avg_und = round(slip_summary["underlying_workforce_cost"] / e_hc, 2) if e_hc > 0 else 0.0
+            return {
+                "beginning_hc": b_hc,
+                "new_hires": n_hr,
+                "separations": s_ep,
+                "ending_hc": e_hc,
+                "net_movement": n_hr - s_ep,
+                "turnover_rate": t_rate,
+                "voluntary_share_pct": v_share,
+                "critical_departures": c_dep,
+                "avg_underlying_cost": avg_und,
+            }
+
+        m1_agg = _agg_hc_window(m1_hc_sbu, m1_summary)
+        m2_agg = _agg_hc_window(m2_hc_sbu, m2_summary)
+
+        # Headline vs Underlying Cost Bridge (Slide 4)
+        avg_mom_pct = (
+            round(((tot_avg_und - m1_agg["avg_underlying_cost"]) / m1_agg["avg_underlying_cost"]) * 100.0, 1)
+            if m1_agg["avg_underlying_cost"] > 0
+            else 0.0
+        )
+        cost_bridge = {
+            "reported_workforce_cost": tot_wf_cost,
+            "eos_settlement_cost": tot_eos_cost,
+            "underlying_workforce_cost": tot_und_cost,
+            "reported_avg_cost_per_emp": round(tot_wf_cost / tot_end_hc, 3) if tot_end_hc > 0 else 0.0,
+            "underlying_avg_cost_per_emp": tot_avg_und,
+            "prev_underlying_avg_cost_per_emp": m1_agg["avg_underlying_cost"],
+            "avg_cost_mom_pct": avg_mom_pct,
+            "eos_slip_count": m0_summary["eos_slip_count"],
+            "eos_pct_of_reported": round((tot_eos_cost / tot_wf_cost * 100.0), 1) if tot_wf_cost > 0 else 0.0,
+        }
+
+        # 3-Month Rolling Trend Table (Slide 1, 5, 7, 10)
+        def _mom_badge(curr_v, prev_v, lower_is_better=False, is_pct_points=False):
+            diff = curr_v - prev_v
+            if is_pct_points:
+                txt = f"{'+' if diff >= 0 else ''}{round(diff, 2)} pp"
+            elif prev_v:
+                pct = round((diff / abs(prev_v)) * 100.0, 1)
+                txt = f"{'+' if pct >= 0 else ''}{pct}%"
+            else:
+                txt = f"{'+' if diff >= 0 else ''}{round(diff, 1)}"
+
+            if abs(diff) < 0.01:
+                rag = "amber"
+            elif lower_is_better:
+                rag = "green" if diff < 0 else "red"
+            else:
+                rag = "green" if diff > 0 else "red"
+            return txt, rag
+
+        hc_mom_txt, hc_rag = _mom_badge(tot_end_hc, m1_agg["ending_hc"], lower_is_better=False)
+        hires_mom_txt, hires_rag = _mom_badge(tot_hires, m1_agg["new_hires"], lower_is_better=False)
+        seps_mom_txt, seps_rag = _mom_badge(tot_seps, m1_agg["separations"], lower_is_better=True)
+        net_mv_curr = tot_hires - tot_seps
+        net_mv_prev = m1_agg["net_movement"]
+        net_mom_txt = "Improving" if net_mv_curr > net_mv_prev else ("Stable" if net_mv_curr == net_mv_prev else "Workforce Contraction")
+        net_rag = "green" if net_mv_curr >= 0 else ("amber" if net_mv_curr > net_mv_prev else "red")
+
+        avg_c_mom_txt, avg_c_rag = _mom_badge(tot_avg_und, m1_agg["avg_underlying_cost"], lower_is_better=True)
+        ot_mom_txt, ot_rag = _mom_badge(m0_summary["overtime_amount"], m1_summary["overtime_amount"], lower_is_better=True)
+        und_mom_txt, und_rag = _mom_badge(tot_und_cost, m1_summary["underlying_workforce_cost"], lower_is_better=True)
+        turn_mom_txt, turn_rag = _mom_badge(tot_turnover_pct, m1_agg["turnover_rate"], lower_is_better=True, is_pct_points=True)
+        vol_mom_txt, vol_rag = _mom_badge(tot_vol_share_pct, m1_agg["voluntary_share_pct"], lower_is_better=True, is_pct_points=True)
+        crit_mom_txt, crit_rag = _mom_badge(tot_crit_seps, m1_agg["critical_departures"], lower_is_better=True)
+
+        three_month_trend = {
+            "m2_label": m2_start.strftime("%b %Y"),
+            "m1_label": m1_start.strftime("%b %Y"),
+            "m0_label": m0_start.strftime("%b %Y"),
+            "rows": [
+                {
+                    "kpi": "Ending Headcount (عدد الموظفين نهاية الشهر)",
+                    "m2": f"{m2_agg['ending_hc']}",
+                    "m1": f"{m1_agg['ending_hc']}",
+                    "m0": f"{tot_end_hc}",
+                    "mom": hc_mom_txt,
+                    "rag": hc_rag,
+                },
+                {
+                    "kpi": "New Hires (تعيينات جديدة)",
+                    "m2": f"{m2_agg['new_hires']}",
+                    "m1": f"{m1_agg['new_hires']}",
+                    "m0": f"{tot_hires}",
+                    "mom": hires_mom_txt,
+                    "rag": hires_rag,
+                },
+                {
+                    "kpi": "Separations / Exits (إنهاء خدمات / مغادرين)",
+                    "m2": f"{m2_agg['separations']}",
+                    "m1": f"{m1_agg['separations']}",
+                    "m0": f"{tot_seps}",
+                    "mom": seps_mom_txt,
+                    "rag": seps_rag,
+                },
+                {
+                    "kpi": "Net Workforce Movement (صافي حركة الكادر)",
+                    "m2": f"{'+' if m2_agg['net_movement'] > 0 else ''}{m2_agg['net_movement']}",
+                    "m1": f"{'+' if m1_agg['net_movement'] > 0 else ''}{m1_agg['net_movement']}",
+                    "m0": f"{'+' if net_mv_curr > 0 else ''}{net_mv_curr}",
+                    "mom": net_mom_txt,
+                    "rag": net_rag,
+                },
+                {
+                    "kpi": "Reported Workforce Cost (إجمالي التكلفة شامل المخالصات)",
+                    "m2": f"{m2_summary['total_workforce_cost']:,.1f} JOD",
+                    "m1": f"{m1_summary['total_workforce_cost']:,.1f} JOD",
+                    "m0": f"{tot_wf_cost:,.1f} JOD",
+                    "mom": _mom_badge(tot_wf_cost, m1_summary["total_workforce_cost"], lower_is_better=True)[0],
+                    "rag": _mom_badge(tot_wf_cost, m1_summary["total_workforce_cost"], lower_is_better=True)[1],
+                },
+                {
+                    "kpi": "End-of-Service / EOS Settlements (مستحقات نهاية الخدمة)",
+                    "m2": f"{m2_summary['eos_amount']:,.1f} JOD",
+                    "m1": f"{m1_summary['eos_amount']:,.1f} JOD",
+                    "m0": f"{tot_eos_cost:,.1f} JOD",
+                    "mom": f"{m0_summary['eos_slip_count']} Slips",
+                    "rag": "amber" if tot_eos_cost > 0 else "green",
+                },
+                {
+                    "kpi": "Underlying Workforce Cost Excl. EOS (التكلفة التشغيلية بدون EOS)",
+                    "m2": f"{m2_summary['underlying_workforce_cost']:,.1f} JOD",
+                    "m1": f"{m1_summary['underlying_workforce_cost']:,.1f} JOD",
+                    "m0": f"{tot_und_cost:,.1f} JOD",
+                    "mom": und_mom_txt,
+                    "rag": und_rag,
+                },
+                {
+                    "kpi": "Avg. Cost / Employee Excl. EOS (متوسط تكلفة الموظف التشغيلي)",
+                    "m2": f"{m2_agg['avg_underlying_cost']:,.1f} JOD",
+                    "m1": f"{m1_agg['avg_underlying_cost']:,.1f} JOD",
+                    "m0": f"{tot_avg_und:,.1f} JOD",
+                    "mom": avg_c_mom_txt,
+                    "rag": avg_c_rag,
+                },
+                {
+                    "kpi": "Overtime Cost (تكلفة العمل الإضافي)",
+                    "m2": f"{m2_summary['overtime_amount']:,.1f} JOD",
+                    "m1": f"{m1_summary['overtime_amount']:,.1f} JOD",
+                    "m0": f"{m0_summary['overtime_amount']:,.1f} JOD",
+                    "mom": ot_mom_txt,
+                    "rag": ot_rag,
+                },
+                {
+                    "kpi": "Overall Turnover Rate (نسبة الدوران الوظيفي)",
+                    "m2": f"{m2_agg['turnover_rate']}%",
+                    "m1": f"{m1_agg['turnover_rate']}%",
+                    "m0": f"{tot_turnover_pct}%",
+                    "mom": turn_mom_txt,
+                    "rag": turn_rag,
+                },
+                {
+                    "kpi": "Voluntary Turnover Share (نسبة الاستقالات الطوعية)",
+                    "m2": f"{m2_agg['voluntary_share_pct']}%",
+                    "m1": f"{m1_agg['voluntary_share_pct']}%",
+                    "m0": f"{tot_vol_share_pct}%",
+                    "mom": vol_mom_txt,
+                    "rag": vol_rag,
+                },
+                {
+                    "kpi": "Critical Role Departures (مغادرة الكفاءات الحرجة)",
+                    "m2": f"{m2_agg['critical_departures']}",
+                    "m1": f"{m1_agg['critical_departures']}",
+                    "m0": f"{tot_crit_seps}",
+                    "mom": crit_mom_txt,
+                    "rag": crit_rag,
+                },
+            ],
+        }
+
+        # Auto-Generated Executive Insights (Slide 6 & Slide 8)
+        positives = []
+        attention_points = []
+        priorities = [
+            "Validate workforce capacity requirements in Delta Factory and Retail branches.",
+            "Analyze monthly separations, focusing on voluntary resignations and critical-role exits.",
+            "Track Underlying Workforce Cost (excluding EOS settlements) separately for accurate month-over-month comparability.",
+            "Monitor Retail overtime by branch, shift, and attendance logs.",
+        ]
+
+        if m0_summary["overtime_amount"] <= m1_summary["overtime_amount"] and m1_summary["overtime_amount"] > 0:
+            positives.append(f"Overtime cost controlled at {m0_summary['overtime_amount']:,.1f} JOD ({ot_mom_txt} vs previous month).")
+        else:
+            positives.append(f"Active workforce of {tot_end_hc} staff tracked across all 5 Strategic Business Units.")
+
+        if tot_avg_und <= m1_agg["avg_underlying_cost"] or m1_agg["avg_underlying_cost"] == 0:
+            positives.append(f"Underlying average employee cost remains controlled at {tot_avg_und:,.1f} JOD/employee (excluding EOS).")
+        if tot_eos_cost > 0:
+            positives.append(f"Isolated {tot_eos_cost:,.1f} JOD of one-time End-of-Service (EOS) settlements from recurring operating cost.")
+
+        retail_ot = (
+            m0_summary["sbu_buckets"]["retail_amman"]["overtime_amount"]
+            + m0_summary["sbu_buckets"]["retail_alhadaf"]["overtime_amount"]
+        )
+        retail_ot_share = round((retail_ot / m0_summary["overtime_amount"] * 100.0), 1) if m0_summary["overtime_amount"] > 0 else 0.0
+        if retail_ot_share >= 50.0:
+            attention_points.append(f"Retail (Amman + Alhadaf) accounts for {retail_ot_share}% ({retail_ot:,.1f} JOD) of total corporate overtime.")
+        if net_mv_curr < 0:
+            attention_points.append(f"Net workforce contracted by {abs(net_mv_curr)} employees ({tot_hires} hires vs {tot_seps} separations).")
+        if tot_seps > 0:
+            attention_points.append(f"Total of {tot_seps} separations recorded ({tot_vol_share_pct}% voluntary resignations, {tot_crit_seps} critical-role exits).")
+        if not attention_points:
+            attention_points.append("Continue monitoring branch-level labor cost ratios and overtime utilization.")
+
+        return {
+            "labor_cost_report": labor_cost_report,
+            "labor_cost_totals": labor_cost_totals,
+            "cost_bridge": cost_bridge,
+            "three_month_trend": three_month_trend,
+            "workforce_movement": {
+                "beginning_hc": tot_beg_hc,
+                "new_hires": tot_hires,
+                "separations": tot_seps,
+                "ending_hc": tot_end_hc,
+                "net_movement": net_mv_curr,
+                "turnover_rate": tot_turnover_pct,
+                "voluntary_separations": tot_vol_seps,
+                "voluntary_share_pct": tot_vol_share_pct,
+                "critical_departures": tot_crit_seps,
+            },
+            "executive_insights": {
+                "positives": positives,
+                "attention_points": attention_points,
+                "priorities": priorities,
+            },
         }
 
     @api.model
