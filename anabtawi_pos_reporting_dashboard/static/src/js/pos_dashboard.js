@@ -24,8 +24,22 @@ export class PosReportingDashboard extends Component {
             date_to: initTo,
             config_ids: initConfigs,
             loading: true,
+            view: "branches",
+            productLoading: false,
+            productFilter: "all",
+            productSearch: "",
+            productSortKey: "qty",
+            productSortOrder: "desc",
             sortKey: "sales",
             sortOrder: "desc",
+        });
+        this.products = useState({
+            loadedKey: "",
+            summary: {},
+            cards: { stock_more: [], best_profit: [], review_price: [], kill: [] },
+            categories: [],
+            products: [],
+            error: "",
         });
 
         this.data = useState({
@@ -53,7 +67,17 @@ export class PosReportingDashboard extends Component {
         return `${year}-${month}-${day}`;
     }
 
+    _filterKey() {
+        const configs = this.state.config_ids || [];
+        return `${this.state.date_from}|${this.state.date_to}|${configs.join(",")}`;
+    }
+
     async fetchDashboardData() {
+        if (this.state.view === "products") {
+            await this.fetchProductData();
+            return;
+        }
+        this.products.loadedKey = "";
         this.state.loading = true;
         try {
             const strFrom = this.state.date_from;
@@ -116,6 +140,132 @@ export class PosReportingDashboard extends Component {
         } else {
             this.state.sortKey = key;
             this.state.sortOrder = key === "branch_name" ? "asc" : "desc";
+        }
+    }
+
+    setView(view) {
+        if (this.state.view === view) {
+            return;
+        }
+        this.state.view = view;
+        if (view === "products" && this.products.loadedKey !== this._filterKey()) {
+            this.fetchProductData();
+        }
+    }
+
+    setProductFilter(filter) {
+        this.state.productFilter = filter;
+    }
+
+    showAllProducts() {
+        this.state.productFilter = "all";
+        this.state.productSearch = "";
+    }
+
+    onProductSearch(ev) {
+        this.state.productSearch = ev.target.value || "";
+    }
+
+    async fetchProductData() {
+        this.state.productLoading = true;
+        this.products.error = "";
+        try {
+            const res = await this.orm.call(
+                "pos.reporting.dashboard",
+                "get_product_dashboard_data",
+                [],
+                {
+                    date_from: this.state.date_from,
+                    date_to: this.state.date_to,
+                    config_ids: this.state.config_ids || [],
+                }
+            );
+            this.products.summary = res.summary || {};
+            this.products.cards = res.cards || { stock_more: [], best_profit: [], review_price: [], kill: [] };
+            this.products.categories = res.categories || [];
+            this.products.products = res.products || [];
+            this.products.loadedKey = this._filterKey();
+        } catch (error) {
+            console.error("Failed to load POS product dashboard", error);
+            this.products.error = "The product list did not load.";
+        } finally {
+            this.state.productLoading = false;
+        }
+    }
+
+    get sortedProducts() {
+        const query = (this.state.productSearch || "").trim().toLowerCase();
+        const filter = this.state.productFilter;
+        let rows = [...(this.products.products || [])];
+        if (filter === "unsold") {
+            rows = rows.filter((row) => !row.qty);
+        } else if (filter && filter !== "all") {
+            rows = rows.filter((row) => row.decision === filter);
+        }
+        if (query) {
+            rows = rows.filter((row) =>
+                (row.name || "").toLowerCase().includes(query)
+                || (row.category || "").toLowerCase().includes(query)
+            );
+        }
+        const key = this.state.productSortKey;
+        const isAsc = this.state.productSortOrder === "asc";
+        rows.sort((a, b) => {
+            let valA = a[key];
+            let valB = b[key];
+            if (typeof valA === "string" || typeof valB === "string") {
+                valA = (valA || "").toLowerCase();
+                valB = (valB || "").toLowerCase();
+                return isAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+            }
+            const missingA = valA === null || valA === undefined;
+            const missingB = valB === null || valB === undefined;
+            if (missingA || missingB) {
+                if (missingA && missingB) return 0;
+                return missingA ? 1 : -1;
+            }
+            return isAsc ? valA - valB : valB - valA;
+        });
+        return rows;
+    }
+
+    sortProducts(key) {
+        if (this.state.productSortKey === key) {
+            this.state.productSortOrder = this.state.productSortOrder === "asc" ? "desc" : "asc";
+        } else {
+            this.state.productSortKey = key;
+            this.state.productSortOrder = key === "name" || key === "category" || key === "decision_label" ? "asc" : "desc";
+        }
+    }
+
+    formatMargin(value) {
+        if (value === undefined || value === null || value === "") {
+            return "—";
+        }
+        return `${Number(value).toLocaleString("en-US", {
+            minimumFractionDigits: 1,
+            maximumFractionDigits: 1,
+        })}%`;
+    }
+
+    async openProductLines(productId) {
+        try {
+            const action = await this.orm.call(
+                "pos.reporting.dashboard",
+                "open_product_lines",
+                [],
+                {
+                    product_id: productId,
+                    date_from: this.state.date_from,
+                    date_to: this.state.date_to,
+                    config_ids: this.state.config_ids || [],
+                }
+            );
+            if (action) {
+                this.actionService.doAction(action);
+            }
+        } catch (error) {
+            console.error("Failed to open product lines", error);
         }
     }
 

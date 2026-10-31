@@ -66,6 +66,142 @@
 
             <!-- Main Dashboard Body -->
             <t t-else="">
+                <div class="o_dashboard_view_tabs mb-3">
+                    <button type="button" class="btn" t-att-class="state.view === 'branches' ? 'btn-primary' : 'btn-outline-primary'" t-on-click="() => this.setView('branches')">
+                        <i class="fa fa-building-o me-1"/> Branches
+                    </button>
+                    <button type="button" class="btn" t-att-class="state.view === 'products' ? 'btn-primary' : 'btn-outline-primary'" t-on-click="() => this.setView('products')">
+                        <i class="fa fa-cube me-1"/> Products
+                    </button>
+                </div>
+
+                <t t-if="state.view === 'products'">
+                    <t t-if="state.productLoading">
+                        <div class="text-center p-5">
+                            <div class="spinner-border text-primary" role="status"/>
+                            <p class="mt-3 text-muted">Reading the POS menu and what sold...</p>
+                        </div>
+                    </t>
+                    <t t-else="">
+                        <div t-if="products.error" class="alert alert-danger" role="alert">
+                            <t t-esc="products.error"/>
+                        </div>
+                        <div class="o_product_summary mb-3">
+                            <span class="badge bg-light text-dark border me-2"><t t-esc="products.summary.menu_count || 0"/> on the POS menu</span>
+                            <span class="badge bg-success me-2"><t t-esc="products.summary.sold_count || 0"/> sold</span>
+                            <span class="badge bg-danger me-2"><t t-esc="products.summary.unsold_count || 0"/> available and not sold</span>
+                            <span class="text-muted">Average margin <t t-esc="formatMargin(products.summary.avg_margin)"/></span>
+                        </div>
+
+                        <div class="o_product_decision_grid mb-4">
+                            <div class="o_decision_card decision-stock">
+                                <div class="decision_title">Stock more</div>
+                                <t t-if="!(products.cards.stock_more || []).length">
+                                    <div class="text-muted">None in this period.</div>
+                                </t>
+                                <t t-foreach="products.cards.stock_more || []" t-as="item" t-key="item.product_id">
+                                    <button type="button" class="decision_row" t-on-click="() => this.openProductLines(item.product_id)">
+                                        <span class="decision_name"><t t-esc="item.name"/></span>
+                                        <span class="decision_meta"><t t-esc="formatDecimal(item.qty, 1)"/> · <t t-esc="formatMargin(item.margin)"/></span>
+                                    </button>
+                                </t>
+                            </div>
+                            <div class="o_decision_card decision-profit">
+                                <div class="decision_title">Best profit</div>
+                                <t t-if="!(products.cards.best_profit || []).length">
+                                    <div class="text-muted">None with a cost in this period.</div>
+                                </t>
+                                <t t-foreach="products.cards.best_profit || []" t-as="item" t-key="item.product_id">
+                                    <button type="button" class="decision_row" t-on-click="() => this.openProductLines(item.product_id)">
+                                        <span class="decision_name"><t t-esc="item.name"/></span>
+                                        <span class="decision_meta"><t t-esc="formatCurrency(item.profit)"/></span>
+                                    </button>
+                                </t>
+                            </div>
+                            <div class="o_decision_card decision-price">
+                                <div class="decision_title">Review price</div>
+                                <t t-if="!(products.cards.review_price || []).length">
+                                    <div class="text-muted">None in this period.</div>
+                                </t>
+                                <t t-foreach="products.cards.review_price || []" t-as="item" t-key="item.product_id">
+                                    <button type="button" class="decision_row" t-on-click="() => this.openProductLines(item.product_id)">
+                                        <span class="decision_name"><t t-esc="item.name"/></span>
+                                        <span class="decision_meta"><t t-esc="formatDecimal(item.qty, 1)"/> · <t t-esc="formatMargin(item.margin)"/></span>
+                                    </button>
+                                </t>
+                            </div>
+                            <div class="o_decision_card decision-kill">
+                                <div class="decision_title">Kill · <t t-esc="products.summary.unsold_count || 0"/> not sold</div>
+                                <t t-if="!(products.cards.kill || []).length">
+                                    <div class="text-muted">Every menu product sold in this period.</div>
+                                </t>
+                                <t t-foreach="products.cards.kill || []" t-as="item" t-key="item.product_id">
+                                    <button type="button" class="decision_row" t-on-click="() => this.openProductLines(item.product_id)">
+                                        <span class="decision_name"><t t-esc="item.name"/></span>
+                                        <span class="decision_meta"><t t-esc="item.category"/></span>
+                                    </button>
+                                </t>
+                            </div>
+                        </div>
+
+                        <div class="o_product_categories mb-3" t-if="products.categories.length">
+                            <button type="button" class="btn btn-sm me-2 mb-2" t-att-class="state.productFilter === 'all' &amp;&amp; !state.productSearch ? 'btn-secondary' : 'btn-outline-secondary'" t-on-click="() => this.showAllProducts()">All categories</button>
+                            <t t-foreach="products.categories" t-as="categ" t-key="categ.name">
+                                <button type="button" class="btn btn-sm btn-outline-secondary me-2 mb-2" t-on-click="() => this.onProductSearch({target: {value: categ.name}})">
+                                    <t t-esc="categ.name"/>
+                                    <span class="ms-1 text-muted"><t t-esc="categ.unsold_count"/> unsold</span>
+                                </button>
+                            </t>
+                        </div>
+
+                        <div class="o_product_toolbar d-flex flex-wrap gap-2 align-items-center mb-3">
+                            <button type="button" class="btn btn-sm" t-att-class="state.productFilter === 'all' ? 'btn-primary' : 'btn-outline-primary'" t-on-click="() => this.setProductFilter('all')">All</button>
+                            <button type="button" class="btn btn-sm" t-att-class="state.productFilter === 'unsold' ? 'btn-danger' : 'btn-outline-danger'" t-on-click="() => this.setProductFilter('unsold')">Did not sell</button>
+                            <button type="button" class="btn btn-sm" t-att-class="state.productFilter === 'stock_more' ? 'btn-success' : 'btn-outline-success'" t-on-click="() => this.setProductFilter('stock_more')">Stock more</button>
+                            <button type="button" class="btn btn-sm" t-att-class="state.productFilter === 'review_price' ? 'btn-warning' : 'btn-outline-warning'" t-on-click="() => this.setProductFilter('review_price')">Review price</button>
+                            <button type="button" class="btn btn-sm" t-att-class="state.productFilter === 'kill' ? 'btn-danger' : 'btn-outline-danger'" t-on-click="() => this.setProductFilter('kill')">Kill</button>
+                            <input type="search" class="form-control form-control-sm product_search" placeholder="Search product or category" t-att-value="state.productSearch" t-on-input="onProductSearch"/>
+                        </div>
+
+                        <div class="o_dashboard_section">
+                            <div class="section_header">
+                                <h4><i class="fa fa-cube text-primary"/> POS menu (<t t-esc="sortedProducts.length"/>)</h4>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-hover o_product_table">
+                                    <thead>
+                                        <tr>
+                                            <th class="sortable_th" t-on-click="() => this.sortProducts('name')">Product</th>
+                                            <th class="sortable_th" t-on-click="() => this.sortProducts('category')">POS category</th>
+                                            <th class="text-end sortable_th" t-on-click="() => this.sortProducts('qty')">Qty</th>
+                                            <th class="text-end sortable_th" t-on-click="() => this.sortProducts('sales')">Sales</th>
+                                            <th class="text-end sortable_th" t-on-click="() => this.sortProducts('profit')">Profit</th>
+                                            <th class="text-end sortable_th" t-on-click="() => this.sortProducts('margin')">Margin</th>
+                                            <th class="text-end sortable_th" t-on-click="() => this.sortProducts('order_count')">Orders</th>
+                                            <th class="sortable_th" t-on-click="() => this.sortProducts('decision_label')">Decision</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr t-foreach="sortedProducts" t-as="row" t-key="row.product_id" class="clickable_kpi" t-on-click="() => this.openProductLines(row.product_id)">
+                                            <td><t t-esc="row.name"/></td>
+                                            <td class="text-muted"><t t-esc="row.category"/></td>
+                                            <td class="text-end"><t t-esc="formatDecimal(row.qty, 1)"/></td>
+                                            <td class="text-end"><t t-esc="formatCurrency(row.sales)"/></td>
+                                            <td class="text-end"><t t-esc="row.profit === null ? '—' : formatCurrency(row.profit)"/></td>
+                                            <td class="text-end"><t t-esc="formatMargin(row.margin)"/></td>
+                                            <td class="text-end"><t t-esc="row.order_count"/></td>
+                                            <td><span t-att-class="'decision_badge decision-' + row.decision"><t t-esc="row.decision_label"/></span></td>
+                                        </tr>
+                                        <tr t-if="!sortedProducts.length">
+                                            <td colspan="8" class="text-center text-muted p-4">No POS menu products match this filter.</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </t>
+                </t>
+                <t t-else="">
                 <!-- KPI Summary Row -->
                 <div class="o_kpi_grid">
                     <!-- Total Sales -->
@@ -678,6 +814,7 @@
                         </table>
                     </div>
                 </div>
+                </t>
             </t>
         </div>
     </t>

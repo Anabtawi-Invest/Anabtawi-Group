@@ -804,6 +804,241 @@ class PosReportingDashboard(models.TransientModel):
             "trends": trend_days,
         }
 
+    def _excluded_pos_helper_products(self, configs):
+        """Pledge, deposit, employee and delivery products are not stock decisions."""
+        Product = self.env["product.product"].sudo()
+        excluded = Product.browse()
+        if "pledge_product_id" in configs._fields:
+            excluded |= configs.mapped("pledge_product_id")
+        if "advance_deposit_product_id" in configs._fields:
+            excluded |= configs.mapped("advance_deposit_product_id")
+        if "pos.site.service.product.line" in self.env:
+            lines = self.env["pos.site.service.product.line"].sudo().search([
+                ("pledge_product_id", "!=", False),
+            ])
+            excluded |= lines.mapped("pledge_product_id")
+        helper_domain = []
+        if "is_employee_service" in Product._fields and "is_delivery_product" in Product._fields:
+            helper_domain = ["|", ("is_employee_service", "=", True), ("is_delivery_product", "=", True)]
+        if "pledge_amount" in Product._fields:
+            helper_domain = (["|"] + helper_domain + [("pledge_amount", ">", 0)]) if helper_domain else [("pledge_amount", ">", 0)]
+        if helper_domain:
+            excluded |= Product.search(helper_domain)
+        return excluded
+
+    def _pos_menu_products(self, configs):
+        """Products the selected POS configs can actually sell.
+
+        This is the Point of Sale menu, not the whole product catalog. A product
+        with no sales in the period stays in the list.
+        """
+        Product = self.env["product.product"].sudo()
+        if not configs:
+            return Product.browse()
+        domain = [
+            ("available_in_pos", "=", True),
+            ("sale_ok", "=", True),
+            ("active", "=", True),
+            "|",
+            ("company_id", "=", False),
+            ("company_id", "in", configs.company_id.ids),
+        ]
+        limited = configs.filtered("limit_categories")
+        if limited and len(limited) == len(configs):
+            categ_ids = limited.iface_available_categ_ids.ids
+            if not categ_ids:
+                return Product.browse()
+            domain.append(("pos_categ_ids", "in", categ_ids))
+        products = Product.search(domain)
+        return products - self._excluded_pos_helper_products(configs)
+
+    def _product_sales_stats(self, sessions):
+        """{product_id: stats} for paid lines in these sessions, gifts excluded."""
+        if not sessions:
+            return {}
+        self.env["pos.order.line"].flush_model([
+            "product_id", "qty", "price_subtotal", "total_cost", "is_total_cost_computed", "order_id", "is_gift",
+        ])
+        self.env["pos.order"].flush_model(["session_id", "state"])
+        self.env.cr.execute(SQL("""
+            SELECT line.product_id,
+                   COALESCE(SUM(line.qty), 0) AS qty,
+                   COALESCE(SUM(line.price_subtotal), 0) AS sales,
+                   COALESCE(SUM(CASE WHEN line.is_total_cost_computed THEN line.total_cost ELSE 0 END), 0) AS cost,
+                   COALESCE(SUM(CASE WHEN line.is_total_cost_computed THEN line.price_subtotal ELSE 0 END), 0) AS sales_with_cost,
+                   BOOL_OR(line.is_total_cost_computed IS NOT TRUE) AS cost_missing,
+                   COUNT(DISTINCT line.order_id) AS order_count
+              FROM pos_order_line line
+              JOIN pos_order ord ON ord.id = line.order_id
+             WHERE ord.session_id IN %(session_ids)s
+               AND ord.state IN ('paid', 'done', 'invoiced')
+               AND line.product_id IS NOT NULL
+               AND COALESCE(line.is_gift, FALSE) IS NOT TRUE
+             GROUP BY line.product_id
+        """, session_ids=tuple(sessions.ids)))
+        stats = {}
+        for product_id, qty, sales, cost, sales_with_cost, cost_missing, order_count in self.env.cr.fetchall():
+            stats[product_id] = {
+                "qty": float(qty or 0.0),
+                "sales": float(sales or 0.0),
+                "cost": float(cost or 0.0),
+                "sales_with_cost": float(sales_with_cost or 0.0),
+                "cost_missing": bool(cost_missing),
+                "order_count": int(order_count or 0),
+            }
+        return stats
+
+    @staticmethod
+    def _product_decision(row, top_qty_ids, avg_margin):
+        if row["qty"] <= 0:
+            return "kill"
+        margin = row["margin"]
+        if row["product_id"] in top_qty_ids and margin is not None and avg_margin > 0 and margin < avg_margin * 0.6:
+            return "review_price"
+        if row["product_id"] in top_qty_ids and margin is not None and margin >= avg_margin:
+            return "stock_more"
+        return "keep"
+
+    @api.model
+    def get_product_dashboard_data(self, date_from=None, date_to=None, config_ids=None):
+        """POS-menu products for the same period and branches as the branch dashboard.
+
+        Products the cashier can sell and that sold nothing stay on the list
+        with quantity 0. Pledge, deposit, gift, employee and delivery items
+        are left out.
+        """
+        engine = self.env["pos.daily.ops.engine"]
+        period = self._parse_period(date_from, date_to)
+        configs = self._get_report_configs(config_ids)
+        sessions = engine._get_sessions(period, configs)
+        products = self._pos_menu_products(configs)
+        stats = self._product_sales_stats(sessions)
+
+        rows = []
+        for product in products:
+            stat = stats.get(product.id, {})
+            qty = stat.get("qty", 0.0)
+            sales = stat.get("sales", 0.0)
+            sales_with_cost = stat.get("sales_with_cost", 0.0)
+            cost = stat.get("cost", 0.0)
+            has_cost = bool(stat) and not stat.get("cost_missing") and sales_with_cost != 0
+            profit = (sales_with_cost - cost) if has_cost else None
+            margin = (profit / sales_with_cost) if has_cost and sales_with_cost else None
+            category = product.pos_categ_ids[:1]
+            rows.append({
+                "product_id": product.id,
+                "name": product.display_name,
+                "category": category.display_name if category else _("No POS category"),
+                "qty": round(qty, 3),
+                "sales": round(sales, 3),
+                "cost": round(cost, 3) if has_cost else None,
+                "profit": round(profit, 3) if profit is not None else None,
+                "margin": round(margin * 100.0, 1) if margin is not None else None,
+                "order_count": stat.get("order_count", 0),
+                "cost_missing": bool(stat.get("cost_missing")),
+            })
+
+        sellers = [row for row in rows if row["qty"] > 0]
+        sales_with_margin = sum(row["sales"] for row in sellers if row["margin"] is not None and row["profit"] is not None)
+        profit_with_margin = sum(row["profit"] for row in sellers if row["profit"] is not None)
+        avg_margin = (profit_with_margin / sales_with_margin * 100.0) if sales_with_margin else 0.0
+        ranked = sorted(sellers, key=lambda row: row["qty"], reverse=True)
+        top_n = min(15, max(5, math.ceil(len(ranked) * 0.2))) if len(ranked) >= 5 else len(ranked)
+        top_qty_ids = {row["product_id"] for row in ranked[:top_n]}
+
+        labels = {
+            "stock_more": _("Stock more"),
+            "review_price": _("Review price"),
+            "kill": _("Kill"),
+            "keep": _("Keep"),
+        }
+        for row in rows:
+            decision = self._product_decision(row, top_qty_ids, avg_margin)
+            row["decision"] = decision
+            row["decision_label"] = labels[decision]
+
+        def _top(decision, key, reverse=True, limit=5):
+            picked = [row for row in rows if row["decision"] == decision]
+            picked.sort(key=lambda row: (row[key] is None, row[key] or 0), reverse=reverse)
+            return picked[:limit]
+
+        best_profit = sorted(
+            (row for row in rows if row["profit"] is not None and row["qty"] > 0),
+            key=lambda row: row["profit"],
+            reverse=True,
+        )[:5]
+        kill_rows = sorted(
+            (row for row in rows if row["decision"] == "kill"),
+            key=lambda row: ((row["qty"] != 0), row["name"]),
+        )
+
+        categories = {}
+        for row in rows:
+            bucket = categories.setdefault(row["category"], {
+                "name": row["category"],
+                "qty": 0.0,
+                "sales": 0.0,
+                "profit": 0.0,
+                "product_count": 0,
+                "unsold_count": 0,
+            })
+            bucket["qty"] += row["qty"]
+            bucket["sales"] += row["sales"]
+            bucket["profit"] += row["profit"] or 0.0
+            bucket["product_count"] += 1
+            if row["qty"] <= 0:
+                bucket["unsold_count"] += 1
+        category_rows = sorted(categories.values(), key=lambda row: row["sales"], reverse=True)
+        for bucket in category_rows:
+            bucket["qty"] = round(bucket["qty"], 3)
+            bucket["sales"] = round(bucket["sales"], 3)
+            bucket["profit"] = round(bucket["profit"], 3)
+
+        return {
+            "date_from": fields.Date.to_string(period["date_from"]),
+            "date_to": fields.Date.to_string(period["date_to"]),
+            "summary": {
+                "menu_count": len(rows),
+                "sold_count": len(sellers),
+                "unsold_count": len(rows) - len(sellers),
+                "total_qty": round(sum(row["qty"] for row in rows), 3),
+                "total_sales": round(sum(row["sales"] for row in rows), 3),
+                "total_profit": round(profit_with_margin, 3),
+                "avg_margin": round(avg_margin, 1),
+            },
+            "cards": {
+                "stock_more": _top("stock_more", "qty"),
+                "best_profit": best_profit,
+                "review_price": _top("review_price", "qty"),
+                "kill": kill_rows[:8],
+            },
+            "categories": category_rows[:8],
+            "products": rows,
+        }
+
+    @api.model
+    def open_product_lines(self, product_id, date_from=None, date_to=None, config_ids=None):
+        """Open the POS order lines of one menu product in this search."""
+        engine = self.env["pos.daily.ops.engine"]
+        period = self._parse_period(date_from, date_to)
+        configs = self._get_report_configs(config_ids)
+        sessions = engine._get_sessions(period, configs)
+        product = self.env["product.product"].browse(product_id).exists()
+        return {
+            "name": product.display_name if product else _("Product sales"),
+            "type": "ir.actions.act_window",
+            "res_model": "pos.order.line",
+            "view_mode": "list,form",
+            "domain": [
+                ("product_id", "=", product_id),
+                ("order_id.session_id", "in", sessions.ids or [0]),
+                ("order_id.state", "in", ("paid", "done", "invoiced")),
+                ("is_gift", "=", False),
+            ],
+            "target": "current",
+            "context": {"create": False, "delete": False},
+        }
+
     @api.model
     def open_kpi_drilldown(self, metric_type, date_from=None, date_to=None, config_ids=None):
         """

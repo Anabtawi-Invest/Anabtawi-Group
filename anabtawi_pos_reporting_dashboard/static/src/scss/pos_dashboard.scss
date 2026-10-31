@@ -207,6 +207,76 @@
     }
 
     /* KPI Grid */
+    .o_dashboard_view_tabs {
+        display: flex;
+        gap: 8px;
+    }
+
+    .o_product_decision_grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 16px;
+    }
+
+    .o_decision_card {
+        background: #fff;
+        border-radius: 12px;
+        padding: 16px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.04);
+        border-top: 4px solid #94a3b8;
+
+        &.decision-stock { border-top-color: #16a34a; }
+        &.decision-profit { border-top-color: #2563eb; }
+        &.decision-price { border-top-color: #d97706; }
+        &.decision-kill { border-top-color: #dc2626; }
+
+        .decision_title {
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        .decision_row {
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+            width: 100%;
+            text-align: left;
+            background: transparent;
+            border: 0;
+            border-bottom: 1px solid #f1f5f9;
+            padding: 6px 0;
+            cursor: pointer;
+
+            .decision_name {
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            .decision_meta {
+                color: #64748b;
+                white-space: nowrap;
+            }
+        }
+    }
+
+    .product_search {
+        max-width: 280px;
+    }
+
+    .decision_badge {
+        display: inline-block;
+        border-radius: 999px;
+        padding: 2px 8px;
+        font-size: 12px;
+        font-weight: 600;
+
+        &.decision-stock_more { background: #dcfce7; color: #166534; }
+        &.decision-review_price { background: #fef3c7; color: #92400e; }
+        &.decision-kill { background: #fee2e2; color: #991b1b; }
+        &.decision-keep { background: #f1f5f9; color: #334155; }
+    }
+
     .o_kpi_grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
