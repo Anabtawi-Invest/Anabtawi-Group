@@ -1097,6 +1097,13 @@ class HrPayrollDashboard(models.AbstractModel):
             effective_kpi_headcount=effective_kpi_headcount,
         )
 
+        selected_company_name = _("All Companies (جميع الشركات)")
+        if target_company_id > 0:
+            for comp_item in allowed_companies:
+                if comp_item.get("id") == target_company_id:
+                    selected_company_name = comp_item.get("name") or selected_company_name
+                    break
+
         data = {
             "date_from": str(start_date),
             "date_to": str(end_date),
@@ -1105,6 +1112,7 @@ class HrPayrollDashboard(models.AbstractModel):
             "active_persona_tab": persona_tab or "all",
             "calendar_days": selected_days,
             "selected_company_id": target_company_id,
+            "selected_company_name": selected_company_name,
             "selected_payrun_id": int(payrun_id) if payrun_id else 0,
             "payrun_batches": payrun_batches,
             "all_departments": all_departments_flat,
@@ -1623,31 +1631,34 @@ class HrPayrollDashboard(models.AbstractModel):
         }
 
     @api.model
-    def _summarize_period_slips(self, p_start, p_end, target_company_id, user_companies, all_target_dep_ids_set):
+    def _summarize_period_slips(self, p_start, p_end, target_company_id, user_companies, all_target_dep_ids_set, preloaded_slips=None):
         """Fast helper to summarize a month's payslip costs (Basic, Allowances, OT, Health Ins, Co. SS, EOS, Total Cost)."""
-        dom = [
-            ("state", "not in", ["cancel"]),
-            ("date_from", "<=", p_end),
-            ("date_to", ">=", p_start),
-        ]
-        if target_company_id > 0:
-            dom.append(("company_id", "=", target_company_id))
+        if preloaded_slips is not None:
+            slips = preloaded_slips
         else:
-            dom.append(("company_id", "in", user_companies.ids))
+            dom = [
+                ("state", "not in", ["cancel"]),
+                ("date_from", "<=", p_end),
+                ("date_to", ">=", p_start),
+            ]
+            if target_company_id > 0:
+                dom.append(("company_id", "=", target_company_id))
+            else:
+                dom.append(("company_id", "in", user_companies.ids))
 
-        if all_target_dep_ids_set:
-            t_list = list(all_target_dep_ids_set)
-            dom.extend(["|", ("employee_id.department_id", "in", t_list), ("department_id", "in", t_list)])
+            if all_target_dep_ids_set:
+                t_list = list(all_target_dep_ids_set)
+                dom.extend(["|", ("employee_id.department_id", "in", t_list), ("department_id", "in", t_list)])
 
-        slips = self.env["hr.payslip"].sudo().search(dom)
-        if all_target_dep_ids_set:
-            slips = slips.filtered(
-                lambda s: (
-                    ((s.employee_id and s.employee_id.department_id) or s.department_id).id in all_target_dep_ids_set
+            slips = self.env["hr.payslip"].sudo().search(dom)
+            if all_target_dep_ids_set:
+                slips = slips.filtered(
+                    lambda s: (
+                        ((s.employee_id and s.employee_id.department_id) or s.department_id).id in all_target_dep_ids_set
+                    )
+                    if ((s.employee_id and s.employee_id.department_id) or s.department_id)
+                    else False
                 )
-                if ((s.employee_id and s.employee_id.department_id) or s.department_id)
-                else False
-            )
 
         if slips:
             try:
@@ -1948,8 +1959,8 @@ class HrPayrollDashboard(models.AbstractModel):
         m2_end = m1_start - timedelta(days=1)
         m2_start = m2_end.replace(day=1)
 
-        # Summarize payslips for M0, M-1, M-2
-        m0_summary = self._summarize_period_slips(start_date, end_date, target_company_id, user_companies, all_target_dep_ids_set)
+        # Summarize payslips for M0 (using current_payslips), M-1, M-2
+        m0_summary = self._summarize_period_slips(start_date, end_date, target_company_id, user_companies, all_target_dep_ids_set, preloaded_slips=current_payslips)
         m1_summary = self._summarize_period_slips(m1_start, m1_end, target_company_id, user_companies, all_target_dep_ids_set)
         m2_summary = self._summarize_period_slips(m2_start, m2_end, target_company_id, user_companies, all_target_dep_ids_set)
 

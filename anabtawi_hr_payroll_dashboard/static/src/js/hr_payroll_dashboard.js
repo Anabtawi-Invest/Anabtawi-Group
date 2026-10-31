@@ -736,17 +736,20 @@ export class HrPayrollDashboard extends Component {
         }
 
         try {
+            const selectedCompanyId = (this.state.company_id && Number(this.state.company_id) > 0)
+                ? Number(this.state.company_id)
+                : false;
+            const selectedPayrunId = (this.state.payrun_id && Number(this.state.payrun_id) > 0)
+                ? Number(this.state.payrun_id)
+                : false;
+
             const wizardVals = {
                 date_from: this.state.date_from,
                 date_to: this.state.date_to,
                 report_type: targetScope,
+                company_id: selectedCompanyId,
+                payrun_id: selectedPayrunId,
             };
-            if (this.state.payrun_id) {
-                wizardVals.payrun_id = this.state.payrun_id;
-            }
-            if (this.state.company_id) {
-                wizardVals.company_id = this.state.company_id;
-            }
             if (this.state.department_ids && this.state.department_ids.length > 0) {
                 wizardVals.department_ids = [[6, 0, this.state.department_ids.map(Number)]];
             }

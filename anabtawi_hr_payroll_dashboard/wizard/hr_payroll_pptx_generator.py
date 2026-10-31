@@ -585,6 +585,7 @@ def build_board_pptx_bytes(data):
     m1_lbl = tmt.get("m1_label") or "Month - 1"
     m2_lbl = tmt.get("m0_label") or "Current"
     period_title = m2_lbl
+    selected_comp_name = data.get("selected_company_name") or "All Companies (جميع الشركات)"
 
     s3m = tmt.get("series_3m") or {}
 
@@ -651,9 +652,9 @@ def build_board_pptx_bytes(data):
     )
     s1.add_rect(76, 214, 780, 1.5, fill_hex="334155")
     s1.add_text(
-        76, 228, 780, 24,
-        f"Scope: 3-Month Rolling Window ({m0_lbl} – {m2_lbl})   |   5 Strategic Business Units   |   Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
-        size_pt=10.0, color_hex="E2E8F0", valign="ctr"
+        76, 226, 780, 26,
+        f"Company Scope: {selected_comp_name}   |   3-Month Window ({m0_lbl} – {m2_lbl})   |   Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+        size_pt=9.8, color_hex="E2E8F0", bold=True, valign="ctr"
     )
     # 3 Scope Pills inside hero box
     s1.add_text(76, 268, 245, 34, f"1. 3-Month Trend ({m0_lbl} – {m2_lbl})", size_pt=9.5, color_hex="FFFFFF", bold=True, align="c", valign="ctr", fill_hex="0F172A", line_hex="3B82F6", round_radius=12000)

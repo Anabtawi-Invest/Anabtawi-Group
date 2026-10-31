@@ -25,7 +25,7 @@ class HrPayrollReportWizard(models.TransientModel):
     date_from = fields.Date(string="Date From", required=True, default=lambda self: fields.Date.today().replace(day=1))
     date_to = fields.Date(string="Date To", required=True, default=lambda self: (fields.Date.today().replace(day=1) + timedelta(days=32)).replace(day=1) - timedelta(days=1))
     payrun_id = fields.Many2one("hr.payslip.run", string="Payrun Batch", help="Filter by specific payroll batch")
-    company_id = fields.Many2one("res.company", string="Company", default=lambda self: self.env.company, required=False)
+    company_id = fields.Many2one("res.company", string="Company", default=False, required=False, help="Leave empty for All Companies")
     department_ids = fields.Many2many("hr.department", string="Departments")
     report_type = fields.Selection([
         ("all", "Complete HR & Payroll Package (All Sheets)"),
@@ -47,17 +47,23 @@ class HrPayrollReportWizard(models.TransientModel):
         with native vector Bar/Column Charts, Stacked Charts, Pie/Doughnut Charts,
         and Corporate Workforce Cost & Headcount Bridge tables."""
         self.ensure_one()
+        target_comp_id = self.company_id.id if self.company_id else 0
         dash_data = self.env["hr.payroll.dashboard"].get_dashboard_data(
             date_from=str(self.date_from) if self.date_from else False,
             date_to=str(self.date_to) if self.date_to else False,
-            payrun_id=self.payrun_id.id if self.payrun_id else False,
-            company_id=self.company_id.id if self.company_id else False,
+            payrun_id=self.payrun_id.id if self.payrun_id else 0,
+            company_id=target_comp_id,
             department_ids=self.department_ids.ids if self.department_ids else [],
         )
         pptx_bytes = build_board_pptx_bytes(dash_data)
         file_data = base64.b64encode(pptx_bytes)
         period_slug = (self.date_to or fields.Date.today()).strftime("%B_%Y")
-        file_name = f"HR_Dashboard_{period_slug}.pptx"
+        comp_slug = ""
+        if self.company_id and self.company_id.name:
+            clean_c = "".join(ch if ch.isalnum() else "_" for ch in self.company_id.name).strip("_")
+            if clean_c:
+                comp_slug = f"_{clean_c}"
+        file_name = f"HR_Dashboard_{period_slug}{comp_slug}.pptx"
         self.write({
             "excel_file": file_data,
             "file_name": file_name,
