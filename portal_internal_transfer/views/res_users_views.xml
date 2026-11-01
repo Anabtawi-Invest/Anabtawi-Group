@@ -32,8 +32,11 @@
                             <field name="van_customer_id"
                                       options="{'no_create': False}"
                                       placeholder="Commercial customer for van sales"/>
-                            <field name="van_pricelist_id"
-                                      placeholder="Pricelist for transfers &amp; sales prices"/>
+                            <div class="text-muted" colspan="2">
+                                Pricelist comes from the van customer contact
+                                (Sales &amp; Purchase → Pricelist). Used for portal
+                                sales prices and for filtering transfer products.
+                            </div>
                         </group>
                     </group>
                 </page>

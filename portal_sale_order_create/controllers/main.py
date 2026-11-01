@@ -57,9 +57,12 @@ class PortalSaleOrderCreate(http.Controller):
         return request.env["stock.warehouse"]
 
     def _get_van_pricelist(self):
+        """Pricelist from mapped van customer contact (property_product_pricelist)."""
         user = request.env.user.sudo()
-        if "van_pricelist_id" in user._fields and user.van_pricelist_id:
-            return user.van_pricelist_id
+        if "van_customer_id" in user._fields and user.van_customer_id:
+            if hasattr(user, "_get_van_contact_pricelist"):
+                return user._get_van_contact_pricelist()
+            return user.van_customer_id.property_product_pricelist.sudo()
         return request.env["product.pricelist"]
 
     def _product_portal_price(self, product, pricelist=None):

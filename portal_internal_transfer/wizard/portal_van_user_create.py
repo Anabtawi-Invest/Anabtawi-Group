@@ -34,13 +34,8 @@ class PortalVanUserCreate(models.TransientModel):
         "res.partner",
         string="Van Customer",
         help="Fixed commercial customer for this van. Portal sales use this partner; "
-        "delivery addresses are created under it.",
-    )
-    van_pricelist_id = fields.Many2one(
-        "product.pricelist",
-        string="Van Pricelist",
-        help="Portal internal transfers only show products from this pricelist. "
-        "Portal sales use it as the default pricelist.",
+        "delivery addresses are created under it. Set the contact's Pricelist "
+        "(Sales & Purchase) for sale prices and transfer product filtering.",
     )
 
     @api.constrains("login")
@@ -116,8 +111,6 @@ class PortalVanUserCreate(models.TransientModel):
         }
         if self.van_customer_id:
             user_vals["van_customer_id"] = self.van_customer_id.id
-        if self.van_pricelist_id:
-            user_vals["van_pricelist_id"] = self.van_pricelist_id.id
         user.write(user_vals)
 
         if self.password:

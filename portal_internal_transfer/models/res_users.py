@@ -38,19 +38,26 @@ class ResUsers(models.Model):
         help="Fixed commercial customer for this van portal user. "
         "Portal sales use this customer; delivery addresses are children under it.",
     )
+    # Kept for older DBs; portal now uses van_customer_id.property_product_pricelist
     van_pricelist_id = fields.Many2one(
         "product.pricelist",
-        string="Van Pricelist",
+        string="Van Pricelist (deprecated)",
         copy=False,
         check_company=False,
-        help="Pricelist for this van. Portal internal transfers only show these products. "
-        "Portal sales use it as the order pricelist and for prices.",
     )
 
-    def _get_van_pricelist_product_ids(self):
-        """Product variants covered by the van pricelist item lines."""
+    def _get_van_contact_pricelist(self):
+        """Pricelist from the mapped van customer contact (Odoo standard field)."""
         self.ensure_one()
-        pricelist = self.van_pricelist_id
+        customer = self.van_customer_id
+        if not customer:
+            return self.env["product.pricelist"]
+        return customer.property_product_pricelist.sudo()
+
+    def _get_van_pricelist_product_ids(self):
+        """Product variants covered by the van customer's contact pricelist."""
+        self.ensure_one()
+        pricelist = self._get_van_contact_pricelist()
         if not pricelist:
             return False
         product_ids = set()

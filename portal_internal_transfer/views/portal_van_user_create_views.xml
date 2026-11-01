@@ -18,8 +18,6 @@
                             <field name="company_id"/>
                             <field name="van_customer_id"
                                       placeholder="Commercial customer for van sales"/>
-                            <field name="van_pricelist_id"
-                                      placeholder="Pricelist for transfers &amp; sales"/>
                         </group>
                         <group string="Access">
                             <field name="password" password="True"

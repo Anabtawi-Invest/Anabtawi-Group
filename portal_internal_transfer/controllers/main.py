@@ -234,9 +234,12 @@ class PortalInternalTransfer(http.Controller):
             ("is_storable", "=", True),
         ]
         user = request.env.user.sudo()
-        if "van_pricelist_id" in user._fields and user.van_pricelist_id:
+        if "van_customer_id" in user._fields and user.van_customer_id:
             pricelist_product_ids = user._get_van_pricelist_product_ids()
-            if not pricelist_product_ids:
+            if pricelist_product_ids is False:
+                # No pricelist on van customer → keep all storable products
+                pass
+            elif not pricelist_product_ids:
                 return {
                     "products": [],
                     "total": 0,
@@ -244,7 +247,8 @@ class PortalInternalTransfer(http.Controller):
                     "limit": limit,
                     "has_more": False,
                 }
-            domain.append(("id", "in", pricelist_product_ids))
+            else:
+                domain.append(("id", "in", pricelist_product_ids))
         if term:
             domain += [
                 "|",
@@ -289,8 +293,10 @@ class PortalInternalTransfer(http.Controller):
 
         user = request.env.user.sudo()
         allowed_product_ids = False
-        if "van_pricelist_id" in user._fields and user.van_pricelist_id:
-            allowed_product_ids = set(user._get_van_pricelist_product_ids() or [])
+        if "van_customer_id" in user._fields and user.van_customer_id:
+            pricelist_ids = user._get_van_pricelist_product_ids()
+            if pricelist_ids is not False:
+                allowed_product_ids = set(pricelist_ids or [])
 
         lines = lines or []
         move_commands = []
@@ -304,7 +310,7 @@ class PortalInternalTransfer(http.Controller):
                 raise ValidationError(_("Invalid product selected."))
             if allowed_product_ids is not False and product.id not in allowed_product_ids:
                 raise ValidationError(
-                    _("Product %(product)s is not allowed on your van pricelist.")
+                    _("Product %(product)s is not allowed on your van customer pricelist.")
                     % {"product": product.display_name}
                 )
             move_vals = {
