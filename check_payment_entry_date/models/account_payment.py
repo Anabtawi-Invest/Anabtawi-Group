@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
-from odoo import api, fields, models
+from odoo import _, api, fields, models
+from odoo.exceptions import UserError
 
 
 class AccountPayment(models.Model):
@@ -23,17 +24,36 @@ class AccountPayment(models.Model):
                 vals['date'] = today
         payments = super().create(vals_list)
         payments._force_check_payment_entry_date()
+        payments._raise_if_blocked_check_date()
         return payments
 
     def write(self, vals):
         res = super().write(vals)
         if not self.env.context.get('skip_check_payment_entry_date'):
             self._force_check_payment_entry_date()
+            to_check = self.filtered(lambda payment: payment.state == 'draft')
+            if 'check_date' in vals:
+                to_check |= self
+            to_check._raise_if_blocked_check_date()
         return res
 
     def action_post(self):
         self._force_check_payment_entry_date()
+        self._raise_if_blocked_check_date()
         return super().action_post()
+
+    def _raise_if_blocked_check_date(self):
+        payments = self.filtered(lambda payment: payment.is_check_payment and payment.check_date)
+        if not payments:
+            return
+        blocked = self.env['check.payment.blocked.date'].sudo().search([
+            ('company_id', 'in', payments.company_id.ids),
+            ('date', 'in', list(set(payments.mapped('check_date')))),
+        ])
+        blocked_keys = {(line.company_id.id, line.date) for line in blocked}
+        for payment in payments:
+            if (payment.company_id.id, payment.check_date) in blocked_keys:
+                raise UserError(_("You cannot cash a check on this day."))
 
     def _force_check_payment_entry_date(self):
         today = fields.Date.context_today(self)

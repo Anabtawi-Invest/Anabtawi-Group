@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_check_blocked_dates" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.check.blocked.dates</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="account.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <block id="print_vendor_checks_setting_container" position="inside">
+                <setting id="check_payment_blocked_dates" string="Blocked Check Dates" company_dependent="1"
+                         help="A check payment cannot use one of these dates as the date printed on the check.">
+                    <field name="check_payment_blocked_date_ids">
+                        <list editable="bottom">
+                            <field name="date"/>
+                            <field name="company_id" column_invisible="1"/>
+                        </list>
+                    </field>
+                </setting>
+            </block>
+        </field>
+    </record>
+</odoo>
