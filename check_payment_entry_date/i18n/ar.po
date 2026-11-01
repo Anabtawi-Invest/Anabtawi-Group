@@ -12,34 +12,59 @@ msgstr ""
 "Plural-Forms: nplurals=6; plural=n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 ? 4 : 5;\n"
 
 #. module: check_payment_entry_date
-#: model:ir.model.fields,field_description:check_payment_entry_date.field_res_company__check_payment_blocked_date_ids
-#: model:ir.model.fields,field_description:check_payment_entry_date.field_res_config_settings__check_payment_blocked_date_ids
 #: model_terms:ir.ui.view,arch_db:check_payment_entry_date.res_config_settings_view_form_check_blocked_dates
-msgid "Blocked Check Dates"
-msgstr "تواريخ ممنوع صرف الشيك فيها"
-
-#. module: check_payment_entry_date
-#: model:ir.model,name:check_payment_entry_date.model_check_payment_blocked_date
-msgid "Blocked Check Date"
-msgstr "تاريخ ممنوع لصرف الشيك"
+msgid "Blocked Check Days"
+msgstr "أيام ممنوع صرف الشيك فيها"
 
 #. module: check_payment_entry_date
 #: model_terms:ir.ui.view,arch_db:check_payment_entry_date.res_config_settings_view_form_check_blocked_dates
-msgid "A check payment cannot use one of these dates as the date printed on the check."
-msgstr "لا يمكن أن يكون تاريخ الشيك المطبوع أحد هذه التواريخ."
+msgid "A check cannot be cashed when the check date falls on one of these days."
+msgstr "لا يمكن صرف شيك إذا وقع تاريخ الشيك في أحد هذه الأيام."
 
 #. module: check_payment_entry_date
-#: model:ir.model.fields,field_description:check_payment_entry_date.field_check_payment_blocked_date__date
-msgid "Date"
-msgstr "التاريخ"
+#: model:ir.model.fields,field_description:check_payment_entry_date.field_res_company__check_blocked_saturday
+#: model:ir.model.fields,field_description:check_payment_entry_date.field_res_config_settings__check_blocked_saturday
+msgid "Saturday"
+msgstr "السبت"
+
+#. module: check_payment_entry_date
+#: model:ir.model.fields,field_description:check_payment_entry_date.field_res_company__check_blocked_sunday
+#: model:ir.model.fields,field_description:check_payment_entry_date.field_res_config_settings__check_blocked_sunday
+msgid "Sunday"
+msgstr "الأحد"
+
+#. module: check_payment_entry_date
+#: model:ir.model.fields,field_description:check_payment_entry_date.field_res_company__check_blocked_monday
+#: model:ir.model.fields,field_description:check_payment_entry_date.field_res_config_settings__check_blocked_monday
+msgid "Monday"
+msgstr "الإثنين"
+
+#. module: check_payment_entry_date
+#: model:ir.model.fields,field_description:check_payment_entry_date.field_res_company__check_blocked_tuesday
+#: model:ir.model.fields,field_description:check_payment_entry_date.field_res_config_settings__check_blocked_tuesday
+msgid "Tuesday"
+msgstr "الثلاثاء"
+
+#. module: check_payment_entry_date
+#: model:ir.model.fields,field_description:check_payment_entry_date.field_res_company__check_blocked_wednesday
+#: model:ir.model.fields,field_description:check_payment_entry_date.field_res_config_settings__check_blocked_wednesday
+msgid "Wednesday"
+msgstr "الأربعاء"
+
+#. module: check_payment_entry_date
+#: model:ir.model.fields,field_description:check_payment_entry_date.field_res_company__check_blocked_thursday
+#: model:ir.model.fields,field_description:check_payment_entry_date.field_res_config_settings__check_blocked_thursday
+msgid "Thursday"
+msgstr "الخميس"
+
+#. module: check_payment_entry_date
+#: model:ir.model.fields,field_description:check_payment_entry_date.field_res_company__check_blocked_friday
+#: model:ir.model.fields,field_description:check_payment_entry_date.field_res_config_settings__check_blocked_friday
+msgid "Friday"
+msgstr "الجمعة"
 
 #. module: check_payment_entry_date
 #. odoo-python
 #: code:addons/check_payment_entry_date/models/account_payment.py:0
 msgid "You cannot cash a check on this day."
 msgstr "لا يمكنك صرف شيك في هذا اليوم."
-
-#. module: check_payment_entry_date
-#: model:ir.model.constraint,message:check_payment_entry_date.constraint_check_payment_blocked_date_date_company_uniq
-msgid "This date is already blocked for check payments."
-msgstr "هذا التاريخ ممنوع مسبقاً لصرف الشيكات."

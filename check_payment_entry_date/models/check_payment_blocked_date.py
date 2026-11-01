@@ -1,40 +1,37 @@
 # -*- coding: utf-8 -*-
 from odoo import fields, models
 
-
-class CheckPaymentBlockedDate(models.Model):
-    _name = 'check.payment.blocked.date'
-    _description = 'Blocked Check Date'
-    _order = 'date, id'
-
-    date = fields.Date(required=True)
-    company_id = fields.Many2one(
-        'res.company',
-        required=True,
-        default=lambda self: self.env.company,
-        index=True,
-    )
-
-    _date_company_uniq = models.Constraint(
-        'unique (date, company_id)',
-        'This date is already blocked for check payments.',
-    )
+# date.weekday(): Monday is 0, Sunday is 6.
+BLOCKED_WEEKDAY_FIELDS = (
+    'check_blocked_monday',
+    'check_blocked_tuesday',
+    'check_blocked_wednesday',
+    'check_blocked_thursday',
+    'check_blocked_friday',
+    'check_blocked_saturday',
+    'check_blocked_sunday',
+)
 
 
 class ResCompany(models.Model):
     _inherit = 'res.company'
 
-    check_payment_blocked_date_ids = fields.One2many(
-        'check.payment.blocked.date',
-        'company_id',
-        string='Blocked Check Dates',
-    )
+    check_blocked_saturday = fields.Boolean(string='Saturday')
+    check_blocked_sunday = fields.Boolean(string='Sunday')
+    check_blocked_monday = fields.Boolean(string='Monday')
+    check_blocked_tuesday = fields.Boolean(string='Tuesday')
+    check_blocked_wednesday = fields.Boolean(string='Wednesday')
+    check_blocked_thursday = fields.Boolean(string='Thursday')
+    check_blocked_friday = fields.Boolean(string='Friday')
 
 
 class ResConfigSettings(models.TransientModel):
     _inherit = 'res.config.settings'
 
-    check_payment_blocked_date_ids = fields.One2many(
-        related='company_id.check_payment_blocked_date_ids',
-        readonly=False,
-    )
+    check_blocked_saturday = fields.Boolean(related='company_id.check_blocked_saturday', readonly=False)
+    check_blocked_sunday = fields.Boolean(related='company_id.check_blocked_sunday', readonly=False)
+    check_blocked_monday = fields.Boolean(related='company_id.check_blocked_monday', readonly=False)
+    check_blocked_tuesday = fields.Boolean(related='company_id.check_blocked_tuesday', readonly=False)
+    check_blocked_wednesday = fields.Boolean(related='company_id.check_blocked_wednesday', readonly=False)
+    check_blocked_thursday = fields.Boolean(related='company_id.check_blocked_thursday', readonly=False)
+    check_blocked_friday = fields.Boolean(related='company_id.check_blocked_friday', readonly=False)

@@ -2,6 +2,8 @@
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 
+from .check_payment_blocked_date import BLOCKED_WEEKDAY_FIELDS
+
 
 class AccountPayment(models.Model):
     _inherit = 'account.payment'
@@ -46,13 +48,9 @@ class AccountPayment(models.Model):
         payments = self.filtered(lambda payment: payment.is_check_payment and payment.check_date)
         if not payments:
             return
-        blocked = self.env['check.payment.blocked.date'].sudo().search([
-            ('company_id', 'in', payments.company_id.ids),
-            ('date', 'in', list(set(payments.mapped('check_date')))),
-        ])
-        blocked_keys = {(line.company_id.id, line.date) for line in blocked}
         for payment in payments:
-            if (payment.company_id.id, payment.check_date) in blocked_keys:
+            weekday_field = BLOCKED_WEEKDAY_FIELDS[payment.check_date.weekday()]
+            if payment.company_id[weekday_field]:
                 raise UserError(_("You cannot cash a check on this day."))
 
     def _force_check_payment_entry_date(self):

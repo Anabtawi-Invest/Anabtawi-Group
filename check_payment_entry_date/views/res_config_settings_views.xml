@@ -6,14 +6,17 @@
         <field name="inherit_id" ref="account.res_config_settings_view_form"/>
         <field name="arch" type="xml">
             <block id="print_vendor_checks_setting_container" position="inside">
-                <setting id="check_payment_blocked_dates" string="Blocked Check Dates" company_dependent="1"
-                         help="A check payment cannot use one of these dates as the date printed on the check.">
-                    <field name="check_payment_blocked_date_ids">
-                        <list editable="bottom">
-                            <field name="date"/>
-                            <field name="company_id" column_invisible="1"/>
-                        </list>
-                    </field>
+                <setting id="check_payment_blocked_days" string="Blocked Check Days" company_dependent="1"
+                         help="A check cannot be cashed when the check date falls on one of these days.">
+                    <div class="content-group">
+                        <div><field name="check_blocked_saturday" class="oe_inline"/> <label for="check_blocked_saturday"/></div>
+                        <div><field name="check_blocked_sunday" class="oe_inline"/> <label for="check_blocked_sunday"/></div>
+                        <div><field name="check_blocked_monday" class="oe_inline"/> <label for="check_blocked_monday"/></div>
+                        <div><field name="check_blocked_tuesday" class="oe_inline"/> <label for="check_blocked_tuesday"/></div>
+                        <div><field name="check_blocked_wednesday" class="oe_inline"/> <label for="check_blocked_wednesday"/></div>
+                        <div><field name="check_blocked_thursday" class="oe_inline"/> <label for="check_blocked_thursday"/></div>
+                        <div><field name="check_blocked_friday" class="oe_inline"/> <label for="check_blocked_friday"/></div>
+                    </div>
                 </setting>
             </block>
         </field>
