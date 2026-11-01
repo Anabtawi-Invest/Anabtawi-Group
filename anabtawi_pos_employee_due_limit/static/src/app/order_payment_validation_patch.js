@@ -9,12 +9,6 @@ const LOG_PREFIX = "[EMPLOYEE_DUE_LIMIT]";
 
 console.info(LOG_PREFIX, "POS patch loaded");
 
-function getCustomerAccountAmount(order) {
-    return order.payment_ids
-        .filter((line) => line.payment_method_id?.type === "pay_later" && line.amount > 0)
-        .reduce((total, line) => total + line.amount, 0);
-}
-
 patch(OrderPaymentValidation.prototype, {
     async askBeforeValidation() {
         const ok = await super.askBeforeValidation(...arguments);
@@ -29,22 +23,13 @@ patch(OrderPaymentValidation.prototype, {
             type: line.payment_method_id?.type,
             amount: line.amount,
         }));
-        const customerAccountAmount = getCustomerAccountAmount(this.order);
-        // Orders kept on the device (deferred sync / offline) are not on the server yet.
-        const heldCustomerAccount = this.pos.models["pos.order"]
-            .filter(
-                (order) =>
-                    order !== this.order &&
-                    order.isUnsyncedPaid &&
-                    order.getPartner?.()?.id === partner?.id
-            )
-            .reduce((total, order) => total + getCustomerAccountAmount(order), 0);
-
+        const customerAccountAmount = this.order.payment_ids
+            .filter((line) => line.payment_method_id?.type === "pay_later" && line.amount > 0)
+            .reduce((total, line) => total + line.amount, 0);
         console.info(LOG_PREFIX, "validating order", {
             partner: partner ? { id: partner.id, name: partner.name } : null,
             payments,
             customerAccountAmount,
-            heldCustomerAccount,
         });
         if (!partner || customerAccountAmount <= 0) {
             console.info(LOG_PREFIX, "not checked: no customer or no Customer Account payment");
@@ -57,7 +42,6 @@ patch(OrderPaymentValidation.prototype, {
                 partner.id,
                 this.pos.config.id,
                 customerAccountAmount,
-                heldCustomerAccount,
             ]);
         } catch (error) {
             console.error(LOG_PREFIX, "server check failed", error);

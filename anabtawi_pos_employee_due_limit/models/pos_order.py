@@ -25,19 +25,6 @@ class PosOrder(models.Model):
 
     def _check_employee_due_limit(self):
         self.ensure_one()
-        if not self.partner_id:
-            _logger.info("[EMPLOYEE_DUE_LIMIT] order %s has no customer -> not checked", self.id)
-            return
-
-        company = self.company_id or self.config_id.company_id
-        start_utc, end_utc = self.partner_id._get_company_calendar_month_bounds(company)
-        if not self.date_order or not (start_utc <= self.date_order < end_utc):
-            _logger.info(
-                "[EMPLOYEE_DUE_LIMIT] order %s date_order=%s outside current month [%s, %s) -> not checked",
-                self.id, self.date_order, start_utc, end_utc,
-            )
-            return
-
         _logger.info(
             "[EMPLOYEE_DUE_LIMIT] order %s payments: %s",
             self.id,
@@ -46,6 +33,9 @@ class PosOrder(models.Model):
                 for p in self.payment_ids
             ],
         )
+        if not self.partner_id:
+            _logger.info("[EMPLOYEE_DUE_LIMIT] order %s has no customer -> not checked", self.id)
+            return
         amount = sum(
             self.payment_ids.filtered(
                 lambda p: p.amount > 0 and p.payment_method_id.type == "pay_later"
