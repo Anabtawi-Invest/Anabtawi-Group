@@ -18,28 +18,32 @@ class ResPartner(models.Model):
     pos_customer_account_due = fields.Monetary(
         string="POS Customer Account Due (This Month)",
         currency_field="currency_id",
-        readonly=True,
-        copy=False,
+        compute="_compute_pos_customer_account_due",
         help="POS Customer Account purchases of this employee in the current calendar month "
-        "(company timezone, by order date). This is what the monthly Partner Limit is compared to.",
+        "(company timezone, by order date). This is what the monthly Partner Limit is compared to. "
+        "Older months are not included.",
     )
 
-    def _refresh_pos_customer_account_due(self):
-        """Store this month's POS Customer Account usage on the work contacts of these partners."""
-        commercial_partners = self.commercial_partner_id
-        if not commercial_partners:
-            return
-        employees = self.env["hr.employee"].sudo().with_context(active_test=False).search([
-            ("work_contact_id.commercial_partner_id", "in", commercial_partners.ids),
-        ])
-        for partner in employees.work_contact_id:
-            company = employees.filtered(lambda e: e.work_contact_id == partner)[:1].company_id
-            currency = (company or self.env.company).currency_id
-            due, _start, _end = partner._get_pos_customer_account_due_this_month(
-                currency, company or self.env.company
+    def _compute_pos_customer_account_due(self):
+        """Always compute live so the value resets automatically when the month changes."""
+        Employee = self.env["hr.employee"].sudo().with_context(active_test=False)
+        for partner in self:
+            employee = Employee.search(
+                [("work_contact_id", "in", (partner | partner.commercial_partner_id).ids)],
+                limit=1,
             )
-            if float_compare(partner.pos_customer_account_due, due, precision_rounding=currency.rounding):
-                partner.sudo().pos_customer_account_due = due
+            if not employee:
+                partner.pos_customer_account_due = 0.0
+                continue
+            company = employee.company_id or self.env.company
+            due, _start, _end = partner._get_pos_customer_account_due_this_month(
+                company.currency_id, company
+            )
+            partner.pos_customer_account_due = due
+
+    def _refresh_pos_customer_account_due(self):
+        """Invalidate the computed monthly due so the next read is up to date."""
+        self.invalidate_recordset(["pos_customer_account_due"])
 
     def _get_due_limit_employee(self, company):
         self.ensure_one()
