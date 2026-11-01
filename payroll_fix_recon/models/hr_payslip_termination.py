@@ -17,6 +17,9 @@ class HrPayslip(models.Model):
         """Remaining days of the given leave types (native balance first, allocations as fallback)."""
         emp = self.employee_id
         target = self.date_to or fields.Date.today()
+        net_bal_days = sum(balance_hours.get((emp.id, t.id), 0.0) for t in leave_types) / U.DAILY_HOURS
+        if net_bal_days < 0:
+            return net_bal_days
         days = 0.0
         for ltype in leave_types:
             try:
@@ -29,7 +32,7 @@ class HrPayslip(models.Model):
                 pass
         if days != 0.0:
             return days
-        return sum(balance_hours.get((emp.id, t.id), 0.0) for t in leave_types) / U.DAILY_HOURS
+        return net_bal_days
 
     def _pfr_set_input(self, code, quantity, amount):
         itype = self.env['hr.payslip.input.type'].sudo().search([('code', '=', code)], limit=1)
@@ -47,7 +50,8 @@ class HrPayslip(models.Model):
             vals['quantity'] = quantity
         line = self.input_line_ids.filtered(lambda l: l.input_type_id == itype)[:1]
         if line:
-            self.input_line_ids = [(1, line.id, vals)]
+            # Respect user's manual input if already present on the payslip
+            return
         else:
             self.input_line_ids = [(0, 0, dict(vals, input_type_id=itype.id))]
 
