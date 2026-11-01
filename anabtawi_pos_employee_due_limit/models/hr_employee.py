@@ -34,6 +34,7 @@ class HrEmployee(models.Model):
                 partner = employee.work_contact_id.with_company(company)
                 if float_compare(partner.credit_limit, limit, precision_rounding=rounding):
                     partner.credit_limit = limit
+        employees.work_contact_id._refresh_pos_customer_account_due()
 
     @api.model_create_multi
     def create(self, vals_list):

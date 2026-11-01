@@ -29,6 +29,7 @@ Employees without a wage cannot buy on Customer Account.
     "data": [
         "data/ir_cron_data.xml",
         "views/res_config_settings_views.xml",
+        "views/res_partner_views.xml",
     ],
     "assets": {
         "point_of_sale._assets_pos": [

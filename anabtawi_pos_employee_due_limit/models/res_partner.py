@@ -15,6 +15,32 @@ _logger = logging.getLogger(__name__)
 class ResPartner(models.Model):
     _inherit = "res.partner"
 
+    pos_customer_account_due = fields.Monetary(
+        string="POS Customer Account Due (This Month)",
+        currency_field="currency_id",
+        readonly=True,
+        copy=False,
+        help="POS Customer Account purchases of this employee in the current calendar month "
+        "(company timezone, by order date). This is what the monthly Partner Limit is compared to.",
+    )
+
+    def _refresh_pos_customer_account_due(self):
+        """Store this month's POS Customer Account usage on the work contacts of these partners."""
+        commercial_partners = self.commercial_partner_id
+        if not commercial_partners:
+            return
+        employees = self.env["hr.employee"].sudo().with_context(active_test=False).search([
+            ("work_contact_id.commercial_partner_id", "in", commercial_partners.ids),
+        ])
+        for partner in employees.work_contact_id:
+            company = employees.filtered(lambda e: e.work_contact_id == partner)[:1].company_id
+            currency = (company or self.env.company).currency_id
+            due, _start, _end = partner._get_pos_customer_account_due_this_month(
+                currency, company or self.env.company
+            )
+            if float_compare(partner.pos_customer_account_due, due, precision_rounding=currency.rounding):
+                partner.sudo().pos_customer_account_due = due
+
     def _get_due_limit_employee(self, company):
         self.ensure_one()
         partners = self | self.commercial_partner_id
@@ -41,19 +67,17 @@ class ResPartner(models.Model):
     def _get_pos_customer_account_due_this_month(self, currency, company, exclude_order=None):
         """Sum of Customer Account payments on POS orders dated in the current calendar month.
 
-        Older months are ignored completely, even if still unpaid. Settlements of older months
-        do not free this month's allowance. Amounts are converted to `currency`.
+        Older months are ignored completely, even if still unpaid.
         """
         self.ensure_one()
         start_utc, end_utc = self._get_company_calendar_month_bounds(company)
         commercial_partner = self.commercial_partner_id
-        domain = [
+        orders = self.env["pos.order"].sudo().search([
             ("partner_id", "child_of", commercial_partner.id),
             ("state", "in", ["paid", "done"]),
             ("date_order", ">=", start_utc),
             ("date_order", "<", end_utc),
-        ]
-        orders = self.env["pos.order"].sudo().search(domain)
+        ])
         if exclude_order:
             orders -= exclude_order
 
@@ -68,12 +92,12 @@ class ResPartner(models.Model):
             )
         return currency.round(total), start_utc, end_utc
 
-    def _get_employee_due_limit_status(self, config, amount, exclude_order=None):
-        """Check whether adding `amount` on Customer Account keeps the employee under his monthly limit.
+    def _get_employee_due_limit_status(self, config, amount, exclude_order=None, held_amount=0.0):
+        """Check whether adding `amount` keeps the employee under his monthly Customer Account limit.
 
-        Amounts are in the POS currency. Partners that are not employees are never blocked.
         Only POS Customer Account sales of the current calendar month (company timezone, by
         order date) are counted. Older unpaid dues are ignored.
+        `held_amount` is Customer Account already taken on this device but not yet synced.
         """
         self.ensure_one()
         status = {"blocked": False, "message": ""}
@@ -110,17 +134,19 @@ class ResPartner(models.Model):
                 limit, currency, config.company_id, fields.Date.today()
             )
 
-        due, month_start, month_end = self._get_pos_customer_account_due_this_month(
+        month_due, month_start, month_end = self._get_pos_customer_account_due_this_month(
             currency, employee.company_id or config.company_id, exclude_order=exclude_order
         )
+        due = currency.round(month_due + (held_amount or 0.0))
         remaining = limit - due
         blocked = float_compare(due + amount, limit, precision_rounding=currency.rounding) > 0
 
         _logger.info(
             "[EMPLOYEE_DUE_LIMIT] partner %s (%s) employee %s: wage=%s limit=%s | "
-            "month [%s, %s) this_month_due=%s this_order=%s due+order=%s -> %s",
+            "month [%s, %s) server_month_due=%s held_unsynced=%s due=%s "
+            "this_order=%s due+order=%s -> %s",
             self.id, self.name, employee.name, wage, limit,
-            month_start, month_end, due, amount, due + amount,
+            month_start, month_end, month_due, held_amount, due, amount, due + amount,
             "BLOCKED" if blocked else "allowed",
         )
 
@@ -143,13 +169,15 @@ class ResPartner(models.Model):
         return status
 
     @api.model
-    def pos_check_employee_due_limit(self, partner_id, config_id, amount):
+    def pos_check_employee_due_limit(self, partner_id, config_id, amount, held_amount=0.0):
         _logger.info(
-            "[EMPLOYEE_DUE_LIMIT] POS check called: partner_id=%s config_id=%s amount=%s",
-            partner_id, config_id, amount,
+            "[EMPLOYEE_DUE_LIMIT] POS check called: partner_id=%s config_id=%s amount=%s held=%s user=%s",
+            partner_id, config_id, amount, held_amount, self.env.user.login,
         )
         partner = self.browse(partner_id).exists()
         config = self.env["pos.config"].browse(config_id).exists()
         if not partner or not config or amount <= 0:
             return {"blocked": False, "message": ""}
-        return partner._get_employee_due_limit_status(config, amount)
+        return partner._get_employee_due_limit_status(
+            config, amount, held_amount=held_amount or 0.0
+        )
