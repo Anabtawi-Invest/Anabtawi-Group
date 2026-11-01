@@ -3,7 +3,7 @@
     "name": "POS Employee Due Limit",
     "version": "19.0.1.0.4",
     "category": "Point of Sale",
-    "summary": "Limit employees' Customer Account due in POS to a percentage of their net wage",
+    "summary": "Limit employees' monthly POS Customer Account usage to a percentage of their net wage",
     "description": """
 POS Employee Due Limit
 ======================
@@ -18,7 +18,9 @@ The limit is refreshed when the wage, the work contact or the settings change,
 and every day by a scheduled action.
 
 When a POS order is paid with Customer Account for an employee, the order is
-blocked if the employee's current due plus the order amount exceeds the limit.
+blocked if this calendar month's Customer Account purchases (by order date,
+company timezone) plus the order amount exceed the monthly limit.
+Older unpaid dues are ignored, so the employee can buy again every month.
 Employees without a wage cannot buy on Customer Account.
     """,
     "author": "Anabtawi",

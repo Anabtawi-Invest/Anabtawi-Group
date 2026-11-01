@@ -15,7 +15,7 @@ class ResCompany(models.Model):
     employee_due_limit_enabled = fields.Boolean(
         string="Employee Due Limit",
         help="Fill employees' credit limit from their wage and block POS Customer Account "
-        "orders that exceed it.",
+        "orders that exceed this month's limit.",
     )
     employee_due_deduction_percent = fields.Float(
         string="Wage Deduction %",
@@ -25,7 +25,8 @@ class ResCompany(models.Model):
     employee_due_max_percent = fields.Float(
         string="Max Due % of Net Wage",
         default=10.0,
-        help="Maximum Customer Account due allowed, as a percentage of the net wage.",
+        help="Maximum Customer Account purchases allowed this calendar month, "
+        "as a percentage of the net wage.",
     )
 
     def write(self, vals):
