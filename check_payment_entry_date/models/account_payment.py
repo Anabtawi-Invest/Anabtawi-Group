@@ -26,26 +26,12 @@ class AccountPayment(models.Model):
                 vals['date'] = today
         payments = super().create(vals_list)
         payments._force_check_payment_entry_date()
-        payments._raise_if_blocked_check_date()
         return payments
 
-    @api.onchange('date', 'check_date', 'payment_method_line_id')
-    def _onchange_blocked_check_day(self):
-        if not self.state or self.state == 'draft':
-            self._raise_if_blocked_check_date()
-
     def write(self, vals):
-        leaving_draft = self.browse()
-        if vals.get('state') not in (None, 'draft', 'canceled', 'rejected'):
-            leaving_draft = self.filtered(lambda payment: payment.state == 'draft')
         res = super().write(vals)
-        if self.env.context.get('skip_check_payment_entry_date'):
-            return res
-        to_check = leaving_draft | self.filtered(lambda payment: payment.state == 'draft')
-        if {'date', 'check_date', 'payment_method_line_id'} & set(vals):
-            to_check |= self
-        to_check._raise_if_blocked_check_date()
-        self._force_check_payment_entry_date()
+        if not self.env.context.get('skip_check_payment_entry_date'):
+            self._force_check_payment_entry_date()
         return res
 
     def action_post(self):
