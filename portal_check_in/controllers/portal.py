@@ -95,7 +95,7 @@ class PortalCheckInController(http.Controller):
             _logger.warning("portal_check_in: invalid float value received: %r", value)
             return False
 
-    def _build_geo_information(self, employee, latitude=False, longitude=False):
+    def _build_geo_information(self, employee, latitude=False, longitude=False, accuracy=False, altitude=False):
         geo_information = {
             'mode': 'systray',
         }
@@ -110,6 +110,10 @@ class PortalCheckInController(http.Controller):
                 'ip_address': ip_address,
                 'browser': browser,
             })
+            if accuracy is not False:
+                geo_information['accuracy'] = accuracy
+            if altitude is not False:
+                geo_information['altitude'] = altitude
             location = _("Unknown")
             if 'base.geocoder' in request.env:
                 try:
@@ -119,10 +123,12 @@ class PortalCheckInController(http.Controller):
             geo_information['location'] = location
 
         _logger.info(
-            "portal_check_in: geo payload built for employee_id=%s -> lat=%s, lon=%s, ip=%s, browser=%s, location=%s",
+            "portal_check_in: geo payload built for employee_id=%s -> lat=%s, lon=%s, accuracy_m=%s, altitude_m=%s, ip=%s, browser=%s, location=%s",
             employee.id,
             latitude,
             longitude,
+            accuracy,
+            altitude,
             geo_information.get('ip_address'),
             geo_information.get('browser'),
             geo_information.get('location'),
@@ -302,13 +308,23 @@ class PortalCheckInController(http.Controller):
             # Attendance is always toggled for the current user's own employee only.
             latitude = self._safe_float(kwargs.get('latitude'))
             longitude = self._safe_float(kwargs.get('longitude'))
+            accuracy = self._safe_float(kwargs.get('accuracy'))
+            altitude = self._safe_float(kwargs.get('altitude'))
             _logger.info(
-                "portal_check_in: parsed geo values for employee_id=%s -> latitude=%s longitude=%s",
+                "portal_check_in: parsed geo values for employee_id=%s -> latitude=%s longitude=%s accuracy_m=%s altitude_m=%s",
                 employee.id,
                 latitude,
                 longitude,
+                accuracy,
+                altitude,
             )
-            geo_information = self._build_geo_information(employee, latitude=latitude, longitude=longitude)
+            geo_information = self._build_geo_information(
+                employee,
+                latitude=latitude,
+                longitude=longitude,
+                accuracy=accuracy,
+                altitude=altitude,
+            )
             attendance = employee._attendance_action_change(geo_information)
             _logger.info(
                 "portal_check_in: attendance toggled successfully for employee_id=%s attendance_id=%s new_state=%s",

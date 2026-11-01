@@ -11,6 +11,9 @@ _logger = logging.getLogger(__name__)
 
 
 PORTAL_ATTENDANCE_LOCK_MINUTES = 2
+# Sent by the portal only for diagnosis. hr.attendance stores in_*/out_* from
+# every geo key, so these must be removed before the attendance is written.
+PORTAL_GEO_DIAGNOSTIC_KEYS = ("accuracy", "altitude")
 
 
 class HrEmployee(models.Model):
@@ -172,13 +175,26 @@ class HrEmployee(models.Model):
         payload = geo_information or {}
         employee_lat = self._safe_float(payload.get('latitude'))
         employee_lon = self._safe_float(payload.get('longitude'))
+        accuracy_m = self._safe_float(payload.get('accuracy'))
+        altitude_m = self._safe_float(payload.get('altitude'))
         if employee_lat is None or employee_lon is None:
+            _logger.warning(
+                "portal_check_in GEO_MISSING employee_id=%s employee=%s state=%s "
+                "payload_keys=%s latitude=%r longitude=%r",
+                self.id,
+                self.name,
+                self.attendance_state,
+                sorted(payload.keys()),
+                payload.get('latitude'),
+                payload.get('longitude'),
+            )
             raise UserError(_(
                 "تعذر التحقق من موقعك. يرجى تفعيل إذن الموقع ثم المحاولة مرة أخرى."
             ))
 
         nearest_distance_m = None
         nearest_radius_m = None
+        nearest_location = None
         for work_location in work_locations:
             location_lat = self._safe_float(work_location.attendance_geo_latitude)
             location_lon = self._safe_float(work_location.attendance_geo_longitude)
@@ -186,12 +202,71 @@ class HrEmployee(models.Model):
             distance_m = self._haversine_distance_m(
                 employee_lat, employee_lon, location_lat, location_lon
             )
-            if distance_m <= radius_m:
+            # Positive north = browser is north of the saved pin.
+            # Positive east = browser is east of the saved pin.
+            delta_north_m = (employee_lat - location_lat) * 111132.0
+            delta_east_m = (
+                (employee_lon - location_lon)
+                * 111320.0
+                * math.cos(math.radians(location_lat))
+            )
+            inside = distance_m <= radius_m
+            _logger.warning(
+                "portal_check_in GEO_COMPARE employee_id=%s employee=%s state=%s "
+                "browser_lat=%.7f browser_lon=%.7f browser_map=https://maps.google.com/?q=%.7f,%.7f "
+                "accuracy_m=%s altitude_m=%s ip=%s browser=%s "
+                "location_id=%s location=%s enforce=%s "
+                "location_lat=%.7f location_lon=%.7f location_map=https://maps.google.com/?q=%.7f,%.7f "
+                "radius_m=%.2f distance_m=%.2f inside=%s "
+                "delta_north_m=%.1f delta_east_m=%.1f",
+                self.id,
+                self.name,
+                self.attendance_state,
+                employee_lat,
+                employee_lon,
+                employee_lat,
+                employee_lon,
+                accuracy_m,
+                altitude_m,
+                payload.get('ip_address'),
+                payload.get('browser'),
+                work_location.id,
+                work_location.name,
+                work_location.attendance_geo_enforce,
+                location_lat,
+                location_lon,
+                location_lat,
+                location_lon,
+                radius_m,
+                distance_m,
+                inside,
+                delta_north_m,
+                delta_east_m,
+            )
+            if inside:
                 return
             if nearest_distance_m is None or distance_m < nearest_distance_m:
                 nearest_distance_m = distance_m
                 nearest_radius_m = radius_m
+                nearest_location = work_location
 
+        hint = self._portal_geo_reject_hint(
+            nearest_distance_m or 0.0,
+            nearest_radius_m or 0.0,
+            accuracy_m,
+        )
+        _logger.warning(
+            "portal_check_in GEO_REJECT employee_id=%s employee=%s state=%s "
+            "nearest_location=%s distance_m=%.2f radius_m=%.2f accuracy_m=%s hint=%s",
+            self.id,
+            self.name,
+            self.attendance_state,
+            nearest_location.display_name if nearest_location else False,
+            nearest_distance_m or 0.0,
+            nearest_radius_m or 0.0,
+            accuracy_m,
+            hint,
+        )
         action_name = "تسجيل الانصراف" if self.attendance_state == 'checked_in' else "تسجيل الحضور"
         raise UserError(_(
             "تم رفض %(action)s: أنت خارج النطاق المسموح لمواقع الدوام المحددة. "
@@ -201,6 +276,30 @@ class HrEmployee(models.Model):
             'dist': nearest_distance_m or 0.0,
             'rad': nearest_radius_m or 0.0,
         })
+
+    @staticmethod
+    def _portal_geo_reject_hint(distance_m, radius_m, accuracy_m):
+        """Explain a geofence rejection for the server log."""
+        if accuracy_m is None:
+            return (
+                "browser sent a point with no accuracy. Open both map links in the "
+                "GEO_COMPARE line: if the browser point is not the factory floor, the "
+                "device location is wrong; if the saved pin is not the factory, fix "
+                "the work location latitude/longitude."
+            )
+        if accuracy_m >= 1000 or accuracy_m > max(radius_m, 100.0):
+            return (
+                "browser fix is coarse (accuracy %.0f m, allowed radius %.0f m). "
+                "A desktop browser, Wi-Fi location, or VPN often reports a point "
+                "kilometers from the person. Retry on a phone with GPS."
+                % (accuracy_m, radius_m)
+            )
+        return (
+            "browser fix looks precise (accuracy %.0f m) but is still %.0f m from "
+            "the saved pin (allowed %.0f m). The work location latitude/longitude "
+            "is probably not the factory building."
+            % (accuracy_m, distance_m, radius_m)
+        )
 
     def _get_available_overtime_authorization_request(self):
         self.ensure_one()
@@ -341,6 +440,9 @@ class HrEmployee(models.Model):
 
         # Enforce geofence restriction for both check-in and check-out
         self._check_portal_geo_restriction(geo_information=geo_information)
+        if geo_information:
+            for key in PORTAL_GEO_DIAGNOSTIC_KEYS:
+                geo_information.pop(key, None)
 
         if self.attendance_state != 'checked_in':
             approval_request = self._check_overtime_gate_before_check_in()

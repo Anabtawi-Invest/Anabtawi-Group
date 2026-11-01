@@ -352,6 +352,8 @@
                                             <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
                                             <input type="hidden" name="latitude" id="lat" class="o_portal_check_latitude"/>
                                             <input type="hidden" name="longitude" id="lon" class="o_portal_check_longitude"/>
+                                            <input type="hidden" name="accuracy" id="geo_accuracy"/>
+                                            <input type="hidden" name="altitude" id="geo_altitude"/>
                                             <button type="button" class="pc-check-circle-btn" onclick="submitCheckIn()">
                                                 <i class="fa fa-hand-pointer-o"/>
                                                 <t t-if="state == 'checked_in'"><t t-esc="txt_check_out_btn"/></t>
@@ -446,6 +448,8 @@
                         var button = form.querySelector('button');
                         var latitudeInput = document.getElementById('lat');
                         var longitudeInput = document.getElementById('lon');
+                        var accuracyInput = document.getElementById('geo_accuracy');
+                        var altitudeInput = document.getElementById('geo_altitude');
 
                         function submitForm() {
                             isSubmitting = true;
@@ -465,8 +469,22 @@
 
                         navigator.geolocation.getCurrentPosition(
                             function (position) {
-                                latitudeInput.value = String(position.coords.latitude || '');
-                                longitudeInput.value = String(position.coords.longitude || '');
+                                var coords = position.coords || {};
+                                latitudeInput.value = String(coords.latitude || '');
+                                longitudeInput.value = String(coords.longitude || '');
+                                if (accuracyInput) {
+                                    accuracyInput.value = coords.accuracy == null ? '' : String(coords.accuracy);
+                                }
+                                if (altitudeInput) {
+                                    altitudeInput.value = coords.altitude == null ? '' : String(coords.altitude);
+                                }
+                                console.warn('[portal_check_in] browser position', {
+                                    latitude: coords.latitude,
+                                    longitude: coords.longitude,
+                                    accuracy_m: coords.accuracy,
+                                    altitude_m: coords.altitude,
+                                    timestamp: position.timestamp,
+                                });
                                 submitForm();
                             },
                             function () {
