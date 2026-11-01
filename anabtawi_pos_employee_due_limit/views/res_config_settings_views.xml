@@ -8,7 +8,7 @@
             <xpath expr="//block[@id='pos_payment_section']" position="after">
                 <block title="Employee Due Limit" id="pos_employee_due_limit_section">
                     <setting id="employee_due_limit"
-                             help="Fill the Partner Limit of each employee's work contact from the wage, and block Customer Account orders that exceed it.">
+                             help="Fill the Partner Limit of each employee's work contact from the wage, and block Customer Account orders that exceed this month's limit.">
                         <field name="employee_due_limit_enabled"/>
                         <div class="content-group mt-2" invisible="not employee_due_limit_enabled">
                             <div class="row">
@@ -20,7 +20,8 @@
                                 <field name="employee_due_max_percent" class="oe_inline"/>
                             </div>
                             <div class="text-muted mt-1">
-                                Limit = (Wage - Wage x Deduction %) x Max Due %
+                                Monthly limit = (Wage - Wage x Deduction %) x Max Due %.<br/>
+                                Only POS Customer Account orders of the current calendar month count.
                             </div>
                             <button name="action_recompute_employee_due_limits" type="object"
                                     string="Recompute Credit Limits" icon="oi-arrow-right"
