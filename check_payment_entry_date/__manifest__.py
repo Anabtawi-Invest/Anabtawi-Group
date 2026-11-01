@@ -1,6 +1,6 @@
 {
     'name': 'Check Payment Entry Date',
-    'version': '19.0.1.2.0',
+    'version': '19.0.1.4.0',
     'summary': 'Post check payments with today as the journal entry date',
     'description': """
 Check Payment Entry Date

@@ -29,28 +29,62 @@ class AccountPayment(models.Model):
         payments._raise_if_blocked_check_date()
         return payments
 
+    @api.onchange('date', 'check_date', 'payment_method_line_id')
+    def _onchange_blocked_check_day(self):
+        if not self.state or self.state == 'draft':
+            self._raise_if_blocked_check_date()
+
     def write(self, vals):
+        leaving_draft = self.browse()
+        if vals.get('state') not in (None, 'draft', 'canceled', 'rejected'):
+            leaving_draft = self.filtered(lambda payment: payment.state == 'draft')
         res = super().write(vals)
-        if not self.env.context.get('skip_check_payment_entry_date'):
-            self._force_check_payment_entry_date()
-            to_check = self.filtered(lambda payment: payment.state == 'draft')
-            if 'check_date' in vals:
-                to_check |= self
-            to_check._raise_if_blocked_check_date()
+        if self.env.context.get('skip_check_payment_entry_date'):
+            return res
+        to_check = leaving_draft | self.filtered(lambda payment: payment.state == 'draft')
+        if {'date', 'check_date', 'payment_method_line_id'} & set(vals):
+            to_check |= self
+        to_check._raise_if_blocked_check_date()
+        self._force_check_payment_entry_date()
         return res
 
     def action_post(self):
-        self._force_check_payment_entry_date()
         self._raise_if_blocked_check_date()
+        self._force_check_payment_entry_date()
         return super().action_post()
 
+    def _is_cheque_payment(self):
+        self.ensure_one()
+        if self.is_check_payment or self.check_number:
+            return True
+        code = self.payment_method_code or self.payment_method_line_id.code or ''
+        if code == 'check_printing' or 'check' in code:
+            return True
+        name = self.payment_method_line_id.name or ''
+        lowered = name.casefold()
+        return 'check' in lowered or 'cheque' in lowered or 'شيك' in name
+
+    def _cheque_date_to_restrict(self):
+        """Date chosen for the cheque.
+
+        Check Date is the printed date when that field is in use.
+        A standard Checks payment uses the Date field shown on the form.
+        """
+        self.ensure_one()
+        if not self._is_cheque_payment():
+            return False
+        if self.is_check_payment:
+            return self.check_date or self.date
+        return self.date
+
     def _raise_if_blocked_check_date(self):
-        payments = self.filtered(lambda payment: payment.is_check_payment and payment.check_date)
-        if not payments:
-            return
-        for payment in payments:
-            weekday_field = BLOCKED_WEEKDAY_FIELDS[payment.check_date.weekday()]
-            if payment.company_id[weekday_field]:
+        for payment in self:
+            cheque_date = payment._cheque_date_to_restrict()
+            if not cheque_date:
+                continue
+            weekday_field = BLOCKED_WEEKDAY_FIELDS[cheque_date.weekday()]
+            companies = (payment.company_id | payment.company_id.root_id | self.env.company).sudo()
+            if any(company[weekday_field] for company in companies):
                 raise UserError(_("You cannot cash a check on this day."))
 
     def _force_check_payment_entry_date(self):
