@@ -6,7 +6,8 @@ import math
 from collections import defaultdict
 from datetime import datetime, time, timedelta
 
-from odoo import models
+from odoo import models, _
+from odoo.exceptions import ValidationError
 
 from .pfr_settlement import recon_alloc_name, pto_recon_alloc_name
 
@@ -29,6 +30,33 @@ class HrPayslip(models.Model):
     # ------------------------------------------------------------------
     # Lifecycle hooks
     # ------------------------------------------------------------------
+    def _pfr_recompute_paid_cycle(self):
+        """Unpaid, cancel, draft, compute sheet, validate, paid. One payslip."""
+        self.ensure_one()
+        slip = self.with_context(
+            tracking_disable=True, mail_notrack=True, mail_create_nolog=True,
+            mail_activity_automation_skip=True,
+        )
+        if slip.state == 'paid':
+            slip.action_payslip_unpaid()
+        slip.invalidate_recordset()
+        if slip.state == 'validated':
+            slip.action_payslip_cancel()
+        slip.invalidate_recordset()
+        if slip.state == 'cancel':
+            slip.action_payslip_draft()
+        slip.invalidate_recordset()
+        if slip.state == 'draft':
+            slip.compute_sheet()
+        slip.invalidate_recordset()
+        if slip.error_count:
+            raise ValidationError(slip._get_error_message() or _("Payslip has errors."))
+        if slip.state == 'draft':
+            slip.action_payslip_done()
+        slip.invalidate_recordset()
+        if slip.state == 'validated':
+            slip.action_payslip_paid()
+
     def action_payslip_done(self):
         by_company = defaultdict(lambda: self.env['hr.payslip'])
         for slip in self:
@@ -130,9 +158,17 @@ class HrPayslip(models.Model):
                 if chunk < 7.99:
                     # a day-based leave type counts any leave as a whole day: store the real fraction of a day
                     leave._pfr_store_fraction(chunk)
-            except Exception:
+            except Exception as exc:
                 _logger.exception("[payroll_fix_recon] %s settlement leave failed slip=%s day=%s",
                                   label, self.id, day)
+                message = str(exc).lower()
+                if exc.__class__.__name__ in ('InterfaceError', 'OperationalError') \
+                        or 'cursor already closed' in message or 'ssl connection' in message:
+                    raise
+                # No allocation fails every later day the same way. Stop here so one slip
+                # cannot keep the database connection open until it drops.
+                if 'allocation' in message:
+                    break
             remaining -= chunk
             day += timedelta(days=1)
 

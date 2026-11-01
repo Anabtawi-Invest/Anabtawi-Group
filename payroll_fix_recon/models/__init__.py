@@ -13,4 +13,5 @@ from . import hr_payslip_worked_days
 from . import hr_payroll_structure
 from . import pfr_advance_wizard
 from . import hr_payslip_run
+from . import pfr_recompute_batch
 from . import hr_leave_allocation

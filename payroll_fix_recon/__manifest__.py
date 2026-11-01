@@ -1,6 +1,6 @@
 {
     'name': 'Payroll Fix Recon',
-    'version': '19.0.1.4.6',
+    'version': '19.0.1.5.0',
     'category': 'Human Resources/Payroll',
     'summary': 'Attendance reconciliation payroll: break policy, daily metrics, rest/absent engine, '
                '4-step lateness settlement and a single-source worked-days ledger.',
@@ -24,6 +24,7 @@
         'views/res_config_settings_views.xml',
         'views/pfr_advance_wizard_views.xml',
         'views/hr_payslip_run_views.xml',
+        'views/pfr_recompute_batch_views.xml',
     ],
     'pre_init_hook': 'pre_init_hook',
     'post_init_hook': 'post_init_hook',

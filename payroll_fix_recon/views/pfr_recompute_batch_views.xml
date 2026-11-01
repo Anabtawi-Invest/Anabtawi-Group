@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_pfr_payslip_recompute_wizard_form" model="ir.ui.view">
+        <field name="name">pfr.payslip.recompute.wizard.form</field>
+        <field name="model">pfr.payslip.recompute.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Recompute Payslips">
+                <div class="alert alert-info" role="alert">
+                    Each payslip is set unpaid, cancelled, put back to draft, computed, validated, and marked paid.
+                    The work runs in the background, one step at a time, so the screen does not have to stay open.
+                </div>
+                <group>
+                    <group>
+                        <field name="company_id" options="{'no_create': True}"/>
+                        <field name="date_from"/>
+                        <field name="date_to"/>
+                    </group>
+                    <group>
+                        <field name="batch_size"/>
+                        <field name="payslip_count" readonly="1"/>
+                    </group>
+                </group>
+                <footer>
+                    <button name="action_start" type="object" string="Start in background" class="btn-primary"/>
+                    <button string="Cancel" special="cancel" class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_pfr_payslip_recompute_wizard" model="ir.actions.act_window">
+        <field name="name">Recompute Payslips</field>
+        <field name="res_model">pfr.payslip.recompute.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <record id="view_pfr_payslip_recompute_batch_list" model="ir.ui.view">
+        <field name="name">pfr.payslip.recompute.batch.list</field>
+        <field name="model">pfr.payslip.recompute.batch</field>
+        <field name="arch" type="xml">
+            <list create="0">
+                <field name="name"/>
+                <field name="date_from"/>
+                <field name="date_to"/>
+                <field name="company_id"/>
+                <field name="state"/>
+                <field name="done_count"/>
+                <field name="skipped_count"/>
+                <field name="remaining_count"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_pfr_payslip_recompute_batch_form" model="ir.ui.view">
+        <field name="name">pfr.payslip.recompute.batch.form</field>
+        <field name="model">pfr.payslip.recompute.batch</field>
+        <field name="arch" type="xml">
+            <form string="Payslip Recompute" create="0">
+                <header>
+                    <button name="action_refresh" type="object" string="Refresh" class="btn-primary"
+                            invisible="state != 'running'"/>
+                    <button name="action_cancel" type="object" string="Cancel remaining"
+                            invisible="state != 'running'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="running,done"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button class="oe_stat_button" icon="fa-file-text-o" disabled="1">
+                            <field name="payslip_count" widget="statinfo" string="Payslips"/>
+                        </button>
+                        <button class="oe_stat_button" icon="fa-check" disabled="1">
+                            <field name="done_count" widget="statinfo" string="Done"/>
+                        </button>
+                        <button class="oe_stat_button" icon="fa-exclamation-triangle" disabled="1">
+                            <field name="skipped_count" widget="statinfo" string="Skipped"/>
+                        </button>
+                        <button class="oe_stat_button" icon="fa-clock-o" disabled="1">
+                            <field name="remaining_count" widget="statinfo" string="Remaining"/>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="company_id" readonly="1"/>
+                            <field name="date_from" readonly="1"/>
+                            <field name="date_to" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="batch_size" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Log">
+                            <field name="log" nolabel="1" readonly="1"/>
+                        </page>
+                        <page string="Skipped">
+                            <field name="skipped_slip_ids" readonly="1">
+                                <list>
+                                    <field name="employee_id"/>
+                                    <field name="date_from"/>
+                                    <field name="date_to"/>
+                                    <field name="state"/>
+                                    <field name="name"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_pfr_payslip_recompute_batch" model="ir.actions.act_window">
+        <field name="name">Recompute Batches</field>
+        <field name="res_model">pfr.payslip.recompute.batch</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <menuitem id="menu_pfr_payslip_recompute"
+              name="Recompute Payslips"
+              parent="hr_payroll.menu_hr_payroll_payslips"
+              action="action_pfr_payslip_recompute_wizard"
+              groups="hr_payroll.group_hr_payroll_manager"
+              sequence="90"/>
+
+</odoo>

@@ -11,5 +11,15 @@
             <field name="interval_number">1</field>
             <field name="interval_type">days</field>
         </record>
+        <record id="ir_cron_pfr_recompute_payslips" model="ir.cron">
+            <field name="name">Payroll Fix Recon: Recompute Payslips</field>
+            <field name="model_id" ref="model_pfr_payslip_recompute_batch"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_recompute_payslips()</field>
+            <field name="active" eval="True"/>
+            <field name="user_id" ref="base.user_root"/>
+            <field name="interval_number">1</field>
+            <field name="interval_type">minutes</field>
+        </record>
     </data>
 </odoo>
