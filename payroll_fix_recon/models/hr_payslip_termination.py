@@ -27,12 +27,20 @@ class HrPayslip(models.Model):
                                          for v in content.values() if isinstance(v, dict)))
             except Exception:
                 pass
-        return days or max(0.0, sum(balance_hours.get((emp.id, t.id), 0.0) for t in leave_types) / U.DAILY_HOURS)
+        if days != 0.0:
+            return days
+        return sum(balance_hours.get((emp.id, t.id), 0.0) for t in leave_types) / U.DAILY_HOURS
 
     def _pfr_set_input(self, code, quantity, amount):
         itype = self.env['hr.payslip.input.type'].sudo().search([('code', '=', code)], limit=1)
         if not itype:
-            return
+            try:
+                itype = self.env['hr.payslip.input.type'].sudo().create({
+                    'code': code,
+                    'name': code.replace('_', ' ').title(),
+                })
+            except Exception:
+                return
         Input = self.env['hr.payslip.input']
         vals = {'amount': amount}
         if 'quantity' in Input._fields:
@@ -56,19 +64,21 @@ class HrPayslip(models.Model):
             types = settlement.leave_types(slip.company_id)
             bal = settlement.balance_hours([slip.employee_id.id], (types['annual'] | types['pto']).ids)
 
-            # Full Extra Hours bank (already x1.25 in storage) — amount uses this quantity.
+            # Remaining Extra Hours balance is in real hours (divided by 1.25).
+            # The termination settlement amount is multiplied by 1.25 (U.OT_RATE).
             extra = max(0.0, round(slip.remaining_extra_hours_balance or 0.0, 2))
-            slip._pfr_set_input('CLEAR_EXTRA', extra, round(extra * hourly, 3))
+            slip._pfr_set_input('CLEAR_EXTRA', extra, round(extra * U.OT_RATE * hourly, 3))
 
             annual = slip._pfr_leave_balance_days(types['annual'], bal)
-            annual = max(0.0, round(annual - (slip.lateness_covered_by_annual_leave or 0.0) / U.DAILY_HOURS, 4))
+            annual = round(annual - (slip.lateness_covered_by_annual_leave or 0.0) / U.DAILY_HOURS, 4)
             slip._pfr_set_input('CLEAR_ANNUAL', annual, round(annual * daily, 3))
 
-            # Full PTO days (entered already x1.5) — amount uses this quantity.
+            # Remaining PTO balance is in real hours (divided by 1.5).
+            # The termination settlement amount is multiplied by 1.5 (U.PH_RATE).
             if 'remaining_pto_balance' in slip._fields:
                 pto = max(0.0, round((slip.remaining_pto_balance or 0.0) / U.DAILY_HOURS, 4))
             else:
                 pto = slip._pfr_leave_balance_days(types['pto'], bal)
                 covered = getattr(slip, 'lateness_covered_by_pto', 0.0) or 0.0
                 pto = max(0.0, round(pto - covered / U.DAILY_HOURS, 4))
-            slip._pfr_set_input('CLEAR_PTO', pto, round(pto * daily, 3))
+            slip._pfr_set_input('CLEAR_PTO', pto, round(pto * U.PH_RATE * daily, 3))

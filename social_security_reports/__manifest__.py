@@ -16,6 +16,7 @@
     'depends': [
         'base',
         'hr',
+        'hr_payroll',
     ],
     'data': [
         'security/ir.model.access.csv',

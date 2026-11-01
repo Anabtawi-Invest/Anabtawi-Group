@@ -6,12 +6,12 @@
         <field name="arch" type="xml">
             <list decoration-success="state == 'reconciled'" decoration-warning="state == 'confirmed'"
                   decoration-danger="customer_collections_mismatch or contribution_mismatch or commission_mismatch"
-                  default_order="date_end desc">
+                  default_order="date_end desc" sample="1">
                 <field name="name"/>
                 <field name="aggregator_id"/>
                 <field name="date_start"/>
                 <field name="date_end"/>
-                <field name="order_count"/>
+                <field name="order_count" optional="hide"/>
                 <field name="expected_net_settlement" widget="monetary" sum="Expected"/>
                 <field name="actual_net_received" widget="monetary" sum="Actual"/>
                 <field name="variance_amount" widget="monetary" sum="Variance"
@@ -20,8 +20,9 @@
                 <field name="contribution_mismatch" column_invisible="True"/>
                 <field name="commission_mismatch" column_invisible="True"/>
                 <field name="currency_id" column_invisible="True"/>
-                <field name="statement_reference" optional="show"/>
-                <field name="state" widget="badge"/>
+                <field name="statement_reference" optional="hide"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'reconciled'" decoration-warning="state == 'confirmed'"/>
                 <field name="company_id" groups="base.group_multi_company"/>
             </list>
         </field>
@@ -56,85 +57,128 @@
                     <field name="state" widget="statusbar" statusbar_visible="draft,confirmed,reconciled"/>
                 </header>
                 <sheet>
+                    <field name="company_id" invisible="1"/>
+                    <field name="currency_id" invisible="1"/>
+                    <field name="statement_filename" invisible="1"/>
+                    <field name="customer_collections_mismatch" invisible="1"/>
+                    <field name="contribution_mismatch" invisible="1"/>
+                    <field name="commission_mismatch" invisible="1"/>
+
                     <div class="oe_title">
                         <label for="name"/>
                         <h1><field name="name" readonly="state != 'draft'"/></h1>
                     </div>
                     <group>
-                        <group string="Statement Scope">
-                            <field name="company_id" options="{'no_create': True}" readonly="state != 'draft'"/>
-                            <field name="currency_id" options="{'no_create': True}" readonly="state != 'draft'"/>
+                        <group name="scope">
                             <field name="aggregator_id" domain="[('company_id', '=', company_id)]" readonly="state != 'draft'"/>
-                            <field name="date_start" readonly="state != 'draft'"/>
-                            <field name="date_end" readonly="state != 'draft'"/>
+                            <label for="date_start" string="Period"/>
+                            <div class="o_row">
+                                <field name="date_start" readonly="state != 'draft'"/>
+                                <i class="fa fa-long-arrow-right" title="to"/>
+                                <field name="date_end" readonly="state != 'draft'"/>
+                            </div>
+                        </group>
+                        <group name="statement">
                             <field name="statement_reference" readonly="state == 'reconciled'"/>
                             <label for="statement_file"/>
                             <div class="o_row">
                                 <field name="statement_file" filename="statement_filename" readonly="state == 'reconciled'"/>
                                 <button name="action_download_statement_template" type="object"
-                                        string="Download Template" class="btn-link" icon="fa-download"/>
+                                        string="Template" class="btn-link" icon="fa-download"
+                                        title="Download blank statement template"/>
                             </div>
-                            <field name="statement_filename" invisible="1"/>
-                        </group>
-                        <group string="Audit Links">
-                            <field name="order_count"/>
-                            <field name="line_count"/>
-                            <field name="bank_statement_line_id" readonly="state == 'reconciled'"/>
-                            <field name="account_move_id" readonly="state == 'reconciled'"/>
-                            <field name="reconciled_by" invisible="state != 'reconciled'"/>
-                            <field name="reconciled_at" invisible="state != 'reconciled'"/>
                         </group>
                     </group>
-                    <group>
-                        <group string="Expected from POS">
-                            <field name="order_count"/>
-                            <field name="expected_customer_collections" widget="monetary"/>
-                            <field name="expected_contribution" widget="monetary"/>
-                            <field name="expected_commission" widget="monetary"/>
-                            <field name="expected_net_settlement" widget="monetary" class="fw-bold"/>
-                        </group>
-                        <group string="Actual Aggregator Statement">
-                            <field name="statement_order_count"/>
-                            <label for="actual_customer_collections"/>
-                            <div class="o_row">
-                                <field name="actual_customer_collections" widget="monetary" readonly="state == 'reconciled'"/>
-                                <span class="badge text-bg-danger" invisible="not customer_collections_mismatch">Mismatch vs Expected</span>
-                            </div>
-                            <label for="actual_contribution"/>
-                            <div class="o_row">
-                                <field name="actual_contribution" widget="monetary" readonly="state == 'reconciled'"/>
-                                <span class="badge text-bg-danger" invisible="not contribution_mismatch">Mismatch vs Expected</span>
-                            </div>
-                            <label for="actual_commission"/>
-                            <div class="o_row">
-                                <field name="actual_commission" widget="monetary" readonly="state == 'reconciled'"/>
-                                <span class="badge text-bg-danger" invisible="not commission_mismatch">Mismatch vs Expected</span>
-                            </div>
-                            <field name="adjustment_amount" widget="monetary" readonly="state == 'reconciled'"/>
-                            <field name="actual_net_received" widget="monetary" class="fw-bold"/>
-                        </group>
-                    </group>
-                    <group string="Statement Breakdown">
-                        <group>
-                            <field name="actual_tpro_loyalty_charges" widget="monetary" readonly="state == 'reconciled'"/>
-                            <field name="actual_tpro_cost_covered" widget="monetary" readonly="state == 'reconciled'"/>
-                            <field name="actual_sponsored_deal_fees" widget="monetary" readonly="state == 'reconciled'"/>
-                        </group>
-                        <group>
-                            <field name="actual_payment_handling_charges" widget="monetary" readonly="state == 'reconciled'"/>
-                            <field name="actual_payment_handling_charges_vat" widget="monetary" readonly="state == 'reconciled'"/>
-                            <field name="cancelled_charged_order_count"/>
-                            <field name="cancelled_charged_commission" widget="monetary"/>
-                        </group>
-                    </group>
-                    <group string="Reconciliation Variance">
-                        <field name="variance_amount" widget="monetary"/>
-                        <field name="variance_percent" widget="percentage"/>
-                        <field name="variance_reason" readonly="state == 'reconciled'"
-                               placeholder="Required when the actual statement differs from POS expectations."/>
-                    </group>
-                    <chatter/>
+
+                    <!-- Summary cards: expected vs actual vs variance -->
+                    <div class="d-flex flex-wrap gap-3 my-3" name="summary">
+                        <div class="border rounded p-3 flex-fill">
+                            <div class="text-muted text-uppercase small">Expected from POS</div>
+                            <h3 class="mb-0"><field name="expected_net_settlement" widget="monetary"/></h3>
+                            <div class="text-muted small"><field name="order_count"/> orders</div>
+                        </div>
+                        <div class="border rounded p-3 flex-fill">
+                            <div class="text-muted text-uppercase small">Actual Received</div>
+                            <h3 class="mb-0"><field name="actual_net_received" widget="monetary"/></h3>
+                            <div class="text-muted small"><field name="statement_order_count"/> orders on statement</div>
+                        </div>
+                        <div class="border rounded p-3 flex-fill">
+                            <div class="text-muted text-uppercase small">Variance</div>
+                            <h3 class="mb-0">
+                                <field name="variance_amount" widget="monetary"
+                                       decoration-danger="variance_amount != 0"
+                                       decoration-success="variance_amount == 0"/>
+                            </h3>
+                            <div class="text-muted small"><field name="variance_percent" widget="percentage"/></div>
+                        </div>
+                    </div>
+
+                    <notebook>
+                        <page string="Expected vs Actual" name="comparison">
+                            <group>
+                                <group string="Expected from POS">
+                                    <field name="expected_customer_collections" widget="monetary"/>
+                                    <field name="expected_contribution" widget="monetary"/>
+                                    <field name="expected_commission" widget="monetary"/>
+                                    <field name="expected_net_settlement" widget="monetary" class="fw-bold"/>
+                                </group>
+                                <group string="Actual Aggregator Statement">
+                                    <label for="actual_customer_collections"/>
+                                    <div class="o_row">
+                                        <field name="actual_customer_collections" widget="monetary" readonly="state == 'reconciled'"/>
+                                        <span class="badge text-bg-danger" invisible="not customer_collections_mismatch">Mismatch</span>
+                                    </div>
+                                    <label for="actual_contribution"/>
+                                    <div class="o_row">
+                                        <field name="actual_contribution" widget="monetary" readonly="state == 'reconciled'"/>
+                                        <span class="badge text-bg-danger" invisible="not contribution_mismatch">Mismatch</span>
+                                    </div>
+                                    <label for="actual_commission"/>
+                                    <div class="o_row">
+                                        <field name="actual_commission" widget="monetary" readonly="state == 'reconciled'"/>
+                                        <span class="badge text-bg-danger" invisible="not commission_mismatch">Mismatch</span>
+                                    </div>
+                                    <field name="adjustment_amount" widget="monetary" readonly="state == 'reconciled'"/>
+                                    <field name="actual_net_received" widget="monetary" class="fw-bold"/>
+                                </group>
+                            </group>
+                            <group>
+                                <field name="variance_reason" readonly="state == 'reconciled'"
+                                       placeholder="Required when the actual statement differs from POS expectations."/>
+                            </group>
+                        </page>
+                        <page string="Statement Breakdown" name="breakdown">
+                            <group>
+                                <group>
+                                    <field name="actual_tpro_loyalty_charges" widget="monetary" readonly="state == 'reconciled'"/>
+                                    <field name="actual_tpro_cost_covered" widget="monetary" readonly="state == 'reconciled'"/>
+                                    <field name="actual_sponsored_deal_fees" widget="monetary" readonly="state == 'reconciled'"/>
+                                </group>
+                                <group>
+                                    <field name="actual_payment_handling_charges" widget="monetary" readonly="state == 'reconciled'"/>
+                                    <field name="actual_payment_handling_charges_vat" widget="monetary" readonly="state == 'reconciled'"/>
+                                    <field name="cancelled_charged_order_count"/>
+                                    <field name="cancelled_charged_commission" widget="monetary"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Audit" name="audit">
+                            <group>
+                                <group>
+                                    <field name="line_count"/>
+                                    <field name="bank_statement_line_id" readonly="state == 'reconciled'"/>
+                                    <field name="account_move_id" readonly="state == 'reconciled'"/>
+                                </group>
+                                <group>
+                                    <field name="company_id" options="{'no_create': True}" readonly="state != 'draft'" groups="base.group_multi_company"/>
+                                    <field name="reconciled_by" invisible="state != 'reconciled'"/>
+                                    <field name="reconciled_at" invisible="state != 'reconciled'"/>
+                                </group>
+                            </group>
+                        </page>
+                    </notebook>
                 </sheet>
+                <chatter/>
             </form>
         </field>
     </record>
@@ -143,7 +187,7 @@
         <field name="name">online.campaign.settlement.pivot</field>
         <field name="model">online.campaign.settlement</field>
         <field name="arch" type="xml">
-            <pivot string="Settlement Reconciliation">
+            <pivot string="Settlement Reconciliation" sample="1">
                 <field name="aggregator_id" type="row"/>
                 <field name="date_end" interval="month" type="col"/>
                 <field name="expected_net_settlement" type="measure"/>
@@ -159,7 +203,7 @@
         <field name="name">online.campaign.settlement.graph</field>
         <field name="model">online.campaign.settlement</field>
         <field name="arch" type="xml">
-            <graph string="Expected vs Actual Settlements" type="bar">
+            <graph string="Expected vs Actual Settlements" type="bar" sample="1">
                 <field name="aggregator_id"/>
                 <field name="expected_net_settlement" type="measure"/>
                 <field name="actual_net_received" type="measure"/>
@@ -178,21 +222,29 @@
                 <field name="statement_reference"/>
                 <field name="date_start"/>
                 <field name="date_end"/>
+                <filter name="draft" string="Draft" domain="[('state', '=', 'draft')]"/>
                 <filter name="to_reconcile" string="To Reconcile" domain="[('state', '=', 'confirmed')]"/>
                 <filter name="reconciled" string="Reconciled" domain="[('state', '=', 'reconciled')]"/>
+                <separator/>
                 <filter name="with_variance" string="With Variance" domain="[('variance_amount', '!=', 0)]"/>
-                <filter name="group_aggregator" string="Aggregator" context="{'group_by': 'aggregator_id'}"/>
-                <filter name="group_month" string="Statement Month" context="{'group_by': 'date_end:month'}"/>
-                <filter name="group_state" string="Status" context="{'group_by': 'state'}"/>
+                <group>
+                    <filter name="group_aggregator" string="Aggregator" context="{'group_by': 'aggregator_id'}"/>
+                    <filter name="group_month" string="Statement Month" context="{'group_by': 'date_end:month'}"/>
+                    <filter name="group_state" string="Status" context="{'group_by': 'state'}"/>
+                </group>
             </search>
         </field>
     </record>
 
     <record id="action_online_campaign_settlements" model="ir.actions.act_window">
-        <field name="name">Aggregator Settlements</field>
+        <field name="name">Settlements</field>
         <field name="res_model">online.campaign.settlement</field>
-        <field name="view_mode">list,form,pivot,graph</field>
+        <field name="view_mode">list,form</field>
         <field name="search_view_id" ref="view_online_campaign_settlement_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Create your first settlement</p>
+            <p>Pick an aggregator and statement period, import the statement, then reconcile against POS expectations.</p>
+        </field>
     </record>
 
     <record id="action_online_campaign_settlement_analysis" model="ir.actions.act_window">

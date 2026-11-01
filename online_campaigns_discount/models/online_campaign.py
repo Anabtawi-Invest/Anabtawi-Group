@@ -21,6 +21,7 @@ class OnlineDiscountCampaign(models.Model):
         ],
         default="draft",
         required=True,
+        copy=False,
         tracking=True,
         index=True,
     )
@@ -113,9 +114,27 @@ class OnlineDiscountCampaign(models.Model):
                 )
                 values.setdefault("company_id", aggregator.company_id.id)
                 values.setdefault("currency_id", aggregator.company_id.currency_id.id)
+            self._check_no_direct_approval(values)
         return super().create(vals_list)
 
+    @api.model
+    def _check_no_direct_approval(self, values):
+        """Approval can only be granted through the approve actions, never by a raw write/create."""
+        if (
+            values.get("state") == "approved"
+            or values.get("ecommerce_approved")
+            or values.get("finance_approved")
+        ):
+            raise AccessError(_(
+                "Campaigns can only be approved with the E-commerce and Finance approval buttons."
+            ))
+
+    def _write_approval(self, values):
+        """Approval write path used only by the approve actions (bypasses the direct-write guard)."""
+        return super().write(values)
+
     def write(self, values):
+        self._check_no_direct_approval(values)
         protected = {
             "start_datetime", "end_datetime", "aggregator_id", "discount_percent",
             "discount_cap_amount", "cap_application", "pricelist_ids", "apply_scope",
@@ -209,14 +228,14 @@ class OnlineDiscountCampaign(models.Model):
     def _finalize_approval(self):
         for campaign in self:
             if campaign.ecommerce_approved and campaign.finance_approved:
-                campaign.state = "approved"
+                campaign._write_approval({"state": "approved"})
 
     def action_ecommerce_approve(self):
         if not self.env.user.has_group("online_campaigns_discount.group_online_campaign_ecommerce_manager"):
             raise AccessError(_("Only an E-commerce Campaign Manager can give this approval."))
         self._check_ready_for_approval()
         for campaign in self.filtered(lambda item: item.state == "pending"):
-            campaign.write({
+            campaign._write_approval({
                 "ecommerce_approved": True,
                 "ecommerce_approved_by": self.env.user.id,
                 "ecommerce_approved_at": fields.Datetime.now(),
@@ -227,6 +246,8 @@ class OnlineDiscountCampaign(models.Model):
         if not self.env.user.has_group("online_campaigns_discount.group_online_campaign_finance_manager"):
             raise AccessError(_("Only an Online Campaign Finance Manager can give this approval."))
         self._check_ready_for_approval()
+        if self.filtered(lambda campaign: campaign.state == "pending" and not campaign.ecommerce_approved):
+            raise UserError(_("E-commerce must approve the campaign before Finance can approve it."))
         missing_accounts = self.filtered(
             lambda campaign: (campaign.aggregator_contribution_percent > 0 and not campaign.aggregator_id.receivable_account_id)
             or not campaign.aggregator_id.discount_expense_account_id
@@ -238,7 +259,7 @@ class OnlineDiscountCampaign(models.Model):
                 "Configure the required aggregator receivable, company discount expense, and commission expense accounts before finance approval."
             ))
         for campaign in self.filtered(lambda item: item.state == "pending"):
-            campaign.write({
+            campaign._write_approval({
                 "finance_approved": True,
                 "finance_approved_by": self.env.user.id,
                 "finance_approved_at": fields.Datetime.now(),

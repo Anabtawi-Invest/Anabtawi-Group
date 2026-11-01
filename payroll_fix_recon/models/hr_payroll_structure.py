@@ -25,6 +25,97 @@ RULES = [
             "result = round(min(hours * wage / 240.0, wage), 3) if hours >= 0.01 else 0.0\n"),
     },
     {
+        'code': 'DED_ANNUAL_LEAVE', 'name': 'Negative Annual Leave Deduction', 'category': 'hr_payroll.DED',
+        'sequence': 75, 'appears_on_payslip': True, 'condition_select': 'python',
+        'condition_python': (
+            "v = version or (employee.version_id if (employee and 'version_id' in employee._fields) else False)\n"
+            "wage = (v.wage if (v and 'wage' in v._fields) else 0.0) or employee.wage or 0.0\n"
+            "annual = inputs['CLEAR_ANNUAL'].amount if 'CLEAR_ANNUAL' in inputs else 0.0\n"
+            "accrual_amount = 0.0\n"
+            "if 'CLEAR_ANNUAL' in inputs and employee and payslip and wage > 0 and payslip.date_to:\n"
+            "    end_date = payslip.date_to\n"
+            "    start_date = (\n"
+            "        (v.contract_date_start if (v and 'contract_date_start' in v._fields) else None)\n"
+            "        or (v.date_start if (v and 'date_start' in v._fields) else None)\n"
+            "        or (employee.contract_date_start if (employee and 'contract_date_start' in employee._fields) else None)\n"
+            "        or (employee.first_contract_date if (employee and 'first_contract_date' in employee._fields) else None)\n"
+            "    )\n"
+            "    if start_date and start_date <= end_date:\n"
+            "        years = end_date.year - start_date.year\n"
+            "        if (end_date.month, end_date.day) < (start_date.month, start_date.day):\n"
+            "            years -= 1\n"
+            "        monthly_accrual = 1.75 if years >= 5 else 1.17\n"
+            "        month = end_date.month\n"
+            "        year = end_date.year\n"
+            "        if month in (1, 3, 5, 7, 8, 10, 12):\n"
+            "            days_in_month = 31\n"
+            "        elif month in (4, 6, 9, 11):\n"
+            "            days_in_month = 30\n"
+            "        elif month == 2:\n"
+            "            leap_year = (year % 4 == 0 and (year % 100 != 0 or year % 400 == 0))\n"
+            "            days_in_month = 29 if leap_year else 28\n"
+            "        else:\n"
+            "            days_in_month = 30\n"
+            "        accrued_days = monthly_accrual * end_date.day / days_in_month\n"
+            "        accrual_amount = accrued_days * wage / 30.0\n"
+            "result = 'CLEAR_ANNUAL' in inputs and (annual + accrual_amount) < 0\n"
+        ),
+        'amount_python_compute': (
+            "v = version or (employee.version_id if (employee and 'version_id' in employee._fields) else False)\n"
+            "wage = (v.wage if (v and 'wage' in v._fields) else 0.0) or employee.wage or 0.0\n"
+            "annual = inputs['CLEAR_ANNUAL'].amount if 'CLEAR_ANNUAL' in inputs else 0.0\n"
+            "accrual_amount = 0.0\n"
+            "if 'CLEAR_ANNUAL' in inputs and employee and payslip and wage > 0 and payslip.date_to:\n"
+            "    end_date = payslip.date_to\n"
+            "    start_date = (\n"
+            "        (v.contract_date_start if (v and 'contract_date_start' in v._fields) else None)\n"
+            "        or (v.date_start if (v and 'date_start' in v._fields) else None)\n"
+            "        or (employee.contract_date_start if (employee and 'contract_date_start' in employee._fields) else None)\n"
+            "        or (employee.first_contract_date if (employee and 'first_contract_date' in employee._fields) else None)\n"
+            "    )\n"
+            "    if start_date and start_date <= end_date:\n"
+            "        years = end_date.year - start_date.year\n"
+            "        if (end_date.month, end_date.day) < (start_date.month, start_date.day):\n"
+            "            years -= 1\n"
+            "        monthly_accrual = 1.75 if years >= 5 else 1.17\n"
+            "        month = end_date.month\n"
+            "        year = end_date.year\n"
+            "        if month in (1, 3, 5, 7, 8, 10, 12):\n"
+            "            days_in_month = 31\n"
+            "        elif month in (4, 6, 9, 11):\n"
+            "            days_in_month = 30\n"
+            "        elif month == 2:\n"
+            "            leap_year = (year % 4 == 0 and (year % 100 != 0 or year % 400 == 0))\n"
+            "            days_in_month = 29 if leap_year else 28\n"
+            "        else:\n"
+            "            days_in_month = 30\n"
+            "        accrued_days = monthly_accrual * end_date.day / days_in_month\n"
+            "        accrual_amount = accrued_days * wage / 30.0\n"
+            "net_annual = annual + accrual_amount\n"
+            "result = round(abs(net_annual), 3) if ('CLEAR_ANNUAL' in inputs and net_annual < 0) else 0.0\n"
+        ),
+    },
+    {
+        'code': 'TERM_EXTRA', 'name': 'Termination: Extra Hours Settlement', 'category': 'hr_payroll.ALW',
+        'sequence': 80, 'appears_on_payslip': True, 'condition_select': 'python',
+        'condition_python': "result = 'CLEAR_EXTRA' in inputs and inputs['CLEAR_EXTRA'].amount > 0\n",
+        'amount_python_compute': "result = round(inputs['CLEAR_EXTRA'].amount, 3)\n",
+    },
+    {
+        'code': 'TERM_PTO', 'name': 'Termination: Paid Time Off Settlement', 'category': 'hr_payroll.ALW',
+        'sequence': 81, 'appears_on_payslip': True, 'condition_select': 'python',
+        'condition_python': "result = 'CLEAR_PTO' in inputs and inputs['CLEAR_PTO'].amount > 0\n",
+        'amount_python_compute': "result = round(inputs['CLEAR_PTO'].amount, 3)\n",
+    },
+    {
+        'code': 'TERM_ANNUAL', 'name': 'Termination: Annual Leave Settlement', 'category': 'hr_payroll.ALW',
+        'sequence': 82, 'appears_on_payslip': True, 'condition_select': 'python',
+        'condition_python': "result = 'CLEAR_ANNUAL' in inputs and inputs['CLEAR_ANNUAL'].amount > 0\n",
+        'amount_python_compute': (
+            "# negative balances are handled by DED_ANNUAL_LEAVE\n"
+            "result = round(inputs['CLEAR_ANNUAL'].amount, 3)\n"),
+    },
+    {
         'code': 'ACTUAL', 'name': 'Actual Salary', 'category': 'hr_payroll.NET',
         'sequence': 90, 'appears_on_payslip': True, 'condition_select': 'none',
         'amount_python_compute': (
@@ -58,20 +149,6 @@ RULES = [
 class HrPayrollStructure(models.Model):
     _inherit = 'hr.payroll.structure'
 
-    @api.model_create_multi
-    def create(self, vals_list):
-        structures = super().create(vals_list)
-        structures._pfr_ensure_rules()
-        return structures
-
     def _pfr_ensure_rules(self):
-        Rule = self.env['hr.salary.rule'].sudo()
-        for struct in self.sudo():
-            have = set(Rule.search([('struct_id', '=', struct.id)]).mapped('code'))
-            for spec in RULES:
-                if spec['code'] in have:
-                    continue
-                vals = {k: v for k, v in spec.items() if k != 'category'}
-                vals.update(struct_id=struct.id, category_id=self.env.ref(spec['category']).id,
-                            amount_select='code')
-                Rule.create(vals)
+        """Disabled: salary rules are managed manually per salary structure in Odoo UI."""
+        return

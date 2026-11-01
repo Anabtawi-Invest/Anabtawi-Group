@@ -8,48 +8,13 @@ Extends account.payment with print_check action.
 """
 
 from odoo import models, fields, api
-from odoo.tools.misc import format_date
 from datetime import date
-
-
-class AccountPaymentMethodLine(models.Model):
-    _inherit = 'account.payment.method.line'
-
-    is_check_payment = fields.Boolean(
-        string='Check Payment',
-        help='Payments using this method show a Check Date, which is the date printed on the cheque.',
-    )
 
 
 class AccountPayment(models.Model):
     """Extend Account Payment to add Print Check action."""
     
     _inherit = 'account.payment'
-
-    is_check_payment = fields.Boolean(related='payment_method_line_id.is_check_payment')
-    check_date = fields.Date(string='Check Date', tracking=True, copy=False)
-
-    @api.onchange('payment_method_line_id')
-    def _onchange_check_payment_date(self):
-        """Copy the current accounting date into Check Date once.
-
-        Forcing the accounting date to today is handled by check_payment_entry_date.
-        This runs safely either before or after that module: it only fills an empty Check Date.
-        """
-        if self.is_check_payment and self.state == 'draft' and not self.check_date:
-            self.check_date = self.date
-
-    @api.model_create_multi
-    def create(self, vals_list):
-        today = fields.Date.context_today(self)
-        method_lines = self.env['account.payment.method.line'].browse(
-            [vals['payment_method_line_id'] for vals in vals_list if vals.get('payment_method_line_id')]
-        )
-        check_line_ids = set(method_lines.filtered('is_check_payment').ids)
-        for vals in vals_list:
-            if vals.get('payment_method_line_id') in check_line_ids and not vals.get('check_date'):
-                vals['check_date'] = vals.get('date') or today
-        return super().create(vals_list)
 
     def _get_cheque_memo(self):
         """Return memo/reference text for cheque printing (Odoo 19: memo, not ref)."""
@@ -70,7 +35,7 @@ class AccountPayment(models.Model):
             'partner_id': self.partner_id.id,
             'partner_name': self.partner_id.name or '',
             'cheque_amount': self.amount,
-            'cheque_date': self._format_cheque_date(self._get_cheque_print_date()),
+            'cheque_date': self._format_cheque_date(self.date or date.today()),
             'currency_code': self.currency_id.name or 'JOD',
             'cheque_memo': self._get_cheque_memo(),
         })
@@ -85,16 +50,6 @@ class AccountPayment(models.Model):
             'context': self.env.context,
         }
     
-    def _get_cheque_print_date(self):
-        if self.is_check_payment and self.check_date:
-            return self.check_date
-        return self.date or date.today()
-
-    def _check_build_page_info(self, i, p):
-        page = super()._check_build_page_info(i, p)
-        page['date'] = format_date(self.env, self._get_cheque_print_date())
-        return page
-
     def _format_cheque_date(self, dt):
         """Format date for cheque display (DD/MM/YYYY)."""
         if not dt:
@@ -150,7 +105,7 @@ class PrintCheck(models.TransientModel):
                     'partner_id': payment.partner_id.id,
                     'partner_name': payment.partner_id.name or '',
                     'cheque_amount': payment.amount,
-                    'cheque_date': self._format_date(payment._get_cheque_print_date()),
+                    'cheque_date': self._format_date(payment.date),
                     'currency_code': payment.currency_id.name or 'JOD',
                     'cheque_memo': payment._get_cheque_memo(),
                 })

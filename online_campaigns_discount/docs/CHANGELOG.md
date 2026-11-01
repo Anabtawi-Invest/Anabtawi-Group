@@ -1,3 +1,12 @@
+# Changelog
+
+## 19.0.6.0.0
+- UI/UX cleanup: menus cut from 12 to 8 (removed duplicate Dashboard, Calendar, Aggregator Sales, Non-Campaign Sales; use view switcher and filters instead).
+- Campaigns: kanban by status, tabbed form (Discount, Eligibility, Approvals, Notes), approval status banners, period on one line.
+- Settlements: expected/actual/variance summary cards, tabbed form.
+- Aggregators: form grouped into Commission, POS Integration, Accounting tabs.
+- Reports: consolidated into one Sales & Profitability action, "This Month" filter, empty-state help, sample data.
+
 ## 19.0.5.6.0
 - Aggregator order ID now prints on the customer receipt: extends point_of_sale.ReceiptHeader with a line showing "<Aggregator> Order ID: <ref>" when online_aggregator_order_ref is set. Wired the previously-unused receipt_extension.xml into the manifest assets.
 
@@ -40,7 +49,6 @@
 - Fixed campaign accounting so discount recovery is posted to a dedicated configurable account instead of the normal Sales account.
 - Reclassification from POS receivable to aggregator receivable is skipped when the aggregator payment method already posts directly to the aggregator receivable account.
 
-# Changelog
 
 ## 19.0.5.0.0
 

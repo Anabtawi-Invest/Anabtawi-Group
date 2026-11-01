@@ -207,6 +207,10 @@ class HrPayslip(models.Model):
         for slip in self:
             if not slip.termination_clearance or not slip.employee_id:
                 continue
+            # payroll_fix_recon (when installed) writes the CLEAR_* termination inputs itself;
+            # REM_LEAVE / ETH_PAY_EOC would only duplicate them with the unreconciled balances.
+            if "remaining_extra_hours_balance" in slip._fields:
+                continue
 
             rem_leave_type = slip._get_input_type_by_code("REM_LEAVE")
             eoc_type = slip._get_input_type_by_code("ETH_PAY_EOC")

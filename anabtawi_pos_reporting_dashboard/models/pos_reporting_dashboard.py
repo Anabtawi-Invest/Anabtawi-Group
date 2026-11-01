@@ -355,6 +355,34 @@ class PosReportingDashboard(models.TransientModel):
             "context": {"create": False, "delete": False},
         }
 
+    def _open_session_drilldown(self, period, configs):
+        """Open the pos.session records the dashboard search included."""
+        list_view = self.env.ref("point_of_sale.view_pos_session_tree", raise_if_not_found=False)
+        form_view = self.env.ref("point_of_sale.view_pos_session_form", raise_if_not_found=False)
+        views = []
+        if list_view:
+            views.append((list_view.id, "list"))
+        if form_view:
+            views.append((form_view.id, "form"))
+        if configs:
+            domain = [
+                ("start_at", ">=", period["session_start"]),
+                ("start_at", "<=", period["session_end"]),
+                ("config_id", "in", configs.ids),
+            ]
+        else:
+            domain = [("id", "=", 0)]
+        return {
+            "name": _("POS Sessions"),
+            "type": "ir.actions.act_window",
+            "res_model": "pos.session",
+            "view_mode": "list,form",
+            "views": views if views else [(False, "list"), (False, "form")],
+            "domain": domain,
+            "target": "current",
+            "context": {"create": False, "delete": False},
+        }
+
     @staticmethod
     def _orders_per_hour(values):
         if values["open_hours"] <= 0:
@@ -783,6 +811,7 @@ class PosReportingDashboard(models.TransientModel):
                 "advance_pending_count": global_totals["advance_pending_count"],
                 "delivery_amount": global_totals["delivery_amount"],
                 "order_count": global_totals["order_count"],
+                "session_count": len(sessions),
                 "orders_per_hour": global_totals["orders_per_hour"],
                 "avg_basket": global_totals["avg_basket"],
                 "paying_order_count": global_totals["paying_order_count"],
@@ -1064,6 +1093,10 @@ class PosReportingDashboard(models.TransientModel):
         configs = self._get_report_configs(config_ids)
         active_config_ids = set(configs.ids)
         sessions = engine._get_sessions(period, configs)
+
+        # Sessions the search included: opened on a selected branch inside the period.
+        if metric_type == "sessions":
+            return self._open_session_drilldown(period, configs)
 
         # Open native POS Expenses list/form (type, status, amount) instead of unified report.
         if metric_type == "expense_amount":
@@ -1534,10 +1567,8 @@ class PosReportingDashboard(models.TransientModel):
             ("state", "in", ("to_approve", "approved", "refused")),
         ])
 
-    def _open_period_expense_drilldown(self, period, states=None):
+    def _open_period_expense_drilldown(self, period):
         expenses = self._get_period_pos_expenses(period)
-        if states:
-            expenses = expenses.filtered(lambda e: e.state in states)
         expense_ids = expenses.ids
 
         list_view = self.env.ref(
@@ -1573,7 +1604,6 @@ class PosReportingDashboard(models.TransientModel):
         del config_ids  # unused: this dashboard is not branch-scoped
         period = self._parse_period(date_from, date_to)
 
-        # --- POS Expenses (all branches, by expense date) ---
         expense_approved_amount = 0.0
         expense_approved_count = 0
         expense_pending_amount = 0.0
@@ -1585,15 +1615,12 @@ class PosReportingDashboard(models.TransientModel):
                 expense_approved_amount += amt
                 expense_approved_count += 1
             else:
-                # to_approve + refused
                 expense_pending_amount += amt
                 expense_pending_count += 1
 
-        # Main POS total = approved + pending (so the card is not stuck at 0 while pending exists)
         expense_amount = expense_approved_amount + expense_pending_amount
         expense_count = expense_approved_count + expense_pending_count
 
-        # --- Configured GL accounts ---
         configured = self._get_configured_expense_accounts()
         account_ids = configured.mapped("account_id").ids
         account_totals = {}

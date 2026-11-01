@@ -4,9 +4,25 @@ Enterprise POS aggregator management for Anabtawi Group and reusable Odoo 19 dep
 The module manages aggregator campaigns, capped discounts, contribution splits,
 commission estimates, accounting entries, profitability reports, and settlement tracking.
 
-## Current release
+See `docs/CHANGELOG.md` for version history.
 
-**Version:** 19.0.5.0.0
+## Menu structure
+
+```text
+Online Campaigns
+├─ Campaigns          (kanban / list / calendar / form)
+├─ Settlements
+├─ Reporting
+│   ├─ Sales & Profitability   (campaign and non-campaign, use filters)
+│   ├─ Order Lines
+│   └─ Settlement Analysis
+└─ Configuration
+    └─ Aggregators
+```
+
+## Requirements
+
+- `openpyxl` Python package for settlement statement import/export (.xlsx).
 
 ## Key features
 

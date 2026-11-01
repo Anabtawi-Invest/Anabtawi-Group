@@ -36,6 +36,7 @@ class PfrLedger:
         self.kind_types = {}                 # bucket -> work entry type (for the payslip lines)
         self.holiday_dates = set()
         self.leave_calendar_dates = set()    # calendar days of validated hr.leave (no settlement leaves)
+        self.paid_leave_dates = set()        # approved paid leaves (annual, sick, etc.) that count like attendance
         self.physical_dates = set()          # every check-in date (holidays included)
         self.attendances = []                # [(local date, hr.attendance)]
         self.regular_net_hours = 0.0         # net hours of check-ins on normal days
@@ -48,6 +49,11 @@ class PfrLedger:
 
     def count(self, bucket):
         return sum(1 for b in self.days.values() if b == bucket)
+
+    @property
+    def qualifying_dates(self):
+        """Physical check-in dates plus approved paid leave dates (for 6:1 rest quota calculation)."""
+        return self.physical_dates | self.paid_leave_dates
 
     @property
     def active_days(self):
@@ -191,6 +197,8 @@ class PfrDayLedger(models.AbstractModel):
                 continue
             else:
                 leave_we[kind][d] = leave_we[kind].get(d, 0.0) + hrs
+                if kind != 'UNPAID' and getattr(wet, 'pfr_pay_percent', 100.0) > 0:
+                    L.paid_leave_dates.add(d)
         L.holiday_dates |= ph_we
 
         # validated leaves: calendar days (rest-day logic) + travel days (continuous)
@@ -204,8 +212,12 @@ class PfrDayLedger(models.AbstractModel):
             for lve in leaves:
                 l_from = lve.request_date_from or U.local_date(lve.date_from, tz)
                 l_to = lve.request_date_to or U.local_date(lve.date_to, tz)
+                wet = lve.holiday_status_id.work_entry_type_id
+                is_paid = (not wet) or (self.classify_type(wet) != 'UNPAID' and getattr(wet, 'pfr_pay_percent', 100.0) > 0)
                 for d in U.daterange(max(l_from, d_from), min(l_to, d_to)):
                     L.leave_calendar_dates.add(d)
+                    if is_paid:
+                        L.paid_leave_dates.add(d)
                     if self.is_travel_leave(lve):
                         if lve.holiday_status_id.work_entry_type_id:
                             L.kind_types.setdefault('TRAVEL', lve.holiday_status_id.work_entry_type_id)

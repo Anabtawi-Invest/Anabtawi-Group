@@ -1,0 +1,26 @@
+<odoo>
+    <!-- Server action on Pay Run -->
+    <record id="action_mass_reconcile_lateness_payrun" model="ir.actions.server">
+        <field name="name">Mass Reconciliation</field>
+        <field name="model_id" ref="hr_payroll.model_hr_payslip_run"/>
+        <field name="binding_model_id" ref="hr_payroll.model_hr_payslip_run"/>
+        <field name="binding_view_types">form</field>
+        <field name="state">code</field>
+        <field name="code">
+action = records._action_mass_reconcile_lateness_no_ot_bank()
+        </field>
+    </record>
+
+    <!-- Server action on Payslips list -->
+    <record id="action_mass_reconcile_lateness_payslips" model="ir.actions.server">
+        <field name="name">Mass Reconciliation</field>
+        <field name="model_id" ref="hr_payroll.model_hr_payslip"/>
+        <field name="binding_model_id" ref="hr_payroll.model_hr_payslip"/>
+        <field name="binding_view_types">list</field>
+        <field name="state">code</field>
+        <field name="code">
+records.action_reconcile_lateness_no_ot_bank()
+action = {'type': 'ir.actions.client', 'tag': 'reload'}
+        </field>
+    </record>
+</odoo>

@@ -8,9 +8,13 @@ from .check_payment_blocked_date import BLOCKED_WEEKDAY_FIELDS
 class AccountPayment(models.Model):
     _inherit = 'account.payment'
 
+    def _uses_separate_check_date(self):
+        self.ensure_one()
+        return 'is_check_payment' in self._fields and self.is_check_payment and 'check_date' in self._fields
+
     @api.onchange('payment_method_line_id')
     def _onchange_check_payment_entry_date(self):
-        if self.is_check_payment and self.state == 'draft':
+        if self._uses_separate_check_date() and self.state == 'draft':
             if not self.check_date:
                 self.check_date = self.date
             self.date = fields.Date.context_today(self)
@@ -19,8 +23,9 @@ class AccountPayment(models.Model):
     def create(self, vals_list):
         today = fields.Date.context_today(self)
         check_line_ids = self._check_payment_method_line_ids(vals_list)
+        has_check_date = 'check_date' in self._fields
         for vals in vals_list:
-            if vals.get('payment_method_line_id') in check_line_ids:
+            if vals.get('payment_method_line_id') in check_line_ids and has_check_date:
                 if not vals.get('check_date'):
                     vals['check_date'] = vals.get('date') or today
                 vals['date'] = today
@@ -41,7 +46,9 @@ class AccountPayment(models.Model):
 
     def _is_cheque_payment(self):
         self.ensure_one()
-        if self.is_check_payment or self.check_number:
+        if 'is_check_payment' in self._fields and self.is_check_payment:
+            return True
+        if 'check_number' in self._fields and self.check_number:
             return True
         code = self.payment_method_code or self.payment_method_line_id.code or ''
         if code == 'check_printing' or 'check' in code:
@@ -59,8 +66,8 @@ class AccountPayment(models.Model):
         self.ensure_one()
         if not self._is_cheque_payment():
             return False
-        if self.is_check_payment:
-            return self.check_date or self.date
+        if self._uses_separate_check_date() and self.check_date:
+            return self.check_date
         return self.date
 
     def _raise_if_blocked_check_date(self):
@@ -76,14 +83,17 @@ class AccountPayment(models.Model):
     def _force_check_payment_entry_date(self):
         today = fields.Date.context_today(self)
         to_fix = self.filtered(
-            lambda payment: payment.is_check_payment and payment.state == 'draft' and payment.date != today
+            lambda payment: payment._uses_separate_check_date() and payment.state == 'draft' and payment.date != today
         )
         if to_fix:
             to_fix.with_context(skip_check_payment_entry_date=True).write({'date': today})
 
     @api.model
     def _check_payment_method_line_ids(self, vals_list):
-        method_lines = self.env['account.payment.method.line'].browse([
+        method_line_model = self.env['account.payment.method.line']
+        if 'is_check_payment' not in method_line_model._fields:
+            return set()
+        method_lines = method_line_model.browse([
             vals['payment_method_line_id']
             for vals in vals_list
             if vals.get('payment_method_line_id')

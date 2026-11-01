@@ -12,7 +12,7 @@ class HrPayslipRun(models.Model):
 
     def action_export_payrun_excel(self):
         self.ensure_one()
-        url = f"/anabtawi_payroll/payrun/xlsx?payrun_id={self.id}"
+        url = f"/anabtawi_payroll/payrun/xlsx?payrun_id={self.id}&t={int(datetime.now().timestamp())}"
         
         ctx = self.env.context
         if ctx.get("active_model") == "hr.payslip" and ctx.get("active_ids"):
@@ -31,8 +31,7 @@ class HrPayslipRun(models.Model):
         readonly=True,
         attachment=True,
         copy=False,
-        help="Immutable Excel snapshot generated when Mark as Paid is pressed the first time. "
-             "Later downloads reuse this file and do not overwrite it.",
+        help="Excel snapshot generated for this Pay Run.",
     )
     audit_filename = fields.Char(string="PayRun Audit Filename", copy=False)
     audit_file_generated_at = fields.Datetime(string="Audit Snapshot Date", readonly=True, copy=False)
@@ -720,7 +719,12 @@ class HrPayslipRun(models.Model):
                 lateness_hrs = summary["lateness_hrs"]
                 out_of_contract_days = summary["out_of_contract_days"]
                 worked_hrs = sum(worked_days.mapped("number_of_hours"))
-                ot_hrs = sum(worked_days.filtered(lambda wd: "overtime" in (wd.code or "").lower() or "ot" in (wd.code or "").lower() or "extra" in (wd.code or "").lower()).mapped("number_of_hours"))
+                ot_hrs = sum(worked_days.filtered(
+                    lambda wd: any(
+                        key in payslip._xlsx_entry_code(wd).lower()
+                        for key in ("overtime", "ot", "extra")
+                    )
+                ).mapped("number_of_hours"))
 
                 # Gather notes
                 input_notes = []

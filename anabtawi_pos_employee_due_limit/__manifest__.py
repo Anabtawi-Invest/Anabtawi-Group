@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "POS Employee Due Limit",
-    "version": "19.0.1.1.0",
+    "version": "19.0.1.0.4",
     "category": "Point of Sale",
     "summary": "Limit employees' monthly POS Customer Account usage to a percentage of their net wage",
     "description": """

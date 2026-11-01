@@ -1,12 +1,11 @@
 import logging
-import os
-from datetime import datetime, time, timedelta
+from datetime import datetime, time
 
 import pytz
 
 from odoo import _, fields, http
 from odoo.exceptions import AccessDenied, UserError, ValidationError
-from odoo.http import Stream, request
+from odoo.http import request
 
 
 _logger = logging.getLogger(__name__)
@@ -41,14 +40,6 @@ def _payload():
     except Exception:
         pass
     return dict(request.params or {})
-
-
-def _version_tuple(value):
-    parts = []
-    for part in str(value or "").split("."):
-        digits = "".join(ch for ch in part if ch.isdigit())
-        parts.append(int(digits) if digits else 0)
-    return tuple(parts)
 
 
 def _as_float(value):
@@ -111,9 +102,6 @@ class AnabtawiMobileAPI(http.Controller):
             }
         if not payload and kwargs:
             payload = {k: v for k, v in kwargs.items() if v is not False}
-
-        if self._update_required(payload.get("platform"), payload.get("app_version")):
-            return self._update_required_error()
 
         login_name = (payload.get("login") or "").strip()
         password = payload.get("password") or ""
@@ -237,23 +225,6 @@ class AnabtawiMobileAPI(http.Controller):
             "uid": user.id,
         }, status=200)
 
-    def _update_required(self, platform, app_version):
-        """True when this Android build is older than the minimum version (or older than the latest one
-        while \"force update\" is on). Web and iPhone always run the newest build, so they are never blocked."""
-        if (platform or "").lower() != "android":
-            return False
-        icp = request.env["ir.config_parameter"].sudo()
-        installed = _version_tuple(app_version)
-        minimum = _version_tuple(icp.get_param("anabtawi_mobile.min_version", ""))
-        if minimum and installed < minimum:
-            return True
-        force = (icp.get_param("anabtawi_mobile.force_update", "False") or "").lower() in ("true", "1", "yes")
-        latest = _version_tuple(icp.get_param("anabtawi_mobile.latest_version", ""))
-        return bool(force and latest and installed < latest)
-
-    def _update_required_error(self):
-        return _error("update_required", _("Please install the latest version of the Employee App to continue."), 426)
-
     def _authenticated_user(self):
         token = _parse_bearer(request.httprequest.headers.get("Authorization"))
         if not token:
@@ -261,13 +232,6 @@ class AnabtawiMobileAPI(http.Controller):
         user = request.env["anabtawi.mobile.device"].authenticate_bearer_token(token, ip_address=self._client_ip())
         if not user:
             return None, token, _error("session_expired", _("Your session has expired."), 401)
-        # Builds before 2.0.1 send no version header: fall back to the version stored at login.
-        device = request.env["anabtawi.mobile.device"]._find_bearer_device(token)
-        headers = request.httprequest.headers
-        platform = headers.get("X-App-Platform") or device.platform
-        app_version = headers.get("X-App-Version") or device.app_version
-        if self._update_required(platform, app_version):
-            return None, token, self._update_required_error()
         return user, token, None
 
     def _employee(self, user):
@@ -550,41 +514,16 @@ class AnabtawiMobileAPI(http.Controller):
                     422,
                 )
 
-        # Minimum time between two check-in / check-out actions (system parameter, default 2 minutes).
-        lock_minutes = _as_float(
-            request.env["ir.config_parameter"].sudo().get_param("anabtawi_mobile.attendance_lock_minutes", "2")
-        )
-        lock_minutes = int(lock_minutes) if lock_minutes and lock_minutes >= 1 else 2
-
-        # Tell the employee the real remaining time. A lock written under an older, longer setting is
-        # shortened so it never outlasts the current limit.
-        employee.invalidate_recordset(["portal_attendance_lock_until"])
-        lock_until = employee.sudo().portal_attendance_lock_until
-        now = fields.Datetime.now()
-        if lock_until and lock_until > now:
-            if (lock_until - now).total_seconds() > lock_minutes * 60:
-                lock_until = now + timedelta(minutes=lock_minutes)
-                employee.sudo().write({"portal_attendance_lock_until": lock_until})
-            wait_seconds = int((lock_until - now).total_seconds()) + 1
-            return _json({
-                "error": "attendance_locked",
-                "message": _(
-                    "Attendance action already submitted. Please wait %(seconds)s seconds before trying again.",
-                    seconds=wait_seconds,
-                ),
-                "retry_after_seconds": wait_seconds,
-            }, status=429)
-
         lock_acquired = False
         try:
-            employee._acquire_portal_attendance_action_lock(lock_minutes=lock_minutes)
+            employee._acquire_portal_attendance_action_lock(lock_minutes=10)
             lock_acquired = True
             attendance = employee._attendance_action_change(geo_information=geo_information)
         except (UserError, ValidationError) as exc:
             if lock_acquired:
                 employee._release_portal_attendance_action_lock()
             message = exc.args[0] if exc.args else str(exc)
-            code = "attendance_locked" if "wait" in message.lower() else "attendance_rejected"
+            code = "attendance_locked" if "10" in message or "wait" in message.lower() else "attendance_rejected"
             return _error(code, message, 429 if code == "attendance_locked" else 422)
         except Exception:
             if lock_acquired:
@@ -726,15 +665,13 @@ class AnabtawiMobileAPI(http.Controller):
             })
         try:
             with request.env.cr.savepoint():
-                # hr_leave_fallback may split one request into several leaves (extra hours, annual, unpaid).
-                leaves = request.env["hr.leave"].sudo().with_company(employee.company_id).create(vals)
+                leave = request.env["hr.leave"].sudo().with_company(employee.company_id).create(vals)
         except (UserError, ValidationError) as exc:
             return _error("validation_error", exc.args[0] if exc.args else str(exc), 422)
         except Exception:
             _logger.exception("Mobile leave creation failed for employee_id=%s", employee.id)
             return _error("server_error", _("The time off request could not be saved."), 500)
-        first = leaves[:1]
-        return _json({"status": "ok", "leave_id": first.id, "leave_ids": leaves.ids, "state": first.state}, 201)
+        return _json({"status": "ok", "leave_id": leave.id, "state": leave.state}, 201)
 
     @http.route(
         "/anabtawi/mobile/leaves/list",
@@ -990,12 +927,10 @@ class AnabtawiMobileAPI(http.Controller):
             return _error("not_found", _("Payslip not found or access denied."), 404)
 
         try:
-            # Same choice as the Print button in Odoo: the salary structure's own report, else the default one.
-            structure_report = payslip.struct_id.report_id if payslip.struct_id else False
-            report = structure_report or request.env.ref("hr_payroll.action_report_payslip")
-            pdf_content, _format = request.env["ir.actions.report"].sudo().with_context(
-                lang=employee.lang or payslip.env.lang
-            )._render_qweb_pdf(report, [payslip.id], data={"company_id": payslip.company_id})
+            report_name = "hr_payroll.report_payslip"
+            pdf_content, _format = request.env["ir.actions.report"].sudo()._render_qweb_pdf(
+                report_name, [payslip.id]
+            )
         except Exception:
             _logger.exception("Failed to render PDF for payslip_id=%s", payslip.id)
             return _error("pdf_failed", _("Could not generate payslip PDF."), 500)
@@ -1016,13 +951,13 @@ class AnabtawiMobileAPI(http.Controller):
         config = request.env["ir.config_parameter"].sudo()
         latest_version = config.get_param("anabtawi_mobile.latest_version")
         if not latest_version:
-            config.set_param("anabtawi_mobile.latest_version", "2.0.0")
-            latest_version = "2.0.0"
+            config.set_param("anabtawi_mobile.latest_version", "1.2.0")
+            latest_version = "1.2.0"
 
         min_version = config.get_param("anabtawi_mobile.min_version", "1.0.0")
         update_message = config.get_param(
             "anabtawi_mobile.update_message",
-            _("A new version of the Anabtawi Employee App (v2.0.0) is available. Please install the latest version.")
+            _("A new version of the Anabtawi Employee App (v1.2.0) with Payslip support is available. Please update to continue.")
         )
         download_url = config.get_param(
             "anabtawi_mobile.download_url",
@@ -1044,19 +979,22 @@ class AnabtawiMobileAPI(http.Controller):
             type="http", auth="public", methods=["GET"], csrf=False, sitemap=False,
         )
     def apk_download(self, **kwargs):
-        # Streamed in small pieces (with Range / resume support) instead of loading the whole APK in memory.
-        try:
-            stream = Stream.from_path(
-                "anabtawi_mobile_api/static/apk/employee_app_latest.apk", filter_ext=(".apk",)
-            )
-        except (FileNotFoundError, ValueError, OSError):
+        module_path = os.path.dirname(os.path.dirname(__file__))
+        apk_path = os.path.join(module_path, "static", "apk", "employee_app_latest.apk")
+        if not os.path.exists(apk_path):
             return request.make_response("APK file not found on server.", status=404)
-        return stream.get_response(
-            as_attachment=True,
-            mimetype="application/vnd.android.package-archive",
-            download_name="Anabtawi-Employee-App.apk",
-            max_age=0,
-        )
+
+        with open(apk_path, "rb") as file:
+            apk_bytes = file.read()
+
+        filename = "Employee-App-v1.2.0-with-payslip.apk"
+        headers = [
+            ("Content-Type", "application/vnd.android.package-archive"),
+            ("Content-Disposition", f'attachment; filename="{filename}"'),
+            ("Content-Length", str(len(apk_bytes))),
+            ("Cache-Control", "no-cache"),
+        ]
+        return request.make_response(apk_bytes, headers=headers)
 
     @http.route(["/pwa", "/mobile/app"], type="http", auth="public", csrf=False)
     def pwa_index(self, **kwargs):

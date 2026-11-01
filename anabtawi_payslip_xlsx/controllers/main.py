@@ -1,7 +1,7 @@
 import base64
 import re
 
-from odoo import _, http
+from odoo import _, fields, http
 from odoo.http import content_disposition, request
 from odoo.tools import osutil
 
@@ -79,24 +79,21 @@ class PayslipXlsxController(http.Controller):
         if not payrun:
             return request.not_found()
 
-        # After Mark as Paid the report is already saved on audit_file — serve that copy.
-        # Before paid: live generate only (do not save).
-        is_paid = payrun.state in ("03_paid", "paid") or (
-            payrun.slip_ids and all(s.state in ("paid", "done") for s in payrun.slip_ids)
-        )
+        # Always generate the new, live report every time PayRun Audit is requested
+        xlsx_content = payrun._generate_payrun_xlsx(payslip_ids=parsed_payslip_ids)
 
-        if is_paid and payrun.audit_file:
-            xlsx_content = base64.b64decode(payrun.audit_file)
-        elif is_paid:
-            # Fallback if Mark as Paid did not store the file for any reason
-            payrun._freeze_payrun_audit()
-            xlsx_content = (
-                base64.b64decode(payrun.audit_file)
-                if payrun.audit_file
-                else payrun._generate_payrun_xlsx()
-            )
-        else:
-            xlsx_content = payrun._generate_payrun_xlsx(payslip_ids=parsed_payslip_ids)
+        # Update the stored audit snapshot if exporting the full pay run
+        if not parsed_payslip_ids:
+            try:
+                period_str = payrun.date_start.strftime("%Y%m") if payrun.date_start else ""
+                fname = f"PayRun_Audit_{period_str or payrun.name or 'Report'}.xlsx"
+                payrun.sudo().write({
+                    "audit_file": base64.b64encode(xlsx_content),
+                    "audit_filename": fname,
+                    "audit_file_generated_at": fields.Datetime.now(),
+                })
+            except Exception:
+                pass
 
         period_str = payrun.date_start.strftime("%Y%m") if payrun.date_start else ""
         if period_str:
@@ -111,5 +108,8 @@ class PayslipXlsxController(http.Controller):
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             ),
             ("Content-Disposition", content_disposition(filename)),
+            ("Cache-Control", "no-cache, no-store, must-revalidate"),
+            ("Pragma", "no-cache"),
+            ("Expires", "0"),
         ]
         return request.make_response(xlsx_content, headers=headers)

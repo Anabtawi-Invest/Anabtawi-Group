@@ -122,13 +122,14 @@ class HrEmployee(models.Model):
             if not end and hasattr(emp, 'contract_id') and emp.contract_id:
                 end = emp.contract_id.date_end
             if not end and 'hr.version' in self.env:
-                # date_start/date_end are computed; order/filter on stored contract dates
-                v = self.env['hr.version'].sudo().search(
-                    [('employee_id', '=', emp.id), ('contract_date_start', '!=', False)],
-                    order='contract_date_start desc, id desc', limit=1,
-                )
-                if v:
-                    end = v.contract_date_end or False
+                try:
+                    v = self.env['hr.version'].sudo().search(
+                        [('employee_id', '=', emp.id)], order='id desc', limit=1
+                    )
+                    if v and getattr(v, 'date_end', False):
+                        end = v.date_end
+                except Exception:
+                    pass
             emp.profile_contract_end_date = end or False
 
     def _compute_company_loan_attachments(self):
@@ -150,7 +151,10 @@ class HrEmployee(models.Model):
         else:
             return self.env['hr.salary.attachment']
 
-        records = Attachment.search(domain, order='date_start desc, id desc')
+        try:
+            records = Attachment.search(domain, order='date_start desc, id desc')
+        except Exception:
+            records = Attachment.search(domain, order='id desc')
         loan_ids = []
         for att in records:
             is_company_loan = False
@@ -214,8 +218,11 @@ class HrEmployee(models.Model):
                 'date_start': date_start,
                 'date_start_formatted': format_date(self.env, date_start) if date_start else '',
                 'total_amount': total_amount,
+                'total_amount_formatted': f"{total_amount:.3f}",
                 'monthly_amount': monthly_amount,
+                'monthly_amount_formatted': f"{monthly_amount:.3f}",
                 'remaining_amount': remaining_amount,
+                'remaining_amount_formatted': f"{remaining_amount:.3f}",
                 'note': getattr(att, 'description', '') or '',
                 'state': state,
             })
@@ -254,6 +261,104 @@ class HrEmployee(models.Model):
         other_end = getattr(self, 'departure_date', False) or self.profile_contract_end_date
         return format_date(self.env, other_end) if other_end else ''
 
+    def profile_ssc_salary_display(self):
+        """Returns formatted SSC Wage / SS Salary with currency if available."""
+        self.ensure_one()
+        candidates = [
+            'x_studio_x_studio_ssc_wage',
+            'x_studio_ssc_wage',
+            'sb_ss_salary',
+            'ssc_wage',
+            'ss_wage',
+            'social_security_wage',
+            'ss_salary',
+        ]
+        val = None
+        for attr in candidates:
+            if hasattr(self, attr):
+                v = getattr(self, attr, None)
+                if v is not None and v != '' and v is not False:
+                    try:
+                        fval = float(v)
+                        if fval > 0:
+                            val = fval
+                            break
+                    except (ValueError, TypeError):
+                        pass
+
+        if val is None and hasattr(self, 'contract_id') and self.contract_id:
+            for attr in candidates:
+                if hasattr(self.contract_id, attr):
+                    v = getattr(self.contract_id, attr, None)
+                    if v is not None and v != '' and v is not False:
+                        try:
+                            fval = float(v)
+                            if fval > 0:
+                                val = fval
+                                break
+                        except (ValueError, TypeError):
+                            pass
+
+        if val is None and 'hr.version' in self.env:
+            try:
+                v = self.env['hr.version'].sudo().search(
+                    [('employee_id', '=', self.id)], order='id desc', limit=1
+                )
+                if v:
+                    for attr in candidates:
+                        if hasattr(v, attr):
+                            cv = getattr(v, attr, None)
+                            if cv is not None and cv != '' and cv is not False:
+                                try:
+                                    fval = float(cv)
+                                    if fval > 0:
+                                        val = fval
+                                        break
+                                except (ValueError, TypeError):
+                                    pass
+            except Exception:
+                pass
+
+        if val is not None and val > 0:
+            currency = self.currency_id or self.company_id.currency_id
+            sym = currency.symbol if currency else ''
+            return f"{val:,.3f} {sym}".strip()
+        return "—"
+
+    def profile_service_charge_display(self):
+        """Returns formatted Service Charge / Points if available."""
+        self.ensure_one()
+        sc = None
+        for attr in ['sb_service_charge', 'x_studio_service_charge', 'service_charge']:
+            if hasattr(self, attr):
+                v = getattr(self, attr, None)
+                if v:
+                    sc = v
+                    break
+
+        pts = None
+        for attr in ['sb_points', 'x_studio_points', 'points']:
+            if hasattr(self, attr):
+                v = getattr(self, attr, None)
+                if v:
+                    pts = v
+                    break
+
+        parts = []
+        if sc:
+            try:
+                parts.append(f"{float(sc):,.2f}")
+            except (ValueError, TypeError):
+                parts.append(str(sc))
+        if pts:
+            try:
+                parts.append(f"{float(pts):g}")
+            except (ValueError, TypeError):
+                parts.append(str(pts))
+        if parts:
+            return " / ".join(parts)
+        return "—"
+
     def action_print_employee_profile_pdf(self):
         self.ensure_one()
         return self.env.ref(
@@ -282,6 +387,59 @@ class HrEmployee(models.Model):
         if line.effective_date:
             parts.append(format_date(self.env, line.effective_date))
         return ' — '.join(p for p in parts if p)
+
+    def profile_health_insurance_entries(self):
+        """Returns health insurance lines for the employee and covered family members.
+        Sorted with 'employee' first, followed by spouse, child, parent.
+        """
+        self.ensure_one()
+        if not hasattr(self, 'health_insurance_ids'):
+            return []
+
+        rel_priority = {'employee': 0, 'spouse': 1, 'child': 2, 'parent': 3}
+        rel_labels = {
+            'employee': 'Employee',
+            'spouse': 'Spouse',
+            'child': 'Child',
+            'parent': 'Parent',
+        }
+
+        records = self.health_insurance_ids.sorted(
+            key=lambda r: (rel_priority.get(r.relationship, 9), r.id)
+        )
+
+        entries = []
+        for r in records:
+            contrib_pct = r.employee_contribution or 0.0
+            entries.append({
+                'id': r.id,
+                'name': r.name or self.name if r.relationship == 'employee' else (r.name or ''),
+                'relationship': r.relationship,
+                'relationship_display': rel_labels.get(r.relationship, (r.relationship or '').capitalize()),
+                'grade': r.grade_id.name if r.grade_id else '',
+                'birthdate': r.birthdate,
+                'birthdate_formatted': format_date(self.env, r.birthdate) if r.birthdate else '',
+                'effective_date': r.effective_date,
+                'effective_date_formatted': format_date(self.env, r.effective_date) if r.effective_date else '',
+                'policy_full_amount': r.policy_full_amount or 0.0,
+                'employee_contribution': contrib_pct,
+                'employee_contribution_formatted': f"{contrib_pct:.1f}%" if contrib_pct else "0%",
+                'monthly_contribution': r.monthly_contribution or 0.0,
+                'monthly_contribution_formatted': f"{(r.monthly_contribution or 0.0):.2f}",
+            })
+        return entries
+
+    def profile_health_insurance_total_monthly(self):
+        """Returns total monthly health insurance contribution deducted from the employee."""
+        self.ensure_one()
+        if not hasattr(self, 'health_insurance_ids'):
+            return 0.0
+        return sum(self.health_insurance_ids.mapped('monthly_contribution') or [0.0])
+
+    def profile_health_insurance_total_monthly_formatted(self):
+        """Returns formatted string of total monthly health insurance contribution."""
+        self.ensure_one()
+        return f"{self.profile_health_insurance_total_monthly():.2f}"
 
     def profile_blood_type_display(self):
         self.ensure_one()

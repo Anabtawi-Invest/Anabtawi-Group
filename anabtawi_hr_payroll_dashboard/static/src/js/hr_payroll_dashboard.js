@@ -29,13 +29,18 @@ export class HrPayrollDashboard extends Component {
             company_id: 0,
             selectedRootId: null,
             selectedAreaId: null,
+            selectedDeptPath: [],
             department_ids: [],
             expandedParents: [],
+            expandedTableDeptIds: [],
+            tableTreeInitialized: false,
+            tableViewMode: "tree",
             searchQuery: "",
             sortKey: "net_salary",
             sortOrder: "desc",
             loading: true,
             exportingExcel: false,
+            exportingPptx: false,
             printingPdf: false,
             isBenchmarkMode: false,
             benchmarkBranches: [],
@@ -57,8 +62,15 @@ export class HrPayrollDashboard extends Component {
             ceo_analytics: {},
             cfo_analytics: {},
             hr_analytics: {},
+            labor_cost_report: [],
+            labor_cost_totals: {},
+            cost_bridge: {},
+            three_month_trend: { m2_label: "M-2", m1_label: "M-1", m0_label: "Current", rows: [] },
+            workforce_movement: {},
+            executive_insights: { positives: [], attention_points: [], priorities: [] },
             kpis: {},
             departments: [],
+            department_tree_rows: [],
             channels: [],
             operational_highlights: {
                 scheduled_hours: 0,
@@ -121,7 +133,16 @@ export class HrPayrollDashboard extends Component {
             this.data.hr_analytics = res?.hr_analytics || {};
             this.data.kpis = res?.kpis || {};
             this.data.departments = res?.departments || [];
+            this.data.department_tree_rows = res?.department_tree_rows || [];
             this.data.channels = res?.channels || [];
+
+            // Auto-expand root and second-level departments in the tree table on first load or filter change
+            if (!this.state.tableTreeInitialized && this.data.department_tree_rows.length > 0) {
+                this.state.expandedTableDeptIds = this.data.department_tree_rows
+                    .filter(r => r.has_children && r.level <= 1)
+                    .map(r => r.department_id);
+                this.state.tableTreeInitialized = true;
+            }
             this.data.operational_highlights = {
                 scheduled_hours: op.scheduled_hours || 0,
                 approved_hours: op.approved_hours || 0,
@@ -259,8 +280,10 @@ export class HrPayrollDashboard extends Component {
         this.state.company_id = parseInt(compId) || 0;
         this.state.selectedRootId = null;
         this.state.selectedAreaId = null;
+        this.state.selectedDeptPath = [];
         this.state.department_ids = [];
         this.state.expandedParents = [];
+        this.state.tableTreeInitialized = false;
         this.fetchDashboardData();
     }
 
@@ -269,42 +292,59 @@ export class HrPayrollDashboard extends Component {
     }
 
     // -------------------------------------------------------------
-    // 3-TIER DEPARTMENT FILTER NAVIGATION (Root -> Area -> Branch)
+    // RECURSIVE N-LEVEL DEPARTMENT FILTER NAVIGATION
+    // (Matches Odoo's exact Department hierarchy to any depth)
     // -------------------------------------------------------------
     selectRootDepartment(rootId) {
         if (rootId === "all") {
             this.state.selectedRootId = null;
             this.state.selectedAreaId = null;
+            this.state.selectedDeptPath = [];
             this.state.department_ids = [];
         } else {
             const rId = parseInt(rootId);
             this.state.selectedRootId = rId;
             this.state.selectedAreaId = null;
+            this.state.selectedDeptPath = [rId];
             this.state.department_ids = [rId];
         }
+        this.state.tableTreeInitialized = false;
         this.fetchDashboardData();
     }
 
-    selectAreaDepartment(area) {
-        const areaId = parseInt(area.id);
-        this.state.selectedAreaId = areaId;
-        this.state.department_ids = [areaId];
-        this.fetchDashboardData();
-    }
-
-    toggleBranchDepartment(branchId, ev) {
+    selectDepartmentAtLevel(deptNode, level, ev) {
         if (ev) {
             ev.stopPropagation();
         }
-        const bId = parseInt(branchId);
-        const areaId = this.state.selectedAreaId;
-        const rootId = this.state.selectedRootId;
+        const dId = parseInt(deptNode.id);
+        const newPath = this.state.selectedDeptPath.slice(0, level);
+        const alreadySelectedAtLevel = this.state.selectedDeptPath[level] === dId;
+
+        if (alreadySelectedAtLevel) {
+            // Clicking an already-selected intermediate department steps back up to its parent
+            this.state.selectedDeptPath = newPath;
+            const parentId = newPath.length > 0 ? newPath[newPath.length - 1] : null;
+            this.state.department_ids = parentId ? [parentId] : [];
+        } else {
+            newPath.push(dId);
+            this.state.selectedDeptPath = newPath;
+            this.state.department_ids = [dId];
+        }
+        this.state.selectedRootId = this.state.selectedDeptPath[0] || null;
+        this.state.selectedAreaId = this.state.selectedDeptPath[1] || null;
+        this.state.tableTreeInitialized = false;
+        this.fetchDashboardData();
+    }
+
+    toggleLeafDepartment(deptId, parentId, ev) {
+        if (ev) {
+            ev.stopPropagation();
+        }
+        const bId = parseInt(deptId);
+        const pId = parseInt(parentId);
         let current = [...(this.state.department_ids || [])];
 
-        const hasParentArea = areaId && current.includes(areaId);
-        const hasParentRoot = rootId && current.includes(rootId);
-
-        if (hasParentArea || hasParentRoot) {
+        if (pId && current.includes(pId)) {
             current = [bId];
         } else {
             const idx = current.indexOf(bId);
@@ -315,44 +355,78 @@ export class HrPayrollDashboard extends Component {
             }
         }
 
-        if (current.length === 0) {
-            if (areaId) {
-                current = [areaId];
-            } else if (rootId) {
-                current = [rootId];
-            }
+        if (current.length === 0 && pId) {
+            current = [pId];
         }
 
         this.state.department_ids = current;
+        this.state.tableTreeInitialized = false;
         this.fetchDashboardData();
+    }
+
+    selectAreaDepartment(area) {
+        this.selectDepartmentAtLevel(area, 1);
+    }
+
+    toggleBranchDepartment(branchId, ev) {
+        const parentId = this.state.selectedDeptPath.length > 0
+            ? this.state.selectedDeptPath[this.state.selectedDeptPath.length - 1]
+            : (this.state.selectedAreaId || this.state.selectedRootId);
+        this.toggleLeafDepartment(branchId, parentId, ev);
     }
 
     selectAllDepartments() {
         this.state.selectedRootId = null;
         this.state.selectedAreaId = null;
+        this.state.selectedDeptPath = [];
         this.state.department_ids = [];
+        this.state.tableTreeInitialized = false;
         this.fetchDashboardData();
     }
 
     isRootSelected(rootId) {
         if (rootId === "all") {
-            return !this.state.selectedRootId && (!this.state.department_ids || this.state.department_ids.length === 0);
+            return this.state.selectedDeptPath.length === 0 && (!this.state.department_ids || this.state.department_ids.length === 0);
         }
-        return this.state.selectedRootId === parseInt(rootId);
+        return this.state.selectedDeptPath[0] === parseInt(rootId);
+    }
+
+    isDeptNodeSelected(deptId, level) {
+        const dId = parseInt(deptId);
+        if (this.state.selectedDeptPath[level] === dId) {
+            return true;
+        }
+        return (this.state.department_ids || []).includes(dId);
     }
 
     isAreaSelected(areaId) {
-        return this.state.selectedAreaId === parseInt(areaId);
+        return this.state.selectedDeptPath[1] === parseInt(areaId);
     }
 
     isBranchSelected(branchId) {
         const bId = parseInt(branchId);
         if (!this.state.department_ids || this.state.department_ids.length === 0) return true;
-        const areaId = this.state.selectedAreaId;
-        if (areaId && this.state.department_ids.includes(areaId)) {
-            return true;
-        }
         return this.state.department_ids.includes(bId);
+    }
+
+    get cascadingDeptTrays() {
+        const trays = [];
+        let currentList = this.data.structured_departments || [];
+        for (let lvl = 0; lvl < this.state.selectedDeptPath.length; lvl++) {
+            const selId = this.state.selectedDeptPath[lvl];
+            const node = currentList.find(n => n.id === selId);
+            if (!node || !node.children || node.children.length === 0) {
+                break;
+            }
+            trays.push({
+                level: lvl + 1,
+                parentNode: node,
+                children: node.children,
+                selectedChildId: this.state.selectedDeptPath[lvl + 1] || null,
+            });
+            currentList = node.children;
+        }
+        return trays;
     }
 
     get activeRootData() {
@@ -366,25 +440,65 @@ export class HrPayrollDashboard extends Component {
         return root.areas.find(a => a.id === this.state.selectedAreaId) || null;
     }
 
-    // Toggle expand/fold of a parent department's child branches
-    toggleParentExpand(parentId, ev) {
+    // -------------------------------------------------------------
+    // EXPANDABLE HIERARCHICAL TREE TABLE CONTROLS
+    // -------------------------------------------------------------
+    setTableViewMode(mode) {
+        this.state.tableViewMode = mode;
+    }
+
+    toggleTableDeptExpand(deptId, ev) {
         if (ev) {
             ev.stopPropagation();
         }
-        const pId = parseInt(parentId);
-        const idx = this.state.expandedParents.indexOf(pId);
+        const dId = parseInt(deptId);
+        const idx = this.state.expandedTableDeptIds.indexOf(dId);
         if (idx > -1) {
-            this.state.expandedParents.splice(idx, 1);
+            this.state.expandedTableDeptIds.splice(idx, 1);
         } else {
-            this.state.expandedParents.push(pId);
+            this.state.expandedTableDeptIds.push(dId);
         }
     }
 
-    isParentExpanded(parentId) {
-        return this.state.expandedParents.includes(parseInt(parentId));
+    isTableDeptExpanded(deptId) {
+        return this.state.expandedTableDeptIds.includes(parseInt(deptId));
     }
 
-    // Multi-Select Department toggle
+    expandAllTableDepts() {
+        const allParentIds = (this.data.department_tree_rows || [])
+            .filter(r => r.has_children)
+            .map(r => r.department_id);
+        this.state.expandedTableDeptIds = [...allParentIds];
+    }
+
+    collapseAllTableDepts() {
+        this.state.expandedTableDeptIds = [];
+    }
+
+    filterByDepartmentFromTable(deptRow, ev) {
+        if (ev) {
+            ev.stopPropagation();
+        }
+        const dId = parseInt(deptRow.department_id);
+        if (!dId) return;
+        const anc = [...(deptRow.ancestor_ids || []), dId];
+        this.state.selectedDeptPath = anc;
+        this.state.selectedRootId = anc[0] || null;
+        this.state.selectedAreaId = anc[1] || null;
+        this.state.department_ids = [dId];
+        this.state.tableTreeInitialized = false;
+        this.fetchDashboardData();
+    }
+
+    // Legacy helpers
+    toggleParentExpand(parentId, ev) {
+        this.toggleTableDeptExpand(parentId, ev);
+    }
+
+    isParentExpanded(parentId) {
+        return this.isTableDeptExpanded(parentId);
+    }
+
     toggleDepartment(deptId, ev) {
         if (ev) {
             ev.stopPropagation();
@@ -402,68 +516,11 @@ export class HrPayrollDashboard extends Component {
         this.fetchDashboardData();
     }
 
-    // Select or toggle parent and all its children together
-    toggleParentWithChildren(parentDept, ev) {
-        if (ev) {
-            ev.stopPropagation();
-        }
-        const parentId = parseInt(parentDept.id);
-        const childIds = (parentDept.children || []).map(c => parseInt(c.id));
-        const allIds = [parentId, ...childIds];
-
-        const current = [...this.state.department_ids];
-        const allAlreadySelected = allIds.every(id => current.includes(id));
-
-        if (allAlreadySelected) {
-            // Deselect all
-            this.state.department_ids = current.filter(id => !allIds.includes(id));
-        } else {
-            // Select all
-            const newSet = new Set([...current, ...allIds]);
-            this.state.department_ids = Array.from(newSet);
-            // Also expand parent if not already expanded so user sees the branches
-            if (!this.state.expandedParents.includes(parentId)) {
-                this.state.expandedParents.push(parentId);
-            }
-        }
-        this.fetchDashboardData();
-    }
-
-    selectAllDepartments() {
-        this.state.department_ids = [];
-        this.fetchDashboardData();
-    }
-
     isDeptSelected(deptId) {
         if (deptId === "all") {
             return !this.state.department_ids || this.state.department_ids.length === 0;
         }
         return this.state.department_ids && this.state.department_ids.includes(parseInt(deptId));
-    }
-
-    isParentPartiallySelected(parentDept) {
-        if (!this.state.department_ids || this.state.department_ids.length === 0) return false;
-        const parentId = parseInt(parentDept.id);
-        const childIds = (parentDept.children || []).map(c => parseInt(c.id));
-        const allIds = [parentId, ...childIds];
-        const hasSome = allIds.some(id => this.state.department_ids.includes(id));
-        const hasAll = allIds.every(id => this.state.department_ids.includes(id));
-        return hasSome && !hasAll;
-    }
-
-    isParentFullySelected(parentDept) {
-        if (!this.state.department_ids || this.state.department_ids.length === 0) return false;
-        const parentId = parseInt(parentDept.id);
-        const childIds = (parentDept.children || []).map(c => parseInt(c.id));
-        const allIds = [parentId, ...childIds];
-        return allIds.every(id => this.state.department_ids.includes(id));
-    }
-
-    getSelectedCountForParent(parentDept) {
-        if (!this.state.department_ids || this.state.department_ids.length === 0) return 0;
-        const childIds = (parentDept.children || []).map(c => parseInt(c.id));
-        const allIds = [parseInt(parentDept.id), ...childIds];
-        return allIds.filter(id => this.state.department_ids.includes(id)).length;
     }
 
     sortBy(key) {
@@ -475,35 +532,141 @@ export class HrPayrollDashboard extends Component {
         }
     }
 
-    get sortedDepartments() {
-        let depts = [...(this.data.departments || [])];
-        const query = (this.state.searchQuery || "").trim().toLowerCase();
+    _compareDeptRows(a, b) {
+        const key = this.state.sortKey || "net_salary";
+        const isAsc = this.state.sortOrder === "asc";
+        let valA = a[key];
+        let valB = b[key];
 
-        if (query) {
-            depts = depts.filter(d => (d.department_name || "").toLowerCase().includes(query));
+        if (typeof valA === "string") {
+            valA = (valA || "").toLowerCase();
+            valB = (valB || "").toLowerCase();
+            return isAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
         }
 
-        const key = this.state.sortKey;
-        const isAsc = this.state.sortOrder === "asc";
+        valA = Number(valA) || 0;
+        valB = Number(valB) || 0;
+        if (valA !== valB) {
+            return isAsc ? valA - valB : valB - valA;
+        }
+        return (Number(b.headcount) || 0) - (Number(a.headcount) || 0);
+    }
 
-        if (!key) return depts;
+    get sortedDepartments() {
+        const query = (this.state.searchQuery || "").trim().toLowerCase();
+        const treeRows = this.data.department_tree_rows || [];
 
-        depts.sort((a, b) => {
-            let valA = a[key];
-            let valB = b[key];
-
-            if (typeof valA === "string") {
-                valA = (valA || "").toLowerCase();
-                valB = (valB || "").toLowerCase();
-                return isAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+        // If user selected Hierarchical Tree mode and we have tree rows
+        if (this.state.tableViewMode === "tree" && treeRows.length > 0) {
+            if (query) {
+                // When searching, show all matching nodes (by short_name or complete_name) sorted
+                const matched = treeRows.filter(
+                    d => (d.complete_name || "").toLowerCase().includes(query)
+                        || (d.short_name || "").toLowerCase().includes(query)
+                );
+                return [...matched].sort((a, b) => this._compareDeptRows(a, b));
             }
 
-            valA = Number(valA) || 0;
-            valB = Number(valB) || 0;
-            return isAsc ? valA - valB : valB - valA;
-        });
+            // Group by parent within treeRows to sort siblings at each level while preserving tree hierarchy
+            const rowMap = new Map();
+            const childrenByParent = new Map();
+            const topRoots = [];
 
+            for (const r of treeRows) {
+                rowMap.set(r.department_id, r);
+            }
+            for (const r of treeRows) {
+                const pId = r.parent_id && rowMap.has(r.parent_id) ? r.parent_id : 0;
+                if (pId === 0) {
+                    topRoots.push(r);
+                } else {
+                    if (!childrenByParent.has(pId)) {
+                        childrenByParent.set(pId, []);
+                    }
+                    childrenByParent.get(pId).push(r);
+                }
+            }
+
+            topRoots.sort((a, b) => this._compareDeptRows(a, b));
+            for (const list of childrenByParent.values()) {
+                list.sort((a, b) => this._compareDeptRows(a, b));
+            }
+
+            const visibleResult = [];
+            const expandedSet = new Set(this.state.expandedTableDeptIds);
+
+            const walk = (node) => {
+                visibleResult.push(node);
+                if (node.has_children && expandedSet.has(node.department_id)) {
+                    const chList = childrenByParent.get(node.department_id) || [];
+                    for (const ch of chList) {
+                        walk(ch);
+                    }
+                }
+            };
+
+            for (const root of topRoots) {
+                walk(root);
+            }
+            return visibleResult;
+        }
+
+        // Flat Leaf View Mode
+        let depts = [...(this.data.departments || [])];
+        if (query) {
+            depts = depts.filter(
+                d => (d.department_name || "").toLowerCase().includes(query)
+                    || (d.short_name || "").toLowerCase().includes(query)
+            );
+        }
+        depts.sort((a, b) => this._compareDeptRows(a, b));
         return depts;
+    }
+
+    get tableSummaryTotals() {
+        const query = (this.state.searchQuery || "").toLowerCase().trim();
+        let leafDepts = [...(this.data.departments || [])];
+        if (query) {
+            leafDepts = leafDepts.filter(
+                d => (d.department_name || "").toLowerCase().includes(query)
+                    || (d.short_name || "").toLowerCase().includes(query)
+                    || (d.complete_name || "").toLowerCase().includes(query)
+            );
+        }
+        const totals = {
+            headcount: 0,
+            payslip_headcount: 0,
+            daily_cost: 0,
+            basic_salary: 0,
+            actual_salary: 0,
+            allowances: 0,
+            overtime_amount: 0,
+            overtime_hours: 0,
+            gross_salary: 0,
+            deductions: 0,
+            social_security_comp: 0,
+            net_salary: 0,
+            pos_sales: 0,
+        };
+        for (const d of leafDepts) {
+            totals.headcount += Number(d.headcount || 0);
+            totals.payslip_headcount += Number(d.payslip_headcount || 0);
+            totals.daily_cost += Number(d.daily_cost || 0);
+            totals.basic_salary += Number(d.basic_salary || 0);
+            totals.actual_salary += Number(d.actual_salary || 0);
+            totals.allowances += Number(d.allowances || 0);
+            totals.overtime_amount += Number(d.overtime_amount || 0);
+            totals.overtime_hours += Number(d.overtime_hours || 0);
+            totals.gross_salary += Number(d.gross_salary || 0);
+            totals.deductions += Number(d.deductions || 0);
+            totals.social_security_comp += Number(d.social_security_comp || 0);
+            totals.net_salary += Number(d.net_salary || 0);
+            totals.pos_sales += Number(d.pos_sales || 0);
+        }
+        if (!query && this.data.kpis && this.data.kpis.headcount) {
+            totals.headcount = this.data.kpis.headcount;
+        }
+        return totals;
     }
 
     formatCurrency(amount) {
@@ -556,29 +719,37 @@ export class HrPayrollDashboard extends Component {
         }
     }
 
-    async exportExcel() {
+    async exportExcel(reportType = "all") {
         if (this.state.exportingExcel) return;
         this.state.exportingExcel = true;
+        const targetScope = (typeof reportType === "string" && reportType) ? reportType : "all";
 
         if (this.notification) {
+            const msgMap = {
+                labor_cost: "Generating 6-Sheet Employee Cost & Headcount Excel Report...",
+                board_pptx: "Generating 10-Slide Executive Board PowerPoint (.pptx) with Charts & Pies...",
+            };
             this.notification.add(
-                "Generating unified HR & Payroll Excel package...",
+                msgMap[targetScope] || "Generating unified HR & Payroll Excel package...",
                 { type: "info" }
             );
         }
 
         try {
+            const selectedCompanyId = (this.state.company_id && Number(this.state.company_id) > 0)
+                ? Number(this.state.company_id)
+                : false;
+            const selectedPayrunId = (this.state.payrun_id && Number(this.state.payrun_id) > 0)
+                ? Number(this.state.payrun_id)
+                : false;
+
             const wizardVals = {
                 date_from: this.state.date_from,
                 date_to: this.state.date_to,
-                report_type: "all",
+                report_type: targetScope,
+                company_id: selectedCompanyId,
+                payrun_id: selectedPayrunId,
             };
-            if (this.state.payrun_id) {
-                wizardVals.payrun_id = this.state.payrun_id;
-            }
-            if (this.state.company_id) {
-                wizardVals.company_id = this.state.company_id;
-            }
             if (this.state.department_ids && this.state.department_ids.length > 0) {
                 wizardVals.department_ids = [[6, 0, this.state.department_ids.map(Number)]];
             }
@@ -586,9 +757,10 @@ export class HrPayrollDashboard extends Component {
             const wizardRes = await this.orm.create("hr.payroll.report.wizard", [wizardVals]);
             const wizardId = Array.isArray(wizardRes) ? wizardRes[0] : wizardRes;
 
+            const methodName = targetScope === "board_pptx" ? "action_export_pptx" : "action_export_xlsx";
             const action = await this.orm.call(
                 "hr.payroll.report.wizard",
-                "action_export_xlsx",
+                methodName,
                 [wizardId]
             );
 
@@ -596,7 +768,9 @@ export class HrPayrollDashboard extends Component {
                 window.location.href = action.url;
                 if (this.notification) {
                     this.notification.add(
-                        "Excel file exported successfully.",
+                        targetScope === "board_pptx"
+                            ? "10-Slide Board PowerPoint (.pptx) downloaded successfully."
+                            : "Excel file exported successfully.",
                         { type: "success" }
                     );
                 }
@@ -607,7 +781,7 @@ export class HrPayrollDashboard extends Component {
                 await this.actionService.doAction(action);
             }
         } catch (error) {
-            console.error("Failed to export unified HR & Payroll Excel report", error);
+            console.error("Failed to export HR & Payroll report", error);
             if (this.notification) {
                 this.notification.add(
                     "Export failed: " + (error.data?.message || error.message || error),
@@ -617,6 +791,10 @@ export class HrPayrollDashboard extends Component {
         } finally {
             this.state.exportingExcel = false;
         }
+    }
+
+    async exportBoardPptx() {
+        return this.exportExcel("board_pptx");
     }
 }
 

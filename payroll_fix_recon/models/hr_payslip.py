@@ -11,6 +11,7 @@ _logger = logging.getLogger(__name__)
 
 RECON_FIELDS = (
     'attendance_gross_overtime', 'overtime_holiday_hours', 'overtime_regular_hours', 'overtime_rest_hours',
+    'overtime_pto_hours',
     'rest_days_taken', 'attendance_gross_undertime',
     'attendance_net_reconciled', 'total_extra_hours_available', 'lateness_covered_by_extra_hours',
     'remaining_extra_hours_balance', 'total_pto_available', 'lateness_covered_by_pto',
@@ -26,16 +27,24 @@ class HrPayslip(models.Model):
     _inherit = 'hr.payslip'
 
     attendance_gross_overtime = fields.Float(
-        string="Monthly Overtime Earned", compute="_compute_attendance_reconciliation_fields", store=True)
+        string="Total Overtime Earned", compute="_compute_attendance_reconciliation_fields", store=True)
     overtime_holiday_hours = fields.Float(
         string="Public Holiday Overtime (x1.5)", compute="_compute_attendance_reconciliation_fields", store=True,
         help="Approved hours worked on public holidays, weighted x1.5. Part of Monthly Overtime Earned.")
     overtime_regular_hours = fields.Float(
-        string="Regular Overtime (x1.25)", compute="_compute_attendance_reconciliation_fields", store=True,
+        string="Monthly Extra Hours Earned", compute="_compute_attendance_reconciliation_fields", store=True,
         help="Approved daily extra hours and extra worked days, weighted x1.25. Part of Monthly Overtime Earned.")
     overtime_rest_hours = fields.Float(
         string="Unused Rest Days Overtime", compute="_compute_attendance_reconciliation_fields", store=True,
         help="Unused rest days of the monthly allowance, 8h x 1.5 each. Part of Monthly Overtime Earned.")
+    overtime_pto_hours = fields.Float(
+        string="Monthly Paid Time Off Earned", compute="_compute_overtime_pto_hours", store=True,
+        help="Total monthly PTO earned (Public Holiday hours + Unused Rest Day hours, weighted x1.5).")
+
+    @api.depends('overtime_holiday_hours', 'overtime_rest_hours')
+    def _compute_overtime_pto_hours(self):
+        for slip in self:
+            slip.overtime_pto_hours = round((slip.overtime_holiday_hours or 0.0) + (slip.overtime_rest_hours or 0.0), 2)
     rest_days_taken = fields.Float(
         string="Rest Days Taken", compute="_compute_attendance_reconciliation_fields", store=True,
         help="Unworked days excluding public holidays and approved leave. Allowance is 4; each unused "

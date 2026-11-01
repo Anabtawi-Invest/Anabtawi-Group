@@ -1,0 +1,4 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_factory_branch_transfer_wizard_account,Factory Branch Transfer Wizard Account,model_factory_branch_transfer_wizard,account.group_account_readonly,1,1,1,1
+access_factory_branch_transfer_wizard_invoice,Factory Branch Transfer Wizard Invoice,model_factory_branch_transfer_wizard,account.group_account_invoice,1,1,1,1
+access_factory_branch_transfer_wizard_stock,Factory Branch Transfer Wizard Stock,model_factory_branch_transfer_wizard,stock.group_stock_user,1,1,1,1

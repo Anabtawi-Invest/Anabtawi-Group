@@ -16,18 +16,35 @@
     <template id="report_income_tax_ar3_template">
         <t t-call="web.html_container">
             <t t-foreach="docs" t-as="doc">
-                <t t-call="web.basic_layout">
-                    <div class="page" dir="rtl" style="font-family: 'DejaVu Sans', Arial, Tahoma, sans-serif; font-size: 11px; color: #000; direction: rtl; text-align: right; line-height: 1.25;">
+                <div class="article" t-att-data-oe-model="doc._name" t-att-data-oe-id="doc.id">
+                    <div class="page" dir="rtl" style="font-family: 'DejaVu Sans', Arial, Tahoma, sans-serif; color: #000; direction: rtl; text-align: right; line-height: 1.25; width: 100% !important; margin: 0 !important; padding: 0 !important;">
                         <style>
-                            @page {
-                                size: A4 portrait;
-                                margin: 6mm 8mm 6mm 8mm;
+                            html, body {
+                                width: 100% !important;
+                                margin: 0 !important;
+                                padding: 0 !important;
+                            }
+                            .article {
+                                width: 100% !important;
+                                max-width: 100% !important;
+                                margin: 0 !important;
+                                padding: 0 !important;
+                            }
+                            .page {
+                                width: 100% !important;
+                                margin: 0 !important;
+                                padding: 0 !important;
+                                font-family: 'DejaVu Sans', Arial, Tahoma, sans-serif;
+                                color: #000;
+                                direction: rtl;
+                                text-align: right;
+                                line-height: 1.25;
                             }
                             table.it-header {
                                 width: 100%;
                                 border-collapse: collapse;
                                 border: none;
-                                margin-bottom: 4px;
+                                margin-bottom: 2px;
                             }
                             table.it-header td {
                                 border: none;
@@ -35,13 +52,13 @@
                                 padding: 0;
                             }
                             .it-ministry {
-                                font-size: 13.5px;
+                                font-size: 14.5px;
                                 font-weight: bold;
                                 line-height: 1.45;
                                 text-align: right;
                             }
                             .it-doc-code {
-                                font-size: 12px;
+                                font-size: 12.5px;
                                 font-weight: bold;
                                 text-align: left;
                                 direction: ltr;
@@ -50,89 +67,94 @@
                                 text-align: center;
                             }
                             .it-logo img {
-                                max-height: 68px;
+                                max-height: 74px;
                                 width: auto;
                             }
                             .it-title-box {
                                 text-align: center;
                                 margin-top: 4px;
-                                margin-bottom: 12px;
+                                margin-bottom: 10px;
                             }
                             .it-title-box .main-title {
-                                font-size: 15.5px;
+                                font-size: 18px;
                                 font-weight: bold;
                                 margin-bottom: 3px;
                             }
                             .it-title-box .sub-title {
-                                font-size: 10px;
+                                font-size: 10.5px;
                             }
                             
                             /* Employee Info Table */
                             table.it-form-table {
                                 width: 100%;
                                 border-collapse: collapse;
-                                margin-bottom: 12px;
-                                border: 1.2px solid #000;
+                                margin-bottom: 10px;
+                                border: 1.5px solid #000;
                             }
                             table.it-form-table th, table.it-form-table td {
                                 border: 1px solid #000;
-                                padding: 4px 3px;
                                 text-align: center;
-                                font-size: 10px;
                                 background-color: #ffffff;
                             }
                             .it-tbl-head {
                                 font-weight: bold;
-                                font-size: 11px;
-                                padding: 3px;
+                                font-size: 12px;
+                                padding: 4px 3px;
+                                background-color: #f7f7f7;
                             }
                             .it-label-row td {
                                 font-weight: normal;
-                                font-size: 9.5px;
+                                font-size: 10px;
                                 padding: 3px 2px;
+                                background-color: #fcfcfc;
                             }
                             .it-val-row td {
                                 font-weight: bold;
-                                font-size: 11px;
+                                font-size: 11.5px;
                                 padding: 5px 3px;
+                                height: 25px;
                             }
 
                             /* Financial Table: Columns aligned with numbers on the RIGHT */
                             table.it-fin-table {
                                 width: 100%;
                                 border-collapse: collapse;
-                                border: 1.2px solid #000;
+                                border: 1.5px solid #000;
                                 margin-bottom: 8px;
                             }
                             table.it-fin-table th, table.it-fin-table td {
                                 border: 1px solid #000;
-                                padding: 3.5px 3px;
-                                font-size: 10px;
                                 background-color: #ffffff;
                             }
                             .it-fin-th {
                                 font-weight: bold;
                                 text-align: center;
-                                font-size: 10.5px;
-                                padding: 3.5px 2px;
+                                font-size: 11.5px;
+                                padding: 4px 2px;
+                                background-color: #f7f7f7;
                             }
                             .it-row-desc {
                                 text-align: center;
-                                font-size: 10px;
-                                padding: 3.5px 3px;
+                                font-size: 11px;
+                                padding: 4.5px 3px;
+                                height: 29px;
+                                vertical-align: middle;
                             }
                             .it-val-num {
                                 text-align: center;
                                 font-weight: bold;
-                                font-size: 10.5px;
+                                font-size: 11.5px;
+                                padding: 4.5px 3px;
+                                height: 29px;
+                                vertical-align: middle;
                             }
 
                             /* Footer Section */
                             .it-declaration-text {
-                                font-size: 10.5px;
+                                font-size: 11px;
                                 font-weight: bold;
                                 text-align: right;
-                                margin-top: 14px;
+                                margin-top: 10px;
                                 margin-bottom: 8px;
                                 line-height: 1.45;
                                 padding-right: 1px;
@@ -140,13 +162,13 @@
                             table.it-sign-table {
                                 width: 100%;
                                 border-collapse: collapse;
-                                border: 1.2px solid #000;
+                                border: 1.5px solid #000;
                                 margin-bottom: 6px;
                             }
                             table.it-sign-table td {
                                 border: 1px solid #000;
                                 padding: 6px 4px;
-                                font-size: 10.5px;
+                                font-size: 11.5px;
                                 background-color: #ffffff;
                             }
                             table.it-date-table {
@@ -162,7 +184,7 @@
                         </style>
 
                         <!-- Top Horizontal Rule as seen in original form -->
-                        <div style="border-top: 1px solid #000; margin-bottom: 8px;"></div>
+                        <div style="border-top: 1.5px solid #000; margin-bottom: 8px;"></div>
 
                         <!-- Header Section -->
                         <table class="it-header">
@@ -269,10 +291,10 @@
                                     <th rowspan="2" class="it-fin-th" style="vertical-align: middle;">الضريبة المقتطعة من اجمالي</th>
                                 </tr>
                                 <tr>
-                                    <th class="it-fin-th" style="font-size: 9.5px; padding: 2px;">فلس</th>
-                                    <th class="it-fin-th" style="font-size: 9.5px; padding: 2px;">دينار</th>
-                                    <th class="it-fin-th" style="font-size: 9.5px; padding: 2px;">فلس</th>
-                                    <th class="it-fin-th" style="font-size: 9.5px; padding: 2px;">دينار</th>
+                                    <th class="it-fin-th" style="font-size: 11px; padding: 3px;">فلس</th>
+                                    <th class="it-fin-th" style="font-size: 11px; padding: 3px;">دينار</th>
+                                    <th class="it-fin-th" style="font-size: 11px; padding: 3px;">فلس</th>
+                                    <th class="it-fin-th" style="font-size: 11px; padding: 3px;">دينار</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -382,14 +404,14 @@
                                 <!-- Row 9: المجموع -->
                                 <tr style="font-weight: bold;">
                                     <t t-set="gtot" t-value="doc.split_val(doc.gross_total)"/>
-                                    <td class="it-val-num" style="font-size: 11px;"><span t-esc="gtot[1]"/></td>
-                                    <td class="it-val-num" style="font-size: 11px;"><span t-esc="gtot[0]"/></td>
-                                    <td class="it-row-desc" style="font-weight: bold; font-size: 11px;">المجموع</td>
+                                    <td class="it-val-num" style="font-size: 12px; height: 32px;"><span t-esc="gtot[1]"/></td>
+                                    <td class="it-val-num" style="font-size: 12px; height: 32px;"><span t-esc="gtot[0]"/></td>
+                                    <td class="it-row-desc" style="font-weight: bold; font-size: 12px; height: 32px;">المجموع</td>
 
                                     <t t-set="ttot" t-value="doc.split_val(doc.tax_total)"/>
-                                    <td class="it-val-num" style="font-size: 11px;"><span t-esc="ttot[1]"/></td>
-                                    <td class="it-val-num" style="font-size: 11px;"><span t-esc="ttot[0]"/></td>
-                                    <td class="it-row-desc" style="font-weight: bold; font-size: 11px;">المجموع</td>
+                                    <td class="it-val-num" style="font-size: 12px; height: 32px;"><span t-esc="ttot[1]"/></td>
+                                    <td class="it-val-num" style="font-size: 12px; height: 32px;"><span t-esc="ttot[0]"/></td>
+                                    <td class="it-row-desc" style="font-weight: bold; font-size: 12px; height: 32px;">المجموع</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -405,7 +427,7 @@
                                 <td style="width: 18%; text-align: center; font-weight: bold;">
                                     اسم صاحب العمل
                                 </td>
-                                <td style="width: 44%; text-align: center; font-weight: bold; font-size: 11px;">
+                                <td style="width: 44%; text-align: center; font-weight: bold; font-size: 12px;">
                                     <span t-esc="doc.employer_name"/>
                                 </td>
                                 <td rowspan="2" style="width: 15%; text-align: center; font-weight: bold; vertical-align: middle;">
@@ -418,7 +440,7 @@
                                 <td style="text-align: center; font-weight: bold;">
                                     الرقم الضريبي
                                 </td>
-                                <td style="text-align: center; font-weight: bold; font-size: 12px; letter-spacing: 1px;">
+                                <td style="text-align: center; font-weight: bold; font-size: 13px; letter-spacing: 1px;">
                                     <span t-esc="doc.employer_tax_id"/>
                                 </td>
                             </tr>
@@ -427,17 +449,17 @@
                         <!-- Date and Bottom Reference Note -->
                         <table class="it-date-table">
                             <tr>
-                                <td style="width: 50%; text-align: right; font-weight: bold; font-size: 11px;">
+                                <td style="width: 50%; text-align: right; font-weight: bold; font-size: 11.5px;">
                                     التاريخ&#160;&#160;&#160;&#160;&#160;<span t-esc="doc.report_date.strftime('%d/%m/%Y') if doc.report_date else ''"/>
                                 </td>
-                                <td style="width: 50%; text-align: left; font-size: 9px; direction: rtl;">
+                                <td style="width: 50%; text-align: left; font-size: 10px; direction: rtl;">
                                     محدث بتاريخ 2019/8/4 م
                                 </td>
                             </tr>
                         </table>
 
                     </div>
-                </t>
+                </div>
             </t>
         </t>
     </template>

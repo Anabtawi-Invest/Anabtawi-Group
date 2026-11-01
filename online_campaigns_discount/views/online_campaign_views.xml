@@ -1,16 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+    <!-- ================= Aggregators ================= -->
     <record id="view_online_campaign_aggregator_list" model="ir.ui.view">
         <field name="name">online.campaign.aggregator.list</field>
         <field name="model">online.campaign.aggregator</field>
         <field name="arch" type="xml">
-            <list decoration-muted="not active">
+            <list decoration-muted="not active" sample="1">
                 <field name="name"/>
-                <field name="default_commission_percent" string="Default Commission %"/>
+                <field name="default_commission_percent" string="Commission %"/>
                 <field name="commission_base" optional="show"/>
-                <field name="partner_id" optional="show"/>
+                <field name="partner_id" optional="hide"/>
                 <field name="company_id" groups="base.group_multi_company"/>
-                <field name="receivable_account_id" optional="show" groups="online_campaigns_discount.group_online_campaign_finance_manager,account.group_account_manager"/>
+                <field name="receivable_account_id" optional="hide" groups="online_campaigns_discount.group_online_campaign_finance_manager,account.group_account_manager"/>
                 <field name="active" widget="boolean_toggle"/>
             </list>
         </field>
@@ -24,32 +25,48 @@
                 <sheet>
                     <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
                     <field name="active" invisible="1"/>
+                    <field name="currency_id" invisible="1"/>
+                    <field name="company_id" invisible="1"/>
                     <div class="oe_title">
                         <label for="name"/>
                         <h1><field name="name" placeholder="e.g. Talabat, Careem, MyThings"/></h1>
                     </div>
                     <group>
-                        <group string="Commercial Setup">
-                            <field name="company_id" options="{'no_create': True}"/>
-                            <field name="currency_id" invisible="1"/>
-                            <field name="partner_id" domain="[('company_id', 'in', [False, company_id])]"/>
-                            <field name="payment_method_ids" widget="many2many_tags"/>
+                        <group string="Commission">
                             <field name="default_commission_percent"/>
                             <field name="commission_base" widget="radio"/>
-                            <field name="color" widget="color_picker"/>
+                        </group>
+                        <group string="POS Integration">
+                            <field name="payment_method_ids" widget="many2many_tags"/>
                             <field name="require_order_ref"/>
                             <field name="order_ref_digit_length" invisible="not require_order_ref"/>
                         </group>
-                        <group string="Accounting" groups="online_campaigns_discount.group_online_campaign_finance_manager,account.group_account_manager">
-                            <field name="receivable_account_id" options="{'no_create': True}"/>
-                            <field name="discount_expense_account_id" options="{'no_create': True}"/>
-                            <field name="commission_expense_account_id" options="{'no_create': True}"/>
-                            <field name="discount_recovery_account_id" options="{'no_create': True}"/>
-                        </group>
                     </group>
-                    <group string="Internal Notes">
-                        <field name="note" nolabel="1"/>
-                    </group>
+                    <notebook>
+                        <page string="Accounting" name="accounting"
+                              groups="online_campaigns_discount.group_online_campaign_finance_manager,account.group_account_manager">
+                            <group>
+                                <group>
+                                    <field name="receivable_account_id" options="{'no_create': True}"/>
+                                    <field name="commission_expense_account_id" options="{'no_create': True}"/>
+                                </group>
+                                <group>
+                                    <field name="discount_expense_account_id" options="{'no_create': True}"/>
+                                    <field name="discount_recovery_account_id" options="{'no_create': True}"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="General" name="general">
+                            <group>
+                                <group>
+                                    <field name="company_id" options="{'no_create': True}" groups="base.group_multi_company"/>
+                                    <field name="partner_id" domain="[('company_id', 'in', [False, company_id])]"/>
+                                    <field name="color" widget="color_picker"/>
+                                </group>
+                            </group>
+                            <field name="note" placeholder="Internal notes..."/>
+                        </page>
+                    </notebook>
                 </sheet>
             </form>
         </field>
@@ -59,15 +76,20 @@
         <field name="name">Aggregators</field>
         <field name="res_model">online.campaign.aggregator</field>
         <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Add your first aggregator</p>
+            <p>Link Talabat, Careem or any delivery platform to its POS payment methods and accounts.</p>
+        </field>
     </record>
 
+    <!-- ================= Campaigns ================= -->
     <record id="view_online_discount_campaign_list" model="ir.ui.view">
         <field name="name">online.discount.campaign.list</field>
         <field name="model">online.discount.campaign</field>
         <field name="arch" type="xml">
             <list decoration-success="state == 'approved'" decoration-warning="state == 'pending'"
                   decoration-danger="state == 'rejected'" decoration-muted="state == 'cancelled' or not active"
-                  default_order="start_datetime desc, priority">
+                  default_order="start_datetime desc, priority" sample="1">
                 <field name="name"/>
                 <field name="aggregator_id"/>
                 <field name="start_datetime"/>
@@ -75,12 +97,40 @@
                 <field name="discount_percent" string="Discount %"/>
                 <field name="discount_cap_amount" widget="monetary"/>
                 <field name="currency_id" column_invisible="True"/>
-                <field name="aggregator_commission_percent" string="Commission %" optional="show"/>
-                <field name="ecommerce_approved" optional="show"/>
-                <field name="finance_approved" optional="show"/>
-                <field name="state" widget="badge"/>
+                <field name="aggregator_commission_percent" string="Commission %" optional="hide"/>
+                <field name="ecommerce_approved" optional="hide"/>
+                <field name="finance_approved" optional="hide"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'approved'" decoration-warning="state == 'pending'"
+                       decoration-danger="state == 'rejected'"/>
                 <field name="company_id" groups="base.group_multi_company"/>
             </list>
+        </field>
+    </record>
+
+    <record id="view_online_discount_campaign_kanban" model="ir.ui.view">
+        <field name="name">online.discount.campaign.kanban</field>
+        <field name="model">online.discount.campaign</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="state" group_create="0" group_delete="0" group_edit="0"
+                    records_draggable="0" sample="1">
+                <templates>
+                    <t t-name="card">
+                        <field name="name" class="fw-bold fs-5"/>
+                        <div class="text-muted"><field name="aggregator_id"/></div>
+                        <div class="mt-2">
+                            <field name="start_datetime" widget="date"/> → <field name="end_datetime" widget="date"/>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mt-2">
+                            <span class="badge text-bg-primary"><field name="discount_percent"/>%</span>
+                            <span class="text-muted">
+                                <i class="fa fa-check-circle me-1" title="E-commerce approved" invisible="not ecommerce_approved"/>
+                                <i class="fa fa-check-circle-o me-1" title="Finance approved" invisible="not finance_approved"/>
+                            </span>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
         </field>
     </record>
 
@@ -111,7 +161,7 @@
                             invisible="state != 'pending' or ecommerce_approved"/>
                     <button name="action_finance_approve" type="object" string="Finance Approve" class="btn-primary"
                             groups="online_campaigns_discount.group_online_campaign_finance_manager"
-                            invisible="state != 'pending' or finance_approved"/>
+                            invisible="state != 'pending' or finance_approved or not ecommerce_approved"/>
                     <button name="action_reject" type="object" string="Reject"
                             groups="online_campaigns_discount.group_online_campaign_approver"
                             invisible="state != 'pending'"/>
@@ -125,55 +175,90 @@
                 <sheet>
                     <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
                     <field name="active" invisible="1"/>
+                    <field name="company_id" invisible="1"/>
+                    <field name="currency_id" invisible="1"/>
+                    <div class="alert alert-danger" role="alert" invisible="state != 'rejected'">
+                        <strong>Rejected:</strong> <field name="rejection_reason" readonly="1" nolabel="1" class="d-inline"/>
+                    </div>
+                    <div class="alert alert-warning" role="alert" invisible="state != 'pending'">
+                        Waiting for approval from
+                        <strong invisible="ecommerce_approved">E-commerce</strong>
+                        <span invisible="ecommerce_approved or finance_approved"> and </span>
+                        <strong invisible="finance_approved">Finance</strong>.
+                    </div>
                     <div class="oe_title">
                         <label for="name"/>
                         <h1><field name="name" placeholder="e.g. Talabat July 50% Campaign"/></h1>
                     </div>
                     <group>
-                        <group string="Schedule and Channel">
-                            <field name="company_id" options="{'no_create': True}" readonly="state != 'draft'"/>
-                            <field name="currency_id" options="{'no_create': True}" readonly="state != 'draft'"/>
+                        <group name="channel">
                             <field name="aggregator_id" domain="[('company_id', '=', company_id)]" readonly="state != 'draft'"/>
-                            <field name="start_datetime" readonly="state != 'draft'"/>
-                            <field name="end_datetime" readonly="state != 'draft'"/>
-                            <field name="pos_config_ids" widget="many2many_tags" domain="[('company_id', '=', company_id)]" readonly="state != 'draft'"/>
-                            <field name="pricelist_ids" widget="many2many_tags" domain="[('currency_id', '=', currency_id)]" readonly="state != 'draft'"/>
+                            <label for="start_datetime" string="Period"/>
+                            <div class="o_row">
+                                <field name="start_datetime" readonly="state != 'draft'"/>
+                                <i class="fa fa-long-arrow-right" title="to"/>
+                                <field name="end_datetime" readonly="state != 'draft'"/>
+                            </div>
                         </group>
-                        <group string="Commercial Terms">
-                            <field name="discount_type" readonly="state != 'draft'"/>
-                            <field name="discount_percent" readonly="state != 'draft'"/>
-                            <field name="discount_cap_amount" widget="monetary" readonly="state != 'draft'"/>
-                            <field name="cap_application" readonly="state != 'draft'"/>
-                            <field name="aggregator_commission_percent" readonly="state != 'draft'"/>
-                            <field name="aggregator_contribution_percent" readonly="state != 'draft'"/>
-                            <field name="company_contribution_percent" readonly="1" force_save="1"/>
+                        <group name="setup">
+                            <field name="company_id" options="{'no_create': True}" readonly="state != 'draft'" groups="base.group_multi_company"/>
+                            <field name="currency_id" options="{'no_create': True}" readonly="state != 'draft'" groups="base.group_multi_currency"/>
                             <field name="priority" readonly="state != 'draft'"/>
                             <field name="allow_stacking" readonly="state != 'draft'"/>
                         </group>
                     </group>
-                    <group string="Eligible Products">
-                        <field name="apply_scope" widget="radio" options="{'horizontal': True}" readonly="state != 'draft'"/>
-                        <field name="product_ids" widget="many2many_tags" invisible="apply_scope != 'specific_products'" readonly="state != 'draft'"/>
-                        <field name="category_ids" widget="many2many_tags" invisible="apply_scope != 'specific_categories'" readonly="state != 'draft'"/>
-                    </group>
-                    <group string="Required Approvals">
-                        <group>
-                            <field name="ecommerce_approved"/>
-                            <field name="ecommerce_approved_by" invisible="not ecommerce_approved"/>
-                            <field name="ecommerce_approved_at" invisible="not ecommerce_approved"/>
-                        </group>
-                        <group>
-                            <field name="finance_approved"/>
-                            <field name="finance_approved_by" invisible="not finance_approved"/>
-                            <field name="finance_approved_at" invisible="not finance_approved"/>
-                        </group>
-                    </group>
-                    <group string="Rejection and Internal Notes">
-                        <field name="rejection_reason" placeholder="Required operational explanation when a campaign is rejected."/>
-                        <field name="note"/>
-                    </group>
-                    <chatter/>
+                    <notebook>
+                        <page string="Discount" name="discount">
+                            <group>
+                                <group string="Customer Discount">
+                                    <field name="discount_type" readonly="state != 'draft'"/>
+                                    <field name="discount_percent" readonly="state != 'draft'"/>
+                                    <field name="discount_cap_amount" widget="monetary" readonly="state != 'draft'"/>
+                                    <field name="cap_application" readonly="state != 'draft'"/>
+                                </group>
+                                <group string="Cost Sharing">
+                                    <field name="aggregator_contribution_percent" readonly="state != 'draft'"/>
+                                    <field name="company_contribution_percent" readonly="1" force_save="1"/>
+                                    <field name="aggregator_commission_percent" readonly="state != 'draft'"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Eligibility" name="eligibility">
+                            <group>
+                                <group string="Where">
+                                    <field name="pos_config_ids" widget="many2many_tags" domain="[('company_id', '=', company_id)]" readonly="state != 'draft'" placeholder="All branches"/>
+                                    <field name="pricelist_ids" widget="many2many_tags" domain="[('currency_id', '=', currency_id)]" readonly="state != 'draft'" placeholder="All pricelists"/>
+                                </group>
+                                <group string="Products">
+                                    <field name="apply_scope" widget="radio" readonly="state != 'draft'"/>
+                                    <field name="product_ids" widget="many2many_tags" invisible="apply_scope != 'specific_products'" readonly="state != 'draft'"/>
+                                    <field name="category_ids" widget="many2many_tags" invisible="apply_scope != 'specific_categories'" readonly="state != 'draft'"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Approvals" name="approvals">
+                            <group>
+                                <group string="E-commerce">
+                                    <field name="ecommerce_approved"/>
+                                    <field name="ecommerce_approved_by" invisible="not ecommerce_approved"/>
+                                    <field name="ecommerce_approved_at" invisible="not ecommerce_approved"/>
+                                </group>
+                                <group string="Finance">
+                                    <field name="finance_approved"/>
+                                    <field name="finance_approved_by" invisible="not finance_approved"/>
+                                    <field name="finance_approved_at" invisible="not finance_approved"/>
+                                </group>
+                            </group>
+                            <group>
+                                <field name="rejection_reason" placeholder="Operational explanation when a campaign is rejected."/>
+                            </group>
+                        </page>
+                        <page string="Notes" name="notes">
+                            <field name="note" placeholder="Internal notes..."/>
+                        </page>
+                    </notebook>
                 </sheet>
+                <chatter/>
             </form>
         </field>
     </record>
@@ -187,30 +272,31 @@
                 <field name="aggregator_id"/>
                 <field name="pricelist_ids"/>
                 <field name="pos_config_ids"/>
+                <filter name="draft" string="Draft" domain="[('state', '=', 'draft')]"/>
                 <filter name="waiting" string="Waiting for Approval" domain="[('state', '=', 'pending')]"/>
                 <filter name="approved" string="Approved" domain="[('state', '=', 'approved')]"/>
-                <filter name="active_now" string="Active Now" domain="[('state', '=', 'approved'), ('start_datetime', '&lt;=', context_today()), ('end_datetime', '&gt;=', context_today())]"/>
+                <filter name="active_now" string="Running Now"
+                        domain="[('state', '=', 'approved'), ('start_datetime', '&lt;=', context_today()), ('end_datetime', '&gt;=', context_today())]"/>
                 <separator/>
-                <filter name="group_aggregator" string="Aggregator" context="{'group_by': 'aggregator_id'}"/>
-                <filter name="group_state" string="Status" context="{'group_by': 'state'}"/>
-                <filter name="group_start" string="Start Month" context="{'group_by': 'start_datetime:month'}"/>
-                <filter name="group_company" string="Company" context="{'group_by': 'company_id'}" groups="base.group_multi_company"/>
+                <filter name="archived" string="Archived" domain="[('active', '=', False)]"/>
+                <group>
+                    <filter name="group_aggregator" string="Aggregator" context="{'group_by': 'aggregator_id'}"/>
+                    <filter name="group_state" string="Status" context="{'group_by': 'state'}"/>
+                    <filter name="group_start" string="Start Month" context="{'group_by': 'start_datetime:month'}"/>
+                    <filter name="group_company" string="Company" context="{'group_by': 'company_id'}" groups="base.group_multi_company"/>
+                </group>
             </search>
         </field>
     </record>
 
     <record id="action_online_discount_campaigns" model="ir.actions.act_window">
-        <field name="name">Online Campaigns</field>
+        <field name="name">Campaigns</field>
         <field name="res_model">online.discount.campaign</field>
-        <field name="view_mode">list,calendar,form</field>
+        <field name="view_mode">kanban,list,calendar,form</field>
         <field name="search_view_id" ref="view_online_discount_campaign_search"/>
-    </record>
-
-    <record id="action_online_discount_campaign_calendar" model="ir.actions.act_window">
-        <field name="name">Campaign Calendar</field>
-        <field name="res_model">online.discount.campaign</field>
-        <field name="view_mode">calendar,list,form</field>
-        <field name="view_id" ref="view_online_discount_campaign_calendar"/>
-        <field name="search_view_id" ref="view_online_discount_campaign_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Create your first campaign</p>
+            <p>Set the discount, cap and cost sharing with the aggregator, then submit for approval.</p>
+        </field>
     </record>
 </odoo>

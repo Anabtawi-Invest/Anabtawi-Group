@@ -7,6 +7,7 @@ import { useSetupAction } from "@web/search/action_hook";
 
 export class PosReportingDashboard extends Component {
     static template = "anabtawi_pos_reporting_dashboard.PosReportingDashboard";
+    static props = ["*"];
 
     setup() {
         this.orm = useService("orm");
@@ -34,25 +35,29 @@ export class PosReportingDashboard extends Component {
             sortKey: "sales",
             sortOrder: "desc",
         });
-        const saved = this.props.state && this.props.state.dashboard;
+
+        // Filters restored when coming back through the breadcrumbs.
+        const saved = (this.props.state && this.props.state.dashboard) || null;
         if (saved) {
-            Object.assign(this.state, saved);
+            Object.assign(this.state, saved.filters);
         }
 
         useSetupAction({
             getLocalState: () => ({
                 dashboard: {
-                    period: this.state.period,
-                    date_from: this.state.date_from,
-                    date_to: this.state.date_to,
-                    config_ids: [...(this.state.config_ids || [])],
-                    view: this.state.view,
-                    productFilter: this.state.productFilter,
-                    productSearch: this.state.productSearch,
-                    productSortKey: this.state.productSortKey,
-                    productSortOrder: this.state.productSortOrder,
-                    sortKey: this.state.sortKey,
-                    sortOrder: this.state.sortOrder,
+                    filters: {
+                        period: this.state.period,
+                        date_from: this.state.date_from,
+                        date_to: this.state.date_to,
+                        config_ids: [...(this.state.config_ids || [])],
+                        view: this.state.view,
+                        productFilter: this.state.productFilter,
+                        productSearch: this.state.productSearch,
+                        productSortKey: this.state.productSortKey,
+                        productSortOrder: this.state.productSortOrder,
+                        sortKey: this.state.sortKey,
+                        sortOrder: this.state.sortOrder,
+                    },
                 },
             }),
         });
