@@ -168,17 +168,27 @@ class HrPayslip(models.Model):
                 self._pfr_create_settlement_leaves(leave_type, -gap, consume_label)
 
     def _pfr_force_extra_hours(self, extra_type):
-        """Make the Extra Hours time-off balance equal the slip's Remaining Extra Hours Balance."""
+        """Allocate Extra Hours from the leftover before the /1.25 real-hours conversion.
+
+        Remaining Extra Hours Balance is that leftover divided by 1.25 for the payslip audit.
+        The time-off balance keeps the weighted hours: Total Extra Hours Available minus step 1.
+        """
         self.ensure_one()
+        target = (self.total_extra_hours_available or 0.0) - (self.lateness_covered_by_extra_hours or 0.0)
         self._pfr_force_leave_balance(
-            extra_type, self.remaining_extra_hours_balance, recon_alloc_name(self),
+            extra_type, max(0.0, target), recon_alloc_name(self),
             'extra_hours_allocated_days', 'Extra Hours')
 
     def _pfr_force_pto(self, pto_type):
-        """Make the Paid Time Off balance equal the slip's Remaining Paid Time Off Available."""
+        """Allocate Paid Time Off from the leftover before the /1.5 real-hours conversion.
+
+        Remaining Paid Time Off Available is that leftover divided by 1.5 for the payslip audit.
+        The time-off balance keeps the weighted hours: Total Paid Time Off Available minus step 2.
+        """
         self.ensure_one()
+        target = (self.total_pto_available or 0.0) - (self.lateness_covered_by_pto or 0.0)
         self._pfr_force_leave_balance(
-            pto_type, self.remaining_pto_balance, pto_recon_alloc_name(self),
+            pto_type, max(0.0, target), pto_recon_alloc_name(self),
             'pto_allocated_days', 'Paid Time Off')
 
     def _pfr_validate_allocation(self, alloc):
