@@ -60,9 +60,10 @@ class HrPayslip(models.Model):
             ('employee_id', '=', self.employee_id.id),
             ('date', '>=', self.date_from),
             ('date', '<=', self.date_to),
-            ('daily_overtime_hours', '>=', OT_MIN_HOURS),
-            ('overtime_status', '!=', 'approved'),
-        ])
+        ]).filtered(
+            lambda att: (att.daily_overtime_hours or 0.0) >= OT_MIN_HOURS
+            and att.overtime_status != 'approved'
+        )
         if attendances:
             attendances.action_approve_factory_overtime()
 
