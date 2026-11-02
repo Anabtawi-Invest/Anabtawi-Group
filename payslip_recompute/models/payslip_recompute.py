@@ -1,9 +1,16 @@
 # -*- coding: utf-8 -*-
 """Recompute payslips in the background. Every payslip gets a log line."""
+import base64
+import io
 import logging
 
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError
+
+try:
+    import openpyxl
+except ImportError:
+    openpyxl = None
 
 _logger = logging.getLogger(__name__)
 
@@ -11,6 +18,62 @@ _RUN_CTX = dict(
     tracking_disable=True, mail_notrack=True, mail_create_nolog=True,
     mail_activity_automation_skip=True,
 )
+
+_NUMBER_HEADERS = {
+    'employee number', 'employee no', 'emp number', 'emp no', 'staff number',
+    'رقم الموظف', 'الرقم الوظيفي',
+}
+
+
+def _normalize_employee_number(value):
+    """Employee Number as stored on the employee, without Excel's trailing .0."""
+    if value is None or value is False:
+        return ''
+    if isinstance(value, float) and value.is_integer():
+        value = int(value)
+    text = str(value).strip()
+    if text.endswith('.0'):
+        text = text[:-2]
+    return text
+
+
+def _header_key(value):
+    return ' '.join(_normalize_employee_number(value).lower().replace('_', ' ').split())
+
+
+def _number_keys(value):
+    text = _normalize_employee_number(value)
+    if not text:
+        return []
+    stripped = text.lstrip('0') or '0'
+    return [text] if stripped == text else [text, stripped]
+
+
+def _numbers_from_rows(rows):
+    """Employee numbers from the first sheet. A header row is skipped."""
+    if not rows:
+        return []
+    header_col = None
+    start_row = 0
+    first = rows[0] or []
+    for index, cell in enumerate(first):
+        if _header_key(cell) in _NUMBER_HEADERS:
+            header_col = index
+            start_row = 1
+            break
+    if header_col is None:
+        header_col = 0
+    numbers = []
+    seen = set()
+    for row in rows[start_row:]:
+        if not row or header_col >= len(row):
+            continue
+        keys = _number_keys(row[header_col])
+        if not keys or _header_key(row[header_col]) in _NUMBER_HEADERS or keys[0] in seen:
+            continue
+        seen.add(keys[0])
+        numbers.append(keys[0])
+    return numbers
 
 
 class PayslipRecomputeBatch(models.Model):
@@ -165,13 +228,83 @@ class PayslipRecomputeWizard(models.TransientModel):
     skip_structure_ids = fields.Many2many(
         'hr.payroll.structure', string="Structures to skip",
         help="Payslips that use one of these salary structures are left out of the run.")
+    employee_file = fields.Binary(
+        string="Employees Excel",
+        help="Optional .xlsx file. A column of Employee Numbers. "
+             "The first row may be a header such as employee_number. Only those employees are recomputed.")
+    employee_filename = fields.Char()
+    employee_match_note = fields.Text(string="Excel match", compute='_compute_payslip_count')
     payslip_count = fields.Integer(compute='_compute_payslip_count')
 
-    @api.depends('date_from', 'date_to', 'skip_structure_ids')
+    @api.depends('date_from', 'date_to', 'skip_structure_ids', 'employee_file')
     def _compute_payslip_count(self):
         for wiz in self:
-            wiz.payslip_count = self.env['hr.payslip'].sudo().search_count(wiz._slip_domain()) \
-                if wiz.date_from and wiz.date_to else 0
+            note = ''
+            ready = wiz.date_from and wiz.date_to
+            if wiz.employee_file and ready:
+                try:
+                    employees, missing, archived = wiz._match_sheet()
+                except UserError as err:
+                    wiz.payslip_count = 0
+                    wiz.employee_match_note = err.args[0] if err.args else str(err)
+                    continue
+                parts = [_("%s employees matched.") % len(employees)]
+                if missing:
+                    parts.append(_("Not found: %s") % ", ".join(missing))
+                if archived:
+                    parts.append(_("Archived, skipped: %s") % ", ".join(archived))
+                note = "\n".join(parts)
+            wiz.employee_match_note = note
+            wiz.payslip_count = self.env['hr.payslip'].sudo().search_count(wiz._slip_domain()) if ready else 0
+
+    def _read_employee_numbers(self):
+        self.ensure_one()
+        if not self.employee_file:
+            return []
+        if not openpyxl:
+            raise UserError(_("The Python package 'openpyxl' is required to read Excel files."))
+        try:
+            raw = base64.b64decode(self.employee_file)
+            workbook = openpyxl.load_workbook(io.BytesIO(raw), data_only=True, read_only=True)
+        except Exception as err:
+            raise UserError(_("This file could not be read. Use an Excel .xlsx file. %s") % err) from err
+        try:
+            sheet = workbook.active
+            rows = [tuple(row) for row in sheet.iter_rows(values_only=True)]
+        finally:
+            workbook.close()
+        numbers = _numbers_from_rows(rows)
+        if not numbers:
+            raise UserError(_("The Excel sheet has no employee numbers."))
+        return numbers
+
+    def _match_sheet(self):
+        """Return active employees, numbers that match nobody, and archived numbers."""
+        self.ensure_one()
+        numbers = self._read_employee_numbers()
+        Employee = self.env['hr.employee'].sudo().with_context(active_test=False)
+        if 'employee_number' not in Employee._fields:
+            raise UserError(_("Employee Number is not available on employees."))
+        index = {}
+        for employee in Employee.search([]):
+            for key in _number_keys(employee.employee_number):
+                index.setdefault(key, Employee.browse())
+                index[key] |= employee
+        matched = Employee.browse()
+        missing = []
+        archived = []
+        for number in numbers:
+            found = Employee.browse()
+            for key in _number_keys(number):
+                found |= index.get(key, Employee.browse())
+            active = found.filtered('active')
+            if active:
+                matched |= active
+            elif found:
+                archived.append(number)
+            else:
+                missing.append(number)
+        return matched, missing, archived
 
     def _slip_domain(self):
         self.ensure_one()
@@ -182,6 +315,9 @@ class PayslipRecomputeWizard(models.TransientModel):
         ]
         if self.skip_structure_ids:
             domain.append(('struct_id', 'not in', self.skip_structure_ids.ids))
+        if self.employee_file:
+            employees, _missing, _archived = self._match_sheet()
+            domain.append(('employee_id', 'in', employees.ids))
         return domain
 
     def action_start(self):
@@ -190,6 +326,10 @@ class PayslipRecomputeWizard(models.TransientModel):
             raise UserError(_("Period To is before Period From."))
         if self.batch_size < 1:
             raise UserError(_("Payslips per step must be at least 1."))
+        if self.employee_file:
+            _employees, missing, _archived = self._match_sheet()
+            if missing:
+                raise UserError(_("These employee numbers were not found:\n%s") % "\n".join(missing))
         running = self.env['payslip.recompute.batch'].search([('state', '=', 'running')], limit=1)
         if running:
             raise UserError(_("A recompute is already running (%s). Wait for it to finish or cancel it.") % running.name)

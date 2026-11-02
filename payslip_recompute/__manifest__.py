@@ -1,6 +1,6 @@
 {
     'name': 'Payslip Recompute',
-    'version': '19.0.1.0.4',
+    'version': '19.0.1.0.6',
     'category': 'Human Resources/Payroll',
     'summary': 'Recompute a period of payslips in the background, with a log of errors and slips left untouched.',
     'author': 'Anabtawi Group',
@@ -9,6 +9,9 @@
         'hr_payroll',
         'payroll_fix_recon',
     ],
+    'external_dependencies': {
+        'python': ['openpyxl'],
+    },
     'data': [
         'security/ir.model.access.csv',
         'data/ir_cron_data.xml',
