@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
-from odoo import models, _
+from datetime import timedelta
+
+from odoo import fields, models, _
 from odoo.exceptions import ValidationError
 
 
@@ -7,7 +9,7 @@ class HrPayslip(models.Model):
     _inherit = 'hr.payslip'
 
     def _recompute_paid_cycle(self):
-        """Unpaid, cancel, draft, compute sheet, validate, paid. One payslip."""
+        """Unpaid, cancel, draft, reset work entries, compute sheet, validate, paid."""
         self.ensure_one()
         slip = self.with_context(
             tracking_disable=True, mail_notrack=True, mail_create_nolog=True,
@@ -23,6 +25,8 @@ class HrPayslip(models.Model):
             slip.action_payslip_draft()
         slip.invalidate_recordset()
         if slip.state == 'draft':
+            slip._recompute_reset_work_entries()
+            slip.invalidate_recordset()
             slip.compute_sheet()
         slip.invalidate_recordset()
         if slip.error_count:
@@ -32,3 +36,73 @@ class HrPayslip(models.Model):
         slip.invalidate_recordset()
         if slip.state == 'validated':
             slip.action_payslip_paid()
+
+    def _recompute_reset_work_entries(self):
+        """Rebuild this employee's work entries for the payslip period.
+
+        Days that still have a validated work entry are left as they are.
+        Uses the calendar reset when that wizard is installed.
+        """
+        self.ensure_one()
+        employee = self.employee_id
+        date_from, date_to = self.date_from, self.date_to
+        if not employee or not date_from or not date_to or date_from > date_to:
+            return
+        WorkEntry = self.env['hr.work.entry'].sudo()
+        entries = WorkEntry.search([
+            ('employee_id', '=', employee.id),
+            ('date', '>=', date_from),
+            ('date', '<=', date_to),
+        ])
+        locked_days = set(entries.filtered(lambda entry: entry.state == 'validated').mapped('date'))
+        slots = []
+        day = date_from
+        while day <= date_to:
+            if day not in locked_days:
+                slots.append({
+                    'date': fields.Date.to_string(day),
+                    'employee_id': employee.id,
+                })
+            day += timedelta(days=1)
+        if not slots:
+            return
+        open_entries = entries.filtered(lambda entry: entry.date not in locked_days)
+        if 'hr.work.entry.regeneration.wizard' in self.env.registry:
+            self.env['hr.work.entry.regeneration.wizard'].sudo().regenerate_work_entries(
+                slots, open_entries.ids)
+            return
+        self._recompute_reset_work_entries_direct(employee, slots, open_entries)
+
+    def _recompute_reset_work_entries_direct(self, employee, slots, entries):
+        """Archive open entries and generate them again for each continuous range."""
+        WorkEntry = self.env['hr.work.entry'].sudo()
+        dates = [fields.Date.from_string(slot['date']) for slot in slots]
+        ranges = []
+        start = end = dates[0]
+        for current in dates[1:]:
+            if current - end != timedelta(days=1):
+                ranges.append((start, end))
+                start = current
+            end = current
+        ranges.append((start, end))
+        null_vals = {'active': False}
+        if 'attendance_id' in WorkEntry._fields:
+            null_vals['attendance_id'] = False
+        for start, end in ranges:
+            chunk = entries.filtered(lambda entry, s=start, t=end: entry.date and s <= entry.date <= t)
+            if chunk:
+                chunk.write(null_vals)
+            versions = employee._get_versions_with_contract_overlap_with_period(start, end)
+            created = versions.sudo().generate_work_entries(start, end)
+            if isinstance(created, list):
+                vals = [row for row in created if isinstance(row, dict)]
+                if vals:
+                    WorkEntry.create(vals)
+            if hasattr(employee, '_pfr_create_absent_entries'):
+                employee._pfr_create_absent_entries(start, end)
+            if hasattr(employee, '_create_absent_work_entries_for_period'):
+                employee._create_absent_work_entries_for_period(start, end)
+        if hasattr(employee, '_lat_prepare_recompute_map') and hasattr(employee, '_lat_recompute_from_map'):
+            recompute_map = employee._lat_prepare_recompute_map()
+            recompute_map[employee.id].update(dates)
+            employee._lat_recompute_from_map(recompute_map)

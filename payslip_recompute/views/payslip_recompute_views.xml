@@ -158,4 +158,11 @@
               groups="hr_payroll.group_hr_payroll_manager"
               sequence="90"/>
 
+    <menuitem id="menu_payslip_recompute_batch"
+              name="Recompute Batches"
+              parent="hr_payroll.menu_hr_payroll_payslips"
+              action="action_payslip_recompute_batch"
+              groups="hr_payroll.group_hr_payroll_manager"
+              sequence="91"/>
+
 </odoo>
