@@ -4,12 +4,14 @@ from datetime import timedelta
 from odoo import fields, models, _
 from odoo.exceptions import ValidationError
 
+from odoo.addons.payroll_fix_recon.models.pfr_utils import OT_MIN_HOURS
+
 
 class HrPayslip(models.Model):
     _inherit = 'hr.payslip'
 
     def _recompute_paid_cycle(self):
-        """Unpaid, cancel, draft, reset work entries, compute sheet, validate, paid."""
+        """Unpaid, cancel, approve extra hours, draft, reset work entries, compute, validate, paid."""
         self.ensure_one()
         slip = self.with_context(
             tracking_disable=True, mail_notrack=True, mail_create_nolog=True,
@@ -22,7 +24,10 @@ class HrPayslip(models.Model):
             slip.action_payslip_cancel()
         slip.invalidate_recordset()
         if slip.state == 'cancel':
+            slip._recompute_approve_extra_hours()
             slip.action_payslip_draft()
+        elif slip.state == 'draft':
+            slip._recompute_approve_extra_hours()
         slip.invalidate_recordset()
         if slip.state == 'draft':
             slip._recompute_reset_work_entries()
@@ -36,6 +41,30 @@ class HrPayslip(models.Model):
         slip.invalidate_recordset()
         if slip.state == 'validated':
             slip.action_payslip_paid()
+
+    def _recompute_approve_extra_hours(self):
+        """Green-check extra hours for this employee inside the payslip period.
+
+        Runs after cancel, before the payslip is set back to draft. Attendances
+        already approved, or under the 0.75 hour minimum, are left as they are.
+        """
+        self.ensure_one()
+        if not self.employee_id or not self.date_from or not self.date_to:
+            return
+        if 'hr.attendance' not in self.env:
+            return
+        Attendance = self.env['hr.attendance'].sudo()
+        if 'daily_overtime_hours' not in Attendance._fields or not hasattr(Attendance, 'action_approve_factory_overtime'):
+            return
+        attendances = Attendance.search([
+            ('employee_id', '=', self.employee_id.id),
+            ('date', '>=', self.date_from),
+            ('date', '<=', self.date_to),
+            ('daily_overtime_hours', '>=', OT_MIN_HOURS),
+            ('overtime_status', '!=', 'approved'),
+        ])
+        if attendances:
+            attendances.action_approve_factory_overtime()
 
     def _recompute_reset_work_entries(self):
         """Rebuild this employee's work entries for the payslip period.

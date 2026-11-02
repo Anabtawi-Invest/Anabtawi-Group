@@ -1,6 +1,6 @@
 {
     'name': 'Payslip Recompute',
-    'version': '19.0.1.0.4',
+    'version': '19.0.1.0.9',
     'category': 'Human Resources/Payroll',
     'summary': 'Recompute a period of payslips in the background, with a log of errors and slips left untouched.',
     'author': 'Anabtawi Group',
