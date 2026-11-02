@@ -21,7 +21,6 @@ class PayslipRecomputeBatch(models.Model):
     name = fields.Char(required=True)
     date_from = fields.Date(required=True, string="Period From")
     date_to = fields.Date(required=True, string="Period To")
-    company_id = fields.Many2one('res.company', required=True, default=lambda self: self.env.company)
     batch_size = fields.Integer(
         default=1, required=True,
         help="Payslips saved together. 1 keeps each step short so the database connection stays up.")
@@ -128,6 +127,7 @@ class PayslipRecomputeLine(models.Model):
     batch_id = fields.Many2one(
         'payslip.recompute.batch', required=True, ondelete='cascade', index=True)
     payslip_id = fields.Many2one('hr.payslip', required=True, ondelete='cascade')
+    company_id = fields.Many2one(related='payslip_id.company_id', store=True)
     employee_id = fields.Many2one(related='payslip_id.employee_id', store=True)
     date_from = fields.Date(related='payslip_id.date_from', store=True)
     date_to = fields.Date(related='payslip_id.date_to', store=True)
@@ -146,22 +146,20 @@ class PayslipRecomputeWizard(models.TransientModel):
 
     date_from = fields.Date(string="Period From", required=True)
     date_to = fields.Date(string="Period To", required=True)
-    company_id = fields.Many2one('res.company', required=True, default=lambda self: self.env.company)
     batch_size = fields.Integer(
         string="Payslips per step", default=1, required=True,
         help="How many payslips are saved in one background step. Leave this at 1.")
     payslip_count = fields.Integer(compute='_compute_payslip_count')
 
-    @api.depends('date_from', 'date_to', 'company_id')
+    @api.depends('date_from', 'date_to')
     def _compute_payslip_count(self):
         for wiz in self:
-            wiz.payslip_count = self.env['hr.payslip'].search_count(wiz._slip_domain()) \
-                if wiz.date_from and wiz.date_to and wiz.company_id else 0
+            wiz.payslip_count = self.env['hr.payslip'].sudo().search_count(wiz._slip_domain()) \
+                if wiz.date_from and wiz.date_to else 0
 
     def _slip_domain(self):
         self.ensure_one()
         return [
-            ('company_id', '=', self.company_id.id),
             ('date_from', '>=', self.date_from),
             ('date_from', '<=', self.date_to),
         ]
@@ -175,14 +173,13 @@ class PayslipRecomputeWizard(models.TransientModel):
         running = self.env['payslip.recompute.batch'].search([('state', '=', 'running')], limit=1)
         if running:
             raise UserError(_("A recompute is already running (%s). Wait for it to finish or cancel it.") % running.name)
-        slips = self.env['hr.payslip'].search(self._slip_domain(), order='date_from, id')
+        slips = self.env['hr.payslip'].sudo().search(self._slip_domain(), order='date_from, id')
         if not slips:
             raise UserError(_("No payslips start in this period."))
         batch = self.env['payslip.recompute.batch'].create({
             'name': _("Recompute %s to %s") % (self.date_from, self.date_to),
             'date_from': self.date_from,
             'date_to': self.date_to,
-            'company_id': self.company_id.id,
             'batch_size': self.batch_size,
             'line_ids': [(0, 0, {'payslip_id': slip.id, 'state': 'pending'}) for slip in slips],
         })

@@ -12,7 +12,6 @@
                 </div>
                 <group>
                     <group>
-                        <field name="company_id" options="{'no_create': True}"/>
                         <field name="date_from"/>
                         <field name="date_to"/>
                     </group>
@@ -38,6 +37,7 @@
                   decoration-muted="state == 'pending'"
                   decoration-success="state == 'done'">
                 <field name="state"/>
+                <field name="company_id"/>
                 <field name="employee_id"/>
                 <field name="date_from"/>
                 <field name="date_to"/>
@@ -74,7 +74,6 @@
                 <field name="name"/>
                 <field name="date_from"/>
                 <field name="date_to"/>
-                <field name="company_id"/>
                 <field name="state"/>
                 <field name="done_count"/>
                 <field name="error_count"/>
@@ -112,7 +111,6 @@
                     </div>
                     <group>
                         <group>
-                            <field name="company_id" readonly="1"/>
                             <field name="date_from" readonly="1"/>
                             <field name="date_to" readonly="1"/>
                         </group>
@@ -126,6 +124,7 @@
                               decoration-muted="state == 'pending'"
                               decoration-success="state == 'done'">
                             <field name="state"/>
+                            <field name="company_id"/>
                             <field name="employee_id"/>
                             <field name="date_from"/>
                             <field name="date_to"/>
