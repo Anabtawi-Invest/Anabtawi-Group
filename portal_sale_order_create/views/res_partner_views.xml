@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_partner_form_portal_payment_term" model="ir.ui.view">
+        <field name="name">res.partner.form.portal.payment.term</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//group[@name='sale']" position="inside">
+                <field name="portal_allow_payment_term"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>
