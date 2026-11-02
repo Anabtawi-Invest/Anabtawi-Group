@@ -7,13 +7,17 @@
         <field name="arch" type="xml">
             <form string="Recompute Payslips">
                 <div class="alert alert-info" role="alert">
-                    Each payslip is set unpaid, cancelled, put back to draft, computed, validated, and marked paid.
-                    The work runs in the background. The log shows every payslip: recomputed, error, or not recomputed.
+                    Each payslip is set unpaid, cancelled, put back to draft, its work entries are reset, then it is computed, validated, and marked paid.
+                    Archived employees are skipped. Salary structures you pick below are left out.
+                    The work runs in the background.
                 </div>
                 <group>
                     <group>
                         <field name="date_from"/>
                         <field name="date_to"/>
+                        <field name="skip_structure_ids" widget="many2many_tags"
+                               options="{'no_create': True}"
+                               placeholder="Leave empty to include every structure"/>
                     </group>
                     <group>
                         <field name="batch_size"/>
@@ -35,6 +39,7 @@
             <list create="0" edit="0" delete="0"
                   decoration-danger="state == 'error'"
                   decoration-muted="state == 'pending'"
+                  decoration-warning="state == 'skipped'"
                   decoration-success="state == 'done'">
                 <field name="state"/>
                 <field name="company_id"/>
@@ -58,6 +63,7 @@
                 <field name="error"/>
                 <filter name="error" string="Error" domain="[('state', '=', 'error')]"/>
                 <filter name="pending" string="Not recomputed" domain="[('state', '=', 'pending')]"/>
+                <filter name="skipped" string="Skipped" domain="[('state', '=', 'skipped')]"/>
                 <filter name="done" string="Recomputed" domain="[('state', '=', 'done')]"/>
                 <group>
                     <filter name="group_state" string="Status" context="{'group_by': 'state'}"/>
@@ -77,6 +83,7 @@
                 <field name="state"/>
                 <field name="done_count"/>
                 <field name="error_count"/>
+                <field name="skipped_count"/>
                 <field name="pending_count"/>
             </list>
         </field>
@@ -102,6 +109,9 @@
                         <button name="action_view_pending" type="object" class="oe_stat_button" icon="fa-clock-o">
                             <field name="pending_count" widget="statinfo" string="Not recomputed"/>
                         </button>
+                        <button name="action_view_skipped" type="object" class="oe_stat_button" icon="fa-ban">
+                            <field name="skipped_count" widget="statinfo" string="Skipped"/>
+                        </button>
                         <button class="oe_stat_button" icon="fa-check" disabled="1">
                             <field name="done_count" widget="statinfo" string="Recomputed"/>
                         </button>
@@ -122,6 +132,7 @@
                     <field name="line_ids" readonly="1">
                         <list decoration-danger="state == 'error'"
                               decoration-muted="state == 'pending'"
+                              decoration-warning="state == 'skipped'"
                               decoration-success="state == 'done'">
                             <field name="state"/>
                             <field name="company_id"/>

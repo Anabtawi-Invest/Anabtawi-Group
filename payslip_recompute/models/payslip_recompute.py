@@ -34,6 +34,7 @@ class PayslipRecomputeBatch(models.Model):
     done_count = fields.Integer(compute='_compute_progress')
     error_count = fields.Integer(compute='_compute_progress')
     pending_count = fields.Integer(compute='_compute_progress')
+    skipped_count = fields.Integer(compute='_compute_progress')
 
     @api.depends('line_ids.state')
     def _compute_progress(self):
@@ -43,6 +44,7 @@ class PayslipRecomputeBatch(models.Model):
             batch.done_count = states.count('done')
             batch.error_count = states.count('error')
             batch.pending_count = states.count('pending')
+            batch.skipped_count = states.count('skipped')
 
     def action_cancel(self):
         self.filtered(lambda b: b.state == 'running').write({'state': 'cancelled'})
@@ -63,6 +65,9 @@ class PayslipRecomputeBatch(models.Model):
 
     def action_view_pending(self):
         return self._open_lines([('state', '=', 'pending')], _("Not recomputed"))
+
+    def action_view_skipped(self):
+        return self._open_lines([('state', '=', 'skipped')], _("Skipped"))
 
     def _open_lines(self, extra_domain, name):
         self.ensure_one()
@@ -88,6 +93,13 @@ class PayslipRecomputeBatch(models.Model):
         Payslip = self.env['hr.payslip'].with_context(**_RUN_CTX).sudo()
         for line in lines:
             slip = Payslip.browse(line.payslip_id.id)
+            employee = slip.employee_id.with_context(active_test=False)
+            if employee and not employee.active:
+                line.write({
+                    'state': 'skipped',
+                    'error': _("Employee is archived."),
+                })
+                continue
             try:
                 with self.env.cr.savepoint():
                     slip._recompute_paid_cycle()
@@ -136,6 +148,7 @@ class PayslipRecomputeLine(models.Model):
         ('pending', 'Not recomputed'),
         ('done', 'Recomputed'),
         ('error', 'Error'),
+        ('skipped', 'Skipped'),
     ], default='pending', required=True, index=True)
     error = fields.Text(string="Error")
 
@@ -149,9 +162,12 @@ class PayslipRecomputeWizard(models.TransientModel):
     batch_size = fields.Integer(
         string="Payslips per step", default=1, required=True,
         help="How many payslips are saved in one background step. Leave this at 1.")
+    skip_structure_ids = fields.Many2many(
+        'hr.payroll.structure', string="Structures to skip",
+        help="Payslips that use one of these salary structures are left out of the run.")
     payslip_count = fields.Integer(compute='_compute_payslip_count')
 
-    @api.depends('date_from', 'date_to')
+    @api.depends('date_from', 'date_to', 'skip_structure_ids')
     def _compute_payslip_count(self):
         for wiz in self:
             wiz.payslip_count = self.env['hr.payslip'].sudo().search_count(wiz._slip_domain()) \
@@ -159,10 +175,14 @@ class PayslipRecomputeWizard(models.TransientModel):
 
     def _slip_domain(self):
         self.ensure_one()
-        return [
+        domain = [
             ('date_from', '>=', self.date_from),
             ('date_from', '<=', self.date_to),
+            ('employee_id.active', '=', True),
         ]
+        if self.skip_structure_ids:
+            domain.append(('struct_id', 'not in', self.skip_structure_ids.ids))
+        return domain
 
     def action_start(self):
         self.ensure_one()
@@ -175,7 +195,7 @@ class PayslipRecomputeWizard(models.TransientModel):
             raise UserError(_("A recompute is already running (%s). Wait for it to finish or cancel it.") % running.name)
         slips = self.env['hr.payslip'].sudo().search(self._slip_domain(), order='date_from, id')
         if not slips:
-            raise UserError(_("No payslips start in this period."))
+            raise UserError(_("No payslips to recompute for this period."))
         batch = self.env['payslip.recompute.batch'].create({
             'name': _("Recompute %s to %s") % (self.date_from, self.date_to),
             'date_from': self.date_from,
