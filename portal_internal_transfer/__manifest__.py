@@ -2,7 +2,7 @@
 {
     "name": "Portal Internal Transfer",
     "summary": "Portal card to create, confirm, list and cancel stock internal transfers",
-    "version": "19.0.1.5.0",
+    "version": "19.0.1.6.0",
     "category": "Inventory/Portal",
     "author": "Anabtawi",
     "license": "LGPL-3",
@@ -11,6 +11,7 @@
         "auth_signup",
         "stock",
         "product",
+        "account",
     ],
     "data": [
         "security/security.xml",

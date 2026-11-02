@@ -3,7 +3,7 @@ import logging
 import re
 from urllib.parse import quote
 
-from odoo import _, http
+from odoo import _, fields, http
 from odoo.exceptions import AccessError, UserError, ValidationError
 from odoo.http import request
 
@@ -64,6 +64,55 @@ class PortalSaleOrderCreate(http.Controller):
                 return user._get_van_contact_pricelist()
             return user.van_customer_id.property_product_pricelist.sudo()
         return request.env["product.pricelist"]
+
+    def _get_van_payment_journal(self):
+        user = request.env.user.sudo()
+        if "van_payment_journal_id" in user._fields and user.van_payment_journal_id:
+            return user.van_payment_journal_id
+        # Fallback used by direct sales module if present
+        if (
+            "salesperson_cash_journal_id" in user._fields
+            and user.salesperson_cash_journal_id
+        ):
+            return user.salesperson_cash_journal_id
+        return request.env["account.journal"]
+
+    def _pay_invoice_fully(self, invoice, journal):
+        """Register full payment on posted invoice using the van journal."""
+        invoice.ensure_one()
+        if not invoice or invoice.state != "posted":
+            return
+        if invoice.payment_state in ("paid", "in_payment"):
+            return
+        residual = invoice.amount_residual
+        if residual <= 0:
+            return
+        if not journal:
+            raise UserError(
+                _(
+                    "No payment journal is set on your user. "
+                    "Ask an administrator to set Van Payment Journal."
+                )
+            )
+        _logger.info(
+            "portal_sale paying invoice=%s residual=%s journal=%s",
+            invoice.name,
+            residual,
+            journal.display_name,
+        )
+        payment_register = (
+            request.env["account.payment.register"]
+            .sudo()
+            .with_context(active_model="account.move", active_ids=invoice.ids)
+            .create(
+                {
+                    "journal_id": journal.id,
+                    "amount": residual,
+                    "payment_date": fields.Date.context_today(invoice),
+                }
+            )
+        )
+        payment_register.action_create_payments()
 
     def _product_portal_price(self, product, pricelist=None):
         if pricelist:
@@ -690,6 +739,8 @@ class PortalSaleOrderCreate(http.Controller):
         invoices = order._create_invoices()
         invoices.action_post()
         invoice = invoices[:1]
+        if invoice:
+            self._pay_invoice_fully(invoice, self._get_van_payment_journal())
         return {
             "order_id": order.id,
             "order_name": order.name,

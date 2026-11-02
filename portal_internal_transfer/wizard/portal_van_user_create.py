@@ -37,6 +37,13 @@ class PortalVanUserCreate(models.TransientModel):
         "delivery addresses are created under it. Set the contact's Pricelist "
         "(Sales & Purchase) for sale prices and transfer product filtering.",
     )
+    van_payment_journal_id = fields.Many2one(
+        "account.journal",
+        string="Payment Journal",
+        required=True,
+        domain="[('type', 'in', ('cash', 'bank')), '|', ('company_id', '=', False), ('company_id', '=', company_id)]",
+        help="Cash/bank journal used to fully pay portal sale invoices for this van.",
+    )
 
     @api.constrains("login")
     def _check_login(self):
@@ -111,6 +118,8 @@ class PortalVanUserCreate(models.TransientModel):
         }
         if self.van_customer_id:
             user_vals["van_customer_id"] = self.van_customer_id.id
+        if self.van_payment_journal_id:
+            user_vals["van_payment_journal_id"] = self.van_payment_journal_id.id
         user.write(user_vals)
 
         if self.password:

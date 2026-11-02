@@ -32,10 +32,13 @@
                             <field name="van_customer_id"
                                       options="{'no_create': False}"
                                       placeholder="Commercial customer for van sales"/>
+                            <field name="van_payment_journal_id"
+                                      placeholder="Cash/bank journal for paid sales"/>
                             <div class="text-muted" colspan="2">
                                 Pricelist comes from the van customer contact
                                 (Sales &amp; Purchase → Pricelist). Used for portal
                                 sales prices and for filtering transfer products.
+                                Payment journal is used to fully pay portal invoices.
                             </div>
                         </group>
                     </group>

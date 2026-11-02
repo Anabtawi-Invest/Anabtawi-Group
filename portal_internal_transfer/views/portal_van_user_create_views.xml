@@ -18,6 +18,8 @@
                             <field name="company_id"/>
                             <field name="van_customer_id"
                                       placeholder="Commercial customer for van sales"/>
+                            <field name="van_payment_journal_id"
+                                      placeholder="Cash/bank journal for paid sales"/>
                         </group>
                         <group string="Access">
                             <field name="password" password="True"

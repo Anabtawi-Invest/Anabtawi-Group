@@ -38,6 +38,14 @@ class ResUsers(models.Model):
         help="Fixed commercial customer for this van portal user. "
         "Portal sales use this customer; delivery addresses are children under it.",
     )
+    van_payment_journal_id = fields.Many2one(
+        "account.journal",
+        string="Van Payment Journal",
+        copy=False,
+        check_company=False,
+        domain="[('type', 'in', ('cash', 'bank'))]",
+        help="Cash/bank journal used to mark portal van sale invoices as fully paid.",
+    )
     # Kept for older DBs; portal now uses van_customer_id.property_product_pricelist
     van_pricelist_id = fields.Many2one(
         "product.pricelist",
