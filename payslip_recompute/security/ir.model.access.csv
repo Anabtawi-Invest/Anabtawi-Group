@@ -1,0 +1,4 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_payslip_recompute_batch,payslip.recompute.batch,model_payslip_recompute_batch,hr_payroll.group_hr_payroll_manager,1,1,1,1
+access_payslip_recompute_line,payslip.recompute.line,model_payslip_recompute_line,hr_payroll.group_hr_payroll_manager,1,1,1,1
+access_payslip_recompute_wizard,payslip.recompute.wizard,model_payslip_recompute_wizard,hr_payroll.group_hr_payroll_manager,1,1,1,1

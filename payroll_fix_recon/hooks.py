@@ -10,9 +10,22 @@ _logger = logging.getLogger(__name__)
 BACKUP_TABLE = 'pfr_employee_backup'
 
 
+def _drop_allocation_duration_check(cr):
+    """The legacy CHECK (number_of_days >= 0) cannot be re-added while any allocation is negative."""
+    cr.execute("""
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'hr_leave_allocation_duration_check'
+    """)
+    if not cr.fetchone():
+        return
+    cr.execute("ALTER TABLE hr_leave_allocation DROP CONSTRAINT IF EXISTS hr_leave_allocation_duration_check")
+    _logger.info("[payroll_fix_recon] Dropped hr_leave_allocation_duration_check.")
+
+
 def pre_init_hook(env):
     """payroll_fix_recon replaces the legacy modules: it re-declares the same models, fields and salary
     rule codes, so running both would double-process every payslip."""
+    _drop_allocation_duration_check(env.cr)
     old = env['ir.module.module'].sudo().search([
         ('name', 'in', list(OLD_MODULES)), ('state', 'in', ('installed', 'to upgrade', 'to install'))])
     if old:
@@ -38,3 +51,15 @@ def post_init_hook(env):
         """ % BACKUP_TABLE)
         _logger.info("[payroll_fix_recon] restored %s employee settings from %s", env.cr.rowcount, BACKUP_TABLE)
         env.invalidate_all()
+    for xmlid in (
+        'payroll_fix_recon.menu_pfr_payslip_recompute',
+        'payroll_fix_recon.action_pfr_payslip_recompute_wizard',
+        'payroll_fix_recon.action_pfr_payslip_recompute_batch',
+        'payroll_fix_recon.view_pfr_payslip_recompute_wizard_form',
+        'payroll_fix_recon.view_pfr_payslip_recompute_batch_list',
+        'payroll_fix_recon.view_pfr_payslip_recompute_batch_form',
+        'payroll_fix_recon.ir_cron_pfr_recompute_payslips',
+    ):
+        rec = env.ref(xmlid, raise_if_not_found=False)
+        if rec:
+            rec.unlink()

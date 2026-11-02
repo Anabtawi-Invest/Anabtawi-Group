@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Recompute payslips in the background, one small batch per cron transaction."""
+"""Recompute payslips in the background. Every payslip gets a log line."""
 import logging
 
 from odoo import api, fields, models, _
@@ -13,8 +13,8 @@ _RUN_CTX = dict(
 )
 
 
-class PfrPayslipRecomputeBatch(models.Model):
-    _name = 'pfr.payslip.recompute.batch'
+class PayslipRecomputeBatch(models.Model):
+    _name = 'payslip.recompute.batch'
     _description = 'Payslip Recompute Batch'
     _order = 'id desc'
 
@@ -30,31 +30,20 @@ class PfrPayslipRecomputeBatch(models.Model):
         ('done', 'Done'),
         ('cancelled', 'Cancelled'),
     ], default='running', required=True, index=True)
-    payslip_ids = fields.Many2many(
-        'hr.payslip', 'pfr_recompute_batch_slip_rel', 'batch_id', 'slip_id',
-        string="Payslips", readonly=True)
-    processed_slip_ids = fields.Many2many(
-        'hr.payslip', 'pfr_recompute_batch_processed_rel', 'batch_id', 'slip_id',
-        string="Processed", readonly=True)
-    skipped_slip_ids = fields.Many2many(
-        'hr.payslip', 'pfr_recompute_batch_skipped_rel', 'batch_id', 'slip_id',
-        string="Skipped", readonly=True)
+    line_ids = fields.One2many('payslip.recompute.line', 'batch_id', string="Log", readonly=True)
     payslip_count = fields.Integer(compute='_compute_progress')
     done_count = fields.Integer(compute='_compute_progress')
-    skipped_count = fields.Integer(compute='_compute_progress')
-    remaining_count = fields.Integer(compute='_compute_progress')
-    log = fields.Text(readonly=True)
+    error_count = fields.Integer(compute='_compute_progress')
+    pending_count = fields.Integer(compute='_compute_progress')
 
-    @api.depends('payslip_ids', 'processed_slip_ids', 'skipped_slip_ids')
+    @api.depends('line_ids.state')
     def _compute_progress(self):
         for batch in self:
-            total = len(batch.payslip_ids)
-            skipped = len(batch.skipped_slip_ids)
-            processed = len(batch.processed_slip_ids)
-            batch.payslip_count = total
-            batch.skipped_count = skipped
-            batch.done_count = processed - skipped
-            batch.remaining_count = total - processed
+            states = batch.line_ids.mapped('state')
+            batch.payslip_count = len(states)
+            batch.done_count = states.count('done')
+            batch.error_count = states.count('error')
+            batch.pending_count = states.count('pending')
 
     def action_cancel(self):
         self.filtered(lambda b: b.state == 'running').write({'state': 'cancelled'})
@@ -70,45 +59,51 @@ class PfrPayslipRecomputeBatch(models.Model):
             'target': 'current',
         }
 
-    def _mark(self, slip, skipped, message):
-        vals = {'processed_slip_ids': [(4, slip.id)]}
-        if skipped:
-            vals['skipped_slip_ids'] = [(4, slip.id)]
-        line = '%s | %s | %s | %s' % (
-            slip.id, slip.employee_id.name or '', slip.date_from,
-            (message or 'done').split('\n')[0],
-        )
-        vals['log'] = ((self.log or '') + line + '\n')[-20000:]
-        self.write(vals)
+    def action_view_errors(self):
+        return self._open_lines([('state', '=', 'error')], _("Errors"))
+
+    def action_view_pending(self):
+        return self._open_lines([('state', '=', 'pending')], _("Not recomputed"))
+
+    def _open_lines(self, extra_domain, name):
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': name,
+            'res_model': 'payslip.recompute.line',
+            'view_mode': 'list,form',
+            'domain': [('batch_id', '=', self.id)] + extra_domain,
+            'target': 'current',
+        }
 
     def _process_next_chunk(self):
         self.ensure_one()
         if self.state != 'running':
             return
         size = max(1, self.batch_size or 1)
-        pending = (self.payslip_ids - self.processed_slip_ids).sorted(key=lambda s: (s.date_from, s.id))
-        chunk = pending[:size]
-        if not chunk:
+        lines = self.line_ids.filtered(lambda l: l.state == 'pending').sorted(
+            key=lambda l: (l.date_from, l.id))[:size]
+        if not lines:
             self.state = 'done'
             return
         Payslip = self.env['hr.payslip'].with_context(**_RUN_CTX).sudo()
-        for slip in chunk:
-            slip = Payslip.browse(slip.id)
+        for line in lines:
+            slip = Payslip.browse(line.payslip_id.id)
             try:
                 with self.env.cr.savepoint():
-                    slip._pfr_recompute_paid_cycle()
+                    slip._recompute_paid_cycle()
             except Exception as exc:
                 if self._connection_lost(exc):
                     raise
-                _logger.exception("[payroll_fix_recon] recompute skipped slip %s", slip.id)
-                self._mark(slip, True, str(exc))
+                _logger.exception("[payslip_recompute] slip %s failed", slip.id)
+                line.write({'state': 'error', 'error': str(exc)})
                 continue
-            self._mark(slip, False, 'done')
+            line.write({'state': 'done', 'error': False})
         self.invalidate_recordset(['state'])
         if self.state != 'running':
             return
-        if self.payslip_ids - self.processed_slip_ids:
-            self.env.ref('payroll_fix_recon.ir_cron_pfr_recompute_payslips').sudo()._trigger()
+        if self.line_ids.filtered(lambda l: l.state == 'pending'):
+            self.env.ref('payslip_recompute.ir_cron_recompute_payslips').sudo()._trigger()
         else:
             self.state = 'done'
 
@@ -125,8 +120,28 @@ class PfrPayslipRecomputeBatch(models.Model):
             batch._process_next_chunk()
 
 
-class PfrPayslipRecomputeWizard(models.TransientModel):
-    _name = 'pfr.payslip.recompute.wizard'
+class PayslipRecomputeLine(models.Model):
+    _name = 'payslip.recompute.line'
+    _description = 'Payslip Recompute Log'
+    _order = 'state, date_from, id'
+
+    batch_id = fields.Many2one(
+        'payslip.recompute.batch', required=True, ondelete='cascade', index=True)
+    payslip_id = fields.Many2one('hr.payslip', required=True, ondelete='cascade')
+    employee_id = fields.Many2one(related='payslip_id.employee_id', store=True)
+    date_from = fields.Date(related='payslip_id.date_from', store=True)
+    date_to = fields.Date(related='payslip_id.date_to', store=True)
+    payslip_name = fields.Char(related='payslip_id.name', store=True)
+    state = fields.Selection([
+        ('pending', 'Not recomputed'),
+        ('done', 'Recomputed'),
+        ('error', 'Error'),
+    ], default='pending', required=True, index=True)
+    error = fields.Text(string="Error")
+
+
+class PayslipRecomputeWizard(models.TransientModel):
+    _name = 'payslip.recompute.wizard'
     _description = 'Recompute Payslips'
 
     date_from = fields.Date(string="Period From", required=True)
@@ -157,19 +172,19 @@ class PfrPayslipRecomputeWizard(models.TransientModel):
             raise UserError(_("Period To is before Period From."))
         if self.batch_size < 1:
             raise UserError(_("Payslips per step must be at least 1."))
-        running = self.env['pfr.payslip.recompute.batch'].search([('state', '=', 'running')], limit=1)
+        running = self.env['payslip.recompute.batch'].search([('state', '=', 'running')], limit=1)
         if running:
             raise UserError(_("A recompute is already running (%s). Wait for it to finish or cancel it.") % running.name)
         slips = self.env['hr.payslip'].search(self._slip_domain(), order='date_from, id')
         if not slips:
             raise UserError(_("No payslips start in this period."))
-        batch = self.env['pfr.payslip.recompute.batch'].create({
+        batch = self.env['payslip.recompute.batch'].create({
             'name': _("Recompute %s to %s") % (self.date_from, self.date_to),
             'date_from': self.date_from,
             'date_to': self.date_to,
             'company_id': self.company_id.id,
             'batch_size': self.batch_size,
-            'payslip_ids': [(6, 0, slips.ids)],
+            'line_ids': [(0, 0, {'payslip_id': slip.id, 'state': 'pending'}) for slip in slips],
         })
-        self.env.ref('payroll_fix_recon.ir_cron_pfr_recompute_payslips').sudo()._trigger()
+        self.env.ref('payslip_recompute.ir_cron_recompute_payslips').sudo()._trigger()
         return batch.action_refresh()
