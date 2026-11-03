@@ -227,13 +227,14 @@ export class PosReportingDashboard extends Component {
         const filter = this.state.productFilter;
         let rows = [...(this.products.products || [])];
         if (filter === "unsold") {
-            rows = rows.filter((row) => !row.qty);
+            rows = rows.filter((row) => row.decision === "kill");
         } else if (filter && filter !== "all") {
             rows = rows.filter((row) => row.decision === filter);
         }
         if (query) {
             rows = rows.filter((row) =>
                 (row.name || "").toLowerCase().includes(query)
+                || (row.branch_name || "").toLowerCase().includes(query)
                 || (row.category || "").toLowerCase().includes(query)
             );
         }
@@ -263,7 +264,7 @@ export class PosReportingDashboard extends Component {
             this.state.productSortOrder = this.state.productSortOrder === "asc" ? "desc" : "asc";
         } else {
             this.state.productSortKey = key;
-            this.state.productSortOrder = key === "name" || key === "category" || key === "decision_label" ? "asc" : "desc";
+            this.state.productSortOrder = key === "name" || key === "branch_name" || key === "category" || key === "decision_label" ? "asc" : "desc";
         }
     }
 
@@ -277,7 +278,7 @@ export class PosReportingDashboard extends Component {
         })}%`;
     }
 
-    async openProductLines(productId) {
+    async openProductLines(productId, configId) {
         try {
             const action = await this.orm.call(
                 "pos.reporting.dashboard",
@@ -285,6 +286,7 @@ export class PosReportingDashboard extends Component {
                 [],
                 {
                     product_id: productId,
+                    config_id: configId || false,
                     date_from: this.state.date_from,
                     date_to: this.state.date_to,
                     config_ids: this.state.config_ids || [],
