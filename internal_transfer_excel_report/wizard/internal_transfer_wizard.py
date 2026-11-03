@@ -1,8 +1,76 @@
 from datetime import datetime, time, timedelta
 import io
+import os
 
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
+
+_BARCODE_FONTS = (
+    '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+    '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
+)
+
+
+def _barcode_font(size):
+    from PIL import ImageFont  # pylint: disable=import-outside-toplevel
+
+    for path in _BARCODE_FONTS:
+        if os.path.exists(path):
+            return ImageFont.truetype(path, size)
+    return ImageFont.load_default()
+
+
+def _code128_image(value):
+    """Return a Code128 PNG stream for an ASCII reference, or None."""
+    if not value or any(ord(char) > 127 for char in value):
+        return None
+
+    from PIL import Image, ImageDraw  # pylint: disable=import-outside-toplevel
+    from reportlab.graphics.barcode.code128 import Code128  # pylint: disable=import-outside-toplevel
+
+    barcode = Code128(value)
+    barcode.validate()
+    if not barcode.valid:
+        return None
+    barcode.encode()
+    pattern = barcode.decompose()
+
+    module = 2
+    quiet = 10 * module
+    bar_height = 70
+    text_gap = 4
+    padding_y = 6
+    font = _barcode_font(14)
+
+    modules = sum(ord(char.upper()) - ord('A') + 1 for char in pattern)
+    bars_width = modules * module
+    probe = Image.new('RGB', (1, 1))
+    probe_draw = ImageDraw.Draw(probe)
+    text_left, text_top, text_right, text_bottom = probe_draw.textbbox((0, 0), value, font=font)
+    text_width = text_right - text_left
+    text_height = text_bottom - text_top
+
+    width = max(bars_width + quiet * 2, text_width + quiet * 2)
+    height = padding_y + bar_height + text_gap + text_height + padding_y
+    image = Image.new('RGB', (width, height), 'white')
+    draw = ImageDraw.Draw(image)
+
+    x = (width - bars_width) / 2
+    y = padding_y
+    for char in pattern:
+        bar_px = (ord(char.upper()) - ord('A') + 1) * module
+        if char.isupper():
+            draw.rectangle([x, y, x + bar_px - 1, y + bar_height - 1], fill='black')
+        x += bar_px
+
+    text_x = (width - text_width) / 2 - text_left
+    text_y = padding_y + bar_height + text_gap - text_top
+    draw.text((text_x, text_y), value, fill='black', font=font)
+
+    stream = io.BytesIO()
+    image.save(stream, format='PNG')
+    stream.seek(0)
+    return stream, width, height
 
 
 class InternalTransferReportWizard(models.TransientModel):
@@ -317,8 +385,65 @@ class InternalTransferReportWizard(models.TransientModel):
                 sheet2.write(row, 3, data['product_uom'], text_style)
                 row += 1
 
+        self._write_barcode_sheet(workbook, sheet1_rows)
         workbook.close()
         return output.getvalue()
+
+    def _write_barcode_sheet(self, workbook, detail_rows):
+        sheet = workbook.add_worksheet(self.env._('Barcodes'))
+        sheet.freeze_panes(1, 0)
+
+        header_style = workbook.add_format({
+            'bold': True,
+            'bg_color': '#D9E1F2',
+            'border': 1,
+            'align': 'center',
+        })
+        text_style = workbook.add_format({'border': 1, 'valign': 'vcenter'})
+
+        for col, header in enumerate((self.env._('Created By'), self.env._('Barcode'))):
+            sheet.write(0, col, header, header_style)
+        sheet.set_column(0, 0, 30)
+
+        seen = set()
+        transfers = []
+        for data in detail_rows:
+            reference = data['transfer_reference']
+            if not reference or reference in seen:
+                continue
+            seen.add(reference)
+            transfers.append(data)
+        transfers.sort(key=lambda data: data['transfer_reference'])
+
+        if not transfers:
+            sheet.set_column(1, 1, 40)
+            sheet.write(1, 0, self.env._('No data for selected filters.'), text_style)
+            return
+
+        max_image_width = 0
+        row = 1
+        for data in transfers:
+            reference = data['transfer_reference']
+            sheet.write(row, 0, data['created_by'], text_style)
+            sheet.write(row, 1, '', text_style)
+
+            image = _code128_image(reference)
+            if not image:
+                sheet.write(row, 1, reference, text_style)
+                row += 1
+                continue
+
+            stream, width, height = image
+            sheet.set_row(row, (height + 8) * 72 / 96)
+            sheet.insert_image(row, 1, 'barcode-%s.png' % row, {
+                'image_data': stream,
+                'x_offset': 4,
+                'y_offset': 4,
+            })
+            max_image_width = max(max_image_width, width)
+            row += 1
+
+        sheet.set_column(1, 1, max((max_image_width + 12 - 5) / 7, 18))
 
     def action_print_excel(self):
         self.ensure_one()
