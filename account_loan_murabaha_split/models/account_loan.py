@@ -11,7 +11,7 @@ class AccountLoan(models.Model):
 
     split_murabaha_interest = fields.Boolean(
         string='Separate Murabaha Entry',
-        help='If enabled, Confirm posts principal alone on the short-term due account, '
+        help='If enabled, Confirm posts the installment at full payment amount on due ST, '
              'and posts murabaha/interest on a separate short-term liability account.',
         tracking=True,
     )
@@ -84,7 +84,7 @@ class AccountLoan(models.Model):
             period_label = format_date(self.env, line.date, date_format='MM/y')
             move_date = line.date + relativedelta(day=31)
 
-            # Principal only (due installments = principal)
+            # Full payment amount on due installments (principal + interest)
             payment_moves_values.append({
                 'company_id': loan.company_id.id,
                 'auto_post': 'at_date',
@@ -92,23 +92,23 @@ class AccountLoan(models.Model):
                 'is_loan_payment_move': True,
                 'date': move_date,
                 'journal_id': loan.journal_id.id,
-                'ref': f"{loan.name} - {_('Principal')} {period_label}",
+                'ref': f"{loan.name} - {_('Principal & Interest')} {period_label}",
                 'line_ids': [
                     Command.create({
                         'account_id': loan.long_term_account_id.id,
-                        'debit': line.principal,
+                        'debit': line.payment,
                         'name': f"{loan.name} - {_('Principal')} {period_label}",
                     }),
                     Command.create({
                         'account_id': loan.short_term_account_id.id,
-                        'credit': line.principal,
+                        'credit': line.payment,
                         'name': f"{loan.name} - {_('Due')} {period_label} "
-                                f"({_('Principal')} {loan.currency_id.format(line.principal)})",
+                                f"({_('Principal')} {loan.currency_id.format(line.principal)} + {_('Interest')} {loan.currency_id.format(line.interest)})",
                     }),
                 ],
             })
 
-            # Murabaha / interest on separate short-term liability
+            # Separate murabaha / interest entry (unchanged)
             if float_compare(line.interest, 0.0, precision_rounding=loan.currency_id.rounding) > 0:
                 murabaha_moves_values.append({
                     'company_id': loan.company_id.id,

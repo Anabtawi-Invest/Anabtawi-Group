@@ -5,8 +5,8 @@
     'summary': 'Split loan principal and murabaha interest into separate journal entries',
     'description': """
 When enabled on a loan, Confirm creates:
-- Principal entry: Dr Long Term / Cr Short Term (principal only)
-- Murabaha entry: Dr Expense / Cr selected short-term liability (interest)
+- Payment entry at full installment amount: Dr Long Term / Cr Short Term (principal + interest)
+- Separate murabaha entry: Dr Expense / Cr selected short-term liability (interest)
     """,
     'author': 'Anabtawi Group',
     'license': 'LGPL-3',
