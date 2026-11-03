@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="account_loan_form_view_murabaha_split" model="ir.ui.view">
+        <field name="name">account.loan.form.murabaha.split</field>
+        <field name="model">account.loan</field>
+        <field name="inherit_id" ref="account_loans.account_loan_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//group[@name='loan_settings_column1']/field[@name='expense_account_id']" position="after">
+                <field name="split_murabaha_interest" readonly="state != 'draft'"/>
+                <field
+                    name="murabaha_liability_account_id"
+                    readonly="state != 'draft'"
+                    invisible="not split_murabaha_interest"
+                    required="split_murabaha_interest"
+                />
+            </xpath>
+        </field>
+    </record>
+</odoo>
