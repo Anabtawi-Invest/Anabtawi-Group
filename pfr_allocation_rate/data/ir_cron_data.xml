@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="ir_cron_pfr_alloc_rate" model="ir.cron">
+            <field name="name">Payroll Fix Recon: Weighted Allocation Batches</field>
+            <field name="model_id" ref="model_pfr_alloc_rate_job"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_process_batches()</field>
+            <field name="active" eval="False"/>
+            <field name="interval_number">1</field>
+            <field name="interval_type">minutes</field>
+        </record>
+    </data>
+</odoo>

@@ -1,0 +1,4 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_pfr_alloc_rate_wizard,pfr.alloc.rate.wizard,model_pfr_alloc_rate_wizard,hr_payroll.group_hr_payroll_user,1,1,1,1
+access_pfr_alloc_rate_job_user,pfr.alloc.rate.job user,model_pfr_alloc_rate_job,hr_payroll.group_hr_payroll_user,1,1,1,0
+access_pfr_alloc_rate_job_manager,pfr.alloc.rate.job manager,model_pfr_alloc_rate_job,hr_payroll.group_hr_payroll_manager,1,1,1,1

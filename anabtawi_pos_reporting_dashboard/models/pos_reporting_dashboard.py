@@ -5,6 +5,7 @@ from collections import defaultdict
 from datetime import datetime, time, timedelta
 
 from odoo import _, api, fields, models
+from odoo.exceptions import AccessError
 from odoo.tools import SQL
 from odoo.addons.pos_ameen_daily_operation.models.pos_daily_ops_engine import DELIVERY_CHANNELS
 
@@ -1044,15 +1045,20 @@ class PosReportingDashboard(models.TransientModel):
             return "stock_more"
         return "keep"
 
+    def _check_product_dashboard_access(self):
+        if not self.env.user.has_group("anabtawi_pos_reporting_dashboard.group_pos_dashboard_products"):
+            raise AccessError(_("You are not allowed to view the product section of the POS dashboard."))
+
     @api.model
     def get_product_dashboard_data(self, date_from=None, date_to=None, config_ids=None):
         """One row per POS-menu product and branch.
 
-        Kill means the product was on hand at that branch on a day in the
+        Did not sell means the product was on hand at that branch on a day in the
         period and still sold nothing there. A branch that never had it on
         the shelf is "Not in this branch", including when the sold quantity
         is zero. Sales still count when the shelf is empty now.
         """
+        self._check_product_dashboard_access()
         engine = self.env["pos.daily.ops.engine"]
         period = self._parse_period(date_from, date_to)
         configs = self._get_report_configs(config_ids)
@@ -1066,6 +1072,11 @@ class PosReportingDashboard(models.TransientModel):
             products, [location for location in locations.values() if location], period,
         )
         stats = self._product_sales_stats(sessions)
+        rates = {
+            rate.pos_categ_id.id: rate.percentage
+            for rate in self.env["pos.category.profit.rate"].sudo().search([])
+            if rate.pos_categ_id
+        }
 
         rows = []
         for config in configs:
@@ -1081,6 +1092,8 @@ class PosReportingDashboard(models.TransientModel):
                 margin = (profit / sales) if sold and sales else None
                 category = product.pos_categ_ids[:1]
                 on_hand = stock_known and (product.id, location.id) in available
+                percentage = rates.get(category.id) if category else None
+                category_profit = (sales - cost * (percentage / 100.0)) if percentage is not None else None
                 rows.append({
                     "row_key": "%s-%s" % (config.id, product.id),
                     "product_id": product.id,
@@ -1093,6 +1106,8 @@ class PosReportingDashboard(models.TransientModel):
                     "cost": round(cost, 3) if sold else None,
                     "profit": round(profit, 3) if profit is not None else None,
                     "margin": round(margin * 100.0, 1) if margin is not None else None,
+                    "percentage": round(percentage, 2) if percentage is not None else None,
+                    "category_profit": round(category_profit, 3) if category_profit is not None else None,
                     "order_count": stat.get("order_count", 0),
                     "available": bool(on_hand) or not stock_known,
                     "cost_missing": False,
@@ -1101,7 +1116,7 @@ class PosReportingDashboard(models.TransientModel):
         labels = {
             "stock_more": _("Stock more"),
             "review_price": _("Review price"),
-            "kill": _("Kill"),
+            "kill": _("Did not sell"),
             "keep": _("Keep"),
             "not_stocked": _("Not in this branch"),
         }
@@ -1130,6 +1145,8 @@ class PosReportingDashboard(models.TransientModel):
         sales_with_margin = sum(row["sales"] for row in sellers if row["margin"] is not None and row["profit"] is not None)
         profit_with_margin = sum(row["profit"] for row in sellers if row["profit"] is not None)
         avg_margin = (profit_with_margin / sales_with_margin * 100.0) if sales_with_margin else 0.0
+        rated_rows = [row for row in rows if row["category_profit"] is not None]
+        category_profit_total = sum(row["category_profit"] for row in rated_rows)
 
         def _top(decision, key, reverse=True, limit=5):
             picked = [row for row in rows if row["decision"] == decision]
@@ -1180,6 +1197,9 @@ class PosReportingDashboard(models.TransientModel):
                 "total_sales": round(sum(row["sales"] for row in rows), 3),
                 "total_profit": round(profit_with_margin, 3),
                 "avg_margin": round(avg_margin, 1),
+                "category_profit_total": round(category_profit_total, 3),
+                "category_rated_count": len(rated_rows),
+                "category_missing_count": len(rows) - len(rated_rows),
             },
             "cards": {
                 "stock_more": _top("stock_more", "qty"),
@@ -1194,6 +1214,7 @@ class PosReportingDashboard(models.TransientModel):
     @api.model
     def open_product_lines(self, product_id, date_from=None, date_to=None, config_ids=None, config_id=None):
         """Open the POS order lines of one menu product in this search."""
+        self._check_product_dashboard_access()
         engine = self.env["pos.daily.ops.engine"]
         period = self._parse_period(date_from, date_to)
         configs = self._get_report_configs(config_ids)

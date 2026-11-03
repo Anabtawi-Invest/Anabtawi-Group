@@ -3,6 +3,7 @@
 import { Component, useState, onWillStart } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
+import { user } from "@web/core/user";
 import { useSetupAction } from "@web/search/action_hook";
 
 export class PosReportingDashboard extends Component {
@@ -26,12 +27,16 @@ export class PosReportingDashboard extends Component {
             date_to: initTo,
             config_ids: initConfigs,
             loading: true,
+            canSeeProducts: false,
             view: "branches",
             productLoading: false,
             productFilter: "all",
             productSearch: "",
             productSortKey: "qty",
             productSortOrder: "desc",
+            categorySearch: "",
+            categorySortKey: "category_profit",
+            categorySortOrder: "desc",
             sortKey: "sales",
             sortOrder: "desc",
         });
@@ -55,6 +60,9 @@ export class PosReportingDashboard extends Component {
                         productSearch: this.state.productSearch,
                         productSortKey: this.state.productSortKey,
                         productSortOrder: this.state.productSortOrder,
+                        categorySearch: this.state.categorySearch,
+                        categorySortKey: this.state.categorySortKey,
+                        categorySortOrder: this.state.categorySortOrder,
                         sortKey: this.state.sortKey,
                         sortOrder: this.state.sortOrder,
                     },
@@ -84,6 +92,12 @@ export class PosReportingDashboard extends Component {
         });
 
         onWillStart(async () => {
+            this.state.canSeeProducts = await user.hasGroup(
+                "anabtawi_pos_reporting_dashboard.group_pos_dashboard_products"
+            );
+            if (!this.state.canSeeProducts && (this.state.view === "products" || this.state.view === "category_profit")) {
+                this.state.view = "branches";
+            }
             await this.fetchDashboardData();
         });
     }
@@ -102,7 +116,7 @@ export class PosReportingDashboard extends Component {
     }
 
     async fetchDashboardData() {
-        if (this.state.view === "products") {
+        if (this.state.view === "products" || this.state.view === "category_profit") {
             await this.fetchProductData();
             return;
         }
@@ -176,8 +190,11 @@ export class PosReportingDashboard extends Component {
         if (this.state.view === view) {
             return;
         }
+        if ((view === "products" || view === "category_profit") && !this.state.canSeeProducts) {
+            return;
+        }
         this.state.view = view;
-        if (view === "products" && this.products.loadedKey !== this._filterKey()) {
+        if ((view === "products" || view === "category_profit") && this.products.loadedKey !== this._filterKey()) {
             this.fetchProductData();
         }
     }
@@ -265,6 +282,50 @@ export class PosReportingDashboard extends Component {
         } else {
             this.state.productSortKey = key;
             this.state.productSortOrder = key === "name" || key === "branch_name" || key === "category" || key === "decision_label" ? "asc" : "desc";
+        }
+    }
+
+    onCategorySearch(ev) {
+        this.state.categorySearch = ev.target.value || "";
+    }
+
+    get sortedCategoryRows() {
+        const query = (this.state.categorySearch || "").trim().toLowerCase();
+        let rows = [...(this.products.products || [])];
+        if (query) {
+            rows = rows.filter((row) =>
+                (row.name || "").toLowerCase().includes(query)
+                || (row.branch_name || "").toLowerCase().includes(query)
+                || (row.category || "").toLowerCase().includes(query)
+            );
+        }
+        const key = this.state.categorySortKey;
+        const isAsc = this.state.categorySortOrder === "asc";
+        rows.sort((a, b) => {
+            let valA = a[key];
+            let valB = b[key];
+            if (typeof valA === "string" || typeof valB === "string") {
+                valA = (valA || "").toLowerCase();
+                valB = (valB || "").toLowerCase();
+                return isAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+            }
+            const missingA = valA === null || valA === undefined;
+            const missingB = valB === null || valB === undefined;
+            if (missingA || missingB) {
+                if (missingA && missingB) return 0;
+                return missingA ? 1 : -1;
+            }
+            return isAsc ? valA - valB : valB - valA;
+        });
+        return rows;
+    }
+
+    sortCategoryRows(key) {
+        if (this.state.categorySortKey === key) {
+            this.state.categorySortOrder = this.state.categorySortOrder === "asc" ? "desc" : "asc";
+        } else {
+            this.state.categorySortKey = key;
+            this.state.categorySortOrder = key === "name" || key === "branch_name" || key === "category" ? "asc" : "desc";
         }
     }
 

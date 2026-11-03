@@ -194,4 +194,47 @@
               action="action_pos_unified_report_wizard"
               groups="anabtawi_pos_reporting_dashboard.group_pos_reporting_dashboard_user"
               sequence="2"/>
+
+    <record id="view_pos_category_profit_rate_list" model="ir.ui.view">
+        <field name="name">pos.category.profit.rate.list</field>
+        <field name="model">pos.category.profit.rate</field>
+        <field name="arch" type="xml">
+            <list string="POS Category Percentages" editable="bottom">
+                <field name="pos_categ_id"/>
+                <field name="percentage"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_pos_category_profit_rate_form" model="ir.ui.view">
+        <field name="name">pos.category.profit.rate.form</field>
+        <field name="model">pos.category.profit.rate</field>
+        <field name="arch" type="xml">
+            <form string="POS Category Percentage">
+                <sheet>
+                    <group>
+                        <field name="pos_categ_id"/>
+                        <field name="percentage"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_pos_category_profit_rate" model="ir.actions.act_window">
+        <field name="name">POS Category Percentages</field>
+        <field name="res_model">pos.category.profit.rate</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Assign a percentage to a POS category.</p>
+            <p>150 means the cost is multiplied by 1.50. Category profit is untaxed sales minus that loaded cost.</p>
+        </field>
+    </record>
+
+    <menuitem id="menu_pos_category_profit_rate"
+              name="POS Category Percentages"
+              parent="point_of_sale.menu_point_rep"
+              action="action_pos_category_profit_rate"
+              groups="anabtawi_pos_reporting_dashboard.group_pos_dashboard_products"
+              sequence="3"/>
 </odoo>
