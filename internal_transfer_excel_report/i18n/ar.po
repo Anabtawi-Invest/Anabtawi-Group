@@ -137,6 +137,16 @@ msgstr "أنشئ بواسطة"
 
 #. module: internal_transfer_excel_report
 #: code:addons/internal_transfer_excel_report/wizard/internal_transfer_wizard.py:0
+msgid "Barcodes"
+msgstr "الباركود"
+
+#. module: internal_transfer_excel_report
+#: code:addons/internal_transfer_excel_report/wizard/internal_transfer_wizard.py:0
+msgid "Barcode"
+msgstr "الباركود"
+
+#. module: internal_transfer_excel_report
+#: code:addons/internal_transfer_excel_report/wizard/internal_transfer_wizard.py:0
 msgid "Creating Date"
 msgstr "تاريخ الإنشاء"
 
