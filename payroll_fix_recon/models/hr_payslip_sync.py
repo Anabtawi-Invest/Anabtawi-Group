@@ -8,6 +8,7 @@ from datetime import datetime, time, timedelta
 
 from odoo import models
 
+from . import pfr_utils as U
 from .pfr_settlement import recon_alloc_name, pto_recon_alloc_name
 
 _logger = logging.getLogger(__name__)
@@ -168,17 +169,19 @@ class HrPayslip(models.Model):
                 self._pfr_create_settlement_leaves(leave_type, -gap, consume_label)
 
     def _pfr_force_extra_hours(self, extra_type):
-        """Make the Extra Hours time-off balance equal the slip's Remaining Extra Hours Balance."""
+        """Make the Extra Hours time-off balance equal Remaining Extra Hours Balance x 1.25."""
         self.ensure_one()
+        target = round((self.remaining_extra_hours_balance or 0.0) * U.OT_RATE, 2)
         self._pfr_force_leave_balance(
-            extra_type, self.remaining_extra_hours_balance, recon_alloc_name(self),
+            extra_type, target, recon_alloc_name(self),
             'extra_hours_allocated_days', 'Extra Hours')
 
     def _pfr_force_pto(self, pto_type):
-        """Make the Paid Time Off balance equal the slip's Remaining Paid Time Off Available."""
+        """Make the Paid Time Off balance equal Remaining Paid Time Off Available x 1.5."""
         self.ensure_one()
+        target = round((self.remaining_pto_balance or 0.0) * U.PH_RATE, 2)
         self._pfr_force_leave_balance(
-            pto_type, self.remaining_pto_balance, pto_recon_alloc_name(self),
+            pto_type, target, pto_recon_alloc_name(self),
             'pto_allocated_days', 'Paid Time Off')
 
     def _pfr_validate_allocation(self, alloc):
