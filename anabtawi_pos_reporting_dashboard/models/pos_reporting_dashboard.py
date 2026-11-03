@@ -881,8 +881,112 @@ class PosReportingDashboard(models.TransientModel):
         products = Product.search(domain)
         return products - self._excluded_pos_helper_products(configs)
 
+    def _config_stock_location(self, config):
+        """Stock location this POS sells from. Child locations are included later."""
+        if "stock.location" not in self.env:
+            return False
+        Location = self.env["stock.location"]
+        picking = config.picking_type_id if "picking_type_id" in config._fields else Location.browse()
+        if picking and picking.default_location_src_id:
+            return picking.default_location_src_id
+        warehouse = config.warehouse_id if "warehouse_id" in config._fields else Location.browse()
+        if warehouse and warehouse.lot_stock_id:
+            return warehouse.lot_stock_id
+        return Location.browse()
+
+    def _products_available_in_period(self, products, locations, period):
+        """{(product_id, location_id)} on hand above zero on any day of the period.
+
+        This is the Inventory at Date quantity for the POS stock location and
+        its children. The check runs from the start of the first day through
+        the end of the last day. A receipt or a balance already above zero
+        counts. Ending the period at zero still counts when the shelf was
+        above zero earlier.
+        """
+        product_ids = tuple(products.ids)
+        root_ids = tuple(location.id for location in locations if location)
+        if not product_ids or not root_ids or "stock.quant" not in self.env:
+            return set()
+        self.env["stock.quant"].flush_model(["product_id", "location_id", "quantity"])
+        self.env["stock.move.line"].flush_model([
+            "product_id", "location_id", "location_dest_id", "quantity_product_uom", "date", "state",
+        ])
+        self.env["stock.location"].flush_model(["location_id"])
+        self.env.cr.execute(SQL("""
+            WITH RECURSIVE descendants AS (
+                SELECT id AS child_id, id AS root_id
+                  FROM stock_location
+                 WHERE id IN %(root_ids)s
+                UNION
+                SELECT sl.id, d.root_id
+                  FROM stock_location sl
+                  JOIN descendants d ON sl.location_id = d.child_id
+            ),
+            on_hand_now AS (
+                SELECT q.product_id, d.root_id, COALESCE(SUM(q.quantity), 0) AS qty
+                  FROM stock_quant q
+                  JOIN descendants d ON d.child_id = q.location_id
+                 WHERE q.product_id IN %(product_ids)s
+                 GROUP BY q.product_id, d.root_id
+            ),
+            signed AS (
+                SELECT sml.product_id, d.root_id, sml.date, sml.id, sml.quantity_product_uom AS qty
+                  FROM stock_move_line sml
+                  JOIN descendants d ON d.child_id = sml.location_dest_id
+                 WHERE sml.state = 'done'
+                   AND sml.date >= %(start)s
+                   AND sml.product_id IN %(product_ids)s
+                UNION ALL
+                SELECT sml.product_id, d.root_id, sml.date, sml.id, -sml.quantity_product_uom
+                  FROM stock_move_line sml
+                  JOIN descendants d ON d.child_id = sml.location_id
+                 WHERE sml.state = 'done'
+                   AND sml.date >= %(start)s
+                   AND sml.product_id IN %(product_ids)s
+            ),
+            net_move AS (
+                SELECT product_id, root_id, date, id, SUM(qty) AS delta
+                  FROM signed
+                 GROUP BY product_id, root_id, date, id
+            ),
+            qty_at_start AS (
+                SELECT product_id, root_id, qty
+                  FROM (
+                        SELECT COALESCE(n.product_id, m.product_id) AS product_id,
+                               COALESCE(n.root_id, m.root_id) AS root_id,
+                               COALESCE(n.qty, 0) - COALESCE(m.qty, 0) AS qty
+                          FROM on_hand_now n
+                          FULL JOIN (
+                                SELECT product_id, root_id, SUM(delta) AS qty
+                                  FROM net_move
+                                 GROUP BY product_id, root_id
+                          ) m ON m.product_id = n.product_id AND m.root_id = n.root_id
+                  ) start_qty
+            ),
+            running AS (
+                SELECT mv.product_id,
+                       mv.root_id,
+                       COALESCE(st.qty, 0) + SUM(mv.delta) OVER (
+                           PARTITION BY mv.product_id, mv.root_id
+                           ORDER BY mv.date, mv.id
+                       ) AS qty
+                  FROM net_move mv
+                  LEFT JOIN qty_at_start st
+                    ON st.product_id = mv.product_id AND st.root_id = mv.root_id
+                 WHERE mv.date <= %(end)s
+            )
+            SELECT product_id, root_id
+              FROM qty_at_start
+             WHERE qty > 0.0000001
+            UNION
+            SELECT product_id, root_id
+              FROM running
+             WHERE qty > 0.0000001
+        """, product_ids=product_ids, root_ids=root_ids, start=period["session_start"], end=period["session_end"]))
+        return {(product_id, location_id) for product_id, location_id in self.env.cr.fetchall()}
+
     def _product_sales_stats(self, sessions):
-        """{product_id: stats} for paid lines in these sessions, gifts excluded.
+        """{(product_id, config_id): stats} for paid lines, gifts excluded.
 
         A line that already has ``total_cost`` keeps that cost. A line that
         does not uses the product's current Cost (``standard_price``) times
@@ -894,9 +998,11 @@ class PosReportingDashboard(models.TransientModel):
             "product_id", "qty", "price_subtotal", "total_cost", "is_total_cost_computed", "order_id", "is_gift",
         ])
         self.env["pos.order"].flush_model(["session_id", "state", "company_id", "currency_rate"])
+        self.env["pos.session"].flush_model(["config_id"])
         self.env["product.product"].flush_model(["standard_price"])
         self.env.cr.execute(SQL("""
             SELECT line.product_id,
+                   sess.config_id,
                    COALESCE(SUM(line.qty), 0) AS qty,
                    COALESCE(SUM(line.price_subtotal), 0) AS sales,
                    COALESCE(SUM(
@@ -910,16 +1016,18 @@ class PosReportingDashboard(models.TransientModel):
                    COUNT(DISTINCT line.order_id) AS order_count
               FROM pos_order_line line
               JOIN pos_order ord ON ord.id = line.order_id
+              JOIN pos_session sess ON sess.id = ord.session_id
               JOIN product_product pp ON pp.id = line.product_id
              WHERE ord.session_id IN %(session_ids)s
                AND ord.state IN ('paid', 'done', 'invoiced')
                AND line.product_id IS NOT NULL
+               AND sess.config_id IS NOT NULL
                AND COALESCE(line.is_gift, FALSE) IS NOT TRUE
-             GROUP BY line.product_id
+             GROUP BY line.product_id, sess.config_id
         """, session_ids=tuple(sessions.ids)))
         stats = {}
-        for product_id, qty, sales, cost, order_count in self.env.cr.fetchall():
-            stats[product_id] = {
+        for product_id, config_id, qty, sales, cost, order_count in self.env.cr.fetchall():
+            stats[(product_id, config_id)] = {
                 "qty": float(qty or 0.0),
                 "sales": float(sales or 0.0),
                 "cost": float(cost or 0.0),
@@ -929,8 +1037,6 @@ class PosReportingDashboard(models.TransientModel):
 
     @staticmethod
     def _product_decision(row, top_qty_ids, avg_margin):
-        if row["qty"] <= 0:
-            return "kill"
         margin = row["margin"]
         if row["product_id"] in top_qty_ids and margin is not None and avg_margin > 0 and margin < avg_margin * 0.6:
             return "review_price"
@@ -940,60 +1046,90 @@ class PosReportingDashboard(models.TransientModel):
 
     @api.model
     def get_product_dashboard_data(self, date_from=None, date_to=None, config_ids=None):
-        """POS-menu products for the same period and branches as the branch dashboard.
+        """One row per POS-menu product and branch.
 
-        Products the cashier can sell and that sold nothing stay on the list
-        with quantity 0. Pledge, deposit, gift, employee and delivery items
-        are left out.
+        Kill means the product was on hand at that branch on a day in the
+        period and still sold nothing there. A branch that never had it on
+        the shelf is "Not in this branch", including when the sold quantity
+        is zero. Sales still count when the shelf is empty now.
         """
         engine = self.env["pos.daily.ops.engine"]
         period = self._parse_period(date_from, date_to)
         configs = self._get_report_configs(config_ids)
         sessions = engine._get_sessions(period, configs)
-        products = self._pos_menu_products(configs)
+        menus = {config.id: self._pos_menu_products(config) for config in configs}
+        products = self.env["product.product"].browse()
+        for menu in menus.values():
+            products |= menu
+        locations = {config.id: self._config_stock_location(config) for config in configs}
+        available = self._products_available_in_period(
+            products, [location for location in locations.values() if location], period,
+        )
         stats = self._product_sales_stats(sessions)
 
         rows = []
-        for product in products:
-            stat = stats.get(product.id, {})
-            qty = stat.get("qty", 0.0)
-            sales = stat.get("sales", 0.0)
-            cost = stat.get("cost", 0.0)
-            sold = bool(stat)
-            profit = (sales - cost) if sold else None
-            margin = (profit / sales) if sold and sales else None
-            category = product.pos_categ_ids[:1]
-            rows.append({
-                "product_id": product.id,
-                "name": product.display_name,
-                "category": category.display_name if category else _("No POS category"),
-                "qty": round(qty, 3),
-                "sales": round(sales, 3),
-                "cost": round(cost, 3) if sold else None,
-                "profit": round(profit, 3) if profit is not None else None,
-                "margin": round(margin * 100.0, 1) if margin is not None else None,
-                "order_count": stat.get("order_count", 0),
-                "cost_missing": False,
-            })
-
-        sellers = [row for row in rows if row["qty"] > 0]
-        sales_with_margin = sum(row["sales"] for row in sellers if row["margin"] is not None and row["profit"] is not None)
-        profit_with_margin = sum(row["profit"] for row in sellers if row["profit"] is not None)
-        avg_margin = (profit_with_margin / sales_with_margin * 100.0) if sales_with_margin else 0.0
-        ranked = sorted(sellers, key=lambda row: row["qty"], reverse=True)
-        top_n = min(15, max(5, math.ceil(len(ranked) * 0.2))) if len(ranked) >= 5 else len(ranked)
-        top_qty_ids = {row["product_id"] for row in ranked[:top_n]}
+        for config in configs:
+            location = locations.get(config.id)
+            stock_known = bool(location)
+            for product in menus.get(config.id, self.env["product.product"]):
+                stat = stats.get((product.id, config.id), {})
+                qty = stat.get("qty", 0.0)
+                sales = stat.get("sales", 0.0)
+                cost = stat.get("cost", 0.0)
+                sold = bool(stat)
+                profit = (sales - cost) if sold else None
+                margin = (profit / sales) if sold and sales else None
+                category = product.pos_categ_ids[:1]
+                on_hand = stock_known and (product.id, location.id) in available
+                rows.append({
+                    "row_key": "%s-%s" % (config.id, product.id),
+                    "product_id": product.id,
+                    "config_id": config.id,
+                    "branch_name": config.name,
+                    "name": product.display_name,
+                    "category": category.display_name if category else _("No POS category"),
+                    "qty": round(qty, 3),
+                    "sales": round(sales, 3),
+                    "cost": round(cost, 3) if sold else None,
+                    "profit": round(profit, 3) if profit is not None else None,
+                    "margin": round(margin * 100.0, 1) if margin is not None else None,
+                    "order_count": stat.get("order_count", 0),
+                    "available": bool(on_hand) or not stock_known,
+                    "cost_missing": False,
+                })
 
         labels = {
             "stock_more": _("Stock more"),
             "review_price": _("Review price"),
             "kill": _("Kill"),
             "keep": _("Keep"),
+            "not_stocked": _("Not in this branch"),
         }
+        rows_by_branch = defaultdict(list)
         for row in rows:
-            decision = self._product_decision(row, top_qty_ids, avg_margin)
-            row["decision"] = decision
-            row["decision_label"] = labels[decision]
+            rows_by_branch[row["config_id"]].append(row)
+        for branch_rows in rows_by_branch.values():
+            sellers = [row for row in branch_rows if row["qty"] > 0]
+            sales_with_margin = sum(row["sales"] for row in sellers if row["margin"] is not None and row["profit"] is not None)
+            profit_with_margin = sum(row["profit"] for row in sellers if row["profit"] is not None)
+            avg_margin = (profit_with_margin / sales_with_margin * 100.0) if sales_with_margin else 0.0
+            ranked = sorted(sellers, key=lambda row: row["qty"], reverse=True)
+            top_n = min(15, max(5, math.ceil(len(ranked) * 0.2))) if len(ranked) >= 5 else len(ranked)
+            top_qty_ids = {row["product_id"] for row in ranked[:top_n]}
+            for row in branch_rows:
+                if row["qty"] <= 0 and not row["available"]:
+                    decision = "not_stocked"
+                elif row["qty"] <= 0:
+                    decision = "kill"
+                else:
+                    decision = self._product_decision(row, top_qty_ids, avg_margin)
+                row["decision"] = decision
+                row["decision_label"] = labels[decision]
+
+        sellers = [row for row in rows if row["qty"] > 0]
+        sales_with_margin = sum(row["sales"] for row in sellers if row["margin"] is not None and row["profit"] is not None)
+        profit_with_margin = sum(row["profit"] for row in sellers if row["profit"] is not None)
+        avg_margin = (profit_with_margin / sales_with_margin * 100.0) if sales_with_margin else 0.0
 
         def _top(decision, key, reverse=True, limit=5):
             picked = [row for row in rows if row["decision"] == decision]
@@ -1024,7 +1160,7 @@ class PosReportingDashboard(models.TransientModel):
             bucket["sales"] += row["sales"]
             bucket["profit"] += row["profit"] or 0.0
             bucket["product_count"] += 1
-            if row["qty"] <= 0:
+            if row["decision"] == "kill":
                 bucket["unsold_count"] += 1
         category_rows = sorted(categories.values(), key=lambda row: row["sales"], reverse=True)
         for bucket in category_rows:
@@ -1036,9 +1172,10 @@ class PosReportingDashboard(models.TransientModel):
             "date_from": fields.Date.to_string(period["date_from"]),
             "date_to": fields.Date.to_string(period["date_to"]),
             "summary": {
-                "menu_count": len(rows),
+                "menu_count": len({row["product_id"] for row in rows}),
                 "sold_count": len(sellers),
-                "unsold_count": len(rows) - len(sellers),
+                "unsold_count": sum(row["decision"] == "kill" for row in rows),
+                "not_stocked_count": sum(row["decision"] == "not_stocked" for row in rows),
                 "total_qty": round(sum(row["qty"] for row in rows), 3),
                 "total_sales": round(sum(row["sales"] for row in rows), 3),
                 "total_profit": round(profit_with_margin, 3),
@@ -1055,11 +1192,13 @@ class PosReportingDashboard(models.TransientModel):
         }
 
     @api.model
-    def open_product_lines(self, product_id, date_from=None, date_to=None, config_ids=None):
+    def open_product_lines(self, product_id, date_from=None, date_to=None, config_ids=None, config_id=None):
         """Open the POS order lines of one menu product in this search."""
         engine = self.env["pos.daily.ops.engine"]
         period = self._parse_period(date_from, date_to)
         configs = self._get_report_configs(config_ids)
+        if config_id:
+            configs = self.env["pos.config"].browse(config_id).exists()
         sessions = engine._get_sessions(period, configs)
         product = self.env["product.product"].browse(product_id).exists()
         list_view = self.env.ref("point_of_sale.view_pos_order_line")
