@@ -565,41 +565,41 @@ class AnabtawiMobileAPI(http.Controller):
             "worked_hours": round(record.worked_hours or 0.0, 2),
         } for record in records]})
 
-    def _eligible_leave_types(self, employee):
-        """Time off types chosen on Time Off settings for this company.
-
-        An empty selection means the Employee App shows no leave types.
-        """
-        company = employee.company_id
+    def _configured_leave_types(self, employee):
+        """Time off types chosen on Time Off settings for this employee."""
+        companies = employee.company_id
+        if employee.user_id:
+            companies |= employee.user_id.company_ids
         lines = request.env["anabtawi.employee.app.leave.type"].sudo().search([
-            ("company_id", "=", company.id),
+            ("company_id", "in", companies.ids),
         ], order="sequence, id")
-        LeaveType = request.env["hr.work.entry.type"].sudo().with_company(company).with_context(
-            employee_id=employee.id,
-            default_employee_id=employee.id,
-            allowed_company_ids=[company.id] if company else [],
-        )
-        selected = lines.leave_type_id
-        if not selected:
-            return LeaveType.browse()
+        selected = request.env["hr.work.entry.type"].sudo().browse()
+        for line in lines:
+            leave_type = line.leave_type_id
+            if leave_type and leave_type.active and leave_type not in selected:
+                selected |= leave_type
+        return selected
 
-        country = company.country_id
-        country_specific = bool(country) and bool(LeaveType.search_count([
-            ("country_id", "=", country.id),
-        ], limit=1))
-        allowed = LeaveType.browse()
-        for leave_type in selected.with_env(LeaveType.env):
-            if not leave_type.active:
-                continue
-            if "time_off_selectable" in leave_type._fields and not leave_type.time_off_selectable:
-                continue
-            if country_specific and leave_type.country_id != country:
-                continue
-            if not country_specific and leave_type.country_id:
-                continue
-            if leave_type.requires_allocation and not leave_type.has_valid_allocation:
-                continue
-            allowed |= leave_type
+    def _leave_allocation_by_type(self, employee, leave_types):
+        if not leave_types:
+            return {}
+        rows = leave_types.get_allocation_data(employee).get(employee, [])
+        return {row[3]: row[1] for row in rows}
+
+    def _leave_type_visible_for_employee(self, leave_type, allocation_by_id):
+        """Hide a type that requires an allocation when the employee has none left."""
+        if "requires_allocation" in leave_type._fields and not leave_type.requires_allocation:
+            return True
+        remaining = allocation_by_id.get(leave_type.id, {}).get("virtual_remaining_leaves") or 0.0
+        return remaining > 0
+
+    def _eligible_leave_types(self, employee):
+        selected = self._configured_leave_types(employee)
+        allocation_by_id = self._leave_allocation_by_type(employee, selected)
+        allowed = selected.browse()
+        for leave_type in selected:
+            if self._leave_type_visible_for_employee(leave_type, allocation_by_id):
+                allowed |= leave_type
         return allowed
 
     @http.route(
