@@ -145,7 +145,8 @@ class AccountLoan(models.Model):
                 'is_loan_payment_move': False,
                 'journal_id': loan.journal_id.id,
             }
-            principal_sum = sum(next_lines.mapped('principal'))
+            # Use full payment (principal + interest) to match loan liability opened at P+I
+            payment_sum = sum(next_lines.mapped('payment'))
             reclassification_moves_values.append({
                 **common_reclassification_values,
                 'date': move_date,
@@ -153,12 +154,12 @@ class AccountLoan(models.Model):
                 'line_ids': [
                     Command.create({
                         'account_id': loan.long_term_account_id.id,
-                        'debit': principal_sum,
+                        'debit': payment_sum,
                         'name': f"{loan.name} - {_('Reclassification LT - ST')} {from_date} to {to_date} (To {loan.short_term_account_id.code})",
                     }),
                     Command.create({
                         'account_id': loan.short_term_account_id.id,
-                        'credit': principal_sum,
+                        'credit': payment_sum,
                         'name': f"{loan.name} - {_('Reclassification LT - ST')} {from_date} to {to_date} (From {loan.long_term_account_id.code})",
                     }),
                 ],
@@ -170,12 +171,12 @@ class AccountLoan(models.Model):
                 'line_ids': [
                     Command.create({
                         'account_id': loan.long_term_account_id.id,
-                        'credit': principal_sum,
+                        'credit': payment_sum,
                         'name': f"{loan.name} - {_('Reversal reclassification LT - ST')} {from_date} to {to_date} (To {loan.short_term_account_id.code})",
                     }),
                     Command.create({
                         'account_id': loan.short_term_account_id.id,
-                        'debit': principal_sum,
+                        'debit': payment_sum,
                         'name': f"{loan.name} - {_('Reversal reclassification LT - ST')} {from_date} to {to_date} (From {loan.long_term_account_id.code})",
                     }),
                 ],
