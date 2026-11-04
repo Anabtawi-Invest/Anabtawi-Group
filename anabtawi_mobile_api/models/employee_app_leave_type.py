@@ -15,7 +15,7 @@ class AnabtawiEmployeeAppLeaveType(models.Model):
         index=True,
     )
     leave_type_id = fields.Many2one(
-        "hr.work.entry.type",
+        "hr.leave.type",
         string="Time Off Type",
         required=True,
         ondelete="cascade",

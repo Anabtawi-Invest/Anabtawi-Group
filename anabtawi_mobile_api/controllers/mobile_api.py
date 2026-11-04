@@ -565,6 +565,15 @@ class AnabtawiMobileAPI(http.Controller):
             "worked_hours": round(record.worked_hours or 0.0, 2),
         } for record in records]})
 
+    def _leave_type_field_name(self):
+        Leave = request.env["hr.leave"]
+        if "holiday_status_id" in Leave._fields:
+            return "holiday_status_id"
+        return "work_entry_type_id"
+
+    def _leave_type_of(self, leave):
+        return leave[self._leave_type_field_name()]
+
     def _configured_leave_types(self, employee):
         """Time off types chosen on Time Off settings for this employee."""
         companies = employee.company_id
@@ -573,7 +582,7 @@ class AnabtawiMobileAPI(http.Controller):
         lines = request.env["anabtawi.employee.app.leave.type"].sudo().search([
             ("company_id", "in", companies.ids),
         ], order="sequence, id")
-        selected = request.env["hr.work.entry.type"].sudo().browse()
+        selected = lines.leave_type_id.browse()
         for line in lines:
             leave_type = line.leave_type_id
             if leave_type and leave_type.active and leave_type not in selected:
@@ -581,7 +590,7 @@ class AnabtawiMobileAPI(http.Controller):
         return selected
 
     def _leave_allocation_by_type(self, employee, leave_types):
-        if not leave_types:
+        if not leave_types or not hasattr(leave_types, "get_allocation_data"):
             return {}
         rows = leave_types.get_allocation_data(employee).get(employee, [])
         return {row[3]: row[1] for row in rows}
@@ -611,16 +620,15 @@ class AnabtawiMobileAPI(http.Controller):
         if error:
             return error
         leave_types = self._eligible_leave_types(employee)
-        allocation_rows = leave_types.get_allocation_data(employee).get(employee, [])
-        allocation_by_id = {row[3]: row[1] for row in allocation_rows}
+        allocation_by_id = self._leave_allocation_by_type(employee, leave_types)
         return _json({"status": "ok", "leave_types": [{
             "id": leave_type.id,
             "name": leave_type.name,
             "max_leaves": round(allocation_by_id.get(leave_type.id, {}).get("max_leaves", 0.0), 2),
             "leaves_used": round(allocation_by_id.get(leave_type.id, {}).get("leaves_taken", 0.0), 2),
             "remaining": round(allocation_by_id.get(leave_type.id, {}).get("virtual_remaining_leaves", 0.0), 2),
-            "request_unit": leave_type.request_unit,
-            "requires_allocation": bool(leave_type.requires_allocation),
+            "request_unit": leave_type.request_unit if "request_unit" in leave_type._fields else "day",
+            "requires_allocation": bool(leave_type.requires_allocation) if "requires_allocation" in leave_type._fields else False,
         } for leave_type in leave_types]})
 
     @http.route(
@@ -647,9 +655,10 @@ class AnabtawiMobileAPI(http.Controller):
         if not reason:
             return _error("invalid_request", _("A reason is required."), 422)
 
+        Leave = request.env["hr.leave"]
         vals = {
             "employee_id": employee.id,
-            "work_entry_type_id": leave_type.id,
+            self._leave_type_field_name(): leave_type.id,
             "request_date_from": date_from,
             "request_date_to": date_to,
             "name": reason,
@@ -671,10 +680,13 @@ class AnabtawiMobileAPI(http.Controller):
                     _("Enter a valid start and end time; the end must be after the start."),
                     422,
                 )
-            vals.update({
+            hour_vals = {
                 "request_hour_from": hour_from,
                 "request_hour_to": hour_to,
-            })
+            }
+            if "request_unit_hours" in Leave._fields:
+                hour_vals["request_unit_hours"] = True
+            vals.update(hour_vals)
         if bool(data.get("request_unit_half")):
             if leave_type.request_unit != "half_day":
                 return _error(
@@ -685,10 +697,12 @@ class AnabtawiMobileAPI(http.Controller):
             if date_from != date_to:
                 return _error("invalid_half_day", _("A half-day request must use one date."), 422)
             period = data.get("request_date_from_period") if data.get("request_date_from_period") in ("am", "pm") else "am"
-            vals.update({
-                "request_date_from_period": period,
-                "request_date_to_period": period,
-            })
+            period_vals = {"request_date_from_period": period}
+            if "request_date_to_period" in Leave._fields:
+                period_vals["request_date_to_period"] = period
+            if "request_unit_half" in Leave._fields:
+                period_vals["request_unit_half"] = True
+            vals.update(period_vals)
         try:
             with request.env.cr.savepoint():
                 leave = request.env["hr.leave"].sudo().with_company(employee.company_id).create(vals)
@@ -710,17 +724,24 @@ class AnabtawiMobileAPI(http.Controller):
         leaves = request.env["hr.leave"].sudo().search(
             [("employee_id", "=", employee.id)], order="request_date_from desc, id desc", limit=30
         )
-        return _json({"status": "ok", "records": [{
-            "id": leave.id,
-            "name": leave.name or "",
-            "type": leave.work_entry_type_id.name,
-            "date_from": fields.Date.to_string(leave.request_date_from) if leave.request_date_from else None,
-            "date_to": fields.Date.to_string(leave.request_date_to) if leave.request_date_to else None,
-            "hour_from": round(leave.request_hour_from, 4) if leave.work_entry_type_id.request_unit == "hour" else None,
-            "hour_to": round(leave.request_hour_to, 4) if leave.work_entry_type_id.request_unit == "hour" else None,
-            "days": round(leave.number_of_days or 0.0, 2),
-            "state": leave.state,
-        } for leave in leaves]})
+        def _record(leave):
+            leave_type = self._leave_type_of(leave)
+            if "request_unit_hours" in leave._fields:
+                hourly = bool(leave.request_unit_hours)
+            else:
+                hourly = bool(leave_type and "request_unit" in leave_type._fields and leave_type.request_unit == "hour")
+            return {
+                "id": leave.id,
+                "name": leave.name or "",
+                "type": leave_type.name if leave_type else "",
+                "date_from": fields.Date.to_string(leave.request_date_from) if leave.request_date_from else None,
+                "date_to": fields.Date.to_string(leave.request_date_to) if leave.request_date_to else None,
+                "hour_from": round(leave.request_hour_from, 4) if hourly else None,
+                "hour_to": round(leave.request_hour_to, 4) if hourly else None,
+                "days": round(leave.number_of_days or 0.0, 2),
+                "state": leave.state,
+            }
+        return _json({"status": "ok", "records": [_record(leave) for leave in leaves]})
 
     def _ensure_default_overtime_categories(self, employee):
         """Create/read the standard Employee App overtime categories.
