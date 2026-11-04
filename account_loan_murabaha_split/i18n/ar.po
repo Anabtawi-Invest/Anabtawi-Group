@@ -1,0 +1,41 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# 	* account_loan_murabaha_split
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 19.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-03-04 12:00+0000\n"
+"PO-Revision-Date: 2026-03-04 12:00+0000\n"
+"Language-Team: \n"
+"Language: ar\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=6; plural=(n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 ? 4 : 5);\n"
+
+#. module: account_loan_murabaha_split
+#: model:ir.model.fields,field_description:account_loan_murabaha_split.field_account_loan__bayaan
+msgid "Statement"
+msgstr "البيان"
+
+#. module: account_loan_murabaha_split
+#: model:ir.model.fields,help:account_loan_murabaha_split.field_account_loan__bayaan
+msgid "Used as journal item label together with the period date (MM/y) when confirming the loan."
+msgstr "يُستخدم كتسمية لبند القيد مع تاريخ الفترة (شهر/سنة) عند تأكيد القرض."
+
+#. module: account_loan_murabaha_split
+#: model:ir.model.fields,field_description:account_loan_murabaha_split.field_account_loan__split_murabaha_interest
+msgid "Separate Murabaha Entry"
+msgstr "قيد مرابحة منفصل"
+
+#. module: account_loan_murabaha_split
+#: model:ir.model.fields,field_description:account_loan_murabaha_split.field_account_loan__murabaha_liability_account_id
+msgid "Murabaha Liability Account"
+msgstr "حساب التزام المرابحة"
+
+#. module: account_loan_murabaha_split
+#: model:ir.model.fields,field_description:account_loan_murabaha_split.field_account_loan__analytic_account_id
+msgid "Analytic Account"
+msgstr "الحساب التحليلي"

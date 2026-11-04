@@ -20,6 +20,7 @@
         "data/ir_config_parameter_data.xml",
         "views/mobile_device_views.xml",
         "views/res_config_settings_views.xml",
+        "views/hr_leave_type_views.xml",
     ],
     "post_init_hook": "post_init_hook",
     "installable": True,
