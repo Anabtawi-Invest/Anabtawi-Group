@@ -32,7 +32,7 @@ class AccountLoan(models.Model):
     bayaan = fields.Char(
         string='Label',
         tracking=True,
-        help='Used as journal item label together with the period date (MM/y) when confirming the loan.',
+        help='Used as journal item label together with each entry accounting date when confirming the loan.',
     )
 
     @api.model
@@ -61,12 +61,12 @@ class AccountLoan(models.Model):
             return False
         return {str(self.analytic_account_id.id): 100.0}
 
-    def _get_bayaan_line_label(self, period_label):
-        """Return '{bayaan} {MM/y}' or False when bayaan is empty."""
+    def _get_bayaan_line_label(self, entry_date):
+        """Return '{bayaan} {entry_date}' using the journal entry accounting date."""
         self.ensure_one()
-        if not self.bayaan:
+        if not self.bayaan or not entry_date:
             return False
-        return f"{self.bayaan} {period_label}"
+        return f"{self.bayaan} {format_date(self.env, entry_date)}"
 
     def _apply_analytic_on_expense_lines(self):
         """Checkbox OFF: analytic 100% on expense account lines of generated moves."""
@@ -81,14 +81,13 @@ class AccountLoan(models.Model):
                 expense_lines.write({'analytic_distribution': distribution})
 
     def _apply_bayaan_on_payment_move_lines(self):
-        """Checkbox OFF: bayaan + date as label on all lines of the Principal & Interest entry."""
+        """Checkbox OFF: bayaan + entry date as label on all lines of the Principal & Interest entry."""
         for loan in self:
             if not loan.bayaan:
                 continue
             payment_moves = loan.line_ids.generated_move_ids.filtered(lambda m: m.is_loan_payment_move)
             for move in payment_moves:
-                period_label = format_date(self.env, move.generating_loan_line_id.date, date_format='MM/y')
-                label = loan._get_bayaan_line_label(period_label)
+                label = loan._get_bayaan_line_label(move.date)
                 if label and move.line_ids:
                     move.line_ids.write({'name': label})
 
@@ -140,7 +139,7 @@ class AccountLoan(models.Model):
 
             period_label = format_date(self.env, line.date, date_format='MM/y')
             move_date = line.date + relativedelta(day=31)
-            bayaan_label = loan._get_bayaan_line_label(period_label)
+            bayaan_label = loan._get_bayaan_line_label(move_date)
 
             principal_name = bayaan_label or f"{loan.name} - {_('Principal')} {period_label}"
             due_name = bayaan_label or (

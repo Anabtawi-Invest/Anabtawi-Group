@@ -22,8 +22,8 @@ msgstr "البيان"
 
 #. module: account_loan_murabaha_split
 #: model:ir.model.fields,help:account_loan_murabaha_split.field_account_loan__bayaan
-msgid "Used as journal item label together with the period date (MM/y) when confirming the loan."
-msgstr "يُستخدم كتسمية لبند القيد مع تاريخ الفترة (شهر/سنة) عند تأكيد القرض."
+msgid "Used as journal item label together with each entry accounting date when confirming the loan."
+msgstr "يُستخدم كتسمية لبند القيد مع تاريخ القيد المحاسبي لكل قيد عند تأكيد القرض."
 
 #. module: account_loan_murabaha_split
 #: model:ir.model.fields,field_description:account_loan_murabaha_split.field_account_loan__split_murabaha_interest
