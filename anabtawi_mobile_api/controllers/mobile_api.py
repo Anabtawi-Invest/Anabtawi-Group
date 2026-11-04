@@ -566,39 +566,21 @@ class AnabtawiMobileAPI(http.Controller):
         } for record in records]})
 
     def _eligible_leave_types(self, employee):
-        """Time off types chosen on Time Off settings for this company.
-
-        An empty selection means the Employee App shows no leave types.
-        """
-        company = employee.company_id
-        lines = request.env["anabtawi.employee.app.leave.type"].sudo().search([
-            ("company_id", "=", company.id),
-        ], order="sequence, id")
-        LeaveType = request.env["hr.work.entry.type"].sudo().with_company(company).with_context(
+        LeaveType = request.env["hr.leave.type"].sudo().with_company(
+            employee.company_id
+        ).with_context(
             employee_id=employee.id,
             default_employee_id=employee.id,
-            allowed_company_ids=[company.id] if company else [],
+            allowed_company_ids=[employee.company_id.id],
         )
-        selected = lines.leave_type_id
-        if not selected:
-            return LeaveType.browse()
-
-        country = company.country_id
-        country_specific = bool(country) and bool(LeaveType.search_count([
-            ("country_id", "=", country.id),
-        ], limit=1))
-        allowed = LeaveType.browse()
-        for leave_type in selected.with_env(LeaveType.env):
-            if not leave_type.active or not leave_type.time_off_selectable:
-                continue
-            if country_specific and leave_type.country_id != country:
-                continue
-            if not country_specific and leave_type.country_id:
-                continue
-            if leave_type.requires_allocation and not leave_type.has_valid_allocation:
-                continue
-            allowed |= leave_type
-        return allowed
+        domain = [
+            ("active", "=", True),
+            ("time_type", "=", "leave"),
+            ("company_id", "in", [False, employee.company_id.id]),
+            ("country_id", "in", [False, employee.company_id.country_id.id]),
+            "|", ("requires_allocation", "=", False), ("has_valid_allocation", "=", True),
+        ]
+        return LeaveType.search(domain, order="sequence, id")
 
     @http.route(
         "/anabtawi/mobile/leaves/balances",
@@ -631,7 +613,7 @@ class AnabtawiMobileAPI(http.Controller):
             return error
         data = _payload()
         try:
-            type_id = int(data.get("holiday_status_id") or data.get("work_entry_type_id") or 0)
+            type_id = int(data.get("holiday_status_id") or 0)
             date_from = fields.Date.to_date(data.get("request_date_from"))
             date_to = fields.Date.to_date(data.get("request_date_to"))
         except (TypeError, ValueError):
@@ -647,7 +629,7 @@ class AnabtawiMobileAPI(http.Controller):
 
         vals = {
             "employee_id": employee.id,
-            "work_entry_type_id": leave_type.id,
+            "holiday_status_id": leave_type.id,
             "request_date_from": date_from,
             "request_date_to": date_to,
             "name": reason,
@@ -670,22 +652,16 @@ class AnabtawiMobileAPI(http.Controller):
                     422,
                 )
             vals.update({
+                "request_unit_hours": True,
                 "request_hour_from": hour_from,
                 "request_hour_to": hour_to,
             })
         if bool(data.get("request_unit_half")):
-            if leave_type.request_unit != "half_day":
-                return _error(
-                    "half_day_leave_type_required",
-                    _("This time off type must use the Half-Day request unit."),
-                    422,
-                )
             if date_from != date_to:
                 return _error("invalid_half_day", _("A half-day request must use one date."), 422)
-            period = data.get("request_date_from_period") if data.get("request_date_from_period") in ("am", "pm") else "am"
             vals.update({
-                "request_date_from_period": period,
-                "request_date_to_period": period,
+                "request_unit_half": True,
+                "request_date_from_period": data.get("request_date_from_period") if data.get("request_date_from_period") in ("am", "pm") else "am",
             })
         try:
             with request.env.cr.savepoint():
@@ -711,11 +687,11 @@ class AnabtawiMobileAPI(http.Controller):
         return _json({"status": "ok", "records": [{
             "id": leave.id,
             "name": leave.name or "",
-            "type": leave.work_entry_type_id.name,
+            "type": leave.holiday_status_id.name,
             "date_from": fields.Date.to_string(leave.request_date_from) if leave.request_date_from else None,
             "date_to": fields.Date.to_string(leave.request_date_to) if leave.request_date_to else None,
-            "hour_from": round(leave.request_hour_from, 4) if leave.work_entry_type_id.request_unit == "hour" else None,
-            "hour_to": round(leave.request_hour_to, 4) if leave.work_entry_type_id.request_unit == "hour" else None,
+            "hour_from": round(leave.request_hour_from, 4) if leave.request_unit_hours else None,
+            "hour_to": round(leave.request_hour_to, 4) if leave.request_unit_hours else None,
             "days": round(leave.number_of_days or 0.0, 2),
             "state": leave.state,
         } for leave in leaves]})

@@ -1,6 +1,6 @@
 {
     "name": "Anabtawi Employee App API",
-    "version": "19.0.1.7.0",
+    "version": "19.0.1.6.1",
     "summary": "Secure Employee App API for attendance, leave, overtime, OTP, password change, and single-device portal restriction",
     "category": "Human Resources",
     "author": "Anabtawi Group",
@@ -12,14 +12,12 @@
         "employee_request",
         "portal_check_in",
         "portal_leaves",
-        "hr_holidays",
         "hr_attendance_overtime_approval_bridge",
     ],
     "data": [
         "security/ir.model.access.csv",
         "data/ir_config_parameter_data.xml",
         "views/mobile_device_views.xml",
-        "views/res_config_settings_views.xml",
     ],
     "post_init_hook": "post_init_hook",
     "installable": True,
