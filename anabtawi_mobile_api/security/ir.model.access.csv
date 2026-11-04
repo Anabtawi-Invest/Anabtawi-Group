@@ -1,3 +1,5 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_anabtawi_mobile_device_system,anabtawi.mobile.device system,model_anabtawi_mobile_device,base.group_system,1,1,1,1
 access_anabtawi_mobile_device_hr_manager,anabtawi.mobile.device hr manager,model_anabtawi_mobile_device,hr.group_hr_manager,1,1,1,0
+access_anabtawi_employee_app_leave_type_system,anabtawi.employee.app.leave.type system,model_anabtawi_employee_app_leave_type,base.group_system,1,1,1,1
+access_anabtawi_employee_app_leave_type_holidays_manager,anabtawi.employee.app.leave.type holidays manager,model_anabtawi_employee_app_leave_type,hr_holidays.group_hr_holidays_manager,1,1,1,1
