@@ -1,6 +1,6 @@
 {
     'name': 'Loan Murabaha Split',
-    'version': '19.0.1.3.0',
+    'version': '19.0.1.4.0',
     'category': 'Accounting/Accounting',
     'summary': 'Split loan principal and murabaha interest into separate journal entries',
     'description': """
@@ -13,7 +13,7 @@ Optional analytic account on the loan is applied at 100%:
 - Checkbox off: expense line only
 - Checkbox on: both murabaha expense and murabaha liability lines
 
-Optional Statement (البيان) field under Asset Group:
+Optional Label (البيان) field under Asset Group:
 - Checkbox off: label on all 3 lines of the Principal & Interest entry
 - Checkbox on: label on Murabaha entry (2 lines) and Principal & Interest entry (2 lines)
 Label format: "{statement} {MM/y}"

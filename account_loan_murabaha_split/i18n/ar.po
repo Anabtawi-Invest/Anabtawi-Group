@@ -17,7 +17,7 @@ msgstr ""
 
 #. module: account_loan_murabaha_split
 #: model:ir.model.fields,field_description:account_loan_murabaha_split.field_account_loan__bayaan
-msgid "Statement"
+msgid "Label"
 msgstr "البيان"
 
 #. module: account_loan_murabaha_split

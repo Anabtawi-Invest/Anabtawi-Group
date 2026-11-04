@@ -30,7 +30,7 @@ class AccountLoan(models.Model):
         help='Applied at 100%% on murabaha/expense journal items when confirming the loan.',
     )
     bayaan = fields.Char(
-        string='Statement',
+        string='Label',
         tracking=True,
         help='Used as journal item label together with the period date (MM/y) when confirming the loan.',
     )
