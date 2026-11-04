@@ -589,7 +589,9 @@ class AnabtawiMobileAPI(http.Controller):
         ], limit=1))
         allowed = LeaveType.browse()
         for leave_type in selected.with_env(LeaveType.env):
-            if not leave_type.active or not leave_type.time_off_selectable:
+            if not leave_type.active:
+                continue
+            if "time_off_selectable" in leave_type._fields and not leave_type.time_off_selectable:
                 continue
             if country_specific and leave_type.country_id != country:
                 continue

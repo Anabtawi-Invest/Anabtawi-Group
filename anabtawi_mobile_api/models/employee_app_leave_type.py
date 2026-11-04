@@ -19,7 +19,6 @@ class AnabtawiEmployeeAppLeaveType(models.Model):
         string="Time Off Type",
         required=True,
         ondelete="cascade",
-        domain="[('time_off_selectable', '=', True)]",
     )
 
     _company_leave_type_unique = models.Constraint(
