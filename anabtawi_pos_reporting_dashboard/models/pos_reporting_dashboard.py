@@ -986,6 +986,33 @@ class PosReportingDashboard(models.TransientModel):
         """, product_ids=product_ids, root_ids=root_ids, start=period["session_start"], end=period["session_end"]))
         return {(product_id, location_id) for product_id, location_id in self.env.cr.fetchall()}
 
+    def _products_in_stock_now(self, products, locations):
+        """{(product_id, location_id)} whose on-hand quantity is above zero today."""
+        product_ids = tuple(products.ids)
+        root_ids = tuple(location.id for location in locations if location)
+        if not product_ids or not root_ids or "stock.quant" not in self.env:
+            return set()
+        self.env["stock.quant"].flush_model(["product_id", "location_id", "quantity"])
+        self.env["stock.location"].flush_model(["location_id"])
+        self.env.cr.execute(SQL("""
+            WITH RECURSIVE descendants AS (
+                SELECT id AS child_id, id AS root_id
+                  FROM stock_location
+                 WHERE id IN %(root_ids)s
+                UNION
+                SELECT sl.id, d.root_id
+                  FROM stock_location sl
+                  JOIN descendants d ON sl.location_id = d.child_id
+            )
+            SELECT q.product_id, d.root_id
+              FROM stock_quant q
+              JOIN descendants d ON d.child_id = q.location_id
+             WHERE q.product_id IN %(product_ids)s
+             GROUP BY q.product_id, d.root_id
+            HAVING SUM(q.quantity) > 0.0000001
+        """, product_ids=product_ids, root_ids=root_ids))
+        return {(product_id, location_id) for product_id, location_id in self.env.cr.fetchall()}
+
     def _product_sales_stats(self, sessions):
         """{(product_id, config_id): stats} for paid lines, gifts excluded.
 
@@ -1068,9 +1095,9 @@ class PosReportingDashboard(models.TransientModel):
         for menu in menus.values():
             products |= menu
         locations = {config.id: self._config_stock_location(config) for config in configs}
-        available = self._products_available_in_period(
-            products, [location for location in locations.values() if location], period,
-        )
+        stock_locations = [location for location in locations.values() if location]
+        available = self._products_available_in_period(products, stock_locations, period)
+        in_stock_now = self._products_in_stock_now(products, stock_locations)
         stats = self._product_sales_stats(sessions)
         rates = {
             rate.pos_categ_id.id: rate.percentage
@@ -1088,10 +1115,11 @@ class PosReportingDashboard(models.TransientModel):
                 sales = stat.get("sales", 0.0)
                 cost = stat.get("cost", 0.0)
                 sold = bool(stat)
-                profit = (sales - cost) if sold else None
-                margin = (profit / sales) if sold and sales else None
+                profit = (cost - sales) if sold else None
+                margin = ((sales - cost) / sales) if sold and sales else None
                 category = product.pos_categ_ids[:1]
-                on_hand = stock_known and (product.id, location.id) in available
+                on_shelf = stock_known and (product.id, location.id) in available
+                in_stock = stock_known and (product.id, location.id) in in_stock_now
                 percentage = rates.get(category.id) if category else None
                 category_profit = (sales - cost * (percentage / 100.0)) if percentage is not None else None
                 rows.append({
@@ -1109,7 +1137,9 @@ class PosReportingDashboard(models.TransientModel):
                     "percentage": round(percentage, 2) if percentage is not None else None,
                     "category_profit": round(category_profit, 3) if category_profit is not None else None,
                     "order_count": stat.get("order_count", 0),
-                    "available": bool(on_hand) or not stock_known,
+                    "on_shelf": bool(on_shelf),
+                    "in_stock": bool(in_stock),
+                    "available": bool(on_shelf) or not stock_known,
                     "cost_missing": False,
                 })
 
@@ -1126,7 +1156,11 @@ class PosReportingDashboard(models.TransientModel):
         for branch_rows in rows_by_branch.values():
             sellers = [row for row in branch_rows if row["qty"] > 0]
             sales_with_margin = sum(row["sales"] for row in sellers if row["margin"] is not None and row["profit"] is not None)
-            profit_with_margin = sum(row["profit"] for row in sellers if row["profit"] is not None)
+            profit_with_margin = sum(
+                row["sales"] - (row["cost"] or 0.0)
+                for row in sellers
+                if row["margin"] is not None and row["profit"] is not None
+            )
             avg_margin = (profit_with_margin / sales_with_margin * 100.0) if sales_with_margin else 0.0
             ranked = sorted(sellers, key=lambda row: row["qty"], reverse=True)
             top_n = min(15, max(5, math.ceil(len(ranked) * 0.2))) if len(ranked) >= 5 else len(ranked)
@@ -1143,10 +1177,62 @@ class PosReportingDashboard(models.TransientModel):
 
         sellers = [row for row in rows if row["qty"] > 0]
         sales_with_margin = sum(row["sales"] for row in sellers if row["margin"] is not None and row["profit"] is not None)
-        profit_with_margin = sum(row["profit"] for row in sellers if row["profit"] is not None)
+        profit_with_margin = sum(
+            row["sales"] - (row["cost"] or 0.0)
+            for row in sellers
+            if row["margin"] is not None and row["profit"] is not None
+        )
         avg_margin = (profit_with_margin / sales_with_margin * 100.0) if sales_with_margin else 0.0
         rated_rows = [row for row in rows if row["category_profit"] is not None]
         category_profit_total = sum(row["category_profit"] for row in rated_rows)
+        category_buckets = {}
+        product_buckets = {}
+        for row in rated_rows:
+            bucket = category_buckets.setdefault(row["category"], {
+                "name": row["category"],
+                "category_profit": 0.0,
+                "sales": 0.0,
+            })
+            bucket["category_profit"] += row["category_profit"]
+            bucket["sales"] += row["sales"]
+            product = product_buckets.setdefault(row["product_id"], {
+                "product_id": row["product_id"],
+                "name": row["name"],
+                "category": row["category"],
+                "category_profit": 0.0,
+                "sales": 0.0,
+                "on_shelf": False,
+            })
+            product["category_profit"] += row["category_profit"]
+            product["sales"] += row["sales"]
+            product["on_shelf"] = product["on_shelf"] or row["on_shelf"]
+        for bucket in category_buckets.values():
+            bucket["category_profit"] = round(bucket["category_profit"], 3)
+            bucket["sales"] = round(bucket["sales"], 3)
+        for product in product_buckets.values():
+            product["category_profit"] = round(product["category_profit"], 3)
+            product["sales"] = round(product["sales"], 3)
+        best_categories = sorted(category_buckets.values(), key=lambda row: row["category_profit"], reverse=True)[:5]
+        best_available = sorted(
+            (row for row in product_buckets.values() if row["on_shelf"]),
+            key=lambda row: row["category_profit"],
+            reverse=True,
+        )[:5]
+        best_unavailable = sorted(
+            (row for row in product_buckets.values() if not row["on_shelf"]),
+            key=lambda row: row["category_profit"],
+            reverse=True,
+        )[:5]
+        worst_in_stock = sorted(
+            (row for row in rated_rows if row["in_stock"]),
+            key=lambda row: row["category_profit"],
+        )[:5]
+        category_cards = {
+            "best_categories": best_categories,
+            "best_available": best_available,
+            "best_unavailable": best_unavailable,
+            "worst_in_stock": worst_in_stock,
+        }
 
         def _top(decision, key, reverse=True, limit=5):
             picked = [row for row in rows if row["decision"] == decision]
@@ -1156,7 +1242,6 @@ class PosReportingDashboard(models.TransientModel):
         best_profit = sorted(
             (row for row in rows if row["profit"] is not None and row["qty"] > 0),
             key=lambda row: row["profit"],
-            reverse=True,
         )[:5]
         kill_rows = sorted(
             (row for row in rows if row["decision"] == "kill"),
@@ -1208,6 +1293,7 @@ class PosReportingDashboard(models.TransientModel):
                 "kill": kill_rows[:8],
             },
             "categories": category_rows[:8],
+            "category_cards": category_cards,
             "products": rows,
         }
 

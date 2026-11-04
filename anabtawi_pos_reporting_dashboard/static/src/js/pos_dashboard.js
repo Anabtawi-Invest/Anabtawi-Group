@@ -74,6 +74,7 @@ export class PosReportingDashboard extends Component {
             loadedKey: "",
             summary: {},
             cards: { stock_more: [], best_profit: [], review_price: [], kill: [] },
+            category_cards: { best_categories: [], best_available: [], best_unavailable: [], worst_in_stock: [] },
             categories: [],
             products: [],
             error: "",
@@ -228,6 +229,7 @@ export class PosReportingDashboard extends Component {
             );
             this.products.summary = res.summary || {};
             this.products.cards = res.cards || { stock_more: [], best_profit: [], review_price: [], kill: [] };
+            this.products.category_cards = res.category_cards || { best_categories: [], best_available: [], best_unavailable: [], worst_in_stock: [] };
             this.products.categories = res.categories || [];
             this.products.products = res.products || [];
             this.products.loadedKey = this._filterKey();

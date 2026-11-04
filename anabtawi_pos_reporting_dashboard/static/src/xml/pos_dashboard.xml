@@ -223,6 +223,56 @@
                             <span class="badge bg-success me-2"><t t-esc="products.summary.category_rated_count || 0"/> with a percentage</span>
                             <span class="badge bg-secondary me-2"><t t-esc="products.summary.category_missing_count || 0"/> missing a percentage</span>
                         </div>
+                        <div class="o_product_decision_grid mb-4">
+                            <div class="o_decision_card decision-profit">
+                                <div class="decision_title">Best category</div>
+                                <t t-if="!(products.category_cards.best_categories || []).length">
+                                    <div class="text-muted">None with a percentage in this period.</div>
+                                </t>
+                                <t t-foreach="products.category_cards.best_categories || []" t-as="item" t-key="item.name">
+                                    <button type="button" class="decision_row" t-on-click="() => this.onCategorySearch({target: {value: item.name}})">
+                                        <span class="decision_name"><t t-esc="item.name"/></span>
+                                        <span class="decision_meta"><t t-esc="formatCurrency(item.category_profit)"/></span>
+                                    </button>
+                                </t>
+                            </div>
+                            <div class="o_decision_card decision-stock">
+                                <div class="decision_title">Best 5 available</div>
+                                <t t-if="!(products.category_cards.best_available || []).length">
+                                    <div class="text-muted">None on the shelf in this period.</div>
+                                </t>
+                                <t t-foreach="products.category_cards.best_available || []" t-as="item" t-key="item.product_id">
+                                    <button type="button" class="decision_row" t-on-click="() => this.openProductLines(item.product_id)">
+                                        <span class="decision_name"><t t-esc="item.name"/></span>
+                                        <span class="decision_meta"><t t-esc="formatCurrency(item.category_profit)"/></span>
+                                    </button>
+                                </t>
+                            </div>
+                            <div class="o_decision_card decision-price">
+                                <div class="decision_title">Best 5 not available</div>
+                                <t t-if="!(products.category_cards.best_unavailable || []).length">
+                                    <div class="text-muted">None off the shelf in this period.</div>
+                                </t>
+                                <t t-foreach="products.category_cards.best_unavailable || []" t-as="item" t-key="item.product_id">
+                                    <button type="button" class="decision_row" t-on-click="() => this.openProductLines(item.product_id)">
+                                        <span class="decision_name"><t t-esc="item.name"/></span>
+                                        <span class="decision_meta"><t t-esc="formatCurrency(item.category_profit)"/></span>
+                                    </button>
+                                </t>
+                            </div>
+                            <div class="o_decision_card decision-kill">
+                                <div class="decision_title">Worst 5 still in stock</div>
+                                <t t-if="!(products.category_cards.worst_in_stock || []).length">
+                                    <div class="text-muted">None with a percentage are in stock today.</div>
+                                </t>
+                                <t t-foreach="products.category_cards.worst_in_stock || []" t-as="item" t-key="item.row_key">
+                                    <button type="button" class="decision_row" t-on-click="() => this.openProductLines(item.product_id, item.config_id)">
+                                        <span class="decision_name"><t t-esc="item.name"/></span>
+                                        <span class="decision_meta"><t t-esc="item.branch_name"/> · <t t-esc="formatCurrency(item.category_profit)"/></span>
+                                    </button>
+                                </t>
+                            </div>
+                        </div>
                         <div class="o_product_toolbar d-flex flex-wrap gap-2 align-items-center mb-3">
                             <input type="search" class="form-control form-control-sm product_search" placeholder="Search product, branch, or category" t-att-value="state.categorySearch" t-on-input="onCategorySearch"/>
                         </div>
