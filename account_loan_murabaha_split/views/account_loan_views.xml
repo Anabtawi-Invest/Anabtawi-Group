@@ -13,6 +13,7 @@
                     invisible="not split_murabaha_interest"
                     required="split_murabaha_interest"
                 />
+                <field name="analytic_account_id" readonly="state != 'draft'"/>
             </xpath>
         </field>
     </record>

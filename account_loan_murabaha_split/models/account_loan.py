@@ -22,27 +22,58 @@ class AccountLoan(models.Model):
         domain="[('account_type', '=', 'liability_current')]",
         help='Short-term liability account credited with the murabaha/interest amount.',
     )
+    analytic_account_id = fields.Many2one(
+        comodel_name='account.analytic.account',
+        string='Analytic Account',
+        tracking=True,
+        check_company=True,
+        help='Applied at 100%% on murabaha/expense journal items when confirming the loan.',
+    )
 
     @api.model
     def default_get(self, fields_list):
         values = super().default_get(fields_list)
-        if 'murabaha_liability_account_id' not in fields_list and 'split_murabaha_interest' not in fields_list:
+        wanted = {'murabaha_liability_account_id', 'split_murabaha_interest', 'analytic_account_id'}
+        if not wanted.intersection(fields_list):
             return values
         previous_loan = self.search([
             ('company_id', '=', self.env.company.id),
-            ('split_murabaha_interest', '=', True),
+            '|',
             ('murabaha_liability_account_id', '!=', False),
+            ('analytic_account_id', '!=', False),
         ], limit=1)
         if previous_loan:
-            values.setdefault('split_murabaha_interest', True)
-            values.setdefault('murabaha_liability_account_id', previous_loan.murabaha_liability_account_id.id)
+            if previous_loan.split_murabaha_interest and previous_loan.murabaha_liability_account_id:
+                values.setdefault('split_murabaha_interest', True)
+                values.setdefault('murabaha_liability_account_id', previous_loan.murabaha_liability_account_id.id)
+            if previous_loan.analytic_account_id:
+                values.setdefault('analytic_account_id', previous_loan.analytic_account_id.id)
         return values
+
+    def _get_loan_analytic_distribution(self):
+        self.ensure_one()
+        if not self.analytic_account_id:
+            return False
+        return {str(self.analytic_account_id.id): 100.0}
+
+    def _apply_analytic_on_expense_lines(self):
+        """Checkbox OFF: analytic 100% on expense account lines of generated moves."""
+        for loan in self:
+            distribution = loan._get_loan_analytic_distribution()
+            if not distribution or not loan.expense_account_id:
+                continue
+            expense_lines = loan.line_ids.generated_move_ids.line_ids.filtered(
+                lambda line: line.account_id == loan.expense_account_id
+            )
+            if expense_lines:
+                expense_lines.write({'analytic_distribution': distribution})
 
     def action_confirm(self):
         normal_loans = self.filtered(lambda loan: not loan.split_murabaha_interest)
         split_loans = self - normal_loans
         if normal_loans:
             super(AccountLoan, normal_loans).action_confirm()
+            normal_loans._apply_analytic_on_expense_lines()
         for loan in split_loans:
             loan._action_confirm_with_murabaha_split()
 
@@ -72,6 +103,7 @@ class AccountLoan(models.Model):
         if not loan.murabaha_liability_account_id:
             raise UserError(_("Please set the Murabaha Liability Account before confirming."))
 
+        analytic_distribution = loan._get_loan_analytic_distribution()
         payment_moves_values = []
         murabaha_moves_values = []
         reclassification_moves_values = []
@@ -108,8 +140,21 @@ class AccountLoan(models.Model):
                 ],
             })
 
-            # Separate murabaha / interest entry (unchanged)
+            # Separate murabaha / interest entry — analytic on both lines when set
             if float_compare(line.interest, 0.0, precision_rounding=loan.currency_id.rounding) > 0:
+                expense_line_vals = {
+                    'account_id': loan.expense_account_id.id,
+                    'debit': line.interest,
+                    'name': f"{loan.name} - {_('Murabaha')} {period_label}",
+                }
+                murabaha_liability_line_vals = {
+                    'account_id': loan.murabaha_liability_account_id.id,
+                    'credit': line.interest,
+                    'name': f"{loan.name} - {_('Murabaha Due')} {period_label}",
+                }
+                if analytic_distribution:
+                    expense_line_vals['analytic_distribution'] = analytic_distribution
+                    murabaha_liability_line_vals['analytic_distribution'] = analytic_distribution
                 murabaha_moves_values.append({
                     'company_id': loan.company_id.id,
                     'auto_post': 'at_date',
@@ -119,16 +164,8 @@ class AccountLoan(models.Model):
                     'journal_id': loan.journal_id.id,
                     'ref': f"{loan.name} - {_('Murabaha')} {period_label}",
                     'line_ids': [
-                        Command.create({
-                            'account_id': loan.expense_account_id.id,
-                            'debit': line.interest,
-                            'name': f"{loan.name} - {_('Murabaha')} {period_label}",
-                        }),
-                        Command.create({
-                            'account_id': loan.murabaha_liability_account_id.id,
-                            'credit': line.interest,
-                            'name': f"{loan.name} - {_('Murabaha Due')} {period_label}",
-                        }),
+                        Command.create(expense_line_vals),
+                        Command.create(murabaha_liability_line_vals),
                     ],
                 })
 
