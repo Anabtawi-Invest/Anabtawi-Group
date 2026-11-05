@@ -1,11 +1,10 @@
+# -*- coding: utf-8 -*-
 import logging
 
-from odoo import _, api, fields, models
+from odoo import fields, models
 from odoo.tools.float_utils import float_compare, float_is_zero, float_round
 
 _logger = logging.getLogger(__name__)
-
-DAILY_CONVERSION_THRESHOLD = 8.0
 
 
 class HrLeave(models.Model):

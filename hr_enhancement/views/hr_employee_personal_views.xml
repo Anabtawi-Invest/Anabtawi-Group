@@ -14,6 +14,18 @@
                            invisible="not ae_is_non_resident"/>
                 </group>
             </xpath>
+            <xpath expr="//sheet/notebook" position="inside">
+                <page name="daily_leave_conversion" string="Daily Leave Conversion"
+                      groups="hr_holidays.group_hr_holidays_user">
+                    <group>
+                        <field name="daily_leave_hours_counter"/>
+                    </group>
+                    <div class="text-muted">
+                        Accumulated hours from the company Daily Time Off type.
+                        Every 8 hours create 1 annual leave day and reduce this counter by 8.
+                    </div>
+                </page>
+            </xpath>
         </field>
     </record>
 </odoo>

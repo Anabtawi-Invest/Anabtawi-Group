@@ -9,6 +9,7 @@
         "security/ir.model.access.csv",
         "data/hr_health_document_type_data.xml",
         "views/hr_employee_personal_views.xml",
+        "views/res_config_settings_views.xml",
         "data/employee_document_migrate.xml",
         "data/employee_document_cron.xml",
         "reports/attendance_card_report.xml",
