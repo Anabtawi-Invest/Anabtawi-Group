@@ -217,8 +217,8 @@ class HrPayslipRun(models.Model):
             wage_val = round(net_amount or 0.0, 3)
             amount_str = f"{wage_val:.3f}"
 
-            # Col 9: Payrun Description
-            payrun_name = desc_str
+            # Col 9: Payrun Description (the slip's own pay run when the selection spans several)
+            payrun_name = (slip.payslip_run_id.name if slip.payslip_run_id else '') or desc_str
 
             # Col 10: Employee Number
             emp_number = (
@@ -385,13 +385,36 @@ class HrPayslip(models.Model):
         return self._do_export_paid_slips(mode='cash')
 
     def action_export_bank_xlsx(self):
-        """Legacy export handler."""
-        payrun = self.mapped('payslip_run_id')[:1]
-        if payrun:
-            return payrun.action_export_bank_xlsx()
+        """Export the payslips checked in the list, including a filtered Select All."""
         if not self:
             raise UserError(_("Please select payslips."))
-        return self._do_export_paid_slips(mode='bank')
+
+        Run = self.env['hr.payslip.run']
+        exportable = [(slip, Run._get_slip_net_amount(slip)) for slip in self]
+        payruns = self.mapped('payslip_run_id')
+        if len(payruns) == 1:
+            helper = payruns
+            name_clean = (payruns.name or "Payroll").replace('/', '_').replace('\\', '_')
+        else:
+            helper = Run.new({
+                'name': 'Selected Payslips',
+                'date_end': fields.Date.today(),
+            })
+            name_clean = "Selected Payslips"
+
+        data = helper._build_bank_xlsx(exportable)
+        att = self.env['ir.attachment'].create({
+            'name': "Banks Payroll List %s.xlsx" % name_clean,
+            'datas': base64.b64encode(data),
+            'res_model': 'hr.payslip',
+            'res_id': self[0].id,
+            'mimetype': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        })
+        return {
+            'type': 'ir.actions.act_url',
+            'url': '/web/content/%s?download=true' % att.id,
+            'target': 'self',
+        }
 
     def _do_export_paid_slips(self, mode='bank', payrun=None):
         pr = payrun or self.mapped('payslip_run_id')[:1]
