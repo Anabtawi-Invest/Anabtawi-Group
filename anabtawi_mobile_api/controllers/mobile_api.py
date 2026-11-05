@@ -578,17 +578,44 @@ class AnabtawiMobileAPI(http.Controller):
         if error:
             return error
         leave_types = self._eligible_leave_types(employee)
-        allocation_rows = leave_types.get_allocation_data(employee).get(employee, [])
+        allocation_rows = (
+            leave_types.get_allocation_data(employee).get(employee, [])
+            if leave_types and hasattr(leave_types, "get_allocation_data")
+            else []
+        )
         allocation_by_id = {row[3]: row[1] for row in allocation_rows}
-        return _json({"status": "ok", "leave_types": [{
-            "id": leave_type.id,
-            "name": leave_type.name,
-            "max_leaves": round(allocation_by_id.get(leave_type.id, {}).get("max_leaves", 0.0), 2),
-            "leaves_used": round(allocation_by_id.get(leave_type.id, {}).get("leaves_taken", 0.0), 2),
-            "remaining": round(allocation_by_id.get(leave_type.id, {}).get("virtual_remaining_leaves", 0.0), 2),
-            "request_unit": leave_type.request_unit,
-            "requires_allocation": bool(leave_type.requires_allocation),
-        } for leave_type in leave_types]})
+
+        def _leave_type_payload(leave_type):
+            requires_allocation = bool(leave_type.requires_allocation)
+            limit_enabled = bool(leave_type.employee_app_limit_enabled)
+            max_request = leave_type.employee_app_max_request or 0.0
+            payload = {
+                "id": leave_type.id,
+                "name": leave_type.name,
+                "request_unit": leave_type.request_unit,
+                "requires_allocation": requires_allocation,
+                "limit_enabled": limit_enabled,
+                "max_request": round(max_request, 2) if limit_enabled and max_request > 0 else None,
+                "max_request_uom": "hour" if leave_type.request_unit == "hour" else "day",
+            }
+            if requires_allocation:
+                allocation = allocation_by_id.get(leave_type.id, {})
+                payload.update({
+                    "max_leaves": round(allocation.get("max_leaves", 0.0), 2),
+                    "leaves_used": round(allocation.get("leaves_taken", 0.0), 2),
+                    "remaining": round(allocation.get("virtual_remaining_leaves", 0.0), 2),
+                })
+            else:
+                payload.update({
+                    "max_leaves": None,
+                    "leaves_used": None,
+                    "remaining": None,
+                })
+            return payload
+
+        return _json({"status": "ok", "leave_types": [
+            _leave_type_payload(leave_type) for leave_type in leave_types
+        ]})
 
     @http.route(
         "/anabtawi/mobile/leaves/create",
@@ -650,6 +677,31 @@ class AnabtawiMobileAPI(http.Controller):
                 "request_unit_half": True,
                 "request_date_from_period": data.get("request_date_from_period") if data.get("request_date_from_period") in ("am", "pm") else "am",
             })
+
+        if leave_type.employee_app_limit_enabled and (leave_type.employee_app_max_request or 0.0) > 0:
+            max_request = leave_type.employee_app_max_request
+            if bool(data.get("request_unit_hours")):
+                requested_amount = (_as_float(data.get("request_hour_to")) or 0.0) - (
+                    _as_float(data.get("request_hour_from")) or 0.0
+                )
+                unit_label = _("hours")
+            elif bool(data.get("request_unit_half")):
+                requested_amount = 0.5
+                unit_label = _("days")
+            else:
+                requested_amount = (date_to - date_from).days + 1
+                unit_label = _("days")
+            if requested_amount > max_request:
+                return _error(
+                    "request_limit_exceeded",
+                    _(
+                        "This amount is not approved. The maximum for this type is %(max)s %(unit)s.",
+                        max=max_request,
+                        unit=unit_label,
+                    ),
+                    422,
+                )
+
         try:
             with request.env.cr.savepoint():
                 leave = request.env["hr.leave"].sudo().with_company(employee.company_id).create(vals)
