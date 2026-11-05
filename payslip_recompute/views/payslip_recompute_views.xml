@@ -7,7 +7,7 @@
         <field name="arch" type="xml">
             <form string="Recompute Payslips">
                 <div class="alert alert-info" role="alert">
-                    Each payslip is set unpaid, cancelled, its extra hours are approved, then it is put back to draft, its work entries are reset, computed, validated, and marked paid.
+                    Each payslip is set unpaid, cancelled, its extra hours are approved, then it is put back to draft, its work entries are reset, a missing salary adjustment is put back on it, then it is computed, validated, and marked paid.
                     Archived employees are skipped. Salary structures you pick below are left out.
                     The work runs in the background.
                 </div>

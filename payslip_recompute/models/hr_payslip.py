@@ -11,7 +11,7 @@ class HrPayslip(models.Model):
     _inherit = 'hr.payslip'
 
     def _recompute_paid_cycle(self):
-        """Unpaid, cancel, approve extra hours, draft, reset work entries, compute, validate, paid."""
+        """Unpaid, cancel, approve extra hours, draft, reset work entries, restore missing salary adjustments, compute, validate, paid."""
         self.ensure_one()
         slip = self.with_context(
             tracking_disable=True, mail_notrack=True, mail_create_nolog=True,
@@ -31,6 +31,8 @@ class HrPayslip(models.Model):
         slip.invalidate_recordset()
         if slip.state == 'draft':
             slip._recompute_reset_work_entries()
+            slip.invalidate_recordset()
+            slip._recompute_restore_salary_adjustments()
             slip.invalidate_recordset()
             slip.compute_sheet()
         slip.invalidate_recordset()
@@ -60,11 +62,109 @@ class HrPayslip(models.Model):
             ('employee_id', '=', self.employee_id.id),
             ('date', '>=', self.date_from),
             ('date', '<=', self.date_to),
-            ('daily_overtime_hours', '>=', OT_MIN_HOURS),
-            ('overtime_status', '!=', 'approved'),
         ])
+        # daily_overtime_hours is computed and not stored, so it cannot be searched.
+        attendances = attendances.filtered(
+            lambda att: (att.daily_overtime_hours or 0.0) >= OT_MIN_HOURS
+            and att.overtime_status != 'approved'
+        )
         if attendances:
             attendances.action_approve_factory_overtime()
+
+    def _recompute_restore_salary_adjustments(self):
+        """Put a missing salary adjustment back on this draft payslip.
+
+        An adjustment that overlaps the payslip, is allowed on its structure,
+        and has no amount on Salary Inputs is restored. A one-time adjustment
+        is set back to Running with Paid Amount 0 and its end date on this
+        payslip's end. A longer one keeps its end date and gets one payslip
+        amount back. An input already carrying an amount is left as it is.
+        A hand-typed input of another type is left as it is.
+        """
+        self.ensure_one()
+        if not self.employee_id or not self.date_from or not self.date_to or not self.struct_id:
+            return
+        if 'hr.salary.attachment' not in self.env:
+            return
+        attachments = self.employee_id.sudo().salary_attachment_ids.filtered(self._recompute_adjustment_applies)
+        if not attachments:
+            return
+        for attachment in attachments:
+            if len(attachment.employee_ids) != 1:
+                continue
+            if self._recompute_input_amount(attachment.other_input_type_id) >= 0.0001:
+                continue
+            active = attachment.active_amount or 0.0
+            paid = attachment.paid_amount or 0.0
+            fully_used = attachment.state == 'close' or active < 0.0001
+            if not fully_used or paid < 0.0001:
+                continue
+            self._recompute_give_back_adjustment(attachment)
+        attachments.invalidate_recordset()
+        self._recompute_write_adjustment_inputs(attachments)
+
+    def _recompute_adjustment_applies(self, attachment):
+        self.ensure_one()
+        if not attachment.date_start or attachment.date_start > self.date_to:
+            return False
+        if attachment.date_end and attachment.date_end < self.date_from:
+            return False
+        if not attachment.other_input_type_id:
+            return False
+        structs = attachment.other_input_type_id.struct_ids
+        return not structs or self.struct_id in structs
+
+    def _recompute_input_amount(self, input_type):
+        self.ensure_one()
+        lines = self.input_line_ids.filtered(lambda line: line.input_type_id == input_type)
+        return sum(abs(line.amount or 0.0) for line in lines)
+
+    def _recompute_give_back_adjustment(self, attachment):
+        """Return one payslip's worth so this slip can take the adjustment again."""
+        self.ensure_one()
+        if attachment.duration_type == 'one':
+            vals = {
+                'state': 'open',
+                'paid_amount': 0.0,
+                'date_end': self.date_to,
+            }
+        else:
+            monthly = attachment.monthly_amount or 0.0
+            paid = attachment.paid_amount or 0.0
+            vals = {
+                'state': 'open',
+                'paid_amount': max(0.0, paid - monthly),
+            }
+        attachment.sudo().write(vals)
+
+    def _recompute_write_adjustment_inputs(self, attachments):
+        """Write the active amount onto a missing or zero Salary Input line."""
+        self.ensure_one()
+        valid = attachments.filtered(self._recompute_adjustment_applies).filtered(lambda a: a.state == 'open')
+        if not valid:
+            return
+        Input = self.env['hr.payslip.input'].sudo()
+        for input_type, group in valid.grouped('other_input_type_id').items():
+            amount = group._get_active_amount()
+            if self.credit_note:
+                amount = -amount
+            if abs(amount) < 0.0001:
+                continue
+            lines = self.input_line_ids.filtered(lambda line: line.input_type_id == input_type)
+            if any(abs(line.amount or 0.0) >= 0.0001 for line in lines):
+                continue
+            name = ', '.join(description for description in group.mapped('description') if description)
+            if lines:
+                lines[:1].sudo().write({'amount': amount, 'name': name or lines[:1].name})
+                if len(lines) > 1:
+                    lines[1:].sudo().unlink()
+            else:
+                Input.create({
+                    'payslip_id': self.id,
+                    'input_type_id': input_type.id,
+                    'name': name,
+                    'amount': amount,
+                })
 
     def _recompute_reset_work_entries(self):
         """Rebuild this employee's work entries for the payslip period.
