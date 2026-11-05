@@ -29,6 +29,11 @@ class AccountLoan(models.Model):
         check_company=True,
         help='Applied at 100%% on murabaha/expense journal items when confirming the loan.',
     )
+    bayaan = fields.Char(
+        string='Label',
+        tracking=True,
+        help='Used as journal item label together with each entry accounting date when confirming the loan.',
+    )
 
     @api.model
     def default_get(self, fields_list):
@@ -56,6 +61,13 @@ class AccountLoan(models.Model):
             return False
         return {str(self.analytic_account_id.id): 100.0}
 
+    def _get_bayaan_line_label(self, entry_date):
+        """Return '{bayaan} {entry_date}' using the journal entry accounting date."""
+        self.ensure_one()
+        if not self.bayaan or not entry_date:
+            return False
+        return f"{self.bayaan} {format_date(self.env, entry_date)}"
+
     def _apply_analytic_on_expense_lines(self):
         """Checkbox OFF: analytic 100% on expense account lines of generated moves."""
         for loan in self:
@@ -68,12 +80,24 @@ class AccountLoan(models.Model):
             if expense_lines:
                 expense_lines.write({'analytic_distribution': distribution})
 
+    def _apply_bayaan_on_payment_move_lines(self):
+        """Checkbox OFF: bayaan + entry date as label on all lines of the Principal & Interest entry."""
+        for loan in self:
+            if not loan.bayaan:
+                continue
+            payment_moves = loan.line_ids.generated_move_ids.filtered(lambda m: m.is_loan_payment_move)
+            for move in payment_moves:
+                label = loan._get_bayaan_line_label(move.date)
+                if label and move.line_ids:
+                    move.line_ids.write({'name': label})
+
     def action_confirm(self):
         normal_loans = self.filtered(lambda loan: not loan.split_murabaha_interest)
         split_loans = self - normal_loans
         if normal_loans:
             super(AccountLoan, normal_loans).action_confirm()
             normal_loans._apply_analytic_on_expense_lines()
+            normal_loans._apply_bayaan_on_payment_move_lines()
         for loan in split_loans:
             loan._action_confirm_with_murabaha_split()
 
@@ -115,6 +139,15 @@ class AccountLoan(models.Model):
 
             period_label = format_date(self.env, line.date, date_format='MM/y')
             move_date = line.date + relativedelta(day=31)
+            bayaan_label = loan._get_bayaan_line_label(move_date)
+
+            principal_name = bayaan_label or f"{loan.name} - {_('Principal')} {period_label}"
+            due_name = bayaan_label or (
+                f"{loan.name} - {_('Due')} {period_label} "
+                f"({_('Principal')} {loan.currency_id.format(line.principal)} + {_('Interest')} {loan.currency_id.format(line.interest)})"
+            )
+            murabaha_name = bayaan_label or f"{loan.name} - {_('Murabaha')} {period_label}"
+            murabaha_due_name = bayaan_label or f"{loan.name} - {_('Murabaha Due')} {period_label}"
 
             # Full payment amount on due installments (principal + interest)
             payment_moves_values.append({
@@ -129,13 +162,12 @@ class AccountLoan(models.Model):
                     Command.create({
                         'account_id': loan.long_term_account_id.id,
                         'debit': line.payment,
-                        'name': f"{loan.name} - {_('Principal')} {period_label}",
+                        'name': principal_name,
                     }),
                     Command.create({
                         'account_id': loan.short_term_account_id.id,
                         'credit': line.payment,
-                        'name': f"{loan.name} - {_('Due')} {period_label} "
-                                f"({_('Principal')} {loan.currency_id.format(line.principal)} + {_('Interest')} {loan.currency_id.format(line.interest)})",
+                        'name': due_name,
                     }),
                 ],
             })
@@ -145,12 +177,12 @@ class AccountLoan(models.Model):
                 expense_line_vals = {
                     'account_id': loan.expense_account_id.id,
                     'debit': line.interest,
-                    'name': f"{loan.name} - {_('Murabaha')} {period_label}",
+                    'name': murabaha_name,
                 }
                 murabaha_liability_line_vals = {
                     'account_id': loan.murabaha_liability_account_id.id,
                     'credit': line.interest,
-                    'name': f"{loan.name} - {_('Murabaha Due')} {period_label}",
+                    'name': murabaha_due_name,
                 }
                 if analytic_distribution:
                     expense_line_vals['analytic_distribution'] = analytic_distribution
