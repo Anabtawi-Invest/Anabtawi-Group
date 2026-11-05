@@ -566,21 +566,8 @@ class AnabtawiMobileAPI(http.Controller):
         } for record in records]})
 
     def _eligible_leave_types(self, employee):
-        LeaveType = request.env["hr.leave.type"].sudo().with_company(
-            employee.company_id
-        ).with_context(
-            employee_id=employee.id,
-            default_employee_id=employee.id,
-            allowed_company_ids=[employee.company_id.id],
-        )
-        domain = [
-            ("active", "=", True),
-            ("time_type", "=", "leave"),
-            ("company_id", "in", [False, employee.company_id.id]),
-            ("country_id", "in", [False, employee.company_id.country_id.id]),
-            "|", ("requires_allocation", "=", False), ("has_valid_allocation", "=", True),
-        ]
-        return LeaveType.search(domain, order="sequence, id")
+        """Types from Time Off > Employee App settings that this employee can request."""
+        return request.env["res.company"].sudo()._anabtawi_leave_types_for_employee(employee)
 
     @http.route(
         "/anabtawi/mobile/leaves/balances",

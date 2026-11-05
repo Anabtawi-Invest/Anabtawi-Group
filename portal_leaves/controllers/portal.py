@@ -186,6 +186,10 @@ class EmployeePortal(CustomerPortal):
     def _get_portal_timeoff_types(self, employee):
         if not employee or not employee.company_id:
             return []
+        allowed = request.env['res.company'].sudo()._anabtawi_leave_types_for_employee(employee)
+        allowed_ids = set(allowed.ids)
+        if not allowed_ids:
+            return []
         LeaveType = request.env['hr.leave.type'].sudo().with_company(employee.company_id).with_context(
             employee_id=employee.id,
             allowed_company_ids=[employee.company_id.id],
@@ -193,36 +197,13 @@ class EmployeePortal(CustomerPortal):
         raw = LeaveType.get_allocation_data_request(hidden_allocations=False)
         return [
             row for row in raw
-            if self._portal_leave_type_matches_backend_record_rule(LeaveType.browse(row[3]), employee)
+            if row[3] in allowed_ids
+            and self._portal_leave_type_matches_backend_record_rule(LeaveType.browse(row[3]), employee)
         ]
 
     def _get_portal_selectable_leave_types(self, employee):
-        """Same selection rules as the backend time off form (hr_leave_views holiday_status_id domain)."""
-        if not employee or not employee.company_id:
-            return request.env['hr.leave.type'].browse()
-        LeaveType = request.env['hr.leave.type'].sudo().with_company(employee.company_id).with_context(
-            employee_id=employee.id,
-            default_employee_id=employee.id,
-            allowed_company_ids=[employee.company_id.id],
-        )
-        domain = [
-            '&',
-            '|',
-            ('company_id', '=', employee.company_id.id),
-            '&',
-            ('company_id', '=', False),
-            ('country_id', 'in', employee.company_id.country_id.ids + [False]),
-            '|',
-            ('requires_allocation', '=', False),
-            '&',
-            ('has_valid_allocation', '=', True),
-            '|',
-            ('allows_negative', '=', True),
-            '&',
-            ('virtual_remaining_leaves', '>', 0),
-            ('allows_negative', '=', False),
-        ]
-        return LeaveType.search(domain, order='sequence')
+        """Only types selected in Time Off > Employee App settings, with allocation rules."""
+        return request.env['res.company'].sudo()._anabtawi_leave_types_for_employee(employee)
 
     def _prepare_featured_timeoff_balances(self, timeoff_types):
         def _normalize_name(name):

@@ -14,6 +14,7 @@
     'data': [
         'security/ir.model.access.csv',
         'views/employee_portal.xml',
+        'views/res_config_settings_views.xml',
     ],
     'assets': {
         'web.assets_frontend': [
