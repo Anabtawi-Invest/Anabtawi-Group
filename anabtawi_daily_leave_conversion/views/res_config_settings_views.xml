@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_daily_leave_conversion" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.daily.leave.conversion</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app string="Daily Leave Conversion" name="anabtawi_daily_leave_conversion"
+                     groups="hr_holidays.group_hr_holidays_manager">
+                    <block title="Daily Leave to Annual" name="daily_leave_conversion_settings">
+                        <setting string="Daily Time Off Type"
+                                 help="Hours from approved leaves of this type increase the employee counter.">
+                            <field name="daily_leave_type_id"/>
+                        </setting>
+                        <setting string="Annual Leave Type"
+                                 help="When the counter reaches 8 hours, the system creates 1 day of this leave type.">
+                            <field name="daily_conversion_annual_leave_type_id"/>
+                        </setting>
+                    </block>
+                </app>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="action_daily_leave_conversion_settings" model="ir.actions.act_window">
+        <field name="name">Settings</field>
+        <field name="res_model">res.config.settings</field>
+        <field name="view_mode">form</field>
+        <field name="context">{'module': 'anabtawi_daily_leave_conversion', 'bin_size': False}</field>
+    </record>
+
+    <menuitem
+        id="menu_daily_leave_conversion_settings"
+        name="Daily Leave Conversion"
+        parent="hr_holidays.menu_hr_holidays_configuration"
+        action="action_daily_leave_conversion_settings"
+        sequence="55"
+        groups="base.group_system"/>
+</odoo>

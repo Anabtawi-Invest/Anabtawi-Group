@@ -1,10 +1,11 @@
-/** @odoo-module **/
+/** @odoo-module */
 
-import { patch } from "@web/core/utils/patch";
-import { PortalHomeCounters } from "@portal/interactions/portal_home_counters";
-
-patch(PortalHomeCounters.prototype, {
-    getCountersAlwaysDisplayed() {
-        return [...super.getCountersAlwaysDisplayed(), "leave_count"];
+import { PortalHomeCounters } from '@portal/js/portal';
+PortalHomeCounters.include({
+    /**
+     * @override
+     */
+    _getCountersAlwaysDisplayed() {
+        return this._super(...arguments).concat(['leave_count']);
     },
 });

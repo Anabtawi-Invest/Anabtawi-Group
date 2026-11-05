@@ -1,0 +1,125 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# 	* anabtawi_daily_leave_conversion
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 19.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-11-05 06:50+0000\n"
+"PO-Revision-Date: 2026-11-05 06:50+0000\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Language: ar\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=6; plural=n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 ? 4 : 5;\n"
+
+#. module: anabtawi_daily_leave_conversion
+#: model:ir.module.module,shortdesc:anabtawi_daily_leave_conversion.module_meta_information
+#: model:ir.module.module,summary:anabtawi_daily_leave_conversion.module_meta_information
+msgid "Daily Leave to Annual Conversion"
+msgstr "مغادرة يومية"
+
+#. module: anabtawi_daily_leave_conversion
+#: model:ir.module.module,description:anabtawi_daily_leave_conversion.module_meta_information
+msgid "Convert every 8 hours of a configured daily leave type into 1 annual leave day"
+msgstr "تحويل كل 8 ساعات من نوع المغادرة اليومية إلى يوم إجازة سنوية واحد"
+
+#. module: anabtawi_daily_leave_conversion
+#: model:ir.ui.menu,name:anabtawi_daily_leave_conversion.menu_daily_leave_conversion_settings
+#: model_terms:ir.ui.view,arch_db:anabtawi_daily_leave_conversion.res_config_settings_view_form_daily_leave_conversion
+#: model_terms:ir.ui.view,arch_db:anabtawi_daily_leave_conversion.view_employee_form_daily_leave_counter
+msgid "Daily Leave Conversion"
+msgstr "مغادرة يومية"
+
+#. module: anabtawi_daily_leave_conversion
+#: model_terms:ir.ui.view,arch_db:anabtawi_daily_leave_conversion.res_config_settings_view_form_daily_leave_conversion
+msgid "Daily Leave to Annual"
+msgstr "مغادرة يومية"
+
+#. module: anabtawi_daily_leave_conversion
+#: model:ir.model.fields,field_description:anabtawi_daily_leave_conversion.field_res_company__daily_leave_type_id
+#: model:ir.model.fields,field_description:anabtawi_daily_leave_conversion.field_res_config_settings__daily_leave_type_id
+#: model_terms:ir.ui.view,arch_db:anabtawi_daily_leave_conversion.res_config_settings_view_form_daily_leave_conversion
+msgid "Daily Time Off Type"
+msgstr "نوع المغادرة اليومية"
+
+#. module: anabtawi_daily_leave_conversion
+#: model_terms:ir.ui.view,arch_db:anabtawi_daily_leave_conversion.res_config_settings_view_form_daily_leave_conversion
+msgid "Hours from approved leaves of this type increase the employee counter."
+msgstr "الساعات من طلبات هذا النوع المعتمدة تُضاف إلى عداد الموظف."
+
+#. module: anabtawi_daily_leave_conversion
+#: model:ir.model.fields,field_description:anabtawi_daily_leave_conversion.field_res_company__daily_conversion_annual_leave_type_id
+#: model:ir.model.fields,field_description:anabtawi_daily_leave_conversion.field_res_config_settings__daily_conversion_annual_leave_type_id
+#: model_terms:ir.ui.view,arch_db:anabtawi_daily_leave_conversion.res_config_settings_view_form_daily_leave_conversion
+msgid "Annual Leave Type"
+msgstr "نوع الإجازة السنوية"
+
+#. module: anabtawi_daily_leave_conversion
+#: model:ir.model.fields,field_description:anabtawi_daily_leave_conversion.field_res_company__daily_conversion_annual_leave_type_id
+msgid "Annual Leave Type for Daily Conversion"
+msgstr "نوع الإجازة السنوية للمغادرة اليومية"
+
+#. module: anabtawi_daily_leave_conversion
+#: model_terms:ir.ui.view,arch_db:anabtawi_daily_leave_conversion.res_config_settings_view_form_daily_leave_conversion
+msgid "When the counter reaches 8 hours, the system creates 1 day of this leave type."
+msgstr "عند وصول العداد إلى 8 ساعات، ينشئ النظام يوماً واحداً من هذا النوع."
+
+#. module: anabtawi_daily_leave_conversion
+#: model:ir.model.fields,help:anabtawi_daily_leave_conversion.field_res_company__daily_leave_type_id
+#: model:ir.model.fields,help:anabtawi_daily_leave_conversion.field_res_config_settings__daily_leave_type_id
+msgid "Hours taken from this leave type are accumulated per employee. Every 8 hours create 1 day of the annual leave type below."
+msgstr "الساعات المأخوذة من هذا النوع تُجمَّع لكل موظف. كل 8 ساعات تُحوَّل إلى يوم واحد من نوع الإجازة السنوية أدناه."
+
+#. module: anabtawi_daily_leave_conversion
+#: model:ir.model.fields,help:anabtawi_daily_leave_conversion.field_res_company__daily_conversion_annual_leave_type_id
+#: model:ir.model.fields,help:anabtawi_daily_leave_conversion.field_res_config_settings__daily_conversion_annual_leave_type_id
+msgid "Leave type used when 8 hours of the daily time off type are converted into 1 annual leave day."
+msgstr "نوع الإجازة المستخدم عند تحويل 8 ساعات من المغادرة اليومية إلى يوم إجازة سنوية واحد."
+
+#. module: anabtawi_daily_leave_conversion
+#: model:ir.model.fields,field_description:anabtawi_daily_leave_conversion.field_hr_employee__daily_leave_hours_counter
+#: model:ir.model.fields,field_description:anabtawi_daily_leave_conversion.field_hr_employee_public__daily_leave_hours_counter
+msgid "Daily Leave Hours Counter"
+msgstr "عداد ساعات المغادرة اليومية"
+
+#. module: anabtawi_daily_leave_conversion
+#: model:ir.model.fields,help:anabtawi_daily_leave_conversion.field_hr_employee__daily_leave_hours_counter
+#: model:ir.model.fields,help:anabtawi_daily_leave_conversion.field_hr_employee_public__daily_leave_hours_counter
+msgid "Accumulated hours from the company daily leave type. Every 8 hours are converted into 1 annual leave day."
+msgstr "الساعات المتراكمة من نوع المغادرة اليومية للشركة. كل 8 ساعات تُحوَّل إلى يوم إجازة سنوية واحد."
+
+#. module: anabtawi_daily_leave_conversion
+#: model_terms:ir.ui.view,arch_db:anabtawi_daily_leave_conversion.view_employee_form_daily_leave_counter
+msgid "Accumulated hours from the company Daily Time Off type. Every 8 hours create 1 annual leave day and reduce this counter by 8."
+msgstr "الساعات المتراكمة من نوع المغادرة اليومية للشركة. كل 8 ساعات تُنشئ يوم إجازة سنوية واحداً وتُنقِص هذا العداد بمقدار 8."
+
+#. module: anabtawi_daily_leave_conversion
+#: model:ir.model.fields,field_description:anabtawi_daily_leave_conversion.field_hr_leave__daily_conversion_hours_applied
+msgid "Daily Conversion Hours Applied"
+msgstr "ساعات التحويل اليومي المطبقة"
+
+#. module: anabtawi_daily_leave_conversion
+#: model:ir.model.fields,help:anabtawi_daily_leave_conversion.field_hr_leave__daily_conversion_hours_applied
+msgid "Hours from this leave that were already added to the employee daily leave counter."
+msgstr "الساعات من هذه المغادرة التي أُضيفت مسبقاً إلى عداد المغادرة اليومية للموظف."
+
+#. module: anabtawi_daily_leave_conversion
+#. odoo-python
+#: code:addons/anabtawi_daily_leave_conversion/models/hr_employee.py:0
+msgid "N/A"
+msgstr "غير متوفر"
+
+#. module: anabtawi_daily_leave_conversion
+#. odoo-python
+#: code:addons/anabtawi_daily_leave_conversion/models/hr_employee.py:0
+msgid "Auto-created: 8 hours of %(daily)s converted to 1 annual leave day (counter was %(before).2f hours). Source leave: %(source)s."
+msgstr "إنشاء تلقائي: تم تحويل 8 ساعات من %(daily)s إلى يوم إجازة سنوية واحد (كان العداد %(before).2f ساعة). المغادرة المصدر: %(source)s."
+
+#. module: anabtawi_daily_leave_conversion
+#: model:ir.actions.act_window,name:anabtawi_daily_leave_conversion.action_daily_leave_conversion_settings
+msgid "Settings"
+msgstr "الإعدادات"
