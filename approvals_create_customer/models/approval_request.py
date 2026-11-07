@@ -67,21 +67,37 @@ class ApprovalRequest(models.Model):
         )
         to_create._create_customer_partner()
 
+    def _portal_assigned_parent(self, owner):
+        """Parent contact for customers created from this portal user's requests."""
+        owner = owner.sudo()
+        if "van_customer_id" in owner._fields and owner.van_customer_id:
+            return owner.van_customer_id
+        return owner.partner_id
+
     def _create_customer_partner(self):
         Partner = self.env["res.partner"].sudo()
         for request in self:
             name = (request.customer_name or "").strip()
             if not name:
                 raise UserError(_("Customer Name is required to create the partner."))
-            partner = Partner.create(
-                {
-                    "name": name,
-                    "phone": (request.customer_phone or "").strip() or False,
-                    "email": (request.customer_email or "").strip() or False,
-                    "customer_rank": 1,
-                    "company_id": request.company_id.id or False,
-                }
-            )
+            parent = self._portal_assigned_parent(request.request_owner_id)
+            if not parent:
+                raise UserError(
+                    _("The requester has no assigned contact to attach the new customer under.")
+                )
+            vals = {
+                "name": name,
+                "phone": (request.customer_phone or "").strip() or False,
+                "email": (request.customer_email or "").strip() or False,
+                "customer_rank": 1,
+                "parent_id": parent.id,
+                "type": "contact",
+                "is_company": False,
+                "company_id": parent.company_id.id
+                or request.company_id.id
+                or False,
+            }
+            partner = Partner.create(vals)
             request.sudo().write(
                 {
                     "created_partner_id": partner.id,
@@ -89,7 +105,11 @@ class ApprovalRequest(models.Model):
                 }
             )
             request.message_post(
-                body=_("Customer %(name)s has been created.", name=partner.display_name)
+                body=_(
+                    "Customer %(name)s has been created under %(parent)s.",
+                    name=partner.display_name,
+                    parent=parent.display_name,
+                )
             )
 
     def action_open_created_partner(self):

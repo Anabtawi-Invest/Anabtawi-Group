@@ -119,156 +119,18 @@ class PortalSaleOrderCreate(http.Controller):
             return pricelist._get_product_price(product, 1.0)
         return product.lst_price
 
-    def _get_van_customer(self):
-        """Mapped van customer exactly (sale partner + address parent)."""
+    def _get_assigned_parent(self):
+        """Contact assigned to this portal user; children are searchable customers."""
         user = request.env.user.sudo()
         if "van_customer_id" in user._fields and user.van_customer_id:
-            mapped = user.van_customer_id
-            _logger.info(
-                "portal_sale van_customer user=%s mapped_id=%s mapped_name=%r "
-                "mapped_is_company=%s commercial_id=%s",
-                user.id,
-                mapped.id,
-                mapped.display_name,
-                mapped.is_company,
-                mapped.commercial_partner_id.id,
-            )
-            return mapped
-        return request.env["res.partner"]
+            return user.van_customer_id
+        return user.partner_id
 
-    def _serialize_address(self, partner):
-        return {
-            "id": partner.id,
-            "name": partner.name or "",
-            "street": partner.street or "",
-            "city": partner.city or "",
-            "phone": partner.phone or "",
-            "display": self._address_display(partner),
-        }
-
-    def _address_display(self, partner):
-        parts = [
-            partner.name or "",
-            partner.street or "",
-            partner.city or "",
-            partner.phone or "",
-        ]
-        return " — ".join(p for p in parts if p)
-
-    def _get_van_delivery_addresses(self, customer):
-        if not customer:
-            return request.env["res.partner"]
-        # Addresses under the mapped van customer (and any wrongly stored under commercial)
-        parents = customer | customer.commercial_partner_id
-        addresses = (
-            request.env["res.partner"]
-            .sudo()
-            .search(
-                [
-                    ("parent_id", "in", parents.ids),
-                    ("type", "in", ("delivery", "other")),
-                    ("active", "=", True),
-                ],
-                order="name, id",
-            )
-        )
-        _logger.info(
-            "portal_sale list addresses customer_id=%s parents=%s count=%s ids=%s",
-            customer.id,
-            parents.ids,
-            len(addresses),
-            addresses.ids,
-        )
-        return addresses
-
-    def _resolve_van_shipping_address(self, customer, address_id=None, address=None):
-        Partner = request.env["res.partner"].sudo()
-        # Always nest under the mapped van customer the user configured
-        parent = customer
-        allowed_parents = customer | customer.commercial_partner_id
-        _logger.info(
-            "portal_sale resolve address parent_id=%s parent_name=%r is_company=%s "
-            "address_id=%s address_payload=%r",
-            parent.id,
-            parent.display_name,
-            parent.is_company,
-            address_id,
-            address,
-        )
-        if address_id:
-            shipping = Partner.browse(int(address_id)).exists()
-            _logger.info(
-                "portal_sale existing address id=%s parent_id=%s type=%s active=%s",
-                shipping.id if shipping else None,
-                shipping.parent_id.id if shipping else None,
-                shipping.type if shipping else None,
-                shipping.active if shipping else None,
-            )
-            if (
-                not shipping
-                or shipping.parent_id.id not in allowed_parents.ids
-                or shipping.type not in ("delivery", "other")
-            ):
-                raise ValidationError(_("Invalid delivery address selected."))
-            # If it was stored under commercial company, re-parent onto mapped customer
-            if shipping.parent_id.id != parent.id:
-                _logger.warning(
-                    "portal_sale re-parenting address %s from %s to mapped customer %s",
-                    shipping.id,
-                    shipping.parent_id.id,
-                    parent.id,
-                )
-                shipping.write({"parent_id": parent.id})
-            return shipping
-
-        address = address or {}
-        name = (address.get("name") or "").strip()
-        street = (address.get("street") or "").strip()
-        city = (address.get("city") or "").strip()
-        phone = (address.get("phone") or "").strip()
-        if not name:
-            raise ValidationError(_("Please enter the place / person name."))
-        if not street:
-            raise ValidationError(_("Please enter the street."))
-        if not city:
-            raise ValidationError(_("Please enter the city."))
-
-        vals = {
-            "name": name,
-            "street": street,
-            "city": city,
-            "phone": phone or False,
-            "type": "delivery",
-            "parent_id": parent.id,
-            "is_company": False,
-        }
-        if parent.company_id:
-            vals["company_id"] = parent.company_id.id
-        else:
-            vals["company_id"] = False
-
-        _logger.info("portal_sale creating delivery address vals=%r", vals)
-        shipping = Partner.create(vals)
-        shipping.invalidate_recordset()
-        parent.invalidate_recordset(["child_ids"])
-        _logger.info(
-            "portal_sale created address id=%s name=%r parent_id=%s type=%s "
-            "company_id=%s child_ids_on_parent=%s",
-            shipping.id,
-            shipping.name,
-            shipping.parent_id.id,
-            shipping.type,
-            shipping.company_id.id,
-            parent.child_ids.ids,
-        )
-        if shipping.parent_id.id != parent.id:
-            _logger.error(
-                "portal_sale address parent mismatch after create: expected=%s got=%s — forcing parent",
-                parent.id,
-                shipping.parent_id.id,
-            )
-            shipping.write({"parent_id": parent.id})
-        return shipping
+    def _is_allowed_portal_customer(self, partner):
+        parent = self._get_assigned_parent()
+        if not partner or not parent:
+            return False
+        return bool(partner.active and partner.parent_id.id == parent.id)
 
     def _available_qty_by_product(self, location, product_ids=None):
         """Map product_id -> available qty (on hand - reserved) in location tree."""
@@ -305,35 +167,14 @@ class PortalSaleOrderCreate(http.Controller):
     @http.route("/my/sales/create", type="http", auth="user", website=True)
     def portal_sale_create(self, **kwargs):
         self._ensure_sales_portal()
-        van_customer = self._get_van_customer()
-        addresses = self._get_van_delivery_addresses(van_customer) if van_customer else []
         return request.render(
             "portal_sale_order_create.portal_sale_create",
             {
                 "page_name": "portal_sale_create",
                 "currency": request.env.company.currency_id,
                 "draft_mode": self._is_draft_portal_user(),
-                "van_customer": van_customer,
-                "van_addresses": addresses,
             },
         )
-
-    @http.route("/my/sales/api/addresses", type="jsonrpc", auth="user", website=True)
-    def api_addresses(self, **kwargs):
-        self._ensure_sales_portal()
-        van_customer = self._get_van_customer()
-        if not van_customer:
-            return {"customer": False, "addresses": []}
-        addresses = self._get_van_delivery_addresses(van_customer)
-        return {
-            "customer": {
-                "id": van_customer.id,
-                "name": van_customer.display_name or van_customer.name,
-                "portal_allow_payment_term": bool(van_customer.portal_allow_payment_term),
-                "default_payment_term_id": van_customer.property_payment_term_id.id or False,
-            },
-            "addresses": [self._serialize_address(a) for a in addresses],
-        }
 
     @http.route(["/my/sales/orders", "/my/sales/orders/page/<int:page>"], type="http", auth="user", website=True)
     def portal_sale_orders(self, page=1, **kwargs):
@@ -385,9 +226,13 @@ class PortalSaleOrderCreate(http.Controller):
         return request.make_json_response(self._search_partners(term))
 
     def _search_partners(self, term):
-        """Search customers by name, phone, or email only."""
+        """Search only contacts under the portal user's assigned parent contact."""
         term = (term or "").strip()
         if len(term) < 1:
+            return []
+
+        parent = self._get_assigned_parent()
+        if not parent:
             return []
 
         try:
@@ -401,7 +246,10 @@ class PortalSaleOrderCreate(http.Controller):
             if len(digits) >= 2:
                 or_clauses.append(("phone", "ilike", digits))
 
-            domain = ["&", ("active", "=", True)]
+            domain = [
+                ("active", "=", True),
+                ("parent_id", "=", parent.id),
+            ]
             for _ in range(len(or_clauses) - 1):
                 domain.append("|")
             domain.extend(or_clauses)
@@ -629,8 +477,6 @@ class PortalSaleOrderCreate(http.Controller):
         partner_id=None,
         lines=None,
         payment_term_id=None,
-        address_id=None,
-        address=None,
         **kwargs,
     ):
         self._ensure_sales_portal()
@@ -638,17 +484,13 @@ class PortalSaleOrderCreate(http.Controller):
         if not lines:
             raise ValidationError(_("Please add at least one product."))
 
-        van_customer = self._get_van_customer()
-        shipping = request.env["res.partner"]
-        if van_customer:
-            partner = van_customer
-            shipping = self._resolve_van_shipping_address(van_customer, address_id, address)
-        else:
-            if not partner_id:
-                raise ValidationError(_("Please select a customer."))
-            partner = request.env["res.partner"].sudo().browse(int(partner_id)).exists()
-            if not partner:
-                raise ValidationError(_("Customer not found."))
+        if not partner_id:
+            raise ValidationError(_("Please select a customer."))
+        partner = request.env["res.partner"].sudo().browse(int(partner_id)).exists()
+        if not partner or not self._is_allowed_portal_customer(partner):
+            raise ValidationError(
+                _("Customer not found among your assigned contacts.")
+            )
 
         payment_term = self._resolve_payment_term(partner, payment_term_id)
 
@@ -707,8 +549,6 @@ class PortalSaleOrderCreate(http.Controller):
             "payment_term_id": payment_term.id,
             "order_line": order_lines,
         }
-        if shipping:
-            order_vals["partner_shipping_id"] = shipping.id
         if van_warehouse:
             order_vals["warehouse_id"] = van_warehouse.id
         if van_pricelist:

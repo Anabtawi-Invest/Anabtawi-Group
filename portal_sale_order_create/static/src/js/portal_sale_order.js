@@ -61,7 +61,6 @@ async function fetchPaymentTerms() {
 }
 
 function initCreatePage(root) {
-    const vanMode = root.dataset.vanMode === "1";
     const state = {
         partner: null,
         paymentTermId: null,
@@ -70,8 +69,6 @@ function initCreatePage(root) {
         productOffset: 0,
         productTerm: "",
         productTotal: 0,
-        vanAddressId: null,
-        vanAddressMode: "existing", // existing | new
     };
 
     const partnerSearch = qs("#partner_search", root);
@@ -80,8 +77,6 @@ function initCreatePage(root) {
     const selectedLabel = qs("#selected_partner_label", root);
     const paymentTermWrap = qs("#payment_term_wrap", root);
     const paymentTermSelect = qs("#payment_term_id", root);
-    const vanAddressSelect = qs("#van_address_id", root);
-    const vanAddressNew = qs("#van_address_new", root);
     const cartBody = qs("#cart_body", root);
     const cartEmpty = qs("#cart_empty", root);
     const cartWrap = qs("#cart_table_wrap", root);
@@ -101,44 +96,9 @@ function initCreatePage(root) {
     let productTimer = null;
     let searchSeq = 0;
 
-    if (!vanMode && (!partnerSearch || !partnerResults)) {
+    if (!partnerSearch || !partnerResults) {
         console.error("portal_sale_order_create: partner search elements missing");
         return;
-    }
-
-    if (vanMode) {
-        const defaultTerm = parseInt(root.dataset.vanDefaultPaymentTermId || "", 10);
-        state.partner = {
-            id: parseInt(root.dataset.vanCustomerId, 10),
-            name: root.dataset.vanCustomerName || "",
-            portal_allow_payment_term: root.dataset.vanAllowPaymentTerm === "1",
-            default_payment_term_id: defaultTerm || false,
-        };
-    }
-
-    function syncVanAddressMode() {
-        if (!vanAddressSelect) {
-            return;
-        }
-        const value = vanAddressSelect.value;
-        if (value === "__new__") {
-            state.vanAddressMode = "new";
-            state.vanAddressId = null;
-            vanAddressNew?.classList.remove("d-none");
-        } else if (value) {
-            state.vanAddressMode = "existing";
-            state.vanAddressId = parseInt(value, 10);
-            vanAddressNew?.classList.add("d-none");
-        } else {
-            state.vanAddressMode = "existing";
-            state.vanAddressId = null;
-            vanAddressNew?.classList.add("d-none");
-        }
-    }
-
-    if (vanAddressSelect) {
-        vanAddressSelect.addEventListener("change", syncVanAddressMode);
-        syncVanAddressMode();
     }
 
     function openModal() {
@@ -296,8 +256,9 @@ function initCreatePage(root) {
                     <div class="list-group-item o_portal_partner_empty">
                         <div class="fw-semibold mb-1">لا يوجد عميل مطابق</div>
                         <div class="small text-muted mb-0">
-                            لم يتم العثور على عميل بهذا الاسم أو رقم الهاتف أو الإيميل.
-                            يمكنك إنشاء عميل جديد من الزر بجانب البحث.
+                            لم يتم العثور على عميل بهذا الاسم أو رقم الهاتف أو الإيميل ضمن جهات الاتصال المخصصة لك.
+                            لطلب عميل جديد استخدم بوابة طلب العميل.
+                            <a href="/my/customer-requests/create">طلب عميل جديد / Request customer</a>
                         </div>
                     </div>`;
                 return;
@@ -349,7 +310,8 @@ function initCreatePage(root) {
                     <div class="fw-semibold mb-1">لا يوجد عميل مطابق</div>
                     <div class="small text-muted mb-0">
                         لم يتم العثور على نتائج. جرّب اسمًا أو رقم هاتف أو إيميل آخر،
-                        أو أنشئ عميلًا جديدًا.
+                        أو اطلب عميلًا جديدًا من
+                        <a href="/my/customer-requests/create">بوابة طلب العميل</a>.
                     </div>
                 </div>`;
         }
@@ -491,23 +453,16 @@ function initCreatePage(root) {
         updateProductMeta(hasMore);
     }
 
-    if (!vanMode && partnerSearch) {
-        partnerSearch.addEventListener("input", schedulePartnerSearch);
-        partnerSearch.addEventListener("keyup", schedulePartnerSearch);
-        partnerSearch.addEventListener("compositionend", schedulePartnerSearch);
-        partnerSearch.addEventListener("focus", schedulePartnerSearch);
+    partnerSearch.addEventListener("input", schedulePartnerSearch);
+    partnerSearch.addEventListener("keyup", schedulePartnerSearch);
+    partnerSearch.addEventListener("compositionend", schedulePartnerSearch);
+    partnerSearch.addEventListener("focus", schedulePartnerSearch);
 
-        qs("#btn_clear_partner", root)?.addEventListener("click", () => {
-            state.partner = null;
-            selectedBox?.classList.add("d-none");
-            hidePaymentTerms();
-        });
-    }
-
-    // Defer van payment-terms UI until helpers exist
-    if (vanMode && state.partner?.portal_allow_payment_term) {
-        showPaymentTerms(state.partner);
-    }
+    qs("#btn_clear_partner", root)?.addEventListener("click", () => {
+        state.partner = null;
+        selectedBox?.classList.add("d-none");
+        hidePaymentTerms();
+    });
 
     if (paymentTermSelect) {
         paymentTermSelect.addEventListener("change", () => {
@@ -565,24 +520,6 @@ function initCreatePage(root) {
             showError(confirmError, "Please select a customer.");
             return;
         }
-        if (vanMode) {
-            if (state.vanAddressMode === "existing" && !state.vanAddressId) {
-                showError(confirmError, "Please select a delivery address or add a new one.");
-                return;
-            }
-            if (state.vanAddressMode === "new") {
-                const name = (qs("#addr_name", root)?.value || "").trim();
-                const street = (qs("#addr_street", root)?.value || "").trim();
-                const city = (qs("#addr_city", root)?.value || "").trim();
-                if (!name || !street || !city) {
-                    showError(
-                        confirmError,
-                        "Please fill place/person name, street and city for the new address."
-                    );
-                    return;
-                }
-            }
-        }
         if (state.partner.portal_allow_payment_term && !state.paymentTermId) {
             showError(confirmError, "Please select payment terms.");
             return;
@@ -608,18 +545,6 @@ function initCreatePage(root) {
                 partner_id: state.partner.id,
                 lines,
             };
-            if (vanMode) {
-                if (state.vanAddressMode === "existing") {
-                    payload.address_id = state.vanAddressId;
-                } else {
-                    payload.address = {
-                        name: (qs("#addr_name", root)?.value || "").trim(),
-                        street: (qs("#addr_street", root)?.value || "").trim(),
-                        city: (qs("#addr_city", root)?.value || "").trim(),
-                        phone: (qs("#addr_phone", root)?.value || "").trim(),
-                    };
-                }
-            }
             if (state.partner.portal_allow_payment_term) {
                 payload.payment_term_id = state.paymentTermId;
             }
