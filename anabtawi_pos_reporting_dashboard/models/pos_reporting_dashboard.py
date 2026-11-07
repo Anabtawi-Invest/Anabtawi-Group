@@ -1353,6 +1353,34 @@ class PosReportingDashboard(models.TransientModel):
 
         title_fmt = workbook.add_format({"bold": True, "font_size": 14, "font_color": "#1A252C"})
         sub_fmt = workbook.add_format({"font_size": 10, "font_color": "#555555"})
+        box_title_fmt = workbook.add_format({
+            "bold": True,
+            "font_size": 10,
+            "bg_color": "#E8F0FE",
+            "border": 1,
+            "valign": "vcenter",
+        })
+        box_text_fmt = workbook.add_format({
+            "font_size": 9,
+            "bg_color": "#F8FBFF",
+            "border": 1,
+            "text_wrap": True,
+            "valign": "top",
+        })
+        legend_label_fmt = workbook.add_format({
+            "bold": True,
+            "font_size": 9,
+            "bg_color": "#FFF8E7",
+            "border": 1,
+            "valign": "vcenter",
+        })
+        legend_text_fmt = workbook.add_format({
+            "font_size": 9,
+            "bg_color": "#FFFDF6",
+            "border": 1,
+            "text_wrap": True,
+            "valign": "top",
+        })
         header_fmt = workbook.add_format({
             "bold": True,
             "bg_color": "#1F4E78",
@@ -1367,10 +1395,58 @@ class PosReportingDashboard(models.TransientModel):
         pct_fmt = workbook.add_format({"border": 1, "num_format": '0.0"%"', "align": "right"})
         empty_fmt = workbook.add_format({"border": 1, "align": "center", "font_color": "#888888"})
 
+        # Title
         sheet.write(0, 0, _("POS menu"), title_fmt)
-        sheet.write(1, 0, _("Period: %s to %s") % (date_from, date_to), sub_fmt)
-        sheet.write(2, 0, _("Rows: %s") % len(rows), sub_fmt)
 
+        # Box 1 — under title
+        sheet.merge_range(1, 0, 1, 8, _("About this export"), box_title_fmt)
+        sheet.merge_range(
+            2,
+            0,
+            3,
+            8,
+            _(
+                "One row per POS-menu product and branch for the selected period. "
+                "Qty / Sales / Profit / Margin come from POS sales. "
+                "The Decision column is a recommendation based on sold quantity and margin "
+                "compared with other products in the same branch."
+            ),
+            box_text_fmt,
+        )
+        sheet.set_row(2, 18)
+        sheet.set_row(3, 18)
+
+        # Period / row count
+        sheet.write(4, 0, _("Period: %s to %s") % (date_from, date_to), sub_fmt)
+        sheet.write(5, 0, _("Rows: %s") % len(rows), sub_fmt)
+
+        # Box 2 — decision legend under row count
+        sheet.merge_range(6, 0, 6, 8, _("Decision meanings"), box_title_fmt)
+        decision_lines = [
+            (_("Stock more"), _(
+                "Top sellers at this branch with margin at or above the branch average. Consider stocking more."
+            )),
+            (_("Review price"), _(
+                "Top sellers with margin much below the branch average (under about 60% of average). Review pricing."
+            )),
+            (_("Keep"), _(
+                "Sold in the period, but not flagged as Stock more or Review price."
+            )),
+            (_("Did not sell"), _(
+                "Was on the shelf at this branch during the period and sold zero."
+            )),
+            (_("Not in this branch"), _(
+                "Not available / not on the shelf at this branch during the period."
+            )),
+        ]
+        legend_start = 7
+        for offset, (label, meaning) in enumerate(decision_lines):
+            row = legend_start + offset
+            sheet.write(row, 0, label, legend_label_fmt)
+            sheet.merge_range(row, 1, row, 8, meaning, legend_text_fmt)
+            sheet.set_row(row, 28)
+
+        header_row = legend_start + len(decision_lines) + 1
         headers = [
             _("Product"),
             _("Branch"),
@@ -1383,9 +1459,9 @@ class PosReportingDashboard(models.TransientModel):
             _("Decision"),
         ]
         for col, label in enumerate(headers):
-            sheet.write(4, col, label, header_fmt)
+            sheet.write(header_row, col, label, header_fmt)
 
-        for row_idx, row in enumerate(rows, start=5):
+        for row_idx, row in enumerate(rows, start=header_row + 1):
             sheet.write(row_idx, 0, row.get("name") or "", text_fmt)
             sheet.write(row_idx, 1, row.get("branch_name") or "", text_fmt)
             sheet.write(row_idx, 2, row.get("category") or "", text_fmt)
@@ -1407,7 +1483,7 @@ class PosReportingDashboard(models.TransientModel):
         sheet.set_column(2, 2, 22)
         sheet.set_column(3, 7, 12)
         sheet.set_column(8, 8, 18)
-        sheet.freeze_panes(5, 0)
+        sheet.freeze_panes(header_row + 1, 0)
         workbook.close()
         return output.getvalue()
 
