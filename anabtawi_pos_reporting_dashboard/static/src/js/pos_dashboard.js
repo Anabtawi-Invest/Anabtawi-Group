@@ -475,7 +475,6 @@ export class PosReportingDashboard extends Component {
             console.error("Failed to export Excel report", error);
         }
     }
-
 }
 
 registry.category("actions").add("pos_reporting_dashboard_main", PosReportingDashboard);

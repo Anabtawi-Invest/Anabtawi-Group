@@ -1115,7 +1115,7 @@ class PosReportingDashboard(models.TransientModel):
                 sales = stat.get("sales", 0.0)
                 cost = stat.get("cost", 0.0)
                 sold = bool(stat)
-                profit = (sales - cost) if sold else None
+                profit = (cost - sales) if sold else None
                 margin = ((sales - cost) / sales) if sold and sales else None
                 category = product.pos_categ_ids[:1]
                 on_shelf = stock_known and (product.id, location.id) in available
