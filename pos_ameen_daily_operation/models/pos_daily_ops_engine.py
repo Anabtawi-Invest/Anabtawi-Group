@@ -121,6 +121,40 @@ class PosDailyOpsEngine(models.AbstractModel):
         return self._get_bucket(payment_method) not in SALES_EXCLUDED_TYPES
 
     @api.model
+    def _get_non_product_sales_order_ids(self, sessions):
+        """POS orders that are pledge receive/return or advance deposit/refund.
+
+        Their Cash/Visa payments are real money (kept in Total POS Income / ``sales``)
+        but they are not product sales, so product KPIs must skip them.
+        """
+        if not sessions:
+            return frozenset()
+        orders = self._get_orders(sessions)
+        if not orders:
+            return frozenset()
+        order_ids = set()
+
+        if 'pos.advance.order' in self.env:
+            advances = self.env['pos.advance.order'].sudo().search([
+                '|',
+                ('advance_pos_order_id', 'in', orders.ids),
+                ('refund_advance_pos_order_id', 'in', orders.ids),
+            ])
+            order_ids.update(advances.mapped('advance_pos_order_id').ids)
+            order_ids.update(advances.mapped('refund_advance_pos_order_id').ids)
+
+        if 'pos.advance.order.pledge' in self.env:
+            pledges = self.env['pos.advance.order.pledge'].sudo().search([
+                '|',
+                ('pos_order_id', 'in', orders.ids),
+                ('return_pos_order_id', 'in', orders.ids),
+            ])
+            order_ids.update(pledges.mapped('pos_order_id').ids)
+            order_ids.update(pledges.mapped('return_pos_order_id').ids)
+
+        return frozenset(oid for oid in order_ids if oid)
+
+    @api.model
     def _get_channel(self, payment_method):
         """'cash', 'visa' or False, used to split pledge and advance deposits."""
         bucket = self._get_bucket(payment_method) if payment_method else 'none'
