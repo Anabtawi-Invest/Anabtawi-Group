@@ -168,11 +168,8 @@
                         </div>
 
                         <div class="o_dashboard_section">
-                            <div class="section_header d-flex flex-wrap gap-2 align-items-center justify-content-between">
-                                <h4 class="mb-0"><i class="fa fa-cube text-primary"/> POS menu (<t t-esc="sortedProducts.length"/>)</h4>
-                                <button type="button" class="btn btn-success btn-sm" t-on-click="exportProductsExcel" t-att-disabled="!sortedProducts.length">
-                                    <i class="fa fa-file-excel-o me-1"/> Export Excel
-                                </button>
+                            <div class="section_header">
+                                <h4><i class="fa fa-cube text-primary"/> POS menu (<t t-esc="sortedProducts.length"/>)</h4>
                             </div>
                             <div class="table-responsive">
                                 <table class="table table-hover o_product_table">

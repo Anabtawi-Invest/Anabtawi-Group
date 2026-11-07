@@ -476,29 +476,6 @@ export class PosReportingDashboard extends Component {
         }
     }
 
-    async exportProductsExcel() {
-        try {
-            const action = await this.orm.call(
-                "pos.reporting.dashboard",
-                "action_export_products_xlsx",
-                [],
-                {
-                    date_from: this.state.date_from,
-                    date_to: this.state.date_to,
-                    config_ids: this.state.config_ids || [],
-                    product_filter: this.state.productFilter || "all",
-                    product_search: this.state.productSearch || "",
-                    sort_key: this.state.productSortKey || "qty",
-                    sort_order: this.state.productSortOrder || "desc",
-                }
-            );
-            if (action) {
-                this.actionService.doAction(action);
-            }
-        } catch (error) {
-            console.error("Failed to export POS menu Excel", error);
-        }
-    }
 }
 
 registry.category("actions").add("pos_reporting_dashboard_main", PosReportingDashboard);
