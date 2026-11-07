@@ -267,6 +267,40 @@
         max-width: 280px;
     }
 
+    .o_product_legend_box {
+        border: 1px solid #dbe3f0;
+        border-radius: 8px;
+        padding: 12px 14px;
+        background: #f8fbff;
+
+        .legend_box_title {
+            font-weight: 700;
+            font-size: 13px;
+            color: #1e3a5f;
+            margin-bottom: 6px;
+        }
+
+        .legend_box_body,
+        .legend_box_list {
+            font-size: 13px;
+            color: #334155;
+            line-height: 1.45;
+        }
+
+        .legend_box_list {
+            padding-left: 1.1rem;
+
+            li + li {
+                margin-top: 4px;
+            }
+        }
+
+        &.o_product_legend_decisions {
+            background: #fffdf6;
+            border-color: #f0e2b8;
+        }
+    }
+
     .o_product_table.table {
         --table-bg: #ffffff;
         --table-color: #0f172a;

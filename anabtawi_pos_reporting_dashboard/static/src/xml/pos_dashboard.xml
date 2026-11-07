@@ -174,6 +174,25 @@
                                     <i class="fa fa-file-excel-o me-1"/> Export Excel
                                 </button>
                             </div>
+                            <div class="o_product_legend_box o_product_legend_about mb-3">
+                                <div class="legend_box_title">About this list</div>
+                                <div class="legend_box_body">
+                                    One row per POS-menu product and branch for the selected period.
+                                    Qty / Sales / Profit / Margin come from POS sales.
+                                    The Decision column is a recommendation based on sold quantity and margin
+                                    compared with other products in the same branch.
+                                </div>
+                            </div>
+                            <div class="o_product_legend_box o_product_legend_decisions mb-3">
+                                <div class="legend_box_title">Decision meanings</div>
+                                <ul class="legend_box_list mb-0">
+                                    <li><strong>Stock more</strong> — Top sellers at this branch with margin at or above the branch average. Consider stocking more.</li>
+                                    <li><strong>Review price</strong> — Top sellers with margin much below the branch average (under about 60% of average). Review pricing.</li>
+                                    <li><strong>Keep</strong> — Sold in the period, but not flagged as Stock more or Review price.</li>
+                                    <li><strong>Did not sell</strong> — Was on the shelf at this branch during the period and sold zero.</li>
+                                    <li><strong>Not in this branch</strong> — Not available / not on the shelf at this branch during the period.</li>
+                                </ul>
+                            </div>
                             <div class="table-responsive">
                                 <table class="table table-hover o_product_table">
                                     <thead>
