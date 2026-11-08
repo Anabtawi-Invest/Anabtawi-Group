@@ -1146,6 +1146,93 @@ class PosReportingDashboard(models.TransientModel):
             }
         return stats
 
+    def _product_compare_sales_stats(self, sessions, exclude_order_ids=None):
+        """Product sales for Compare, aligned with Branches Sales Without Tax rules.
+
+        - Untaxed line ``price_subtotal`` (no tax)
+        - Gift / hospitality lines excluded
+        - Pledge / advance orders excluded via ``exclude_order_ids``
+        - Orders paid only with hospitality payment methods excluded
+        - Orders with no normal (Cash/Visa/…) payment excluded
+        - Refunds: if normal payments on the order are negative, qty/sales are signed negative
+        """
+        if not sessions:
+            return {}
+        excluded = tuple(oid for oid in (exclude_order_ids or ()) if oid) or (0,)
+        self.env["pos.order.line"].flush_model([
+            "product_id", "qty", "price_subtotal", "total_cost", "is_total_cost_computed", "order_id", "is_gift",
+        ])
+        self.env["pos.order"].flush_model(["session_id", "state", "company_id", "currency_rate"])
+        self.env["pos.session"].flush_model(["config_id"])
+        self.env["pos.payment"].flush_model(["amount", "session_id", "pos_order_id", "payment_method_id"])
+        self.env["pos.payment.method"].flush_model(["daily_ops_report_type"])
+        self.env["product.product"].flush_model(["standard_price"])
+        self.env.cr.execute(SQL("""
+            WITH normal_pay AS (
+                SELECT pay.pos_order_id AS order_id,
+                       SUM(COALESCE(pay.amount, 0)) AS pay_total
+                  FROM pos_payment pay
+                  LEFT JOIN pos_payment_method pm ON pm.id = pay.payment_method_id
+                 WHERE pay.session_id IN %(session_ids)s
+                   AND pay.pos_order_id IS NOT NULL
+                   AND COALESCE(pm.daily_ops_report_type, 'none') NOT IN ('hospitality', 'advance_applied')
+                 GROUP BY pay.pos_order_id
+                HAVING ABS(SUM(COALESCE(pay.amount, 0))) > 0.0005
+            )
+            SELECT line.product_id,
+                   sess.config_id,
+                   COALESCE(SUM(
+                       CASE
+                           WHEN np.pay_total < 0 THEN -ABS(COALESCE(line.qty, 0))
+                           ELSE COALESCE(line.qty, 0)
+                       END
+                   ), 0) AS qty,
+                   COALESCE(SUM(
+                       CASE
+                           WHEN np.pay_total < 0 THEN -ABS(COALESCE(line.price_subtotal, 0))
+                           ELSE COALESCE(line.price_subtotal, 0)
+                       END
+                   ), 0) AS sales,
+                   COALESCE(SUM(
+                       CASE
+                           WHEN line.is_total_cost_computed THEN
+                               CASE
+                                   WHEN np.pay_total < 0 THEN -ABS(COALESCE(line.total_cost, 0))
+                                   ELSE COALESCE(line.total_cost, 0)
+                               END
+                           ELSE
+                               CASE
+                                   WHEN np.pay_total < 0 THEN -ABS(COALESCE(line.qty, 0))
+                                   ELSE COALESCE(line.qty, 0)
+                               END
+                               * COALESCE((pp.standard_price ->> (ord.company_id::varchar))::numeric, 0)
+                               * COALESCE(NULLIF(ord.currency_rate, 0), 1)
+                       END
+                   ), 0) AS cost,
+                   COUNT(DISTINCT line.order_id) AS order_count
+              FROM pos_order_line line
+              JOIN pos_order ord ON ord.id = line.order_id
+              JOIN pos_session sess ON sess.id = ord.session_id
+              JOIN product_product pp ON pp.id = line.product_id
+              JOIN normal_pay np ON np.order_id = ord.id
+             WHERE ord.session_id IN %(session_ids)s
+               AND ord.state IN ('paid', 'done', 'invoiced')
+               AND line.product_id IS NOT NULL
+               AND sess.config_id IS NOT NULL
+               AND COALESCE(line.is_gift, FALSE) IS NOT TRUE
+               AND ord.id NOT IN %(excluded_orders)s
+             GROUP BY line.product_id, sess.config_id
+        """, session_ids=tuple(sessions.ids), excluded_orders=excluded))
+        stats = {}
+        for product_id, config_id, qty, sales, cost, order_count in self.env.cr.fetchall():
+            stats[(product_id, config_id)] = {
+                "qty": float(qty or 0.0),
+                "sales": float(sales or 0.0),
+                "cost": float(cost or 0.0),
+                "order_count": int(order_count or 0),
+            }
+        return stats
+
     @staticmethod
     def _compare_delta(current, previous):
         """Amount and percent change from previous → current."""
@@ -1190,8 +1277,8 @@ class PosReportingDashboard(models.TransientModel):
         sessions_b = engine._get_sessions(period_b, configs)
         exclude_a = engine._get_non_product_sales_order_ids(sessions_a)
         exclude_b = engine._get_non_product_sales_order_ids(sessions_b)
-        stats_a = self._product_sales_stats(sessions_a, exclude_order_ids=exclude_a)
-        stats_b = self._product_sales_stats(sessions_b, exclude_order_ids=exclude_b)
+        stats_a = self._product_compare_sales_stats(sessions_a, exclude_order_ids=exclude_a)
+        stats_b = self._product_compare_sales_stats(sessions_b, exclude_order_ids=exclude_b)
 
         product_filter_id = int(product_id) if product_id else False
         keys = set(stats_a) | set(stats_b)
