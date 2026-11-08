@@ -45,8 +45,12 @@ async function fetchLocations(term) {
 function initCreatePage(root) {
     const destId = parseInt(root.dataset.destId || "", 10);
     const destName = root.dataset.destName || "";
+    const srcId = parseInt(root.dataset.srcId || "", 10);
+    const srcName = root.dataset.srcName || "";
     const state = {
-        locationSrc: null,
+        locationSrc: srcId
+            ? {id: srcId, name: srcName}
+            : null,
         locationDest: destId
             ? {id: destId, name: destName}
             : null,
@@ -111,10 +115,15 @@ function initCreatePage(root) {
             results.innerHTML = "";
         }
 
+        const searchWrap = input.closest(".o_portal_loc_autocomplete");
+
         function selectLocation(loc) {
             state[stateKey] = loc;
             selectedLabel.textContent = loc.name;
             selectedBox.classList.remove("d-none");
+            if (searchWrap) {
+                searchWrap.classList.add("d-none");
+            }
             input.value = "";
             hideResults();
         }
@@ -183,10 +192,14 @@ function initCreatePage(root) {
         clearBtn.addEventListener("click", () => {
             state[stateKey] = null;
             selectedBox.classList.add("d-none");
+            if (searchWrap) {
+                searchWrap.classList.remove("d-none");
+            }
+            input.focus();
         });
     }
 
-    // Destination comes from backend mapping; source remains selectable.
+    // Destination comes from backend mapping; source defaults to supplier WH stock.
     setupLocationSearch({
         inputId: "#location_src_search",
         resultsId: "#location_src_results",

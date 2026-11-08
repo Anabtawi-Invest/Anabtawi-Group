@@ -23,3 +23,64 @@ class ApprovalCategory(models.Model):
             self.has_reference = "no"
             self.has_payment_method = "no"
             self.requirer_document = "required"
+
+    @api.model
+    def _create_customer_category_vals(self, company):
+        """Defaults for a per-company Create Customer approval category."""
+        vals = {
+            "name": "Create Customer",
+            "approval_type": "create_customer",
+            "company_id": company.id,
+            "sequence": 85,
+            "description": "Request creation of a new customer contact",
+            "has_date": "no",
+            "has_period": "no",
+            "has_product": "no",
+            "has_quantity": "no",
+            "has_amount": "no",
+            "has_reference": "no",
+            "has_partner": "no",
+            "has_payment_method": "no",
+            "has_location": "no",
+            "requirer_document": "required",
+            "approval_minimum": 1,
+            "automated_sequence": True,
+            "sequence_code": "APCUST",
+            "active": True,
+        }
+        admin = self.env.ref("base.user_admin", raise_if_not_found=False)
+        if admin:
+            vals["approver_ids"] = [(0, 0, {"user_id": admin.id, "required": True})]
+        return vals
+
+    @api.model
+    def _ensure_create_customer_categories(self, companies=None):
+        """Create one Create Customer category per company when missing.
+
+        Called on module install (post_init) and as a safety net when a portal
+        user submits from a company that still has no category.
+        """
+        Company = self.env["res.company"].sudo()
+        companies = companies if companies is not None else Company.search([])
+        Category = self.sudo()
+        created = Category.browse()
+        for company in companies:
+            existing = Category.search(
+                [
+                    ("approval_type", "=", "create_customer"),
+                    ("company_id", "=", company.id),
+                    ("active", "=", True),
+                ],
+                limit=1,
+            )
+            if existing:
+                category = existing
+            else:
+                category = Category.create(self._create_customer_category_vals(company))
+                created |= category
+            if (
+                "x_create_contact_on_approve" in category._fields
+                and category.x_create_contact_on_approve
+            ):
+                category.x_create_contact_on_approve = False
+        return created

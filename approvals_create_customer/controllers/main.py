@@ -32,26 +32,56 @@ class PortalCustomerRequest(http.Controller):
         if request.env.user._is_public() or not request.env.user.has_group(GROUP_XMLID):
             raise AccessError(_("You do not have access to Customer Request Portal."))
 
-    def _get_category(self):
+    def _portal_company(self):
+        """Company of the van/portal user — not website env.company (avoids crossover)."""
+        return request.env.user.company_id or request.env.company
+
+    def _get_category(self, company=None):
         Category = request.env["approval.category"].sudo()
-        company = request.env.company
+        company = company or self._portal_company()
         category = Category.search(
             [
                 ("approval_type", "=", "create_customer"),
-                ("company_id", "in", [False, company.id]),
+                ("company_id", "=", company.id),
                 ("active", "=", True),
             ],
-            order="company_id desc, id",
+            order="id",
             limit=1,
         )
         if not category:
-            # env.ref uses the portal user env (no ACL on approval.category) — always sudo.
-            category = request.env.ref(CATEGORY_XMLID, raise_if_not_found=False)
-            if category:
-                category = Category.browse(category.id)
+            # Already-installed DBs / new companies: create the missing per-company category.
+            Category._ensure_create_customer_categories(company)
+            category = Category.search(
+                [
+                    ("approval_type", "=", "create_customer"),
+                    ("company_id", "=", company.id),
+                    ("active", "=", True),
+                ],
+                order="id",
+                limit=1,
+            )
+        if not category:
+            # Legacy single xmlid category (older installs) if company matches or is empty.
+            legacy = request.env.ref(CATEGORY_XMLID, raise_if_not_found=False)
+            if legacy:
+                legacy = Category.browse(legacy.id)
+                if legacy.exists() and legacy.active and (
+                    not legacy.company_id or legacy.company_id == company
+                ):
+                    category = legacy
         if not category or not category.exists() or not category.active:
             raise UserError(
                 _("Create Customer approval category is not configured. Please contact an administrator.")
+            )
+        if category.company_id and category.company_id != company:
+            raise UserError(
+                _(
+                    "Create Customer approval category belongs to %(cat_company)s, "
+                    "but your user belongs to %(user_company)s. "
+                    "Please configure a Create Customer category for your company.",
+                    cat_company=category.company_id.display_name,
+                    user_company=company.display_name,
+                )
             )
         # Portal create-customer must NOT use approval_contact mandatory VAT/attachment rules
         if "x_create_contact_on_approve" in category._fields and category.x_create_contact_on_approve:
@@ -276,11 +306,15 @@ class PortalCustomerRequest(http.Controller):
                 _("Please attach at least one Commercial Register (السجل التجاري) document.")
             )
 
-        category = self._get_category()
-        Approval = request.env["approval.request"].sudo()
+        company = self._portal_company()
+        if not company:
+            raise UserError(_("Your user has no company. Please contact an administrator."))
+        category = self._get_category(company)
+        Approval = request.env["approval.request"].sudo().with_company(company)
         vals = {
             "category_id": category.id,
             "request_owner_id": request.env.user.id,
+            "company_id": company.id,
             "customer_name": name,
             "customer_phone": phone or False,
             "customer_email": email or False,

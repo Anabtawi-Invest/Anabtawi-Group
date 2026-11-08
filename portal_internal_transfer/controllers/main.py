@@ -56,6 +56,20 @@ class PortalInternalTransfer(http.Controller):
             )
         return location
 
+    def _get_default_source_location(self, dest_location=None):
+        """Supplier/main warehouse stock used when the van portal was set up."""
+        user = request.env.user.sudo()
+        company = user.company_id or request.env.company
+        if not company or not hasattr(user, "_van_get_supplier_warehouse"):
+            return request.env["stock.location"]
+        supplier = user._van_get_supplier_warehouse(company)
+        location = supplier.lot_stock_id if supplier else request.env["stock.location"]
+        if not location or location.usage != "internal" or not location.active:
+            return request.env["stock.location"]
+        if dest_location and location.id == dest_location.id:
+            return request.env["stock.location"]
+        return location
+
     def _get_internal_picking_type(self, source_location=None):
         """Prefer the source warehouse INT type so push routes on that WH apply."""
         PickingType = request.env["stock.picking.type"].sudo()
@@ -120,11 +134,13 @@ class PortalInternalTransfer(http.Controller):
     def portal_transfer_create(self, **kwargs):
         self._ensure_access()
         dest_location = self._get_mapped_dest_location(raise_if_missing=False)
+        source_location = self._get_default_source_location(dest_location)
         return request.render(
             "portal_internal_transfer.portal_transfer_create",
             {
                 "page_name": "portal_transfer_create",
                 "dest_location": dest_location,
+                "source_location": source_location,
             },
         )
 

@@ -85,6 +85,24 @@ class ApprovalRequest(models.Model):
                 raise UserError(
                     _("The requester has no assigned contact to attach the new customer under.")
                 )
+            # Keep partner in the request owner's company to avoid multi-company crossover
+            # with the van user / approval request.
+            company = (
+                request.company_id
+                or request.request_owner_id.company_id
+                or parent.company_id
+            )
+            if parent.company_id and company and parent.company_id != company:
+                raise UserError(
+                    _(
+                        "Assigned van customer %(parent)s belongs to %(parent_company)s, "
+                        "but the request belongs to %(request_company)s. "
+                        "Set the van customer on the portal user to a contact in the same company.",
+                        parent=parent.display_name,
+                        parent_company=parent.company_id.display_name,
+                        request_company=company.display_name,
+                    )
+                )
             vals = {
                 "name": name,
                 "phone": (request.customer_phone or "").strip() or False,
@@ -93,11 +111,9 @@ class ApprovalRequest(models.Model):
                 "parent_id": parent.id,
                 "type": "contact",
                 "is_company": False,
-                "company_id": parent.company_id.id
-                or request.company_id.id
-                or False,
+                "company_id": company.id if company else False,
             }
-            partner = Partner.create(vals)
+            partner = Partner.with_company(company).create(vals) if company else Partner.create(vals)
             request.sudo().write(
                 {
                     "created_partner_id": partner.id,

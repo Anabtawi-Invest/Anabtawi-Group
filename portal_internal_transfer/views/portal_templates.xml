@@ -47,7 +47,9 @@
         <t t-call="portal.portal_layout">
             <div class="container o_portal_transfer_create py-4"
                  t-att-data-dest-id="dest_location.id if dest_location else ''"
-                 t-att-data-dest-name="dest_location.complete_name if dest_location else ''">
+                 t-att-data-dest-name="dest_location.complete_name if dest_location else ''"
+                 t-att-data-src-id="source_location.id if source_location else ''"
+                 t-att-data-src-name="source_location.complete_name if source_location else ''">
                 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
                     <h3 class="mb-0">Create Internal Transfer</h3>
                     <a href="/my/transfers" class="btn btn-secondary">My Internal Transfers</a>
@@ -63,14 +65,17 @@
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label class="form-label">Source location</label>
-                                <div class="o_portal_loc_autocomplete">
+                                <div t-attf-class="o_portal_loc_autocomplete#{source_location and ' d-none' or ''}">
                                     <input type="text" class="form-control" id="location_src_search"
                                            placeholder="Type location name..." autocomplete="off"
                                            t-att-disabled="not dest_location"/>
                                     <div id="location_src_results" class="o_portal_loc_results list-group mt-2"></div>
                                 </div>
-                                <div id="selected_location_src" class="alert alert-success mt-2 d-none mb-0">
-                                    <strong>From:</strong> <span id="selected_location_src_label"/>
+                                <div id="selected_location_src"
+                                     t-attf-class="alert alert-success mt-2 mb-0#{source_location and '' or ' d-none'}">
+                                    <strong>From:</strong>
+                                    <span id="selected_location_src_label"
+                                          t-esc="source_location.complete_name if source_location else ''"/>
                                     <button type="button" class="btn btn-sm btn-link" id="btn_clear_location_src">Change</button>
                                 </div>
                             </div>
