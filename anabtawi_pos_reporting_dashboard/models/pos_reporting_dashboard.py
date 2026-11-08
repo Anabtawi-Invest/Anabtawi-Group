@@ -208,8 +208,9 @@ class PosReportingDashboard(models.TransientModel):
         rules as those loops, in three SQL aggregates.
 
         Untaxed / VAT / channel net / paying orders skip pledge receive/return and
-        advance deposit/refund POS orders. Total POS Income (``sales``) stays
-        inclusive of that money.
+        advance deposit/refund POS orders, cancelled orders, and gift-only orders
+        (no non-gift product lines). Total POS Income (``sales``) stays inclusive
+        of that money.
         """
         if not sessions:
             return
@@ -218,7 +219,7 @@ class PosReportingDashboard(models.TransientModel):
         non_product_orders = tuple(non_product_order_ids) or (0,)
         self.env["pos.payment"].flush_model(["amount", "session_id", "pos_order_id", "payment_method_id"])
         self.env["pos.order"].flush_model(["config_id", "session_id", "state", "amount_total", "amount_tax"])
-        self.env["pos.order.line"].flush_model(["order_id", "price_unit", "qty", "discount", "is_gift"])
+        self.env["pos.order.line"].flush_model(["order_id", "price_unit", "qty", "discount", "is_gift", "product_id"])
         self.env["pos.payment.method"].flush_model(["daily_ops_report_type"])
         self.env["pos.session"].flush_model(["config_id"])
 
@@ -245,6 +246,19 @@ class PosReportingDashboard(models.TransientModel):
              WHERE pay.session_id IN %(session_ids)s
                AND COALESCE(pm.daily_ops_report_type, 'none') NOT IN %(excluded)s
                AND (pay.pos_order_id IS NULL OR pay.pos_order_id NOT IN %(non_product_orders)s)
+               AND (
+                    pay.pos_order_id IS NULL
+                    OR (
+                        ord.state IN ('paid', 'done', 'invoiced')
+                        AND EXISTS (
+                            SELECT 1
+                              FROM pos_order_line l
+                             WHERE l.order_id = ord.id
+                               AND COALESCE(l.is_gift, FALSE) IS NOT TRUE
+                               AND l.product_id IS NOT NULL
+                        )
+                    )
+               )
              GROUP BY sess.config_id, COALESCE(pm.daily_ops_report_type, 'none')
         """, session_ids=session_ids, excluded=excluded, non_product_orders=non_product_orders))
         for config_id, bucket, untaxed, tax in self.env.cr.fetchall():
@@ -269,6 +283,14 @@ class PosReportingDashboard(models.TransientModel):
                      GROUP BY pay.pos_order_id
                     HAVING SUM(COALESCE(pay.amount, 0)) > 0.0005
               ) inc ON inc.order_id = ord.id
+             WHERE ord.state IN ('paid', 'done', 'invoiced')
+               AND EXISTS (
+                    SELECT 1
+                      FROM pos_order_line l
+                     WHERE l.order_id = ord.id
+                       AND COALESCE(l.is_gift, FALSE) IS NOT TRUE
+                       AND l.product_id IS NOT NULL
+               )
              GROUP BY ord.config_id
         """, session_ids=session_ids, excluded=excluded, non_product_orders=non_product_orders))
         for config_id, count in self.env.cr.fetchall():
