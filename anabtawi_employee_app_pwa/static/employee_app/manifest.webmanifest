@@ -1,7 +1,7 @@
 {
   "name": "Employee App",
   "short_name": "Employee",
-  "description": "Secure attendance, leave, overtime, and employee self-service for Anabtawi Group.",
+  "description": "Secure attendance, leave, and employee self-service for Anabtawi Group.",
   "start_url": "/employee-portal",
   "scope": "/employee-portal",
   "display": "standalone",
