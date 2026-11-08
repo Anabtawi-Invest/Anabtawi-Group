@@ -2088,9 +2088,12 @@ class PosReportingDashboard(models.TransientModel):
     def _transfer_move_uom(self, move):
         if not move:
             return False
-        if "product_uom" in move._fields:
+        # Odoo 19 renamed stock.move.product_uom → uom_id (older DBs may still have product_uom).
+        if "uom_id" in move._fields and move.uom_id:
+            return move.uom_id
+        if "product_uom" in move._fields and move.product_uom:
             return move.product_uom
-        return move.uom_id
+        return False
 
     def _resolve_request_move_for_receipt(self, receipt_move, hub_ids):
         """Find the hub request/send move that feeds this branch receipt move."""
