@@ -282,6 +282,6 @@
               name="POS Transfer Locations"
               parent="point_of_sale.menu_point_rep"
               action="action_pos_dashboard_transfer_location"
-              groups="anabtawi_pos_reporting_dashboard.group_pos_reporting_dashboard_user"
+              groups="anabtawi_pos_reporting_dashboard.group_pos_dashboard_transfers"
               sequence="4"/>
 </odoo>

@@ -28,6 +28,7 @@ export class PosReportingDashboard extends Component {
             config_ids: initConfigs,
             loading: true,
             canSeeProducts: false,
+            canSeeTransfers: false,
             view: "branches",
             productLoading: false,
             productFilter: "all",
@@ -42,9 +43,26 @@ export class PosReportingDashboard extends Component {
             transferSearch: "",
             transferSortKey: "where",
             transferSortOrder: "asc",
+            compareLoading: false,
+            compare_date_from_a: "",
+            compare_date_to_a: "",
+            compare_date_from_b: "",
+            compare_date_to_b: "",
+            compare_product_id: false,
+            compare_product_label: "",
+            compare_product_term: "",
+            compareProductOptions: [],
+            compareSearch: "",
+            compareSortKey: "sales_delta",
+            compareSortOrder: "asc",
             sortKey: "sales",
             sortOrder: "desc",
         });
+        const monthRanges = this._defaultCompareRanges();
+        this.state.compare_date_from_a = monthRanges.aFrom;
+        this.state.compare_date_to_a = monthRanges.aTo;
+        this.state.compare_date_from_b = monthRanges.bFrom;
+        this.state.compare_date_to_b = monthRanges.bTo;
 
         // Filters restored when coming back through the breadcrumbs.
         const saved = (this.props.state && this.props.state.dashboard) || null;
@@ -72,6 +90,15 @@ export class PosReportingDashboard extends Component {
                         transferSearch: this.state.transferSearch,
                         transferSortKey: this.state.transferSortKey,
                         transferSortOrder: this.state.transferSortOrder,
+                        compare_date_from_a: this.state.compare_date_from_a,
+                        compare_date_to_a: this.state.compare_date_to_a,
+                        compare_date_from_b: this.state.compare_date_from_b,
+                        compare_date_to_b: this.state.compare_date_to_b,
+                        compare_product_id: this.state.compare_product_id,
+                        compare_product_label: this.state.compare_product_label,
+                        compareSearch: this.state.compareSearch,
+                        compareSortKey: this.state.compareSortKey,
+                        compareSortOrder: this.state.compareSortOrder,
                         sortKey: this.state.sortKey,
                         sortOrder: this.state.sortOrder,
                     },
@@ -96,6 +123,17 @@ export class PosReportingDashboard extends Component {
             error: "",
         });
 
+        this.compare = useState({
+            loadedKey: "",
+            summary: {},
+            rows: [],
+            date_from_a: "",
+            date_to_a: "",
+            date_from_b: "",
+            date_to_b: "",
+            error: "",
+        });
+
         this.data = useState({
             date_from: "",
             date_to: "",
@@ -112,7 +150,13 @@ export class PosReportingDashboard extends Component {
             this.state.canSeeProducts = await user.hasGroup(
                 "anabtawi_pos_reporting_dashboard.group_pos_dashboard_products"
             );
-            if (!this.state.canSeeProducts && (this.state.view === "products" || this.state.view === "category_profit")) {
+            this.state.canSeeTransfers = await user.hasGroup(
+                "anabtawi_pos_reporting_dashboard.group_pos_dashboard_transfers"
+            );
+            if (!this.state.canSeeProducts && (this.state.view === "products" || this.state.view === "category_profit" || this.state.view === "compare")) {
+                this.state.view = "branches";
+            }
+            if (!this.state.canSeeTransfers && this.state.view === "transfers") {
                 this.state.view = "branches";
             }
             await this.fetchDashboardData();
@@ -127,9 +171,35 @@ export class PosReportingDashboard extends Component {
         return `${year}-${month}-${day}`;
     }
 
+    _defaultCompareRanges() {
+        const now = new Date();
+        const aFrom = new Date(now.getFullYear(), now.getMonth(), 1);
+        const aTo = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const bFrom = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const bTo = new Date(now.getFullYear(), now.getMonth(), 0);
+        return {
+            aFrom: this._formatLocalDate(aFrom),
+            aTo: this._formatLocalDate(aTo),
+            bFrom: this._formatLocalDate(bFrom),
+            bTo: this._formatLocalDate(bTo),
+        };
+    }
+
     _filterKey() {
         const configs = this.state.config_ids || [];
         return `${this.state.date_from}|${this.state.date_to}|${configs.join(",")}`;
+    }
+
+    _compareFilterKey() {
+        const configs = this.state.config_ids || [];
+        return [
+            this.state.compare_date_from_a,
+            this.state.compare_date_to_a,
+            this.state.compare_date_from_b,
+            this.state.compare_date_to_b,
+            this.state.compare_product_id || "",
+            configs.join(","),
+        ].join("|");
     }
 
     async fetchDashboardData() {
@@ -141,10 +211,14 @@ export class PosReportingDashboard extends Component {
             await this.fetchTransferData();
             return;
         }
+        if (this.state.view === "compare") {
+            await this.fetchCompareData();
+            return;
+        }
         this.products.loadedKey = "";
         this.transfers.loadedKey = "";
-        this.state.loading = true;
-        try {
+        this.compare.loadedKey = "";
+        this.state.loading = true;        try {
             const strFrom = this.state.date_from;
             const strTo = this.state.date_to;
 
@@ -212,7 +286,10 @@ export class PosReportingDashboard extends Component {
         if (this.state.view === view) {
             return;
         }
-        if ((view === "products" || view === "category_profit") && !this.state.canSeeProducts) {
+        if ((view === "products" || view === "category_profit" || view === "compare") && !this.state.canSeeProducts) {
+            return;
+        }
+        if (view === "transfers" && !this.state.canSeeTransfers) {
             return;
         }
         this.state.view = view;
@@ -220,8 +297,200 @@ export class PosReportingDashboard extends Component {
             this.fetchProductData();
         } else if (view === "transfers" && this.transfers.loadedKey !== this._filterKey()) {
             this.fetchTransferData();
+        } else if (view === "compare" && this.compare.loadedKey !== this._compareFilterKey()) {
+            this.fetchCompareData();
         } else if (view === "branches" && !(this.data.branches || []).length) {
             this.fetchDashboardData();
+        }
+    }
+
+    setComparePreset(which, preset) {
+        const now = new Date();
+        let fromDate;
+        let toDate;
+        if (preset === "this_month") {
+            fromDate = new Date(now.getFullYear(), now.getMonth(), 1);
+            toDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        } else if (preset === "prev_month") {
+            fromDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+            toDate = new Date(now.getFullYear(), now.getMonth(), 0);
+        } else if (preset === "this_week") {
+            const day = now.getDay();
+            const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+            fromDate = new Date(now.getFullYear(), now.getMonth(), diff);
+            toDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        } else {
+            fromDate = now;
+            toDate = now;
+        }
+        if (which === "a") {
+            this.state.compare_date_from_a = this._formatLocalDate(fromDate);
+            this.state.compare_date_to_a = this._formatLocalDate(toDate);
+        } else {
+            this.state.compare_date_from_b = this._formatLocalDate(fromDate);
+            this.state.compare_date_to_b = this._formatLocalDate(toDate);
+        }
+    }
+
+    async onCompareProductTerm(ev) {
+        this.state.compare_product_term = ev.target.value || "";
+        const term = this.state.compare_product_term.trim();
+        if (!term) {
+            this.state.compareProductOptions = [];
+            return;
+        }
+        try {
+            const options = await this.orm.call(
+                "pos.reporting.dashboard",
+                "search_compare_products",
+                [],
+                { term, limit: 20 }
+            );
+            this.state.compareProductOptions = options || [];
+        } catch (error) {
+            console.error("Failed to search compare products", error);
+            this.state.compareProductOptions = [];
+        }
+    }
+
+    selectCompareProduct(product) {
+        this.state.compare_product_id = product.id;
+        this.state.compare_product_label = product.name;
+        this.state.compare_product_term = product.name;
+        this.state.compareProductOptions = [];
+    }
+
+    clearCompareProduct() {
+        this.state.compare_product_id = false;
+        this.state.compare_product_label = "";
+        this.state.compare_product_term = "";
+        this.state.compareProductOptions = [];
+    }
+
+    onCompareSearch(ev) {
+        this.state.compareSearch = ev.target.value || "";
+    }
+
+    async fetchCompareData() {
+        this.state.compareLoading = true;
+        this.state.loading = false;
+        this.compare.error = "";
+        try {
+            const res = await this.orm.call(
+                "pos.reporting.dashboard",
+                "get_compare_dashboard_data",
+                [],
+                {
+                    date_from_a: this.state.compare_date_from_a,
+                    date_to_a: this.state.compare_date_to_a,
+                    date_from_b: this.state.compare_date_from_b,
+                    date_to_b: this.state.compare_date_to_b,
+                    config_ids: this.state.config_ids || [],
+                    product_id: this.state.compare_product_id || false,
+                }
+            );
+            this.compare.summary = res.summary || {};
+            this.compare.rows = res.rows || [];
+            this.compare.date_from_a = res.date_from_a || this.state.compare_date_from_a;
+            this.compare.date_to_a = res.date_to_a || this.state.compare_date_to_a;
+            this.compare.date_from_b = res.date_from_b || this.state.compare_date_from_b;
+            this.compare.date_to_b = res.date_to_b || this.state.compare_date_to_b;
+            this.compare.error = res.error || "";
+            this.compare.loadedKey = this._compareFilterKey();
+            if (res.all_branches && res.all_branches.length) {
+                this.data.all_branches = res.all_branches;
+            }
+        } catch (error) {
+            console.error("Failed to load compare dashboard", error);
+            this.compare.error = "The comparison did not load.";
+        } finally {
+            this.state.compareLoading = false;
+        }
+    }
+
+    get sortedCompareRows() {
+        const query = (this.state.compareSearch || "").trim().toLowerCase();
+        let rows = [...(this.compare.rows || [])];
+        if (query) {
+            rows = rows.filter((row) =>
+                (row.product_name || "").toLowerCase().includes(query)
+                || (row.branch_name || "").toLowerCase().includes(query)
+            );
+        }
+        const key = this.state.compareSortKey;
+        const isAsc = this.state.compareSortOrder === "asc";
+        rows.sort((a, b) => {
+            let valA = a[key];
+            let valB = b[key];
+            if (typeof valA === "string" || typeof valB === "string") {
+                valA = (valA || "").toLowerCase();
+                valB = (valB || "").toLowerCase();
+                return isAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+            }
+            valA = Number(valA) || 0;
+            valB = Number(valB) || 0;
+            return isAsc ? valA - valB : valB - valA;
+        });
+        return rows;
+    }
+
+    sortCompare(key) {
+        if (this.state.compareSortKey === key) {
+            this.state.compareSortOrder = this.state.compareSortOrder === "asc" ? "desc" : "asc";
+        } else {
+            this.state.compareSortKey = key;
+            this.state.compareSortOrder = (
+                key === "product_name" || key === "branch_name" ? "asc" : "asc"
+            );
+        }
+    }
+
+    compareDirectionClass(direction) {
+        if (direction === "up") return "text-success fw-semibold";
+        if (direction === "down") return "text-danger fw-semibold";
+        return "text-muted";
+    }
+
+    compareDirectionIcon(direction) {
+        if (direction === "up") return "▲";
+        if (direction === "down") return "▼";
+        return "●";
+    }
+
+    compareSummaryDelta() {
+        return this.compare.summary?.sales_delta || { amount: 0, percent: 0, direction: "flat" };
+    }
+
+    compareSummaryBadgeClass() {
+        const direction = this.compareSummaryDelta().direction;
+        if (direction === "up") return "bg-success";
+        if (direction === "down") return "bg-danger";
+        return "bg-secondary";
+    }
+
+    async exportCompareExcel() {
+        try {
+            const action = await this.orm.call(
+                "pos.reporting.dashboard",
+                "action_export_compare_xlsx",
+                [],
+                {
+                    date_from_a: this.state.compare_date_from_a,
+                    date_to_a: this.state.compare_date_to_a,
+                    date_from_b: this.state.compare_date_from_b,
+                    date_to_b: this.state.compare_date_to_b,
+                    config_ids: this.state.config_ids || [],
+                    product_id: this.state.compare_product_id || false,
+                    sort_key: this.state.compareSortKey || "sales_delta",
+                    sort_order: this.state.compareSortOrder || "asc",
+                    search: this.state.compareSearch || "",
+                }
+            );
+            if (action) {
+                this.actionService.doAction(action);
+            }
+        } catch (error) {
+            console.error("Failed to export compare Excel", error);
         }
     }
 

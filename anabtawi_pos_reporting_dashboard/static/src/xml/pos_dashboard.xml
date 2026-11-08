@@ -76,7 +76,10 @@
                     <button t-if="state.canSeeProducts" type="button" class="btn" t-att-class="state.view === 'category_profit' ? 'btn-primary' : 'btn-outline-primary'" t-on-click="() => this.setView('category_profit')">
                         <i class="fa fa-percent me-1"/> Category profit
                     </button>
-                    <button type="button" class="btn" t-att-class="state.view === 'transfers' ? 'btn-primary' : 'btn-outline-primary'" t-on-click="() => this.setView('transfers')">
+                    <button t-if="state.canSeeProducts" type="button" class="btn" t-att-class="state.view === 'compare' ? 'btn-primary' : 'btn-outline-primary'" t-on-click="() => this.setView('compare')">
+                        <i class="fa fa-balance-scale me-1"/> Compare
+                    </button>
+                    <button t-if="state.canSeeTransfers" type="button" class="btn" t-att-class="state.view === 'transfers' ? 'btn-primary' : 'btn-outline-primary'" t-on-click="() => this.setView('transfers')">
                         <i class="fa fa-exchange me-1"/> Transfers
                     </button>
                 </div>
@@ -337,7 +340,165 @@
                         </div>
                     </t>
                 </t>
-                <t t-elif="state.view === 'transfers'">
+                <t t-elif="state.canSeeProducts &amp;&amp; state.view === 'compare'">
+                    <t t-if="state.compareLoading">
+                        <div class="text-center p-5">
+                            <div class="spinner-border text-primary" role="status"/>
+                            <p class="mt-3 text-muted">Comparing product sales across the two periods...</p>
+                        </div>
+                    </t>
+                    <t t-else="">
+                        <div t-if="compare.error" class="alert alert-danger" role="alert">
+                            <t t-esc="compare.error"/>
+                        </div>
+
+                        <div class="o_compare_filters card border-0 shadow-sm mb-3 p-3">
+                            <div class="row g-3 align-items-end">
+                                <div class="col-lg-3">
+                                    <label class="form-label fw-semibold">Period A (current)</label>
+                                    <div class="btn-group btn-group-sm mb-2 d-flex" role="group">
+                                        <button type="button" class="btn btn-outline-primary" t-on-click="() => this.setComparePreset('a', 'this_month')">This month</button>
+                                        <button type="button" class="btn btn-outline-primary" t-on-click="() => this.setComparePreset('a', 'prev_month')">Prev month</button>
+                                        <button type="button" class="btn btn-outline-primary" t-on-click="() => this.setComparePreset('a', 'this_week')">This week</button>
+                                    </div>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <input type="date" class="form-control filter_input" t-model="state.compare_date_from_a"/>
+                                        <span class="text-muted">to</span>
+                                        <input type="date" class="form-control filter_input" t-model="state.compare_date_to_a"/>
+                                    </div>
+                                </div>
+                                <div class="col-lg-3">
+                                    <label class="form-label fw-semibold">Period B (compare with)</label>
+                                    <div class="btn-group btn-group-sm mb-2 d-flex" role="group">
+                                        <button type="button" class="btn btn-outline-primary" t-on-click="() => this.setComparePreset('b', 'prev_month')">Prev month</button>
+                                        <button type="button" class="btn btn-outline-primary" t-on-click="() => this.setComparePreset('b', 'this_month')">This month</button>
+                                        <button type="button" class="btn btn-outline-primary" t-on-click="() => this.setComparePreset('b', 'this_week')">This week</button>
+                                    </div>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <input type="date" class="form-control filter_input" t-model="state.compare_date_from_b"/>
+                                        <span class="text-muted">to</span>
+                                        <input type="date" class="form-control filter_input" t-model="state.compare_date_to_b"/>
+                                    </div>
+                                </div>
+                                <div class="col-lg-4">
+                                    <label class="form-label fw-semibold">Product (optional)</label>
+                                    <div class="input-group">
+                                        <input type="search" class="form-control filter_input" placeholder="All products — type to pick one"
+                                               t-att-value="state.compare_product_term"
+                                               t-on-input="onCompareProductTerm"/>
+                                        <button t-if="state.compare_product_id" type="button" class="btn btn-outline-secondary" t-on-click="clearCompareProduct">Clear</button>
+                                    </div>
+                                    <div t-if="state.compareProductOptions.length" class="list-group mt-1 shadow-sm" style="max-height: 220px; overflow: auto; position: absolute; z-index: 5; width: min(100%, 420px);">
+                                        <button t-foreach="state.compareProductOptions" t-as="opt" t-key="opt.id"
+                                                type="button" class="list-group-item list-group-item-action"
+                                                t-on-click="() => this.selectCompareProduct(opt)">
+                                            <t t-esc="opt.name"/>
+                                        </button>
+                                    </div>
+                                    <div t-if="state.compare_product_label" class="small text-muted mt-1">
+                                        Selected: <t t-esc="state.compare_product_label"/>
+                                    </div>
+                                </div>
+                                <div class="col-lg-2 d-flex gap-2">
+                                    <button type="button" class="btn btn-primary flex-grow-1" t-on-click="fetchCompareData">
+                                        <i class="fa fa-refresh me-1"/> Compare
+                                    </button>
+                                    <button type="button" class="btn btn-success" t-on-click="exportCompareExcel" t-att-disabled="!sortedCompareRows.length" title="Export Excel">
+                                        <i class="fa fa-file-excel-o"/>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="small text-muted mt-2">
+                                Uses the same session-start rule as Products. Sales are untaxed and exclude hospitality/gift and pledge-advance orders. Branch pills above still apply.
+                            </div>
+                        </div>
+
+                        <div class="o_product_summary mb-3">
+                            <span class="badge bg-light text-dark border me-2"><t t-esc="compare.summary.row_count || 0"/> lines</span>
+                            <span class="badge bg-primary me-2">
+                                Sales A <t t-esc="formatCurrency(compare.summary.sales_a || 0)"/>
+                            </span>
+                            <span class="badge bg-info me-2">
+                                Sales B <t t-esc="formatCurrency(compare.summary.sales_b || 0)"/>
+                            </span>
+                            <span class="badge me-2" t-att-class="compareSummaryBadgeClass()">
+                                <t t-esc="compareDirectionIcon(compareSummaryDelta().direction)"/>
+                                <t t-esc="formatCurrency(compareSummaryDelta().amount)"/>
+                                (<t t-esc="formatDecimal(compareSummaryDelta().percent, 1)"/>%)
+                            </span>
+                            <span class="badge bg-light text-dark border me-2">
+                                Qty A <t t-esc="formatDecimal(compare.summary.qty_a || 0, 3)"/>
+                                / B <t t-esc="formatDecimal(compare.summary.qty_b || 0, 3)"/>
+                            </span>
+                            <span class="badge bg-light text-dark border me-2">
+                                Orders A <t t-esc="compare.summary.orders_a || 0"/>
+                                / B <t t-esc="compare.summary.orders_b || 0"/>
+                            </span>
+                        </div>
+
+                        <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+                            <input type="search" class="form-control filter_input" style="max-width: 280px;"
+                                   placeholder="Filter result rows..."
+                                   t-att-value="state.compareSearch"
+                                   t-on-input="onCompareSearch"/>
+                            <span class="text-muted small">
+                                A: <t t-esc="compare.date_from_a"/> → <t t-esc="compare.date_to_a"/>
+                                · B: <t t-esc="compare.date_from_b"/> → <t t-esc="compare.date_to_b"/>
+                            </span>
+                        </div>
+
+                        <div class="table-responsive o_product_table_wrap">
+                            <table class="table table_branch_data align-middle">
+                                <thead>
+                                    <tr>
+                                        <th class="sortable_th" t-on-click="() => this.sortCompare('product_name')">Product</th>
+                                        <th class="sortable_th" t-on-click="() => this.sortCompare('branch_name')">Branch</th>
+                                        <th class="text-end sortable_th" t-on-click="() => this.sortCompare('sales_a')">Sales A</th>
+                                        <th class="text-end sortable_th" t-on-click="() => this.sortCompare('sales_b')">Sales B</th>
+                                        <th class="text-end sortable_th" t-on-click="() => this.sortCompare('sales_delta')">Sales Δ</th>
+                                        <th class="text-end sortable_th" t-on-click="() => this.sortCompare('qty_a')">Qty A</th>
+                                        <th class="text-end sortable_th" t-on-click="() => this.sortCompare('qty_b')">Qty B</th>
+                                        <th class="text-end sortable_th" t-on-click="() => this.sortCompare('qty_delta')">Qty Δ</th>
+                                        <th class="text-end sortable_th" t-on-click="() => this.sortCompare('orders_a')">Orders A</th>
+                                        <th class="text-end sortable_th" t-on-click="() => this.sortCompare('orders_b')">Orders B</th>
+                                        <th class="text-end sortable_th" t-on-click="() => this.sortCompare('orders_delta')">Orders Δ</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr t-foreach="sortedCompareRows" t-as="row" t-key="row.row_key">
+                                        <td class="fw-semibold"><t t-esc="row.product_name"/></td>
+                                        <td><t t-esc="row.branch_name"/></td>
+                                        <td class="text-end"><t t-esc="formatCurrency(row.sales_a)"/></td>
+                                        <td class="text-end"><t t-esc="formatCurrency(row.sales_b)"/></td>
+                                        <td class="text-end" t-att-class="compareDirectionClass(row.sales_direction)">
+                                            <t t-esc="compareDirectionIcon(row.sales_direction)"/>
+                                            <t t-esc="formatCurrency(row.sales_delta)"/>
+                                            (<t t-esc="formatDecimal(row.sales_delta_pct, 1)"/>%)
+                                        </td>
+                                        <td class="text-end"><t t-esc="formatDecimal(row.qty_a, 3)"/></td>
+                                        <td class="text-end"><t t-esc="formatDecimal(row.qty_b, 3)"/></td>
+                                        <td class="text-end" t-att-class="compareDirectionClass(row.qty_direction)">
+                                            <t t-esc="compareDirectionIcon(row.qty_direction)"/>
+                                            <t t-esc="formatDecimal(row.qty_delta, 3)"/>
+                                            (<t t-esc="formatDecimal(row.qty_delta_pct, 1)"/>%)
+                                        </td>
+                                        <td class="text-end"><t t-esc="row.orders_a"/></td>
+                                        <td class="text-end"><t t-esc="row.orders_b"/></td>
+                                        <td class="text-end" t-att-class="compareDirectionClass(row.orders_direction)">
+                                            <t t-esc="compareDirectionIcon(row.orders_direction)"/>
+                                            <t t-esc="formatDecimal(row.orders_delta, 0)"/>
+                                            (<t t-esc="formatDecimal(row.orders_delta_pct, 1)"/>%)
+                                        </td>
+                                    </tr>
+                                    <tr t-if="!sortedCompareRows.length">
+                                        <td colspan="11" class="text-center text-muted p-4">No product sales match these two periods and filters.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </t>
+                </t>
+                <t t-elif="state.canSeeTransfers &amp;&amp; state.view === 'transfers'">
                     <t t-if="state.transferLoading">
                         <div class="text-center p-5">
                             <div class="spinner-border text-primary" role="status"/>

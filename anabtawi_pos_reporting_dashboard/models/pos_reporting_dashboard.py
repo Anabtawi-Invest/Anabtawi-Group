@@ -1092,15 +1092,18 @@ class PosReportingDashboard(models.TransientModel):
         """, product_ids=product_ids, root_ids=root_ids))
         return {(product_id, location_id) for product_id, location_id in self.env.cr.fetchall()}
 
-    def _product_sales_stats(self, sessions):
+    def _product_sales_stats(self, sessions, exclude_order_ids=None):
         """{(product_id, config_id): stats} for paid lines, gifts excluded.
 
         A line that already has ``total_cost`` keeps that cost. A line that
         does not uses the product's current Cost (``standard_price``) times
         the quantity, converted into the order currency.
+
+        ``exclude_order_ids`` skips pledge/advance (non-product) orders when set.
         """
         if not sessions:
             return {}
+        excluded = tuple(oid for oid in (exclude_order_ids or ()) if oid) or (0,)
         self.env["pos.order.line"].flush_model([
             "product_id", "qty", "price_subtotal", "total_cost", "is_total_cost_computed", "order_id", "is_gift",
         ])
@@ -1130,8 +1133,9 @@ class PosReportingDashboard(models.TransientModel):
                AND line.product_id IS NOT NULL
                AND sess.config_id IS NOT NULL
                AND COALESCE(line.is_gift, FALSE) IS NOT TRUE
+               AND ord.id NOT IN %(excluded_orders)s
              GROUP BY line.product_id, sess.config_id
-        """, session_ids=tuple(sessions.ids)))
+        """, session_ids=tuple(sessions.ids), excluded_orders=excluded))
         stats = {}
         for product_id, config_id, qty, sales, cost, order_count in self.env.cr.fetchall():
             stats[(product_id, config_id)] = {
@@ -1141,6 +1145,329 @@ class PosReportingDashboard(models.TransientModel):
                 "order_count": int(order_count or 0),
             }
         return stats
+
+    @staticmethod
+    def _compare_delta(current, previous):
+        """Amount and percent change from previous → current."""
+        current = float(current or 0.0)
+        previous = float(previous or 0.0)
+        amount = round(current - previous, 3)
+        if abs(previous) < 0.0005:
+            percent = 100.0 if abs(current) > 0.0005 else 0.0
+        else:
+            percent = round((amount / previous) * 100.0, 1)
+        if amount > 0.0005:
+            direction = "up"
+        elif amount < -0.0005:
+            direction = "down"
+        else:
+            direction = "flat"
+        return {
+            "amount": amount,
+            "percent": percent,
+            "direction": direction,
+        }
+
+    @api.model
+    def get_compare_dashboard_data(
+        self,
+        date_from_a=None,
+        date_to_a=None,
+        date_from_b=None,
+        date_to_b=None,
+        config_ids=None,
+        product_id=None,
+    ):
+        """Compare real product sales (untaxed, no hospitality) between two periods."""
+        self._check_product_dashboard_access()
+        engine = self.env["pos.daily.ops.engine"]
+        period_a = self._parse_period(date_from_a, date_to_a)
+        period_b = self._parse_period(date_from_b, date_to_b)
+        configs = self._get_report_configs(config_ids)
+        all_configs = self._get_report_configs()
+
+        sessions_a = engine._get_sessions(period_a, configs)
+        sessions_b = engine._get_sessions(period_b, configs)
+        exclude_a = engine._get_non_product_sales_order_ids(sessions_a)
+        exclude_b = engine._get_non_product_sales_order_ids(sessions_b)
+        stats_a = self._product_sales_stats(sessions_a, exclude_order_ids=exclude_a)
+        stats_b = self._product_sales_stats(sessions_b, exclude_order_ids=exclude_b)
+
+        product_filter_id = int(product_id) if product_id else False
+        keys = set(stats_a) | set(stats_b)
+        if product_filter_id:
+            keys = {key for key in keys if key[0] == product_filter_id}
+
+        product_ids = {key[0] for key in keys}
+        products = {
+            product.id: product
+            for product in self.env["product.product"].sudo().browse(list(product_ids))
+        }
+        config_names = {config.id: config.name for config in configs}
+
+        rows = []
+        for product_id_key, config_id in keys:
+            product = products.get(product_id_key)
+            if not product:
+                continue
+            a = stats_a.get((product_id_key, config_id), {})
+            b = stats_b.get((product_id_key, config_id), {})
+            sales_a = float(a.get("sales") or 0.0)
+            sales_b = float(b.get("sales") or 0.0)
+            qty_a = float(a.get("qty") or 0.0)
+            qty_b = float(b.get("qty") or 0.0)
+            orders_a = int(a.get("order_count") or 0)
+            orders_b = int(b.get("order_count") or 0)
+            sales_delta = self._compare_delta(sales_a, sales_b)
+            qty_delta = self._compare_delta(qty_a, qty_b)
+            orders_delta = self._compare_delta(orders_a, orders_b)
+            rows.append({
+                "row_key": "%s-%s" % (product_id_key, config_id),
+                "product_id": product_id_key,
+                "config_id": config_id,
+                "product_name": product.display_name,
+                "branch_name": config_names.get(config_id) or "",
+                "sales_a": round(sales_a, 3),
+                "sales_b": round(sales_b, 3),
+                "sales_delta": sales_delta["amount"],
+                "sales_delta_pct": sales_delta["percent"],
+                "sales_direction": sales_delta["direction"],
+                "qty_a": round(qty_a, 3),
+                "qty_b": round(qty_b, 3),
+                "qty_delta": qty_delta["amount"],
+                "qty_delta_pct": qty_delta["percent"],
+                "qty_direction": qty_delta["direction"],
+                "orders_a": orders_a,
+                "orders_b": orders_b,
+                "orders_delta": orders_delta["amount"],
+                "orders_delta_pct": orders_delta["percent"],
+                "orders_direction": orders_delta["direction"],
+            })
+
+        rows.sort(key=lambda r: (r["sales_delta"], r["product_name"], r["branch_name"]))
+
+        def _sum(field):
+            return round(sum(r[field] for r in rows), 3)
+
+        summary = {
+            "row_count": len(rows),
+            "sales_a": _sum("sales_a"),
+            "sales_b": _sum("sales_b"),
+            "qty_a": _sum("qty_a"),
+            "qty_b": _sum("qty_b"),
+            "orders_a": int(sum(r["orders_a"] for r in rows)),
+            "orders_b": int(sum(r["orders_b"] for r in rows)),
+        }
+        summary["sales_delta"] = self._compare_delta(summary["sales_a"], summary["sales_b"])
+        summary["qty_delta"] = self._compare_delta(summary["qty_a"], summary["qty_b"])
+        summary["orders_delta"] = self._compare_delta(summary["orders_a"], summary["orders_b"])
+
+        return {
+            "date_from_a": period_a["date_from"].isoformat(),
+            "date_to_a": period_a["date_to"].isoformat(),
+            "date_from_b": period_b["date_from"].isoformat(),
+            "date_to_b": period_b["date_to"].isoformat(),
+            "all_branches": [{"id": c.id, "name": c.name} for c in all_configs],
+            "product_id": product_filter_id or False,
+            "product_name": (
+                self.env["product.product"].sudo().browse(product_filter_id).display_name
+                if product_filter_id else ""
+            ),
+            "summary": summary,
+            "rows": rows,
+            "error": "",
+        }
+
+    @api.model
+    def search_compare_products(self, term="", limit=30):
+        """Product autocomplete for the Compare tab."""
+        self._check_product_dashboard_access()
+        term = (term or "").strip()
+        Product = self.env["product.product"].sudo()
+        domain = [("available_in_pos", "=", True), ("sale_ok", "=", True), ("active", "=", True)]
+        if term:
+            domain = ["&"] + domain + [
+                "|", "|",
+                ("name", "ilike", term),
+                ("default_code", "ilike", term),
+                ("barcode", "ilike", term),
+            ]
+        products = Product.search(domain, limit=max(1, min(int(limit or 30), 80)), order="default_code, name, id")
+        return [{"id": p.id, "name": p.display_name} for p in products]
+
+    @api.model
+    def _generate_compare_xlsx(self, rows, summary, period_a_label, period_b_label):
+        import xlsxwriter
+
+        output = io.BytesIO()
+        workbook = xlsxwriter.Workbook(output, {"in_memory": True})
+        sheet = workbook.add_worksheet(_("Sales compare"))
+
+        title_fmt = workbook.add_format({"bold": True, "font_size": 14, "font_color": "#1A252C"})
+        sub_fmt = workbook.add_format({"font_size": 10, "font_color": "#555555"})
+        header_fmt = workbook.add_format({
+            "bold": True,
+            "bg_color": "#1F4E78",
+            "font_color": "#FFFFFF",
+            "border": 1,
+            "align": "center",
+            "valign": "vcenter",
+        })
+        text_fmt = workbook.add_format({"border": 1, "align": "left"})
+        num_fmt = workbook.add_format({"border": 1, "num_format": "#,##0.000", "align": "right"})
+        int_fmt = workbook.add_format({"border": 1, "num_format": "#,##0", "align": "right"})
+        pct_fmt = workbook.add_format({"border": 1, "num_format": '0.0"%"', "align": "right"})
+        up_fmt = workbook.add_format({
+            "border": 1, "num_format": "#,##0.000", "align": "right", "font_color": "#15803D", "bold": True,
+        })
+        down_fmt = workbook.add_format({
+            "border": 1, "num_format": "#,##0.000", "align": "right", "font_color": "#B91C1C", "bold": True,
+        })
+        flat_fmt = workbook.add_format({
+            "border": 1, "num_format": "#,##0.000", "align": "right", "font_color": "#64748B",
+        })
+
+        sheet.write(0, 0, _("Product sales comparison"), title_fmt)
+        sheet.write(1, 0, _("Period A: %s") % period_a_label, sub_fmt)
+        sheet.write(2, 0, _("Period B: %s") % period_b_label, sub_fmt)
+        sheet.write(
+            3,
+            0,
+            _("Untaxed product sales only (hospitality / gift and pledge-advance orders excluded)."),
+            sub_fmt,
+        )
+
+        summary = summary or {}
+        sheet.write(5, 0, _("Summary"), workbook.add_format({"bold": True}))
+        sheet.write(6, 0, _("Sales A"), text_fmt)
+        sheet.write_number(6, 1, float(summary.get("sales_a") or 0.0), num_fmt)
+        sheet.write(6, 2, _("Sales B"), text_fmt)
+        sheet.write_number(6, 3, float(summary.get("sales_b") or 0.0), num_fmt)
+        sales_delta = (summary.get("sales_delta") or {}).get("amount", 0.0)
+        sheet.write(6, 4, _("Sales change"), text_fmt)
+        sheet.write_number(6, 5, float(sales_delta), num_fmt)
+
+        headers = [
+            _("Product"),
+            _("Branch"),
+            _("Sales A"),
+            _("Sales B"),
+            _("Sales Δ"),
+            _("Sales Δ %"),
+            _("Qty A"),
+            _("Qty B"),
+            _("Qty Δ"),
+            _("Qty Δ %"),
+            _("Orders A"),
+            _("Orders B"),
+            _("Orders Δ"),
+            _("Orders Δ %"),
+            _("Sales trend"),
+        ]
+        header_row = 8
+        for col, label in enumerate(headers):
+            sheet.write(header_row, col, label, header_fmt)
+
+        def _delta_fmt(direction):
+            if direction == "up":
+                return up_fmt
+            if direction == "down":
+                return down_fmt
+            return flat_fmt
+
+        for row_idx, row in enumerate(rows, start=header_row + 1):
+            sheet.write(row_idx, 0, row.get("product_name") or "", text_fmt)
+            sheet.write(row_idx, 1, row.get("branch_name") or "", text_fmt)
+            sheet.write_number(row_idx, 2, float(row.get("sales_a") or 0.0), num_fmt)
+            sheet.write_number(row_idx, 3, float(row.get("sales_b") or 0.0), num_fmt)
+            sheet.write_number(row_idx, 4, float(row.get("sales_delta") or 0.0), _delta_fmt(row.get("sales_direction")))
+            sheet.write_number(row_idx, 5, float(row.get("sales_delta_pct") or 0.0), pct_fmt)
+            sheet.write_number(row_idx, 6, float(row.get("qty_a") or 0.0), num_fmt)
+            sheet.write_number(row_idx, 7, float(row.get("qty_b") or 0.0), num_fmt)
+            sheet.write_number(row_idx, 8, float(row.get("qty_delta") or 0.0), _delta_fmt(row.get("qty_direction")))
+            sheet.write_number(row_idx, 9, float(row.get("qty_delta_pct") or 0.0), pct_fmt)
+            sheet.write_number(row_idx, 10, int(row.get("orders_a") or 0), int_fmt)
+            sheet.write_number(row_idx, 11, int(row.get("orders_b") or 0), int_fmt)
+            sheet.write_number(row_idx, 12, float(row.get("orders_delta") or 0.0), _delta_fmt(row.get("orders_direction")))
+            sheet.write_number(row_idx, 13, float(row.get("orders_delta_pct") or 0.0), pct_fmt)
+            trend = {"up": _("Increase"), "down": _("Decrease"), "flat": _("No change")}.get(
+                row.get("sales_direction"), _("No change")
+            )
+            sheet.write(row_idx, 14, trend, text_fmt)
+
+        sheet.set_column(0, 0, 42)
+        sheet.set_column(1, 1, 24)
+        sheet.set_column(2, 13, 12)
+        sheet.set_column(14, 14, 12)
+        sheet.freeze_panes(header_row + 1, 0)
+        workbook.close()
+        return output.getvalue()
+
+    @api.model
+    def action_export_compare_xlsx(
+        self,
+        date_from_a=None,
+        date_to_a=None,
+        date_from_b=None,
+        date_to_b=None,
+        config_ids=None,
+        product_id=None,
+        sort_key="sales_delta",
+        sort_order="asc",
+        search="",
+    ):
+        """Download the Compare tab table as Excel."""
+        self._check_product_dashboard_access()
+        data = self.get_compare_dashboard_data(
+            date_from_a=date_from_a,
+            date_to_a=date_to_a,
+            date_from_b=date_from_b,
+            date_to_b=date_to_b,
+            config_ids=config_ids,
+            product_id=product_id,
+        )
+        rows = list(data.get("rows") or [])
+        query = (search or "").strip().lower()
+        if query:
+            rows = [
+                row for row in rows
+                if query in (row.get("product_name") or "").lower()
+                or query in (row.get("branch_name") or "").lower()
+            ]
+        reverse = (sort_order or "asc") == "desc"
+        key = sort_key or "sales_delta"
+
+        def _sort_value(row):
+            value = row.get(key)
+            if isinstance(value, str):
+                return (value or "").lower()
+            return value if value is not None else 0
+
+        rows.sort(key=_sort_value, reverse=reverse)
+        period_a_label = "%s → %s" % (data.get("date_from_a") or "", data.get("date_to_a") or "")
+        period_b_label = "%s → %s" % (data.get("date_from_b") or "", data.get("date_to_b") or "")
+        content = self._generate_compare_xlsx(rows, data.get("summary") or {}, period_a_label, period_b_label)
+        filename = "POS_Sales_Compare_%s_%s_vs_%s_%s.xlsx" % (
+            data.get("date_from_a") or "a_from",
+            data.get("date_to_a") or "a_to",
+            data.get("date_from_b") or "b_from",
+            data.get("date_to_b") or "b_to",
+        )
+        attachment = self.env["ir.attachment"].sudo().create(
+            {
+                "name": filename,
+                "type": "binary",
+                "datas": base64.b64encode(content),
+                "mimetype": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "res_model": "pos.reporting.dashboard",
+                "res_id": 0,
+            }
+        )
+        return {
+            "type": "ir.actions.act_url",
+            "url": "/web/content/%s?download=true" % attachment.id,
+            "target": "self",
+        }
 
     @staticmethod
     def _product_decision(row, top_qty_ids, avg_margin):
@@ -1177,7 +1504,10 @@ class PosReportingDashboard(models.TransientModel):
         stock_locations = [location for location in locations.values() if location]
         available = self._products_available_in_period(products, stock_locations, period)
         in_stock_now = self._products_in_stock_now(products, stock_locations)
-        stats = self._product_sales_stats(sessions)
+        stats = self._product_sales_stats(
+            sessions,
+            exclude_order_ids=engine._get_non_product_sales_order_ids(sessions),
+        )
         rates = {
             rate.pos_categ_id.id: rate.percentage
             for rate in self.env["pos.category.profit.rate"].sudo().search([])
@@ -1646,6 +1976,163 @@ class PosReportingDashboard(models.TransientModel):
             return 0.0
         return float(move.quantity or 0.0)
 
+    def _transfer_move_uom(self, move):
+        if not move:
+            return False
+        if "product_uom" in move._fields:
+            return move.product_uom
+        return move.uom_id
+
+    def _resolve_request_move_for_receipt(self, receipt_move, hub_ids):
+        """Find the hub request/send move that feeds this branch receipt move."""
+        Move = self.env["stock.move"].sudo()
+        Picking = self.env["stock.picking"].sudo()
+        if not receipt_move or not receipt_move.product_id:
+            return Move.browse()
+
+        product = receipt_move.product_id
+        receipt_picking = receipt_move.picking_id
+
+        orig = receipt_move.move_orig_ids.filtered(
+            lambda m: m.state != "cancel" and m.product_id == product
+        )
+        if orig:
+            return orig[:1]
+
+        incoming = Move.search(
+            [
+                ("move_dest_ids", "in", receipt_move.ids),
+                ("product_id", "=", product.id),
+                ("state", "!=", "cancel"),
+            ],
+            order="id desc",
+            limit=1,
+        )
+        if incoming:
+            return incoming
+
+        hub_dest_ids = set(hub_ids or [])
+        if receipt_picking and receipt_picking.location_id:
+            hub_dest_ids.add(receipt_picking.location_id.id)
+
+        group = receipt_move.group_id or (receipt_picking.group_id if receipt_picking else False)
+        if group and hub_dest_ids:
+            candidates = Move.search(
+                [
+                    ("group_id", "=", group.id),
+                    ("product_id", "=", product.id),
+                    ("location_dest_id", "in", list(hub_dest_ids)),
+                    ("state", "!=", "cancel"),
+                    ("picking_id", "!=", False),
+                ],
+                order="id desc",
+            )
+            candidates = candidates.filtered(
+                lambda m: m.picking_id
+                and m.picking_id.id != (receipt_picking.id if receipt_picking else 0)
+                and m.picking_id.picking_type_code == "internal"
+            )
+            linked = candidates.filtered(lambda m: receipt_move in m.move_dest_ids)
+            if linked:
+                return linked[:1]
+            if candidates:
+                return candidates[:1]
+
+        origin = (receipt_picking.origin or "").strip() if receipt_picking else ""
+        if origin and not origin.lower().startswith("return of"):
+            req_picking = Picking.search(
+                [
+                    ("name", "=", origin),
+                    ("state", "!=", "cancel"),
+                    ("picking_type_code", "=", "internal"),
+                ],
+                limit=1,
+            )
+            if not req_picking and hub_dest_ids:
+                req_picking = Picking.search(
+                    [
+                        ("name", "ilike", origin),
+                        ("location_dest_id", "in", list(hub_dest_ids)),
+                        ("state", "!=", "cancel"),
+                        ("picking_type_code", "=", "internal"),
+                    ],
+                    limit=1,
+                )
+            if req_picking:
+                req_move = req_picking.move_ids.filtered(
+                    lambda m: m.state != "cancel" and m.product_id == product
+                )[:1]
+                if req_move:
+                    return req_move
+
+        return Move.browse()
+
+    def _resolve_receipt_move_for_request(self, request_move, branch_location_ids):
+        """Find the branch receipt move created from this hub request/send move."""
+        Move = self.env["stock.move"].sudo()
+        Picking = self.env["stock.picking"].sudo()
+        if not request_move or not request_move.product_id:
+            return Move.browse()
+
+        product = request_move.product_id
+        request_picking = request_move.picking_id
+
+        dest = request_move.move_dest_ids.filtered(
+            lambda m: m.state != "cancel" and m.product_id == product
+        )
+        if branch_location_ids:
+            dest_branch = dest.filtered(
+                lambda m: m.picking_id
+                and m.picking_id.location_dest_id.id in branch_location_ids
+            )
+            if dest_branch:
+                return dest_branch[:1]
+        if dest:
+            return dest[:1]
+
+        group = request_move.group_id or (request_picking.group_id if request_picking else False)
+        if group and branch_location_ids:
+            candidates = Move.search(
+                [
+                    ("group_id", "=", group.id),
+                    ("product_id", "=", product.id),
+                    ("location_dest_id", "in", list(branch_location_ids)),
+                    ("state", "!=", "cancel"),
+                    ("picking_id", "!=", False),
+                ],
+                order="id desc",
+            )
+            candidates = candidates.filtered(
+                lambda m: m.picking_id
+                and m.picking_id.id != (request_picking.id if request_picking else 0)
+                and m.picking_id.picking_type_code == "internal"
+            )
+            linked = candidates.filtered(lambda m: request_move in m.move_orig_ids)
+            if linked:
+                return linked[:1]
+            if candidates:
+                return candidates[:1]
+
+        if request_picking and branch_location_ids:
+            receipt = Picking.search(
+                [
+                    ("origin", "=", request_picking.name),
+                    ("location_dest_id", "in", list(branch_location_ids)),
+                    ("state", "!=", "cancel"),
+                    ("picking_type_code", "=", "internal"),
+                ],
+                order="id desc",
+                limit=1,
+            )
+            if receipt:
+                receipt_move = receipt.move_ids.filtered(
+                    lambda m: m.state != "cancel" and m.product_id == product
+                )[:1]
+                if receipt_move:
+                    return receipt_move
+
+        return Move.browse()
+
     def _transfer_gap_where(self, asked, sent, received, receipt_state, has_receipt):
         """Where the mismatch happened for the supervisor."""
         send_gap = round(asked - sent, 3)
@@ -1698,9 +2185,14 @@ class PosReportingDashboard(models.TransientModel):
         }
         return labels.get(state, state or "")
 
+    def _check_transfer_dashboard_access(self):
+        if not self.env.user.has_group("anabtawi_pos_reporting_dashboard.group_pos_dashboard_transfers"):
+            raise AccessError(_("You are not allowed to view the Transfers section of the POS dashboard."))
+
     @api.model
     def get_transfer_dashboard_data(self, date_from=None, date_to=None, config_ids=None):
         """Branch request → تسليم الطلبيات send → branch receive, per product line."""
+        self._check_transfer_dashboard_access()
         period = self._parse_period(date_from, date_to)
         _dt_start, _dt_end, start_str, end_str = self._period_bounds(period)
         configs = self._get_report_configs(config_ids)
@@ -1731,13 +2223,6 @@ class PosReportingDashboard(models.TransientModel):
             return empty
         if not configs:
             return empty
-
-        def _move_uom(move):
-            if not move:
-                return False
-            if "product_uom" in move._fields:
-                return move.product_uom
-            return move.uom_id
 
         config_by_location = {}
         branch_location_ids = set()
@@ -1790,27 +2275,29 @@ class PosReportingDashboard(models.TransientModel):
             ],
             order="scheduled_date desc, id desc",
         )
-        receipt_picking_ids = set(receipt_pickings.ids)
 
-        def _config_for_request(picking, receipt_picking=False):
+        def _config_for_pair(request_picking=False, receipt_picking=False):
             if receipt_picking:
                 config = config_by_location.get(receipt_picking.location_dest_id.id)
                 if config:
                     return config
-            config = config_by_location.get(picking.location_id.id)
-            if config:
-                return config
-            op_name = picking.picking_type_id.name or ""
-            for candidate in configs:
-                if candidate.name and candidate.name in op_name:
-                    return candidate
-                loc_ids = config_location_ids.get(candidate.id) or set()
-                if picking.location_id.id in loc_ids:
-                    return candidate
+            if request_picking:
+                config = config_by_location.get(request_picking.location_id.id)
+                if config:
+                    return config
+                op_name = request_picking.picking_type_id.name or ""
+                for candidate in configs:
+                    if candidate.name and candidate.name in op_name:
+                        return candidate
+                    loc_ids = config_location_ids.get(candidate.id) or set()
+                    if request_picking.location_id.id in loc_ids:
+                        return candidate
             return False
 
         rows = []
         seen = set()
+        paired_receipt_move_ids = set()
+        paired_request_move_ids = set()
 
         def _append_row(config, product, uom, asked, sent, received, request_picking, receipt_picking):
             key = (
@@ -1855,6 +2342,54 @@ class PosReportingDashboard(models.TransientModel):
                 ),
             })
 
+        def _quantities_from_pair(request_move, receipt_move):
+            """Asked/sent from the request; received only after the branch validates."""
+            asked = float((request_move.product_uom_qty if request_move else (
+                receipt_move.product_uom_qty if receipt_move else 0.0
+            )) or 0.0)
+            if request_move:
+                sent = self._transfer_move_qty(request_move, done_only=True)
+            elif receipt_move:
+                # Without a request doc, receipt demand is the best "sent" signal.
+                sent = float(receipt_move.product_uom_qty or 0.0) if (
+                    receipt_move.picking_id and receipt_move.picking_id.state == "done"
+                ) else 0.0
+            else:
+                sent = 0.0
+            received = self._transfer_move_qty(receipt_move, done_only=True) if receipt_move else 0.0
+            return asked, sent, received
+
+        # Pass 1: requests that already have a branch receipt (Asked/Sent from request).
+        for picking in request_pickings:
+            if self._transfer_is_return_picking(picking):
+                continue
+            for move in picking.move_ids.filtered(lambda m: m.state != "cancel" and m.product_id):
+                if move.id in paired_request_move_ids:
+                    continue
+                receipt_move = self._resolve_receipt_move_for_request(move, branch_location_ids)
+                if not receipt_move:
+                    continue
+                receipt_picking = receipt_move.picking_id
+                if receipt_picking and self._transfer_is_return_picking(receipt_picking):
+                    continue
+                config = _config_for_pair(picking, receipt_picking)
+                if not config:
+                    continue
+                asked, sent, received = _quantities_from_pair(move, receipt_move)
+                _append_row(
+                    config,
+                    move.product_id,
+                    self._transfer_move_uom(move),
+                    asked,
+                    sent,
+                    received,
+                    picking,
+                    receipt_picking,
+                )
+                paired_request_move_ids.add(move.id)
+                paired_receipt_move_ids.add(receipt_move.id)
+
+        # Pass 2: receipts in period still unpaired (resolve request via chain/group/origin).
         for picking in receipt_pickings:
             if self._transfer_is_return_picking(picking):
                 continue
@@ -1862,63 +2397,52 @@ class PosReportingDashboard(models.TransientModel):
             if not config:
                 continue
             for move in picking.move_ids.filtered(lambda m: m.state != "cancel" and m.product_id):
-                orig_moves = move.move_orig_ids.filtered(lambda m: m.state != "cancel")
-                request_move = orig_moves[:1]
+                if move.id in paired_receipt_move_ids:
+                    continue
+                request_move = self._resolve_request_move_for_receipt(move, hub_ids)
                 request_picking = request_move.picking_id if request_move else False
                 if request_picking and self._transfer_is_return_picking(request_picking):
+                    request_move = self.env["stock.move"].browse()
+                    request_picking = False
+                if request_move and request_move.id in paired_request_move_ids:
                     continue
-                asked = float((request_move.product_uom_qty if request_move else move.product_uom_qty) or 0.0)
-                if request_move and request_picking and request_picking.state == "done":
-                    sent = self._transfer_move_qty(request_move, done_only=True)
-                elif request_move:
-                    sent = 0.0
-                else:
-                    sent = float(move.product_uom_qty or 0.0) if picking.state == "done" else 0.0
-                received = self._transfer_move_qty(move, done_only=True)
+                asked, sent, received = _quantities_from_pair(request_move, move)
                 _append_row(
                     config,
                     move.product_id,
-                    _move_uom(request_move or move),
+                    self._transfer_move_uom(request_move or move),
                     asked,
                     sent,
                     received,
                     request_picking,
                     picking,
                 )
+                paired_receipt_move_ids.add(move.id)
+                if request_move:
+                    paired_request_move_ids.add(request_move.id)
 
-        # Requests with no receipt in this branch set (not created / not approved path).
+        # Pass 3: requests still without a receipt (not approved / not created).
         for picking in request_pickings:
             if self._transfer_is_return_picking(picking):
                 continue
             for move in picking.move_ids.filtered(lambda m: m.state != "cancel" and m.product_id):
-                dest_moves = move.move_dest_ids.filtered(lambda m: m.state != "cancel")
-                receipt_picking = dest_moves[:1].picking_id if dest_moves else False
-                if receipt_picking and receipt_picking.id in receipt_picking_ids:
+                if move.id in paired_request_move_ids:
                     continue
-                if receipt_picking and self._transfer_is_return_picking(receipt_picking):
-                    receipt_picking = False
-                    dest_moves = dest_moves.browse()
-                config = _config_for_request(picking, receipt_picking)
+                config = _config_for_pair(picking, False)
                 if not config:
                     continue
-                asked = float(move.product_uom_qty or 0.0)
-                sent = self._transfer_move_qty(move, done_only=True)
-                received = 0.0
-                if receipt_picking:
-                    receipt_move = dest_moves.filtered(lambda m: m.product_id == move.product_id)[:1]
-                    received = self._transfer_move_qty(receipt_move, done_only=True)
-                else:
-                    receipt_picking = False
+                asked, sent, received = _quantities_from_pair(move, False)
                 _append_row(
                     config,
                     move.product_id,
-                    _move_uom(move),
+                    self._transfer_move_uom(move),
                     asked,
                     sent,
                     received,
                     picking,
-                    receipt_picking,
+                    False,
                 )
+                paired_request_move_ids.add(move.id)
 
         rows.sort(key=lambda r: (
             0 if r["not_approved"] else 1,
@@ -1962,6 +2486,7 @@ class PosReportingDashboard(models.TransientModel):
     @api.model
     def open_transfer_picking(self, picking_id):
         """Open one internal transfer from the Transfers dashboard."""
+        self._check_transfer_dashboard_access()
         picking = self.env["stock.picking"].browse(int(picking_id or 0)).exists()
         if not picking:
             raise AccessError(_("Transfer not found."))
