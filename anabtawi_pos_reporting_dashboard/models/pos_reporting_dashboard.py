@@ -1646,6 +1646,163 @@ class PosReportingDashboard(models.TransientModel):
             return 0.0
         return float(move.quantity or 0.0)
 
+    def _transfer_move_uom(self, move):
+        if not move:
+            return False
+        if "product_uom" in move._fields:
+            return move.product_uom
+        return move.uom_id
+
+    def _resolve_request_move_for_receipt(self, receipt_move, hub_ids):
+        """Find the hub request/send move that feeds this branch receipt move."""
+        Move = self.env["stock.move"].sudo()
+        Picking = self.env["stock.picking"].sudo()
+        if not receipt_move or not receipt_move.product_id:
+            return Move.browse()
+
+        product = receipt_move.product_id
+        receipt_picking = receipt_move.picking_id
+
+        orig = receipt_move.move_orig_ids.filtered(
+            lambda m: m.state != "cancel" and m.product_id == product
+        )
+        if orig:
+            return orig[:1]
+
+        incoming = Move.search(
+            [
+                ("move_dest_ids", "in", receipt_move.ids),
+                ("product_id", "=", product.id),
+                ("state", "!=", "cancel"),
+            ],
+            order="id desc",
+            limit=1,
+        )
+        if incoming:
+            return incoming
+
+        hub_dest_ids = set(hub_ids or [])
+        if receipt_picking and receipt_picking.location_id:
+            hub_dest_ids.add(receipt_picking.location_id.id)
+
+        group = receipt_move.group_id or (receipt_picking.group_id if receipt_picking else False)
+        if group and hub_dest_ids:
+            candidates = Move.search(
+                [
+                    ("group_id", "=", group.id),
+                    ("product_id", "=", product.id),
+                    ("location_dest_id", "in", list(hub_dest_ids)),
+                    ("state", "!=", "cancel"),
+                    ("picking_id", "!=", False),
+                ],
+                order="id desc",
+            )
+            candidates = candidates.filtered(
+                lambda m: m.picking_id
+                and m.picking_id.id != (receipt_picking.id if receipt_picking else 0)
+                and m.picking_id.picking_type_code == "internal"
+            )
+            linked = candidates.filtered(lambda m: receipt_move in m.move_dest_ids)
+            if linked:
+                return linked[:1]
+            if candidates:
+                return candidates[:1]
+
+        origin = (receipt_picking.origin or "").strip() if receipt_picking else ""
+        if origin and not origin.lower().startswith("return of"):
+            req_picking = Picking.search(
+                [
+                    ("name", "=", origin),
+                    ("state", "!=", "cancel"),
+                    ("picking_type_code", "=", "internal"),
+                ],
+                limit=1,
+            )
+            if not req_picking and hub_dest_ids:
+                req_picking = Picking.search(
+                    [
+                        ("name", "ilike", origin),
+                        ("location_dest_id", "in", list(hub_dest_ids)),
+                        ("state", "!=", "cancel"),
+                        ("picking_type_code", "=", "internal"),
+                    ],
+                    limit=1,
+                )
+            if req_picking:
+                req_move = req_picking.move_ids.filtered(
+                    lambda m: m.state != "cancel" and m.product_id == product
+                )[:1]
+                if req_move:
+                    return req_move
+
+        return Move.browse()
+
+    def _resolve_receipt_move_for_request(self, request_move, branch_location_ids):
+        """Find the branch receipt move created from this hub request/send move."""
+        Move = self.env["stock.move"].sudo()
+        Picking = self.env["stock.picking"].sudo()
+        if not request_move or not request_move.product_id:
+            return Move.browse()
+
+        product = request_move.product_id
+        request_picking = request_move.picking_id
+
+        dest = request_move.move_dest_ids.filtered(
+            lambda m: m.state != "cancel" and m.product_id == product
+        )
+        if branch_location_ids:
+            dest_branch = dest.filtered(
+                lambda m: m.picking_id
+                and m.picking_id.location_dest_id.id in branch_location_ids
+            )
+            if dest_branch:
+                return dest_branch[:1]
+        if dest:
+            return dest[:1]
+
+        group = request_move.group_id or (request_picking.group_id if request_picking else False)
+        if group and branch_location_ids:
+            candidates = Move.search(
+                [
+                    ("group_id", "=", group.id),
+                    ("product_id", "=", product.id),
+                    ("location_dest_id", "in", list(branch_location_ids)),
+                    ("state", "!=", "cancel"),
+                    ("picking_id", "!=", False),
+                ],
+                order="id desc",
+            )
+            candidates = candidates.filtered(
+                lambda m: m.picking_id
+                and m.picking_id.id != (request_picking.id if request_picking else 0)
+                and m.picking_id.picking_type_code == "internal"
+            )
+            linked = candidates.filtered(lambda m: request_move in m.move_orig_ids)
+            if linked:
+                return linked[:1]
+            if candidates:
+                return candidates[:1]
+
+        if request_picking and branch_location_ids:
+            receipt = Picking.search(
+                [
+                    ("origin", "=", request_picking.name),
+                    ("location_dest_id", "in", list(branch_location_ids)),
+                    ("state", "!=", "cancel"),
+                    ("picking_type_code", "=", "internal"),
+                ],
+                order="id desc",
+                limit=1,
+            )
+            if receipt:
+                receipt_move = receipt.move_ids.filtered(
+                    lambda m: m.state != "cancel" and m.product_id == product
+                )[:1]
+                if receipt_move:
+                    return receipt_move
+
+        return Move.browse()
+
     def _transfer_gap_where(self, asked, sent, received, receipt_state, has_receipt):
         """Where the mismatch happened for the supervisor."""
         send_gap = round(asked - sent, 3)
@@ -1737,13 +1894,6 @@ class PosReportingDashboard(models.TransientModel):
         if not configs:
             return empty
 
-        def _move_uom(move):
-            if not move:
-                return False
-            if "product_uom" in move._fields:
-                return move.product_uom
-            return move.uom_id
-
         config_by_location = {}
         branch_location_ids = set()
         config_location_ids = {}
@@ -1795,27 +1945,29 @@ class PosReportingDashboard(models.TransientModel):
             ],
             order="scheduled_date desc, id desc",
         )
-        receipt_picking_ids = set(receipt_pickings.ids)
 
-        def _config_for_request(picking, receipt_picking=False):
+        def _config_for_pair(request_picking=False, receipt_picking=False):
             if receipt_picking:
                 config = config_by_location.get(receipt_picking.location_dest_id.id)
                 if config:
                     return config
-            config = config_by_location.get(picking.location_id.id)
-            if config:
-                return config
-            op_name = picking.picking_type_id.name or ""
-            for candidate in configs:
-                if candidate.name and candidate.name in op_name:
-                    return candidate
-                loc_ids = config_location_ids.get(candidate.id) or set()
-                if picking.location_id.id in loc_ids:
-                    return candidate
+            if request_picking:
+                config = config_by_location.get(request_picking.location_id.id)
+                if config:
+                    return config
+                op_name = request_picking.picking_type_id.name or ""
+                for candidate in configs:
+                    if candidate.name and candidate.name in op_name:
+                        return candidate
+                    loc_ids = config_location_ids.get(candidate.id) or set()
+                    if request_picking.location_id.id in loc_ids:
+                        return candidate
             return False
 
         rows = []
         seen = set()
+        paired_receipt_move_ids = set()
+        paired_request_move_ids = set()
 
         def _append_row(config, product, uom, asked, sent, received, request_picking, receipt_picking):
             key = (
@@ -1860,6 +2012,54 @@ class PosReportingDashboard(models.TransientModel):
                 ),
             })
 
+        def _quantities_from_pair(request_move, receipt_move):
+            """Asked/sent from the request; received only after the branch validates."""
+            asked = float((request_move.product_uom_qty if request_move else (
+                receipt_move.product_uom_qty if receipt_move else 0.0
+            )) or 0.0)
+            if request_move:
+                sent = self._transfer_move_qty(request_move, done_only=True)
+            elif receipt_move:
+                # Without a request doc, receipt demand is the best "sent" signal.
+                sent = float(receipt_move.product_uom_qty or 0.0) if (
+                    receipt_move.picking_id and receipt_move.picking_id.state == "done"
+                ) else 0.0
+            else:
+                sent = 0.0
+            received = self._transfer_move_qty(receipt_move, done_only=True) if receipt_move else 0.0
+            return asked, sent, received
+
+        # Pass 1: requests that already have a branch receipt (Asked/Sent from request).
+        for picking in request_pickings:
+            if self._transfer_is_return_picking(picking):
+                continue
+            for move in picking.move_ids.filtered(lambda m: m.state != "cancel" and m.product_id):
+                if move.id in paired_request_move_ids:
+                    continue
+                receipt_move = self._resolve_receipt_move_for_request(move, branch_location_ids)
+                if not receipt_move:
+                    continue
+                receipt_picking = receipt_move.picking_id
+                if receipt_picking and self._transfer_is_return_picking(receipt_picking):
+                    continue
+                config = _config_for_pair(picking, receipt_picking)
+                if not config:
+                    continue
+                asked, sent, received = _quantities_from_pair(move, receipt_move)
+                _append_row(
+                    config,
+                    move.product_id,
+                    self._transfer_move_uom(move),
+                    asked,
+                    sent,
+                    received,
+                    picking,
+                    receipt_picking,
+                )
+                paired_request_move_ids.add(move.id)
+                paired_receipt_move_ids.add(receipt_move.id)
+
+        # Pass 2: receipts in period still unpaired (resolve request via chain/group/origin).
         for picking in receipt_pickings:
             if self._transfer_is_return_picking(picking):
                 continue
@@ -1867,63 +2067,52 @@ class PosReportingDashboard(models.TransientModel):
             if not config:
                 continue
             for move in picking.move_ids.filtered(lambda m: m.state != "cancel" and m.product_id):
-                orig_moves = move.move_orig_ids.filtered(lambda m: m.state != "cancel")
-                request_move = orig_moves[:1]
+                if move.id in paired_receipt_move_ids:
+                    continue
+                request_move = self._resolve_request_move_for_receipt(move, hub_ids)
                 request_picking = request_move.picking_id if request_move else False
                 if request_picking and self._transfer_is_return_picking(request_picking):
+                    request_move = self.env["stock.move"].browse()
+                    request_picking = False
+                if request_move and request_move.id in paired_request_move_ids:
                     continue
-                asked = float((request_move.product_uom_qty if request_move else move.product_uom_qty) or 0.0)
-                if request_move and request_picking and request_picking.state == "done":
-                    sent = self._transfer_move_qty(request_move, done_only=True)
-                elif request_move:
-                    sent = 0.0
-                else:
-                    sent = float(move.product_uom_qty or 0.0) if picking.state == "done" else 0.0
-                received = self._transfer_move_qty(move, done_only=True)
+                asked, sent, received = _quantities_from_pair(request_move, move)
                 _append_row(
                     config,
                     move.product_id,
-                    _move_uom(request_move or move),
+                    self._transfer_move_uom(request_move or move),
                     asked,
                     sent,
                     received,
                     request_picking,
                     picking,
                 )
+                paired_receipt_move_ids.add(move.id)
+                if request_move:
+                    paired_request_move_ids.add(request_move.id)
 
-        # Requests with no receipt in this branch set (not created / not approved path).
+        # Pass 3: requests still without a receipt (not approved / not created).
         for picking in request_pickings:
             if self._transfer_is_return_picking(picking):
                 continue
             for move in picking.move_ids.filtered(lambda m: m.state != "cancel" and m.product_id):
-                dest_moves = move.move_dest_ids.filtered(lambda m: m.state != "cancel")
-                receipt_picking = dest_moves[:1].picking_id if dest_moves else False
-                if receipt_picking and receipt_picking.id in receipt_picking_ids:
+                if move.id in paired_request_move_ids:
                     continue
-                if receipt_picking and self._transfer_is_return_picking(receipt_picking):
-                    receipt_picking = False
-                    dest_moves = dest_moves.browse()
-                config = _config_for_request(picking, receipt_picking)
+                config = _config_for_pair(picking, False)
                 if not config:
                     continue
-                asked = float(move.product_uom_qty or 0.0)
-                sent = self._transfer_move_qty(move, done_only=True)
-                received = 0.0
-                if receipt_picking:
-                    receipt_move = dest_moves.filtered(lambda m: m.product_id == move.product_id)[:1]
-                    received = self._transfer_move_qty(receipt_move, done_only=True)
-                else:
-                    receipt_picking = False
+                asked, sent, received = _quantities_from_pair(move, False)
                 _append_row(
                     config,
                     move.product_id,
-                    _move_uom(move),
+                    self._transfer_move_uom(move),
                     asked,
                     sent,
                     received,
                     picking,
-                    receipt_picking,
+                    False,
                 )
+                paired_request_move_ids.add(move.id)
 
         rows.sort(key=lambda r: (
             0 if r["not_approved"] else 1,
