@@ -963,6 +963,17 @@ class PosReportingDashboard(models.TransientModel):
             return warehouse.lot_stock_id
         return Location.browse()
 
+    def _config_transfer_stock_location(self, config):
+        """Stock location for the Transfers dashboard (explicit mapping preferred)."""
+        if "pos.dashboard.transfer.location" in self.env:
+            mapping = self.env["pos.dashboard.transfer.location"].sudo().search(
+                [("config_id", "=", config.id), ("active", "=", True)],
+                limit=1,
+            )
+            if mapping.location_id:
+                return mapping.location_id
+        return self._config_stock_location(config)
+
     def _products_available_in_period(self, products, locations, period):
         """{(product_id, location_id)} on hand above zero on any day of the period.
 
@@ -1602,6 +1613,375 @@ class PosReportingDashboard(models.TransientModel):
             "url": "/web/content/%s?download=true" % attachment.id,
             "target": "self",
         }
+
+    def _transfer_hub_locations(self):
+        """Locations used as تسليم الطلبيات (order delivery) hubs."""
+        Location = self.env["stock.location"].sudo()
+        return Location.search([
+            ("active", "=", True),
+            ("usage", "=", "internal"),
+            ("name", "ilike", "تسليم الطلبيات"),
+        ])
+
+    def _transfer_descendant_location_ids(self, roots):
+        """Root stock locations plus every child under them."""
+        if not roots:
+            return set()
+        Location = self.env["stock.location"].sudo()
+        return set(Location.search([("id", "child_of", roots.ids)]).ids)
+
+    def _transfer_is_return_picking(self, picking):
+        origin = (picking.origin or "").strip().lower()
+        if origin.startswith("return of") or origin.startswith("إرجاع") or origin.startswith("ارجاع"):
+            return True
+        if "return_id" in picking._fields and picking.return_id:
+            return True
+        return False
+
+    def _transfer_move_qty(self, move, done_only=False):
+        """Quantity in the move UoM. When done_only, zero unless the picking is Done."""
+        if not move:
+            return 0.0
+        if done_only and move.picking_id and move.picking_id.state != "done":
+            return 0.0
+        return float(move.quantity or 0.0)
+
+    def _transfer_gap_where(self, asked, sent, received, receipt_state, has_receipt):
+        """Where the mismatch happened for the supervisor."""
+        send_gap = round(asked - sent, 3)
+        receive_gap = round(sent - received, 3)
+        not_approved = (not has_receipt) or (receipt_state not in ("done", "cancel"))
+        parts = []
+        if abs(send_gap) > 0.0005:
+            parts.append("send")
+        if not_approved:
+            parts.append("waiting")
+        elif abs(receive_gap) > 0.0005:
+            parts.append("receive")
+        if not parts:
+            where = "ok"
+            where_label = _("Match")
+        elif parts == ["send"]:
+            where = "send"
+            where_label = _("At تسليم الطلبيات")
+        elif parts == ["receive"]:
+            where = "receive"
+            where_label = _("At branch")
+        elif parts == ["waiting"]:
+            where = "waiting"
+            where_label = _("Not approved")
+        elif "send" in parts and "waiting" in parts:
+            where = "send_waiting"
+            where_label = _("Send gap + not approved")
+        elif "send" in parts and "receive" in parts:
+            where = "both"
+            where_label = _("Send and receive")
+        else:
+            where = "mixed"
+            where_label = _("Mixed")
+        return {
+            "send_gap": send_gap,
+            "receive_gap": receive_gap if not not_approved else round(sent - received, 3),
+            "not_approved": not_approved,
+            "where": where,
+            "where_label": where_label,
+        }
+
+    def _transfer_state_label(self, state):
+        labels = {
+            "draft": _("Draft"),
+            "waiting": _("Waiting"),
+            "confirmed": _("Waiting"),
+            "assigned": _("Ready"),
+            "done": _("Done"),
+            "cancel": _("Cancelled"),
+        }
+        return labels.get(state, state or "")
+
+    def _check_transfer_dashboard_access(self):
+        if not self.env.user.has_group("anabtawi_pos_reporting_dashboard.group_pos_dashboard_transfers"):
+            raise AccessError(_("You are not allowed to view the Transfers section of the POS dashboard."))
+
+    @api.model
+    def get_transfer_dashboard_data(self, date_from=None, date_to=None, config_ids=None):
+        """Branch request → تسليم الطلبيات send → branch receive, per product line."""
+        self._check_transfer_dashboard_access()
+        period = self._parse_period(date_from, date_to)
+        _dt_start, _dt_end, start_str, end_str = self._period_bounds(period)
+        configs = self._get_report_configs(config_ids)
+        all_configs = self._get_report_configs()
+        Picking = self.env["stock.picking"].sudo()
+        hub_locations = self._transfer_hub_locations()
+        hub_ids = set(hub_locations.ids)
+
+        empty = {
+            "date_from": period["date_from"].isoformat(),
+            "date_to": period["date_to"].isoformat(),
+            "all_branches": [{"id": c.id, "name": c.name} for c in all_configs],
+            "summary": {
+                "line_count": 0,
+                "asked": 0.0,
+                "sent": 0.0,
+                "received": 0.0,
+                "send_gap": 0.0,
+                "receive_gap": 0.0,
+                "not_approved_count": 0,
+                "mismatch_count": 0,
+            },
+            "rows": [],
+            "error": "",
+        }
+        if not hub_ids:
+            empty["error"] = _("No تسليم الطلبيات location was found.")
+            return empty
+        if not configs:
+            return empty
+
+        def _move_uom(move):
+            if not move:
+                return False
+            if "product_uom" in move._fields:
+                return move.product_uom
+            return move.uom_id
+
+        config_by_location = {}
+        branch_location_ids = set()
+        config_location_ids = {}
+        TransferMap = self.env["pos.dashboard.transfer.location"].sudo()
+        mapped_configs = TransferMap.search([
+            ("config_id", "in", configs.ids),
+            ("active", "=", True),
+        ]).mapped("config_id")
+        for config in configs:
+            root = self._config_transfer_stock_location(config)
+            if not root:
+                continue
+            loc_ids = self._transfer_descendant_location_ids(root)
+            config_location_ids[config.id] = loc_ids
+            for loc_id in loc_ids:
+                branch_location_ids.add(loc_id)
+                config_by_location.setdefault(loc_id, config)
+
+        if not branch_location_ids:
+            empty["error"] = _(
+                "No transfer stock location is linked to the selected POS branches. "
+                "Open Point of Sale → Reporting → POS Transfer Locations and assign each branch."
+            )
+            return empty
+
+        date_domain = [
+            "|", "|",
+            "&", ("scheduled_date", ">=", start_str), ("scheduled_date", "<", end_str),
+            "&", ("date_done", ">=", start_str), ("date_done", "<", end_str),
+            "&", ("create_date", ">=", start_str), ("create_date", "<", end_str),
+        ]
+        base_domain = [
+            ("picking_type_code", "=", "internal"),
+            ("state", "!=", "cancel"),
+        ] + date_domain
+
+        receipt_pickings = Picking.search(
+            base_domain
+            + [
+                ("location_id", "in", list(hub_ids)),
+                ("location_dest_id", "in", list(branch_location_ids)),
+            ],
+            order="scheduled_date desc, id desc",
+        )
+        request_pickings = Picking.search(
+            base_domain
+            + [
+                ("location_dest_id", "in", list(hub_ids)),
+            ],
+            order="scheduled_date desc, id desc",
+        )
+        receipt_picking_ids = set(receipt_pickings.ids)
+
+        def _config_for_request(picking, receipt_picking=False):
+            if receipt_picking:
+                config = config_by_location.get(receipt_picking.location_dest_id.id)
+                if config:
+                    return config
+            config = config_by_location.get(picking.location_id.id)
+            if config:
+                return config
+            op_name = picking.picking_type_id.name or ""
+            for candidate in configs:
+                if candidate.name and candidate.name in op_name:
+                    return candidate
+                loc_ids = config_location_ids.get(candidate.id) or set()
+                if picking.location_id.id in loc_ids:
+                    return candidate
+            return False
+
+        rows = []
+        seen = set()
+
+        def _append_row(config, product, uom, asked, sent, received, request_picking, receipt_picking):
+            key = (
+                config.id if config else 0,
+                product.id,
+                request_picking.id if request_picking else 0,
+                receipt_picking.id if receipt_picking else 0,
+            )
+            if key in seen:
+                return
+            seen.add(key)
+            receipt_state = receipt_picking.state if receipt_picking else False
+            has_receipt = bool(receipt_picking)
+            gap = self._transfer_gap_where(
+                asked, sent, received, receipt_state or "", has_receipt
+            )
+            rows.append({
+                "row_key": "%s-%s-%s-%s" % key,
+                "config_id": config.id if config else False,
+                "branch_name": config.name if config else "",
+                "product_id": product.id,
+                "product_name": product.display_name,
+                "uom": uom.display_name if uom else "",
+                "asked": round(asked, 3),
+                "sent": round(sent, 3),
+                "received": round(received, 3),
+                "send_gap": gap["send_gap"],
+                "receive_gap": gap["receive_gap"],
+                "not_approved": gap["not_approved"],
+                "where": gap["where"],
+                "where_label": gap["where_label"],
+                "request_picking_id": request_picking.id if request_picking else False,
+                "request_picking_name": request_picking.name if request_picking else "",
+                "request_state": request_picking.state if request_picking else "",
+                "request_state_label": self._transfer_state_label(request_picking.state) if request_picking else "",
+                "receipt_picking_id": receipt_picking.id if receipt_picking else False,
+                "receipt_picking_name": receipt_picking.name if receipt_picking else "",
+                "receipt_state": receipt_state or "",
+                "receipt_state_label": (
+                    self._transfer_state_label(receipt_state) if receipt_state
+                    else _("Not created")
+                ),
+            })
+
+        for picking in receipt_pickings:
+            if self._transfer_is_return_picking(picking):
+                continue
+            config = config_by_location.get(picking.location_dest_id.id)
+            if not config:
+                continue
+            for move in picking.move_ids.filtered(lambda m: m.state != "cancel" and m.product_id):
+                orig_moves = move.move_orig_ids.filtered(lambda m: m.state != "cancel")
+                request_move = orig_moves[:1]
+                request_picking = request_move.picking_id if request_move else False
+                if request_picking and self._transfer_is_return_picking(request_picking):
+                    continue
+                asked = float((request_move.product_uom_qty if request_move else move.product_uom_qty) or 0.0)
+                if request_move and request_picking and request_picking.state == "done":
+                    sent = self._transfer_move_qty(request_move, done_only=True)
+                elif request_move:
+                    sent = 0.0
+                else:
+                    sent = float(move.product_uom_qty or 0.0) if picking.state == "done" else 0.0
+                received = self._transfer_move_qty(move, done_only=True)
+                _append_row(
+                    config,
+                    move.product_id,
+                    _move_uom(request_move or move),
+                    asked,
+                    sent,
+                    received,
+                    request_picking,
+                    picking,
+                )
+
+        # Requests with no receipt in this branch set (not created / not approved path).
+        for picking in request_pickings:
+            if self._transfer_is_return_picking(picking):
+                continue
+            for move in picking.move_ids.filtered(lambda m: m.state != "cancel" and m.product_id):
+                dest_moves = move.move_dest_ids.filtered(lambda m: m.state != "cancel")
+                receipt_picking = dest_moves[:1].picking_id if dest_moves else False
+                if receipt_picking and receipt_picking.id in receipt_picking_ids:
+                    continue
+                if receipt_picking and self._transfer_is_return_picking(receipt_picking):
+                    receipt_picking = False
+                    dest_moves = dest_moves.browse()
+                config = _config_for_request(picking, receipt_picking)
+                if not config:
+                    continue
+                asked = float(move.product_uom_qty or 0.0)
+                sent = self._transfer_move_qty(move, done_only=True)
+                received = 0.0
+                if receipt_picking:
+                    receipt_move = dest_moves.filtered(lambda m: m.product_id == move.product_id)[:1]
+                    received = self._transfer_move_qty(receipt_move, done_only=True)
+                else:
+                    receipt_picking = False
+                _append_row(
+                    config,
+                    move.product_id,
+                    _move_uom(move),
+                    asked,
+                    sent,
+                    received,
+                    picking,
+                    receipt_picking,
+                )
+
+        rows.sort(key=lambda r: (
+            0 if r["not_approved"] else 1,
+            0 if r["where"] != "ok" else 1,
+            r["branch_name"] or "",
+            r["product_name"] or "",
+        ))
+
+        summary = {
+            "line_count": len(rows),
+            "asked": round(sum(r["asked"] for r in rows), 3),
+            "sent": round(sum(r["sent"] for r in rows), 3),
+            "received": round(sum(r["received"] for r in rows), 3),
+            "send_gap": round(sum(r["send_gap"] for r in rows), 3),
+            "receive_gap": round(sum(r["receive_gap"] for r in rows if not r["not_approved"]), 3),
+            "not_approved_count": sum(1 for r in rows if r["not_approved"]),
+            "mismatch_count": sum(1 for r in rows if r["where"] != "ok"),
+        }
+        warning = ""
+        if not mapped_configs:
+            warning = _(
+                "No POS Transfer Locations are configured yet. "
+                "Assign each branch under Point of Sale → Reporting → POS Transfer Locations "
+                "so receipts match the correct stock location."
+            )
+        elif len(mapped_configs) < len(configs):
+            missing = configs - mapped_configs
+            warning = _(
+                "Some branches have no transfer location assigned: %s"
+            ) % ", ".join(missing.mapped("name"))
+
+        return {
+            "date_from": period["date_from"].isoformat(),
+            "date_to": period["date_to"].isoformat(),
+            "all_branches": [{"id": c.id, "name": c.name} for c in all_configs],
+            "summary": summary,
+            "rows": rows,
+            "error": warning,
+        }
+
+    @api.model
+    def open_transfer_picking(self, picking_id):
+        """Open one internal transfer from the Transfers dashboard."""
+        self._check_transfer_dashboard_access()
+        picking = self.env["stock.picking"].browse(int(picking_id or 0)).exists()
+        if not picking:
+            raise AccessError(_("Transfer not found."))
+        action = {
+            "name": picking.name,
+            "type": "ir.actions.act_window",
+            "res_model": "stock.picking",
+            "res_id": picking.id,
+            "view_mode": "form",
+            "views": [(False, "form")],
+            "target": "current",
+            "context": {"create": False},
+        }
+        return action
 
     @api.model
     def open_product_lines(self, product_id, date_from=None, date_to=None, config_ids=None, config_id=None):

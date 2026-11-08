@@ -76,6 +76,9 @@
                     <button t-if="state.canSeeProducts" type="button" class="btn" t-att-class="state.view === 'category_profit' ? 'btn-primary' : 'btn-outline-primary'" t-on-click="() => this.setView('category_profit')">
                         <i class="fa fa-percent me-1"/> Category profit
                     </button>
+                    <button t-if="state.canSeeTransfers" type="button" class="btn" t-att-class="state.view === 'transfers' ? 'btn-primary' : 'btn-outline-primary'" t-on-click="() => this.setView('transfers')">
+                        <i class="fa fa-exchange me-1"/> Transfers
+                    </button>
                 </div>
 
                 <t t-if="state.canSeeProducts &amp;&amp; state.view === 'products'">
@@ -331,6 +334,97 @@
                                     </tbody>
                                 </table>
                             </div>
+                        </div>
+                    </t>
+                </t>
+                <t t-elif="state.canSeeTransfers &amp;&amp; state.view === 'transfers'">
+                    <t t-if="state.transferLoading">
+                        <div class="text-center p-5">
+                            <div class="spinner-border text-primary" role="status"/>
+                            <p class="mt-3 text-muted">Reading branch transfer requests and receipts...</p>
+                        </div>
+                    </t>
+                    <t t-else="">
+                        <div t-if="transfers.error" class="alert alert-warning" role="alert">
+                            <t t-esc="transfers.error"/>
+                        </div>
+                        <div class="o_product_summary mb-3">
+                            <span class="badge bg-light text-dark border me-2"><t t-esc="transfers.summary.line_count || 0"/> lines</span>
+                            <span class="badge bg-primary me-2">Asked <t t-esc="formatDecimal(transfers.summary.asked || 0, 3)"/></span>
+                            <span class="badge bg-info me-2">Sent <t t-esc="formatDecimal(transfers.summary.sent || 0, 3)"/></span>
+                            <span class="badge bg-success me-2">Received <t t-esc="formatDecimal(transfers.summary.received || 0, 3)"/></span>
+                            <span class="badge bg-danger me-2">Gaps <t t-esc="transfers.summary.mismatch_count || 0"/></span>
+                            <span class="badge bg-warning text-dark me-2">Not approved <t t-esc="transfers.summary.not_approved_count || 0"/></span>
+                        </div>
+                        <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+                            <div class="btn-group" role="group">
+                                <button type="button" class="btn btn-sm" t-att-class="state.transferFilter === 'all' ? 'btn-primary' : 'btn-outline-primary'" t-on-click="() => this.setTransferFilter('all')">All</button>
+                                <button type="button" class="btn btn-sm" t-att-class="state.transferFilter === 'mismatch' ? 'btn-primary' : 'btn-outline-primary'" t-on-click="() => this.setTransferFilter('mismatch')">Differences</button>
+                                <button type="button" class="btn btn-sm" t-att-class="state.transferFilter === 'not_approved' ? 'btn-primary' : 'btn-outline-primary'" t-on-click="() => this.setTransferFilter('not_approved')">Not approved</button>
+                                <button type="button" class="btn btn-sm" t-att-class="state.transferFilter === 'send' ? 'btn-primary' : 'btn-outline-primary'" t-on-click="() => this.setTransferFilter('send')">Send gap</button>
+                                <button type="button" class="btn btn-sm" t-att-class="state.transferFilter === 'receive' ? 'btn-primary' : 'btn-outline-primary'" t-on-click="() => this.setTransferFilter('receive')">Receive gap</button>
+                            </div>
+                            <input type="search" class="form-control filter_input" style="max-width: 280px;" placeholder="Search branch, product, transfer..." t-att-value="state.transferSearch" t-on-input="onTransferSearch"/>
+                        </div>
+                        <div class="table-responsive o_product_table_wrap">
+                            <table class="table table_branch_data align-middle">
+                                <thead>
+                                    <tr>
+                                        <th class="sortable_th" t-on-click="() => this.sortTransfers('branch_name')">Branch</th>
+                                        <th class="sortable_th" t-on-click="() => this.sortTransfers('product_name')">Product</th>
+                                        <th class="text-end sortable_th" t-on-click="() => this.sortTransfers('asked')">Asked</th>
+                                        <th class="text-end sortable_th" t-on-click="() => this.sortTransfers('sent')">Sent</th>
+                                        <th class="text-end sortable_th" t-on-click="() => this.sortTransfers('received')">Received</th>
+                                        <th class="text-end sortable_th" t-on-click="() => this.sortTransfers('send_gap')">Send gap</th>
+                                        <th class="text-end sortable_th" t-on-click="() => this.sortTransfers('receive_gap')">Receive gap</th>
+                                        <th class="sortable_th" t-on-click="() => this.sortTransfers('where')">Where</th>
+                                        <th class="sortable_th" t-on-click="() => this.sortTransfers('request_picking_name')">Request</th>
+                                        <th class="sortable_th" t-on-click="() => this.sortTransfers('receipt_picking_name')">Receipt</th>
+                                        <th>Receipt status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr t-foreach="sortedTransfers" t-as="row" t-key="row.row_key">
+                                        <td><t t-esc="row.branch_name"/></td>
+                                        <td>
+                                            <div class="fw-semibold"><t t-esc="row.product_name"/></div>
+                                            <div class="text-muted small"><t t-esc="row.uom"/></div>
+                                        </td>
+                                        <td class="text-end"><t t-esc="formatDecimal(row.asked, 3)"/></td>
+                                        <td class="text-end"><t t-esc="formatDecimal(row.sent, 3)"/></td>
+                                        <td class="text-end"><t t-esc="formatDecimal(row.received, 3)"/></td>
+                                        <td class="text-end" t-att-class="hasTransferGap(row.send_gap) ? 'text-danger fw-semibold' : ''">
+                                            <t t-esc="formatDecimal(row.send_gap, 3)"/>
+                                        </td>
+                                        <td class="text-end" t-att-class="(!row.not_approved &amp;&amp; hasTransferGap(row.receive_gap)) ? 'text-danger fw-semibold' : ''">
+                                            <t t-esc="formatDecimal(row.receive_gap, 3)"/>
+                                        </td>
+                                        <td t-att-class="transferWhereClass(row.where)">
+                                            <t t-esc="row.where_label"/>
+                                        </td>
+                                        <td>
+                                            <button t-if="row.request_picking_id" type="button" class="btn btn-link p-0 text-start" t-on-click="() => this.openTransferPicking(row.request_picking_id)">
+                                                <t t-esc="row.request_picking_name"/>
+                                            </button>
+                                            <span t-else="" class="text-muted">—</span>
+                                        </td>
+                                        <td>
+                                            <button t-if="row.receipt_picking_id" type="button" class="btn btn-link p-0 text-start" t-on-click="() => this.openTransferPicking(row.receipt_picking_id)">
+                                                <t t-esc="row.receipt_picking_name"/>
+                                            </button>
+                                            <span t-else="" class="text-muted">—</span>
+                                        </td>
+                                        <td>
+                                            <span t-att-class="row.not_approved ? 'badge bg-warning text-dark' : (row.receipt_state === 'done' ? 'badge bg-success' : 'badge bg-secondary')">
+                                                <t t-esc="row.receipt_state_label"/>
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    <tr t-if="!sortedTransfers.length">
+                                        <td colspan="11" class="text-center text-muted p-4">No branch transfers match this period and filter.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
                     </t>
                 </t>

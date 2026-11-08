@@ -10,5 +10,10 @@
             <field name="comment">Shows the Products and Category profit sections on the POS Executive Dashboard.</field>
             <field name="implied_ids" eval="[(4, ref('anabtawi_pos_reporting_dashboard.group_pos_reporting_dashboard_user'))]"/>
         </record>
+        <record id="group_pos_dashboard_transfers" model="res.groups">
+            <field name="name">POS Dashboard Transfers</field>
+            <field name="comment">Shows the Transfers tab on the POS Executive Dashboard and the POS Transfer Locations configuration menu.</field>
+            <field name="implied_ids" eval="[(4, ref('anabtawi_pos_reporting_dashboard.group_pos_reporting_dashboard_user'))]"/>
+        </record>
     </data>
 </odoo>
