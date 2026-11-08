@@ -2,7 +2,7 @@
 
 ## Excel format (.xlsx)
 
-Use **Download Excel Template** on the batch form, or build a sheet with:
+Build an Excel (.xlsx) sheet with:
 
 ### Minimal (recommended)
 | internal_reference | quantity |
@@ -22,7 +22,7 @@ If `location` is empty, the batch **Default Location** is used.
 
 Accepted headers:
 - Product: `internal_reference` (also accepts `sku` / `default_code`)
-- Qty: `quantity` | `qty` | `counted`
+- Qty: `quantity` | `qty` | `counted` | `physical` (also accepts typos `phisical` / `phyiscal`)
 - Location: `location` | `complete_name`
 
 Upload **.xlsx** only (not CSV, not legacy `.xls`).

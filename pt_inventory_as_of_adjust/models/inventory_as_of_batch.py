@@ -22,7 +22,19 @@ except ImportError:  # pragma: no cover
 _logger = logging.getLogger(__name__)
 
 SKU_HEADERS = {"sku", "default_code", "internal_reference", "defaultcode"}
-QTY_HEADERS = {"quantity", "qty", "counted", "counted_qty", "count"}
+QTY_HEADERS = {
+    "quantity",
+    "qty",
+    "counted",
+    "counted_qty",
+    "count",
+    # Common count-sheet labels / typos from warehouse Excel files
+    "physical",
+    "phisical",
+    "phyiscal",
+    "physical_qty",
+    "physical_quantity",
+}
 LOCATION_HEADERS = {
     "location",
     "location_name",
@@ -165,49 +177,6 @@ class InventoryAsOfBatch(models.Model):
         self.state = "ready"
         return True
 
-    def action_download_import_template(self):
-        """Download a blank Excel count template with the expected columns."""
-        self.ensure_one()
-        if xlsxwriter is None:
-            raise UserError(
-                _("The Python library 'xlsxwriter' is required to export Excel files.")
-            )
-        output = io.BytesIO()
-        workbook = xlsxwriter.Workbook(output, {"in_memory": True})
-        sheet = workbook.add_worksheet(_("Count"))
-        header_format = workbook.add_format({"bold": True})
-        sheet.write(0, 0, "internal_reference", header_format)
-        sheet.write(0, 1, "quantity", header_format)
-        sheet.write(0, 2, "location", header_format)
-        sheet.write(1, 0, "REPLACE_WITH_SKU_1")
-        sheet.write(1, 1, 5)
-        sheet.write(1, 2, "")
-        sheet.write(2, 0, "REPLACE_WITH_SKU_2")
-        sheet.write(2, 1, 0)
-        sheet.write(2, 2, "")
-        sheet.set_column(0, 0, 24)
-        sheet.set_column(1, 1, 12)
-        sheet.set_column(2, 2, 24)
-        workbook.close()
-        filename = "as_of_inventory_template.xlsx"
-        attachment = self.env["ir.attachment"].create(
-            {
-                "name": filename,
-                "type": "binary",
-                "datas": base64.b64encode(output.getvalue()),
-                "res_model": self._name,
-                "res_id": self.id,
-                "mimetype": (
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                ),
-            }
-        )
-        return {
-            "type": "ir.actions.act_url",
-            "url": "/web/content/%s?download=true" % attachment.id,
-            "target": "download",
-        }
-
     def action_export_as_of_stock_xlsx(self):
         """Build Excel of products with on-hand > 0 at location on as-of date."""
         self.ensure_one()
@@ -237,33 +206,34 @@ class InventoryAsOfBatch(models.Model):
         as_of_label = fields.Datetime.to_string(self.as_of_datetime).replace(":", "-")
         location_label = (self.location_id.name or "location").replace("/", "-")
         filename = "As_of_Stock_%s_%s.xlsx" % (location_label, as_of_label)
-        # Store on the record (not as a separate attachment) so the binary
-        # widget can show the file after the form reloads.
+        # Save on the record, then reload the form. Do not return act_url:
+        # a download action leaves the form with a stale empty binary widget.
         self.write(
             {
-                "as_of_stock_xlsx": base64.b64encode(xlsx_bytes),
+                "as_of_stock_xlsx": base64.b64encode(xlsx_bytes).decode("ascii"),
                 "as_of_stock_xlsx_filename": filename,
             }
         )
-        download_url = (
-            "/web/content/?model=%s&id=%s&field=as_of_stock_xlsx"
-            "&filename_field=as_of_stock_xlsx_filename&download=true"
-            % (self._name, self.id)
-        )
-        # Download without leaving the page, then reload the form so the
-        # As-of Stock Excel field shows the saved file.
         return {
-            "type": "ir.actions.act_url",
-            "url": download_url,
-            "target": "download",
-            "next": {
-                "type": "ir.actions.act_window",
-                "name": _("As-of Inventory Adjustment"),
-                "res_model": self._name,
-                "res_id": self.id,
-                "view_mode": "form",
-                "views": [(False, "form")],
-                "target": "current",
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "title": _("Export ready"),
+                "message": _(
+                    "As-of stock Excel has been saved on this batch. "
+                    "Download it from the As-of Stock Excel field."
+                ),
+                "type": "success",
+                "sticky": False,
+                "next": {
+                    "type": "ir.actions.act_window",
+                    "name": _("As-of Inventory Adjustment"),
+                    "res_model": self._name,
+                    "res_id": self.id,
+                    "view_mode": "form",
+                    "views": [(False, "form")],
+                    "target": "current",
+                },
             },
         }
 
