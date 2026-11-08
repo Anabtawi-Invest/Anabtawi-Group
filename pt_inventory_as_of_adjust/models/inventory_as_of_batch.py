@@ -8,7 +8,12 @@ import traceback
 
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
-from odoo.tools.float_utils import float_is_zero
+from odoo.tools.float_utils import float_compare, float_is_zero, float_round
+
+try:
+    import xlsxwriter
+except ImportError:  # pragma: no cover
+    xlsxwriter = None
 
 _logger = logging.getLogger(__name__)
 
@@ -65,6 +70,13 @@ class InventoryAsOfBatch(models.Model):
         ondelete="set null",
         copy=False,
     )
+    as_of_stock_xlsx = fields.Binary(
+        string="As-of Stock Excel",
+        attachment=True,
+        copy=False,
+        help="Excel of products with on-hand > 0 at the default location on the as-of date.",
+    )
+    as_of_stock_xlsx_filename = fields.Char(copy=False)
     state = fields.Selection(
         selection=[
             ("draft", "Draft"),
@@ -93,6 +105,12 @@ class InventoryAsOfBatch(models.Model):
     applied_count = fields.Integer(compute="_compute_counts", store=True)
     error_count = fields.Integer(compute="_compute_counts", store=True)
     skip_count = fields.Integer(compute="_compute_counts", store=True)
+    missing_count = fields.Integer(
+        string="Not On Sheet",
+        compute="_compute_counts",
+        store=True,
+        help="Products that had stock at the default location on the as-of date but were left off the sheet.",
+    )
     company_id = fields.Many2one(
         "res.company",
         default=lambda self: self.env.company,
@@ -100,7 +118,7 @@ class InventoryAsOfBatch(models.Model):
     )
     note = fields.Text()
 
-    @api.depends("line_ids.state")
+    @api.depends("line_ids.state", "line_ids.missing_from_sheet")
     def _compute_counts(self):
         for batch in self:
             lines = batch.line_ids
@@ -109,6 +127,7 @@ class InventoryAsOfBatch(models.Model):
             batch.applied_count = len(lines.filtered(lambda l: l.state == "applied"))
             batch.error_count = len(lines.filtered(lambda l: l.state == "error"))
             batch.skip_count = len(lines.filtered(lambda l: l.state == "skip"))
+            batch.missing_count = len(lines.filtered(lambda l: l.missing_from_sheet))
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -135,8 +154,113 @@ class InventoryAsOfBatch(models.Model):
             line_vals.append(self._prepare_line_vals(idx, row))
         if line_vals:
             self.env["inventory.as.of.line"].create(line_vals)
+        self._add_missing_zero_lines()
         self.state = "ready"
         return True
+
+    def action_export_as_of_stock_xlsx(self):
+        """Build Excel of products with on-hand > 0 at location on as-of date."""
+        self.ensure_one()
+        if xlsxwriter is None:
+            raise UserError(
+                _("The Python library 'xlsxwriter' is required to export Excel files.")
+            )
+        if not self.as_of_datetime:
+            raise UserError(_("Set the As-of Date."))
+        if not self.location_id:
+            raise UserError(_("Set the Default Location."))
+
+        rows = self._prepare_as_of_stock_rows()
+        if not rows:
+            raise UserError(
+                _(
+                    "No products with quantity greater than zero at %(location)s "
+                    "on %(date)s."
+                )
+                % {
+                    "location": self.location_id.complete_name,
+                    "date": self.as_of_datetime,
+                }
+            )
+
+        xlsx_bytes = self._build_as_of_stock_xlsx(rows)
+        as_of_label = fields.Datetime.to_string(self.as_of_datetime).replace(":", "-")
+        location_label = (self.location_id.name or "location").replace("/", "-")
+        filename = "As_of_Stock_%s_%s.xlsx" % (location_label, as_of_label)
+        self.write(
+            {
+                "as_of_stock_xlsx": base64.b64encode(xlsx_bytes),
+                "as_of_stock_xlsx_filename": filename,
+            }
+        )
+        return {
+            "type": "ir.actions.act_url",
+            "url": (
+                "/web/content/?model=%s&id=%s&field=as_of_stock_xlsx"
+                "&filename=%s&download=true"
+                % (self._name, self.id, filename)
+            ),
+            "target": "self",
+        }
+
+    def _prepare_as_of_stock_rows(self):
+        """Return [{name, quantity}] for products with as-of on-hand > 0."""
+        self.ensure_one()
+        _qty_today_map, qty_as_of_map = self._strict_on_hand_by_product(
+            self.location_id, self.as_of_datetime
+        )
+        positive_ids = [
+            product_id
+            for product_id, qty in qty_as_of_map.items()
+            if qty and qty > 0.0
+        ]
+        if not positive_ids:
+            return []
+
+        products = (
+            self.env["product.product"]
+            .with_context(active_test=False)
+            .browse(positive_ids)
+        )
+        rows = []
+        for product in products.sorted(
+            key=lambda p: ((p.display_name or "").lower(), p.id)
+        ):
+            if not product.is_storable:
+                continue
+            rounding = product.uom_id.rounding or 0.01
+            qty = float_round(
+                qty_as_of_map.get(product.id, 0.0), precision_rounding=rounding
+            )
+            if float_compare(qty, 0.0, precision_rounding=rounding) <= 0:
+                continue
+            rows.append(
+                {
+                    "name": product.display_name or product.name or str(product.id),
+                    "quantity": qty,
+                }
+            )
+        return rows
+
+    def _build_as_of_stock_xlsx(self, rows):
+        self.ensure_one()
+        output = io.BytesIO()
+        workbook = xlsxwriter.Workbook(output, {"in_memory": True})
+        sheet = workbook.add_worksheet(_("As-of Stock"))
+        header_format = workbook.add_format({"bold": True})
+        qty_format = workbook.add_format({"num_format": "0.00"})
+
+        sheet.write(0, 0, _("Product Name"), header_format)
+        sheet.write(0, 1, _("Quantity On Hand"), header_format)
+        sheet.set_column(0, 0, 50)
+        sheet.set_column(1, 1, 18)
+
+        for index, row in enumerate(rows, start=1):
+            sheet.write(index, 0, row["name"])
+            sheet.write_number(index, 1, row["quantity"], qty_format)
+
+        workbook.close()
+        return output.getvalue()
 
     def action_confirm_apply(self):
         self.ensure_one()
@@ -360,6 +484,145 @@ class InventoryAsOfBatch(models.Model):
             "state": state,
             "error_message": error_message,
         }
+
+    def _add_missing_zero_lines(self):
+        """Add counted-0 lines for stock at the default location left off the sheet.
+
+        Only the batch default location itself is considered. Child locations
+        are left alone. A product already present on any sheet line is skipped.
+        """
+        self.ensure_one()
+        location = self.location_id
+        if not location or not self.as_of_datetime:
+            return
+
+        present_ids = set(self.line_ids.mapped("product_id").ids)
+        qty_today_map, qty_as_of_map = self._strict_on_hand_by_product(
+            location, self.as_of_datetime
+        )
+        candidate_ids = [
+            product_id
+            for product_id, qty in qty_as_of_map.items()
+            if product_id not in present_ids and qty > 0.0
+        ]
+        if not candidate_ids:
+            return
+
+        products = (
+            self.env["product.product"]
+            .with_context(active_test=False)
+            .browse(candidate_ids)
+        )
+        next_row = max(self.line_ids.mapped("row_number") or [0])
+        vals_list = []
+        for product in products:
+            if not product.is_storable:
+                continue
+            rounding = product.uom_id.rounding or 0.01
+            qty_as_of = float_round(
+                qty_as_of_map.get(product.id, 0.0), precision_rounding=rounding
+            )
+            if float_compare(qty_as_of, 0.0, precision_rounding=rounding) <= 0:
+                continue
+            qty_today = float_round(
+                qty_today_map.get(product.id, 0.0), precision_rounding=rounding
+            )
+            correction = float_round(-qty_as_of, precision_rounding=rounding)
+            next_row += 1
+            vals_list.append(
+                {
+                    "batch_id": self.id,
+                    "row_number": next_row,
+                    "raw_sku": product.default_code or product.barcode or str(product.id),
+                    "product_id": product.id,
+                    "location_id": location.id,
+                    "counted_as_of": 0.0,
+                    "qty_as_of": qty_as_of,
+                    "qty_today": qty_today,
+                    "correction": correction,
+                    "counted_to_apply": float_round(
+                        qty_today + correction, precision_rounding=rounding
+                    ),
+                    "state": "to_apply",
+                    "missing_from_sheet": True,
+                }
+            )
+        if not vals_list:
+            return
+
+        Line = self.env["inventory.as.of.line"]
+        for start in range(0, len(vals_list), 500):
+            Line.create(vals_list[start : start + 500])
+        _logger.info(
+            "As-of batch %s added %s not-on-sheet line(s) at %s as of %s",
+            self.id,
+            len(vals_list),
+            location.complete_name,
+            self.as_of_datetime,
+        )
+
+    def _strict_on_hand_by_product(self, location, as_of_datetime):
+        """Return (qty_today, qty_as_of) maps for this location only.
+
+        Child locations are excluded. The as-of figure rewinds done moves
+        after that datetime, matching qty_available with strict=True and to_date.
+        """
+        self.ensure_one()
+        company_ids = [self.company_id.id, False]
+        Quant = (
+            self.env["stock.quant"]
+            .with_company(self.company_id)
+            .with_context(active_test=False)
+        )
+        Move = (
+            self.env["stock.move"]
+            .with_company(self.company_id)
+            .with_context(active_test=False)
+        )
+        quant_domain = [
+            ("location_id", "=", location.id),
+            ("company_id", "in", company_ids),
+            ("product_id.is_storable", "=", True),
+        ]
+        qty_today = {}
+        for product, quantity in Quant._read_group(
+            quant_domain, ["product_id"], ["quantity:sum"]
+        ):
+            if product:
+                qty_today[product.id] = quantity or 0.0
+
+        qty_as_of = dict(qty_today)
+        as_of = fields.Datetime.to_datetime(as_of_datetime)
+        if as_of and as_of < fields.Datetime.now():
+            move_base = [
+                ("state", "=", "done"),
+                ("date", ">", as_of),
+                ("company_id", "in", company_ids),
+                ("product_id.is_storable", "=", True),
+            ]
+            for product, qty in Move._read_group(
+                move_base
+                + [
+                    ("location_dest_id", "=", location.id),
+                    ("location_id", "!=", location.id),
+                ],
+                ["product_id"],
+                ["product_qty:sum"],
+            ):
+                if product:
+                    qty_as_of[product.id] = qty_as_of.get(product.id, 0.0) - (qty or 0.0)
+            for product, qty in Move._read_group(
+                move_base
+                + [
+                    ("location_id", "=", location.id),
+                    ("location_dest_id", "!=", location.id),
+                ],
+                ["product_id"],
+                ["product_qty:sum"],
+            ):
+                if product:
+                    qty_as_of[product.id] = qty_as_of.get(product.id, 0.0) + (qty or 0.0)
+        return qty_today, qty_as_of
 
     def _resolve_product(self, raw_key, match_by_id=False):
         if not raw_key:

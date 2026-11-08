@@ -75,6 +75,14 @@ class InventoryAsOfLine(models.Model):
         required=True,
         index=True,
     )
+    missing_from_sheet = fields.Boolean(
+        string="Not On Sheet",
+        readonly=True,
+        copy=False,
+        index=True,
+        help="This product had stock at the batch default location on the as-of date "
+        "but was left off the count sheet, so the counted quantity is 0.",
+    )
     note = fields.Char(string="Valuation Note")
     error_message = fields.Text()
     company_id = fields.Many2one(related="batch_id.company_id", store=True)
@@ -97,13 +105,18 @@ class InventoryAsOfLine(models.Model):
             product = line.product_id
             location = line.location_id
             company = line.batch_id.company_id
-            qty_today = product.with_company(company).with_context(
-                location=location.id,
-                company_id=company.id,
-            ).qty_available
+            qty_ctx = {
+                "location": location.id,
+                "company_id": company.id,
+            }
+            # Sheet lines follow standard on-hand (child locations included).
+            # Lines added because the product was missing from the sheet stay
+            # on the selected location itself.
+            if line.missing_from_sheet:
+                qty_ctx["strict"] = True
+            qty_today = product.with_company(company).with_context(**qty_ctx).qty_available
             qty_as_of = product.with_company(company).with_context(
-                location=location.id,
-                company_id=company.id,
+                **qty_ctx,
                 to_date=line.batch_id.as_of_datetime,
             ).qty_available
             correction = line.counted_as_of - qty_as_of

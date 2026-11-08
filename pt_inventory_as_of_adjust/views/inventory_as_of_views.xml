@@ -11,6 +11,7 @@
                   decoration-info="state == 'to_apply'">
                 <field name="row_number" optional="show"/>
                 <field name="raw_sku"/>
+                <field name="missing_from_sheet" optional="show"/>
                 <field name="product_id"/>
                 <field name="location_id"/>
                 <field name="counted_as_of"/>
@@ -63,6 +64,7 @@
                             <field name="raw_sku" readonly="1"/>
                             <field name="product_id"/>
                             <field name="location_id"/>
+                            <field name="missing_from_sheet" readonly="1"/>
                         </group>
                         <group>
                             <field name="counted_as_of"/>
@@ -96,6 +98,7 @@
                 <filter name="skip" string="Skip" domain="[('state', '=', 'skip')]"/>
                 <filter name="applied" string="Applied" domain="[('state', '=', 'applied')]"/>
                 <filter name="error" string="Error" domain="[('state', '=', 'error')]"/>
+                <filter name="missing_from_sheet" string="Not On Sheet" domain="[('missing_from_sheet', '=', True)]"/>
                 <group>
                     <filter name="group_state" string="State" context="{'group_by': 'state'}"/>
                     <filter name="group_location" string="Location" context="{'group_by': 'location_id'}"/>
@@ -153,6 +156,10 @@
                     <button name="action_reset_draft" type="object" string="Reset to Draft"
                             groups="pt_inventory_as_of_adjust.group_inventory_as_of_user"
                             invisible="state in ('applying', 'draft') or applied_count"/>
+                    <button name="action_export_as_of_stock_xlsx" type="object"
+                            string="Export As-of Stock Excel"
+                            groups="pt_inventory_as_of_adjust.group_inventory_as_of_user"
+                            invisible="not as_of_datetime or not location_id"/>
                     <field name="state" widget="statusbar"
                             statusbar_visible="draft,ready,applying,done"/>
                 </header>
@@ -169,6 +176,10 @@
                                 context="{'search_default_error': 1}">
                             <field name="error_count" widget="statinfo" string="Errors"/>
                         </button>
+                        <button name="action_open_lines" type="object" class="oe_stat_button" icon="fa-exclamation-circle"
+                                context="{'search_default_missing_from_sheet': 1}">
+                            <field name="missing_count" widget="statinfo" string="Not On Sheet"/>
+                        </button>
                     </div>
                     <div class="oe_title">
                         <label for="name"/>
@@ -184,6 +195,8 @@
                         <group>
                             <field name="csv_filename" invisible="1"/>
                             <field name="csv_file" filename="csv_filename" readonly="state == 'applying'"/>
+                            <field name="as_of_stock_xlsx_filename" invisible="1"/>
+                            <field name="as_of_stock_xlsx" filename="as_of_stock_xlsx_filename" readonly="1"/>
                             <field name="chunk_size" readonly="state == 'applying'"/>
                             <field name="company_id" groups="base.group_multi_company" readonly="1"/>
                             <field name="applied_count" readonly="1"/>
@@ -204,6 +217,7 @@
                                       editable="bottom">
                                     <field name="row_number" readonly="1"/>
                                     <field name="raw_sku" readonly="1"/>
+                                    <field name="missing_from_sheet" optional="show" readonly="1"/>
                                     <field name="product_id"/>
                                     <field name="location_id"/>
                                     <field name="counted_as_of"/>
@@ -259,6 +273,8 @@
                 CSV columns: <code>product_id</code> (or sku / barcode / default_code), <code>quantity</code>,
                 optional <code>location</code> (also accepts <code>Lines/Location</code>).
                 If location is empty or the column is missing, Default Location is used.
+                Products with stock at the Default Location on the as-of date that are
+                missing from the file are added with counted quantity 0.
             </p>
         </field>
     </record>
