@@ -1,4 +1,3 @@
-product_id,quantity,location
-1698,465,ALSANAT/Stock
-1213,2,NAKHL/Stock
-1214,3,NAKHL/Stock
+default_code,quantity,location
+REPLACE_WITH_SKU_1,5,NAKHL/Stock
+REPLACE_WITH_SKU_2,0,NAKHL/Stock

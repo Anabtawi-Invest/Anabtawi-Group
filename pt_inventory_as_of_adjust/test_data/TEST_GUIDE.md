@@ -4,24 +4,24 @@
 
 ### Minimal (recommended)
 ```csv
-sku,quantity
+default_code,quantity
 810129329667,5
 810129329674,0
 ```
 
-- `sku` = barcode **or** Internal Reference (`default_code`)
+- `default_code` / `sku` = **exact** Internal Reference (`default_code`) — no barcode, no product id, no case-insensitive match
 - `quantity` = **true counted qty as of the As-of Date** (not today's target)
 
 ### Optional location column
 ```csv
-sku,quantity,location
+default_code,quantity,location
 810129329667,5,NAKHL/Stock
 ```
 
 If `location` is empty, the batch **Default Location** is used.
 
 Accepted headers (any one):
-- Product: `sku` | `barcode` | `default_code`
+- Product: `default_code` | `sku` | `internal_reference`
 - Qty: `quantity` | `qty` | `counted`
 - Location: `location` | `complete_name`
 
@@ -37,7 +37,7 @@ Replace SKUs with real products from your DB before upload.
 
 Pick **1 product** with:
 - type storable
-- known Internal Reference / barcode
+- known Internal Reference (`default_code`)
 - stock in one location (e.g. NAKHL/Stock)
 - preferably **standard cost**
 

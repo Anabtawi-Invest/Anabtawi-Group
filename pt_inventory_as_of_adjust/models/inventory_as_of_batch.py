@@ -17,8 +17,7 @@ except ImportError:  # pragma: no cover
 
 _logger = logging.getLogger(__name__)
 
-SKU_HEADERS = {"sku", "barcode", "default_code", "internal_reference", "defaultcode"}
-PRODUCT_ID_HEADERS = {"product_id", "productid", "variant_id", "product_variant_id"}
+SKU_HEADERS = {"sku", "default_code", "internal_reference", "defaultcode"}
 QTY_HEADERS = {"quantity", "qty", "counted", "counted_qty", "count"}
 LOCATION_HEADERS = {
     "location",
@@ -398,10 +397,11 @@ class InventoryAsOfBatch(models.Model):
             raise UserError(_("CSV has no header row."))
 
         header_map = self._map_headers(reader.fieldnames)
-        if not header_map.get("sku") and not header_map.get("product_id"):
+        if not header_map.get("sku"):
             raise UserError(
                 _(
-                    "CSV must include a product column: product_id, sku, barcode, or default_code."
+                    "CSV must include an Internal Reference column: "
+                    "sku, default_code, or internal_reference."
                 )
             )
         if not header_map.get("quantity"):
@@ -411,11 +411,7 @@ class InventoryAsOfBatch(models.Model):
         for row in reader:
             if not row:
                 continue
-            product_key = ""
-            if header_map.get("product_id"):
-                product_key = (row.get(header_map["product_id"]) or "").strip()
-            if not product_key and header_map.get("sku"):
-                product_key = (row.get(header_map["sku"]) or "").strip()
+            product_key = (row.get(header_map["sku"]) or "").strip()
             qty_raw = (row.get(header_map["quantity"]) or "").strip()
             if not product_key and not qty_raw:
                 continue
@@ -425,7 +421,6 @@ class InventoryAsOfBatch(models.Model):
             rows.append(
                 {
                     "product_key": product_key,
-                    "match_by_id": bool(header_map.get("product_id")),
                     "quantity": qty_raw,
                     "location": location_name,
                 }
@@ -439,9 +434,7 @@ class InventoryAsOfBatch(models.Model):
         raw_sku = (row.get("product_key") or "").strip()
         location_name = (row.get("location") or "").strip()
         location = self._resolve_location(location_name)
-        product = self._resolve_product(
-            raw_sku, match_by_id=bool(row.get("match_by_id"))
-        )
+        product = self._resolve_product(raw_sku)
         error_message = False
         state = "to_apply"
         counted_as_of = 0.0
@@ -458,7 +451,10 @@ class InventoryAsOfBatch(models.Model):
 
         if not product:
             state = "error"
-            error_message = _("Product not found for '%s'") % raw_sku
+            error_message = _(
+                "Product not found for Internal Reference '%s' "
+                "(exact default_code match required)."
+            ) % raw_sku
         elif location_name and not location:
             state = "error"
             error_message = _(
@@ -547,7 +543,7 @@ class InventoryAsOfBatch(models.Model):
                 {
                     "batch_id": self.id,
                     "row_number": next_row,
-                    "raw_sku": product.default_code or product.barcode or str(product.id),
+                    "raw_sku": product.default_code or str(product.id),
                     "product_id": product.id,
                     "location_id": location.id,
                     "counted_as_of": 0.0,
@@ -638,26 +634,13 @@ class InventoryAsOfBatch(models.Model):
                     qty_as_of[product.id] = qty_as_of.get(product.id, 0.0) + (qty or 0.0)
         return qty_today, qty_as_of
 
-    def _resolve_product(self, raw_key, match_by_id=False):
+    def _resolve_product(self, raw_key):
+        """Match only by exact Internal Reference (default_code)."""
         if not raw_key:
             return self.env["product.product"]
-        Product = self.env["product.product"]
-        if match_by_id or raw_key.isdigit():
-            try:
-                product = Product.browse(int(raw_key))
-                if product.exists():
-                    return product
-            except (TypeError, ValueError):
-                pass
-            if match_by_id:
-                return Product
-        product = Product.search([("barcode", "=", raw_key)], limit=1)
-        if product:
-            return product
-        product = Product.search([("default_code", "=", raw_key)], limit=1)
-        if product:
-            return product
-        return Product.search([("default_code", "=ilike", raw_key)], limit=1)
+        return self.env["product.product"].search(
+            [("default_code", "=", raw_key)], limit=1
+        )
 
     def _company_location_domain(self, extra_domain=None):
         """Restrict locations to the batch company (or shared company-less locs)."""
@@ -750,10 +733,7 @@ class InventoryAsOfBatch(models.Model):
             key = self._normalize_header(name)
             # Also accept bare last segment: "foo/location" -> try "location"
             last = key.rsplit("/", 1)[-1]
-            if key in PRODUCT_ID_HEADERS or last in PRODUCT_ID_HEADERS:
-                if "product_id" not in mapping:
-                    mapping["product_id"] = name
-            elif key in SKU_HEADERS or last in SKU_HEADERS:
+            if key in SKU_HEADERS or last in SKU_HEADERS:
                 if "sku" not in mapping:
                     mapping["sku"] = name
             elif key in QTY_HEADERS or last in QTY_HEADERS:

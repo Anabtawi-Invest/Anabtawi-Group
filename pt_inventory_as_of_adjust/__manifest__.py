@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 {
     "name": "PT Inventory As-of Adjustment",
-    "version": "19.0.1.0.14",
+    "version": "19.0.1.0.15",
     "category": "Inventory",
     "summary": "Import counted qty as of a past date, review, and apply in batches",
     "description": """
-Upload a CSV of counted quantities as of a specific date (by product_id or sku).
+Upload a CSV of counted quantities as of a specific date (exact Internal Reference / default_code).
 The module computes the correction against historical on-hand, lets you
 review lines, then applies inventory adjustments in cron chunks with that
 past counting/accounting date.
