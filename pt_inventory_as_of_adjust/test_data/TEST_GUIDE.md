@@ -1,33 +1,31 @@
 # As-of Inventory Adjustment — Test Template
 
-## CSV format (UTF-8, not Excel .xlsx)
+## Excel format (.xlsx)
+
+Use **Download Excel Template** on the batch form, or build a sheet with:
 
 ### Minimal (recommended)
-```csv
-default_code,quantity
-810129329667,5
-810129329674,0
-```
+| internal_reference | quantity |
+|--------------------|----------|
+| 810129329667 | 5 |
+| 810129329674 | 0 |
 
-- `default_code` / `sku` = **exact** Internal Reference (`default_code`) — no barcode, no product id, no case-insensitive match
+- `internal_reference` = **exact** product Internal Reference (`default_code`) — no barcode, no product id, no case-insensitive match
 - `quantity` = **true counted qty as of the As-of Date** (not today's target)
 
 ### Optional location column
-```csv
-default_code,quantity,location
-810129329667,5,NAKHL/Stock
-```
+| internal_reference | quantity | location |
+|--------------------|----------|----------|
+| 810129329667 | 5 | NAKHL/Stock |
 
 If `location` is empty, the batch **Default Location** is used.
 
-Accepted headers (any one):
-- Product: `default_code` | `sku` | `internal_reference`
+Accepted headers:
+- Product: `internal_reference` (also accepts `sku` / `default_code`)
 - Qty: `quantity` | `qty` | `counted`
 - Location: `location` | `complete_name`
 
-Sample files in this folder:
-- `as_of_inventory_template.csv`
-- `as_of_inventory_template_with_location.csv`
+Upload **.xlsx** only (not CSV, not legacy `.xls`).
 
 Replace SKUs with real products from your DB before upload.
 
@@ -63,7 +61,7 @@ Expected after Load:
    - Default Location: `NAKHL/Stock`
    - Accounting Date: same day `31/08` (optional but recommended)
    - Chunk size: `50` (or `1` for first test)
-4. Upload CSV → **Load / Recompute Lines**
+4. Upload Excel → **Load / Recompute Lines**
 5. Review lines → **Confirm Apply**
 6. Wait for cron (or run cron **As-of Inventory: Apply Chunks** manually)
 7. Check:
@@ -77,8 +75,8 @@ Expected after Load:
 |------|------------------------|---------------------|
 | Same | equal | Skip |
 | Different | ≠ | To Apply |
-| Unknown SKU | — | Error |
+| Unknown Internal Reference | — | Error |
 
 ### Do **not** use for first test
 - Lot/serial tracked products (v1 has no lot column)
-- `.xlsx` (save as CSV UTF-8)
+- CSV or `.xls` (use `.xlsx`)

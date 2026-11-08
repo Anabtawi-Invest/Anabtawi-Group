@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 import base64
 import binascii
-import csv
 import io
 import logging
 import traceback
@@ -9,6 +8,11 @@ import traceback
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 from odoo.tools.float_utils import float_compare, float_is_zero, float_round
+
+try:
+    import openpyxl
+except ImportError:  # pragma: no cover
+    openpyxl = None
 
 try:
     import xlsxwriter
@@ -51,7 +55,7 @@ class InventoryAsOfBatch(models.Model):
         required=True,
         domain="[('usage', 'in', ('internal', 'transit')), '|', ('company_id', '=', False), ('company_id', '=', company_id)]",
         check_company=True,
-        help="Used when the CSV has no location column (or blank location).",
+        help="Used when the Excel file has no location column (or blank location).",
     )
     accounting_date = fields.Date(
         string="Accounting Date",
@@ -61,11 +65,15 @@ class InventoryAsOfBatch(models.Model):
         string="Inventory Reason",
         default="As-of Physical Inventory",
     )
-    csv_filename = fields.Char()
-    csv_file = fields.Binary(string="CSV File", attachment=True)
+    csv_filename = fields.Char(string="Excel Filename")
+    csv_file = fields.Binary(
+        string="Excel File",
+        attachment=True,
+        help="Upload an .xlsx count sheet with internal_reference and quantity columns.",
+    )
     csv_attachment_id = fields.Many2one(
         "ir.attachment",
-        string="CSV Attachment",
+        string="Excel Attachment",
         ondelete="set null",
         copy=False,
     )
@@ -140,13 +148,13 @@ class InventoryAsOfBatch(models.Model):
         if self.state == "applying":
             raise UserError(_("Cannot reload lines while the batch is applying."))
         if not self.csv_file and not self.csv_attachment_id:
-            raise UserError(_("Upload a CSV file first."))
+            raise UserError(_("Upload an Excel file (.xlsx) first."))
         if not self.as_of_datetime:
             raise UserError(_("Set the As-of Date."))
         if not self.location_id:
             raise UserError(_("Set the Default Location."))
 
-        rows = self._parse_csv_rows()
+        rows = self._parse_import_rows()
         self.line_ids.unlink()
         line_vals = []
         for idx, row in enumerate(rows, start=1):
@@ -156,6 +164,49 @@ class InventoryAsOfBatch(models.Model):
         self._add_missing_zero_lines()
         self.state = "ready"
         return True
+
+    def action_download_import_template(self):
+        """Download a blank Excel count template with the expected columns."""
+        self.ensure_one()
+        if xlsxwriter is None:
+            raise UserError(
+                _("The Python library 'xlsxwriter' is required to export Excel files.")
+            )
+        output = io.BytesIO()
+        workbook = xlsxwriter.Workbook(output, {"in_memory": True})
+        sheet = workbook.add_worksheet(_("Count"))
+        header_format = workbook.add_format({"bold": True})
+        sheet.write(0, 0, "internal_reference", header_format)
+        sheet.write(0, 1, "quantity", header_format)
+        sheet.write(0, 2, "location", header_format)
+        sheet.write(1, 0, "REPLACE_WITH_SKU_1")
+        sheet.write(1, 1, 5)
+        sheet.write(1, 2, "")
+        sheet.write(2, 0, "REPLACE_WITH_SKU_2")
+        sheet.write(2, 1, 0)
+        sheet.write(2, 2, "")
+        sheet.set_column(0, 0, 24)
+        sheet.set_column(1, 1, 12)
+        sheet.set_column(2, 2, 24)
+        workbook.close()
+        filename = "as_of_inventory_template.xlsx"
+        attachment = self.env["ir.attachment"].create(
+            {
+                "name": filename,
+                "type": "binary",
+                "datas": base64.b64encode(output.getvalue()),
+                "res_model": self._name,
+                "res_id": self.id,
+                "mimetype": (
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                ),
+            }
+        )
+        return {
+            "type": "ir.actions.act_url",
+            "url": "/web/content/%s?download=true" % attachment.id,
+            "target": "download",
+        }
 
     def action_export_as_of_stock_xlsx(self):
         """Build Excel of products with on-hand > 0 at location on as-of date."""
@@ -384,31 +435,34 @@ class InventoryAsOfBatch(models.Model):
             has_error = bool(self.line_ids.filtered(lambda l: l.state == "error"))
             self.state = "error" if has_error else "done"
 
-    def _parse_csv_rows(self):
+    def _parse_import_rows(self):
+        """Parse the uploaded Excel (.xlsx) count sheet into normalized row dicts."""
         self.ensure_one()
         raw = self._get_csv_raw_bytes()
-        if raw[:2] == b"PK":
+        if raw[:2] != b"PK":
             raise UserError(
-                _("This looks like an Excel file (.xlsx). Save As CSV (UTF-8) and upload again.")
+                _(
+                    "Upload an Excel file (.xlsx). "
+                    "CSV is no longer accepted for as-of inventory import."
+                )
             )
-        text = self._decode_csv_bytes(raw)
-        reader = self._csv_dict_reader(text)
-        if not reader.fieldnames:
-            raise UserError(_("CSV has no header row."))
+        fieldnames, dict_rows = self._read_xlsx_table(raw)
+        if not fieldnames:
+            raise UserError(_("Excel file has no header row."))
 
-        header_map = self._map_headers(reader.fieldnames)
+        header_map = self._map_headers(fieldnames)
         if not header_map.get("sku"):
             raise UserError(
                 _(
-                    "CSV must include an Internal Reference column: "
-                    "sku, default_code, or internal_reference."
+                    "Excel must include an Internal Reference column named "
+                    "internal_reference (also accepts sku or default_code)."
                 )
             )
         if not header_map.get("quantity"):
-            raise UserError(_("CSV must include a quantity column."))
+            raise UserError(_("Excel must include a quantity column."))
 
         rows = []
-        for row in reader:
+        for row in dict_rows:
             if not row:
                 continue
             product_key = (row.get(header_map["sku"]) or "").strip()
@@ -426,8 +480,74 @@ class InventoryAsOfBatch(models.Model):
                 }
             )
         if not rows:
-            raise UserError(_("CSV has no data rows."))
+            raise UserError(_("Excel file has no data rows."))
         return rows
+
+    def _read_xlsx_table(self, raw):
+        """Return (fieldnames, list_of_row_dicts) from the first worksheet."""
+        if openpyxl is None:
+            raise UserError(
+                _("The Python library 'openpyxl' is required to read Excel files.")
+            )
+        try:
+            workbook = openpyxl.load_workbook(
+                io.BytesIO(raw),
+                read_only=True,
+                data_only=True,
+            )
+        except Exception as exc:
+            raise UserError(
+                _("The uploaded file could not be read as an Excel (.xlsx) file.")
+            ) from exc
+
+        sheet = workbook.worksheets[0]
+        rows_iter = sheet.iter_rows(values_only=True)
+        try:
+            header_row = next(rows_iter)
+        except StopIteration as exc:
+            workbook.close()
+            raise UserError(_("Excel file is empty.")) from exc
+
+        fieldnames = [self._excel_cell_to_text(cell) for cell in header_row]
+        while fieldnames and not fieldnames[-1]:
+            fieldnames.pop()
+        if not any(fieldnames):
+            workbook.close()
+            raise UserError(_("Excel file has no header row."))
+
+        dict_rows = []
+        for row in rows_iter:
+            if not row or all(cell is None or str(cell).strip() == "" for cell in row):
+                continue
+            values = {}
+            empty = True
+            for index, name in enumerate(fieldnames):
+                if not name:
+                    continue
+                cell = row[index] if index < len(row) else None
+                text = self._excel_cell_to_text(cell)
+                values[name] = text
+                if text:
+                    empty = False
+            if not empty:
+                dict_rows.append(values)
+        workbook.close()
+        return fieldnames, dict_rows
+
+    @api.model
+    def _excel_cell_to_text(self, value):
+        """Normalize Excel cell values for SKU/qty matching."""
+        if value is None:
+            return ""
+        if isinstance(value, bool):
+            return str(value)
+        if isinstance(value, int):
+            return str(value)
+        if isinstance(value, float):
+            if value.is_integer():
+                return str(int(value))
+            return ("%s" % value).rstrip("0").rstrip(".")
+        return str(value).strip()
 
     def _prepare_line_vals(self, row_number, row):
         self.ensure_one()
@@ -695,7 +815,7 @@ class InventoryAsOfBatch(models.Model):
             except ValueError:
                 pass
         _logger.warning(
-            "As-of CSV location not found: %r (batch=%s company=%s) → using default %s",
+            "As-of Excel location not found: %r (batch=%s company=%s) → using default %s",
             location_name,
             self.id,
             self.company_id.display_name,
@@ -717,7 +837,7 @@ class InventoryAsOfBatch(models.Model):
 
     @api.model
     def _normalize_header(self, name):
-        """Normalize CSV header: 'Lines/Location' -> 'lines/location'."""
+        """Normalize Excel/CSV-style header: 'Lines/Location' -> 'lines/location'."""
         key = str(name or "").strip().lower()
         key = key.replace(" ", "_").replace("\\", "/")
         while "__" in key:
@@ -765,44 +885,4 @@ class InventoryAsOfBatch(models.Model):
                 return raw if isinstance(raw, bytes) else base64.b64decode(raw)
             if att.datas:
                 return base64.b64decode(att.datas)
-        raise UserError(_("Upload a CSV file first."))
-
-    @api.model
-    def _decode_csv_bytes(self, raw):
-        if raw[:2] in (b"\xff\xfe", b"\xfe\xff"):
-            try:
-                return raw.decode("utf-16")
-            except UnicodeDecodeError:
-                pass
-        for encoding in (
-            "utf-8-sig",
-            "utf-8",
-            "utf-16",
-            "utf-16-le",
-            "utf-16-be",
-            "cp1256",
-            "cp1252",
-            "latin-1",
-        ):
-            try:
-                text = raw.decode(encoding)
-                if encoding.startswith("utf-8") and text.count("\x00") > max(4, len(text) // 20):
-                    continue
-                return text
-            except UnicodeDecodeError:
-                continue
-        return raw.decode("utf-8", errors="replace")
-
-    @api.model
-    def _csv_dict_reader(self, text):
-        best_delimiter = ","
-        best_cols = 0
-        for delimiter in (",", ";", "\t", "|"):
-            reader = csv.DictReader(io.StringIO(text), delimiter=delimiter)
-            if not reader.fieldnames:
-                continue
-            ncol = len([name for name in reader.fieldnames if name and str(name).strip()])
-            if ncol > best_cols:
-                best_cols = ncol
-                best_delimiter = delimiter
-        return csv.DictReader(io.StringIO(text), delimiter=best_delimiter)
+        raise UserError(_("Upload an Excel file (.xlsx) first."))

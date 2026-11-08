@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 {
     "name": "PT Inventory As-of Adjustment",
-    "version": "19.0.1.0.15",
+    "version": "19.0.1.0.17",
     "category": "Inventory",
     "summary": "Import counted qty as of a past date, review, and apply in batches",
     "description": """
-Upload a CSV of counted quantities as of a specific date (exact Internal Reference / default_code).
-The module computes the correction against historical on-hand, lets you
-review lines, then applies inventory adjustments in cron chunks with that
-past counting/accounting date.
+Upload an Excel (.xlsx) of counted quantities as of a specific date
+(exact internal_reference). The module computes the correction against
+historical on-hand, lets you review lines, then applies inventory
+adjustments in cron chunks with that past counting/accounting date.
 Products with stock at the default location on that date that were left off
 the sheet are added as counted quantity 0.
     """,
@@ -26,7 +26,7 @@ the sheet are added as counted quantity 0.
         "views/menus.xml",
     ],
     "external_dependencies": {
-        "python": ["xlsxwriter"],
+        "python": ["openpyxl", "xlsxwriter"],
     },
     "installable": True,
     "application": False,

@@ -114,7 +114,7 @@
         <field name="context">{}</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
-                Lines appear after you load a CSV on an As-of Inventory batch.
+                Lines appear after you load an Excel file on an As-of Inventory batch.
             </p>
         </field>
     </record>
@@ -156,6 +156,9 @@
                     <button name="action_reset_draft" type="object" string="Reset to Draft"
                             groups="pt_inventory_as_of_adjust.group_inventory_as_of_user"
                             invisible="state in ('applying', 'draft') or applied_count"/>
+                    <button name="action_download_import_template" type="object"
+                            string="Download Excel Template"
+                            groups="pt_inventory_as_of_adjust.group_inventory_as_of_user"/>
                     <button name="action_export_as_of_stock_xlsx" type="object"
                             string="Export As-of Stock Excel"
                             groups="pt_inventory_as_of_adjust.group_inventory_as_of_user"
@@ -267,10 +270,10 @@
         <field name="view_mode">list,form</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
-                Create a batch, upload a CSV of counted quantities as of a past date, review, then apply.
+                Create a batch, upload an Excel (.xlsx) of counted quantities as of a past date, review, then apply.
             </p>
             <p>
-                CSV columns: <code>sku</code> / <code>default_code</code> (exact Internal Reference),
+                Excel columns: <code>internal_reference</code> (exact match to product Internal Reference),
                 <code>quantity</code>, optional <code>location</code> (also accepts <code>Lines/Location</code>).
                 If location is empty or the column is missing, Default Location is used.
                 Products with stock at the Default Location on the as-of date that are
