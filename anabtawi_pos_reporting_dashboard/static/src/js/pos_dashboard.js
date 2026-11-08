@@ -528,7 +528,13 @@ export class PosReportingDashboard extends Component {
             this.data.date_to = res.date_to || this.state.date_to;
         } catch (error) {
             console.error("Failed to load transfer dashboard", error);
-            this.transfers.error = "The transfer list did not load.";
+            const serverMsg =
+                (error && error.data && (error.data.message || error.data.debug)) ||
+                (error && error.message) ||
+                "";
+            this.transfers.error = serverMsg
+                ? `The transfer list did not load: ${String(serverMsg).split("\n")[0]}`
+                : "The transfer list did not load.";
         } finally {
             this.state.transferLoading = false;
         }
