@@ -2141,6 +2141,35 @@ class PosReportingDashboard(models.TransientModel):
             and m.picking_id.picking_type_code == "internal"
         )
 
+    def _resolve_forward_receipt_move(self, send_move, branch_location_ids):
+        """Next internal move after a تسليم الطلبيات → branch send (2-step routes).
+
+        Many warehouses ship hub→branch as two pickings: the first
+        (e.g. NAJ/INT/…) has empty ``move_orig_ids`` and pushes into a second
+        branch picking (e.g. BASHA/INT/…) via ``move_dest_ids``. That first
+        document is the send; the second is the real branch receipt.
+        """
+        Move = self.env["stock.move"].sudo()
+        if not send_move or not send_move.product_id:
+            return Move.browse()
+        product = send_move.product_id
+        send_picking = send_move.picking_id
+        dest = send_move.move_dest_ids.filtered(
+            lambda m: m.state != "cancel"
+            and m.product_id == product
+            and m.picking_id
+            and m.picking_id.picking_type_code == "internal"
+            and (not send_picking or m.picking_id.id != send_picking.id)
+        )
+        if branch_location_ids:
+            dest_branch = dest.filtered(
+                lambda m: m.location_dest_id.id in branch_location_ids
+                or (m.picking_id and m.picking_id.location_dest_id.id in branch_location_ids)
+            )
+            if dest_branch:
+                return dest_branch[:1]
+        return dest[:1] if dest else Move.browse()
+
     def _resolve_request_move_for_receipt(self, receipt_move, hub_ids):
         """Find the hub request/send move that feeds this branch receipt move."""
         Move = self.env["stock.move"].sudo()
@@ -2532,7 +2561,7 @@ class PosReportingDashboard(models.TransientModel):
                 paired_request_move_ids.add(move.id)
                 paired_receipt_move_ids.add(receipt_move.id)
 
-        # Pass 2: receipts in period still unpaired (resolve request via chain/group/origin).
+        # Pass 2: hub→branch pickings in period (may be 2-step: send then branch receipt).
         for picking in receipt_pickings:
             if self._transfer_is_return_picking(picking):
                 continue
@@ -2540,8 +2569,35 @@ class PosReportingDashboard(models.TransientModel):
             if not config:
                 continue
             for move in picking.move_ids.filtered(lambda m: m.state != "cancel" and m.product_id):
-                if move.id in paired_receipt_move_ids:
+                if move.id in paired_request_move_ids or move.id in paired_receipt_move_ids:
                     continue
+
+                # 2-step: this hub→branch move feeds a later branch picking → treat
+                # current as تسليم الطلبيات send/request, next as branch receipt.
+                next_receipt = self._resolve_forward_receipt_move(move, branch_location_ids)
+                if next_receipt:
+                    if next_receipt.id in paired_receipt_move_ids:
+                        continue
+                    next_picking = next_receipt.picking_id
+                    if next_picking and self._transfer_is_return_picking(next_picking):
+                        next_receipt = self.env["stock.move"].browse()
+                        next_picking = False
+                    if next_receipt:
+                        asked, sent, received = _quantities_from_pair(move, next_receipt)
+                        _append_row(
+                            config,
+                            move.product_id,
+                            self._transfer_move_uom(move),
+                            asked,
+                            sent,
+                            received,
+                            picking,
+                            next_picking,
+                        )
+                        paired_request_move_ids.add(move.id)
+                        paired_receipt_move_ids.add(next_receipt.id)
+                        continue
+
                 request_move = self._resolve_request_move_for_receipt(move, hub_ids)
                 request_picking = request_move.picking_id if request_move else False
                 if request_picking and self._transfer_is_return_picking(request_picking):
