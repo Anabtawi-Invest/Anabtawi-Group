@@ -2095,6 +2095,52 @@ class PosReportingDashboard(models.TransientModel):
             return move.product_uom
         return False
 
+    def _transfer_linked_moves_by_group_or_reference(
+        self, move, picking, product, location_dest_ids, exclude_picking_id=None,
+    ):
+        """Sibling internal moves via procurement group (≤18) or reference_ids (19+).
+
+        Odoo 19 removed ``stock.move.group_id`` (and often picking.group_id) in favour of
+        ``reference_ids`` / ``stock.reference``.
+        """
+        Move = self.env["stock.move"].sudo()
+        if not move or not product or not location_dest_ids:
+            return Move.browse()
+        domain_base = [
+            ("product_id", "=", product.id),
+            ("location_dest_id", "in", list(location_dest_ids)),
+            ("state", "!=", "cancel"),
+            ("picking_id", "!=", False),
+        ]
+        candidates = Move.browse()
+        group = False
+        if "group_id" in move._fields and move.group_id:
+            group = move.group_id
+        elif picking and "group_id" in picking._fields and picking.group_id:
+            group = picking.group_id
+        if group and "group_id" in Move._fields:
+            candidates = Move.search(
+                domain_base + [("group_id", "=", group.id)],
+                order="id desc",
+            )
+        if not candidates and "reference_ids" in Move._fields:
+            refs = False
+            if "reference_ids" in move._fields and move.reference_ids:
+                refs = move.reference_ids
+            elif picking and "reference_ids" in picking._fields and picking.reference_ids:
+                refs = picking.reference_ids
+            if refs:
+                candidates = Move.search(
+                    domain_base + [("reference_ids", "in", refs.ids)],
+                    order="id desc",
+                )
+        exclude_id = exclude_picking_id or 0
+        return candidates.filtered(
+            lambda m: m.picking_id
+            and m.picking_id.id != exclude_id
+            and m.picking_id.picking_type_code == "internal"
+        )
+
     def _resolve_request_move_for_receipt(self, receipt_move, hub_ids):
         """Find the hub request/send move that feeds this branch receipt move."""
         Move = self.env["stock.move"].sudo()
@@ -2127,22 +2173,13 @@ class PosReportingDashboard(models.TransientModel):
         if receipt_picking and receipt_picking.location_id:
             hub_dest_ids.add(receipt_picking.location_id.id)
 
-        group = receipt_move.group_id or (receipt_picking.group_id if receipt_picking else False)
-        if group and hub_dest_ids:
-            candidates = Move.search(
-                [
-                    ("group_id", "=", group.id),
-                    ("product_id", "=", product.id),
-                    ("location_dest_id", "in", list(hub_dest_ids)),
-                    ("state", "!=", "cancel"),
-                    ("picking_id", "!=", False),
-                ],
-                order="id desc",
-            )
-            candidates = candidates.filtered(
-                lambda m: m.picking_id
-                and m.picking_id.id != (receipt_picking.id if receipt_picking else 0)
-                and m.picking_id.picking_type_code == "internal"
+        if hub_dest_ids:
+            candidates = self._transfer_linked_moves_by_group_or_reference(
+                receipt_move,
+                receipt_picking,
+                product,
+                hub_dest_ids,
+                exclude_picking_id=receipt_picking.id if receipt_picking else 0,
             )
             linked = candidates.filtered(lambda m: receipt_move in m.move_dest_ids)
             if linked:
@@ -2202,22 +2239,13 @@ class PosReportingDashboard(models.TransientModel):
         if dest:
             return dest[:1]
 
-        group = request_move.group_id or (request_picking.group_id if request_picking else False)
-        if group and branch_location_ids:
-            candidates = Move.search(
-                [
-                    ("group_id", "=", group.id),
-                    ("product_id", "=", product.id),
-                    ("location_dest_id", "in", list(branch_location_ids)),
-                    ("state", "!=", "cancel"),
-                    ("picking_id", "!=", False),
-                ],
-                order="id desc",
-            )
-            candidates = candidates.filtered(
-                lambda m: m.picking_id
-                and m.picking_id.id != (request_picking.id if request_picking else 0)
-                and m.picking_id.picking_type_code == "internal"
+        if branch_location_ids:
+            candidates = self._transfer_linked_moves_by_group_or_reference(
+                request_move,
+                request_picking,
+                product,
+                branch_location_ids,
+                exclude_picking_id=request_picking.id if request_picking else 0,
             )
             linked = candidates.filtered(lambda m: request_move in m.move_orig_ids)
             if linked:
