@@ -5,5 +5,10 @@
             <field name="name">POS Executive Dashboard Access</field>
             <field name="comment">Only users with this permission can view the POS Executive Dashboard, Expenses Dashboard, and generate unified Excel reports.</field>
         </record>
+        <record id="group_pos_dashboard_products" model="res.groups">
+            <field name="name">POS Dashboard Products</field>
+            <field name="comment">Shows the Products and Category profit sections on the POS Executive Dashboard.</field>
+            <field name="implied_ids" eval="[(4, ref('anabtawi_pos_reporting_dashboard.group_pos_reporting_dashboard_user'))]"/>
+        </record>
     </data>
 </odoo>
