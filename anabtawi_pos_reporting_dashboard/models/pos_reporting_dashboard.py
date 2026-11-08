@@ -963,6 +963,17 @@ class PosReportingDashboard(models.TransientModel):
             return warehouse.lot_stock_id
         return Location.browse()
 
+    def _config_transfer_stock_location(self, config):
+        """Stock location for the Transfers dashboard (explicit mapping preferred)."""
+        if "pos.dashboard.transfer.location" in self.env:
+            mapping = self.env["pos.dashboard.transfer.location"].sudo().search(
+                [("config_id", "=", config.id), ("active", "=", True)],
+                limit=1,
+            )
+            if mapping.location_id:
+                return mapping.location_id
+        return self._config_stock_location(config)
+
     def _products_available_in_period(self, products, locations, period):
         """{(product_id, location_id)} on hand above zero on any day of the period.
 
@@ -1731,8 +1742,13 @@ class PosReportingDashboard(models.TransientModel):
         config_by_location = {}
         branch_location_ids = set()
         config_location_ids = {}
+        TransferMap = self.env["pos.dashboard.transfer.location"].sudo()
+        mapped_configs = TransferMap.search([
+            ("config_id", "in", configs.ids),
+            ("active", "=", True),
+        ]).mapped("config_id")
         for config in configs:
-            root = self._config_stock_location(config)
+            root = self._config_transfer_stock_location(config)
             if not root:
                 continue
             loc_ids = self._transfer_descendant_location_ids(root)
@@ -1742,7 +1758,10 @@ class PosReportingDashboard(models.TransientModel):
                 config_by_location.setdefault(loc_id, config)
 
         if not branch_location_ids:
-            empty["error"] = _("No stock location is linked to the selected POS branches.")
+            empty["error"] = _(
+                "No transfer stock location is linked to the selected POS branches. "
+                "Open Point of Sale → Reporting → POS Transfer Locations and assign each branch."
+            )
             return empty
 
         date_domain = [
@@ -1918,13 +1937,26 @@ class PosReportingDashboard(models.TransientModel):
             "not_approved_count": sum(1 for r in rows if r["not_approved"]),
             "mismatch_count": sum(1 for r in rows if r["where"] != "ok"),
         }
+        warning = ""
+        if not mapped_configs:
+            warning = _(
+                "No POS Transfer Locations are configured yet. "
+                "Assign each branch under Point of Sale → Reporting → POS Transfer Locations "
+                "so receipts match the correct stock location."
+            )
+        elif len(mapped_configs) < len(configs):
+            missing = configs - mapped_configs
+            warning = _(
+                "Some branches have no transfer location assigned: %s"
+            ) % ", ".join(missing.mapped("name"))
+
         return {
             "date_from": period["date_from"].isoformat(),
             "date_to": period["date_to"].isoformat(),
             "all_branches": [{"id": c.id, "name": c.name} for c in all_configs],
             "summary": summary,
             "rows": rows,
-            "error": "",
+            "error": warning,
         }
 
     @api.model

@@ -8,6 +8,7 @@
     "license": "LGPL-3",
     "depends": [
         "point_of_sale",
+        "stock",
         "account",
         "web",
         "pos_advance_order",
