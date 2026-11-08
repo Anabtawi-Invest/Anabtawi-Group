@@ -2287,25 +2287,25 @@ class PosReportingDashboard(models.TransientModel):
             parts.append("receive")
         if not parts:
             where = "ok"
-            where_label = _("Match")
+            where_label = _("Match — asked, sent, and received agree")
         elif parts == ["send"]:
             where = "send"
-            where_label = _("At تسليم الطلبيات")
+            where_label = _("Hub sent less than asked")
         elif parts == ["receive"]:
             where = "receive"
-            where_label = _("At branch")
+            where_label = _("Branch received less than sent")
         elif parts == ["waiting"]:
             where = "waiting"
-            where_label = _("Not approved")
+            where_label = _("Branch receipt not validated yet")
         elif "send" in parts and "waiting" in parts:
             where = "send_waiting"
-            where_label = _("Send gap + not approved")
+            where_label = _("Hub short + receipt not validated")
         elif "send" in parts and "receive" in parts:
             where = "both"
-            where_label = _("Send and receive")
+            where_label = _("Short at hub and again at branch")
         else:
             where = "mixed"
-            where_label = _("Mixed")
+            where_label = _("Mixed issue")
         return {
             "send_gap": send_gap,
             "receive_gap": receive_gap if not not_approved else round(sent - received, 3),
@@ -2483,17 +2483,20 @@ class PosReportingDashboard(models.TransientModel):
             })
 
         def _quantities_from_pair(request_move, receipt_move):
-            """Asked/sent from the request; received only after the branch validates."""
+            """Asked = demand; Sent = hub done qty; Received = branch done qty.
+
+            When only a hub→branch receipt exists (no paired request), use that
+            move's demand as Asked and its done quantity as both Sent and the
+            starting point for Received — never treat demand as Sent, or a
+            partial ship is mis-labeled as a receive gap.
+            """
             asked = float((request_move.product_uom_qty if request_move else (
                 receipt_move.product_uom_qty if receipt_move else 0.0
             )) or 0.0)
             if request_move:
                 sent = self._transfer_move_qty(request_move, done_only=True)
             elif receipt_move:
-                # Without a request doc, receipt demand is the best "sent" signal.
-                sent = float(receipt_move.product_uom_qty or 0.0) if (
-                    receipt_move.picking_id and receipt_move.picking_id.state == "done"
-                ) else 0.0
+                sent = self._transfer_move_qty(receipt_move, done_only=True)
             else:
                 sent = 0.0
             received = self._transfer_move_qty(receipt_move, done_only=True) if receipt_move else 0.0
