@@ -37,6 +37,11 @@ export class PosReportingDashboard extends Component {
             categorySearch: "",
             categorySortKey: "category_profit",
             categorySortOrder: "desc",
+            transferLoading: false,
+            transferFilter: "all",
+            transferSearch: "",
+            transferSortKey: "where",
+            transferSortOrder: "asc",
             sortKey: "sales",
             sortOrder: "desc",
         });
@@ -63,6 +68,10 @@ export class PosReportingDashboard extends Component {
                         categorySearch: this.state.categorySearch,
                         categorySortKey: this.state.categorySortKey,
                         categorySortOrder: this.state.categorySortOrder,
+                        transferFilter: this.state.transferFilter,
+                        transferSearch: this.state.transferSearch,
+                        transferSortKey: this.state.transferSortKey,
+                        transferSortOrder: this.state.transferSortOrder,
                         sortKey: this.state.sortKey,
                         sortOrder: this.state.sortOrder,
                     },
@@ -77,6 +86,13 @@ export class PosReportingDashboard extends Component {
             category_cards: { best_categories: [], best_available: [], best_unavailable: [], worst_in_stock: [] },
             categories: [],
             products: [],
+            error: "",
+        });
+
+        this.transfers = useState({
+            loadedKey: "",
+            summary: {},
+            rows: [],
             error: "",
         });
 
@@ -121,7 +137,12 @@ export class PosReportingDashboard extends Component {
             await this.fetchProductData();
             return;
         }
+        if (this.state.view === "transfers") {
+            await this.fetchTransferData();
+            return;
+        }
         this.products.loadedKey = "";
+        this.transfers.loadedKey = "";
         this.state.loading = true;
         try {
             const strFrom = this.state.date_from;
@@ -197,7 +218,152 @@ export class PosReportingDashboard extends Component {
         this.state.view = view;
         if ((view === "products" || view === "category_profit") && this.products.loadedKey !== this._filterKey()) {
             this.fetchProductData();
+        } else if (view === "transfers" && this.transfers.loadedKey !== this._filterKey()) {
+            this.fetchTransferData();
+        } else if (view === "branches" && !(this.data.branches || []).length) {
+            this.fetchDashboardData();
         }
+    }
+
+    setTransferFilter(filter) {
+        this.state.transferFilter = filter;
+    }
+
+    onTransferSearch(ev) {
+        this.state.transferSearch = ev.target.value || "";
+    }
+
+    async fetchTransferData() {
+        this.state.transferLoading = true;
+        this.state.loading = false;
+        this.transfers.error = "";
+        try {
+            const res = await this.orm.call(
+                "pos.reporting.dashboard",
+                "get_transfer_dashboard_data",
+                [],
+                {
+                    date_from: this.state.date_from,
+                    date_to: this.state.date_to,
+                    config_ids: this.state.config_ids || [],
+                }
+            );
+            this.transfers.summary = res.summary || {};
+            this.transfers.rows = res.rows || [];
+            this.transfers.error = res.error || "";
+            this.transfers.loadedKey = this._filterKey();
+            if (res.all_branches && res.all_branches.length) {
+                this.data.all_branches = res.all_branches;
+            }
+            this.data.date_from = res.date_from || this.state.date_from;
+            this.data.date_to = res.date_to || this.state.date_to;
+        } catch (error) {
+            console.error("Failed to load transfer dashboard", error);
+            this.transfers.error = "The transfer list did not load.";
+        } finally {
+            this.state.transferLoading = false;
+        }
+    }
+
+    get sortedTransfers() {
+        const query = (this.state.transferSearch || "").trim().toLowerCase();
+        const filter = this.state.transferFilter;
+        let rows = [...(this.transfers.rows || [])];
+        if (filter === "mismatch") {
+            rows = rows.filter((row) => row.where !== "ok");
+        } else if (filter === "not_approved") {
+            rows = rows.filter((row) => row.not_approved);
+        } else if (filter === "send") {
+            rows = rows.filter((row) => Math.abs(row.send_gap || 0) > 0.0005);
+        } else if (filter === "receive") {
+            rows = rows.filter((row) => !row.not_approved && Math.abs(row.receive_gap || 0) > 0.0005);
+        }
+        if (query) {
+            rows = rows.filter((row) =>
+                (row.product_name || "").toLowerCase().includes(query)
+                || (row.branch_name || "").toLowerCase().includes(query)
+                || (row.request_picking_name || "").toLowerCase().includes(query)
+                || (row.receipt_picking_name || "").toLowerCase().includes(query)
+                || (row.where_label || "").toLowerCase().includes(query)
+            );
+        }
+        const key = this.state.transferSortKey;
+        const isAsc = this.state.transferSortOrder === "asc";
+        const whereRank = {
+            waiting: 0,
+            send_waiting: 1,
+            both: 2,
+            send: 3,
+            receive: 4,
+            mixed: 5,
+            ok: 6,
+        };
+        rows.sort((a, b) => {
+            let valA = a[key];
+            let valB = b[key];
+            if (key === "where") {
+                valA = whereRank[a.where] ?? 9;
+                valB = whereRank[b.where] ?? 9;
+            }
+            if (typeof valA === "string" || typeof valB === "string") {
+                valA = (valA || "").toLowerCase();
+                valB = (valB || "").toLowerCase();
+                return isAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+            }
+            const missingA = valA === null || valA === undefined;
+            const missingB = valB === null || valB === undefined;
+            if (missingA || missingB) {
+                if (missingA && missingB) return 0;
+                return missingA ? 1 : -1;
+            }
+            return isAsc ? valA - valB : valB - valA;
+        });
+        return rows;
+    }
+
+    sortTransfers(key) {
+        if (this.state.transferSortKey === key) {
+            this.state.transferSortOrder = this.state.transferSortOrder === "asc" ? "desc" : "asc";
+        } else {
+            this.state.transferSortKey = key;
+            this.state.transferSortOrder = (
+                key === "branch_name"
+                || key === "product_name"
+                || key === "where"
+                || key === "request_picking_name"
+                || key === "receipt_picking_name"
+            ) ? "asc" : "desc";
+        }
+    }
+
+    async openTransferPicking(pickingId) {
+        if (!pickingId) {
+            return;
+        }
+        try {
+            const action = await this.orm.call(
+                "pos.reporting.dashboard",
+                "open_transfer_picking",
+                [],
+                { picking_id: pickingId }
+            );
+            if (action) {
+                this.actionService.doAction(action);
+            }
+        } catch (error) {
+            console.error("Failed to open transfer", error);
+        }
+    }
+
+    transferWhereClass(where) {
+        if (where === "ok") return "text-success";
+        if (where === "waiting" || where === "send_waiting") return "text-warning";
+        if (where === "send" || where === "receive" || where === "both" || where === "mixed") return "text-danger";
+        return "";
+    }
+
+    hasTransferGap(value) {
+        return Math.abs(Number(value) || 0) > 0.0005;
     }
 
     setProductFilter(filter) {

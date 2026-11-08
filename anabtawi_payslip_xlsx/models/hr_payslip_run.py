@@ -303,6 +303,8 @@ class HrPayslipRun(models.Model):
         fixed_ded_cols = [
             (_("Income Tax"), 16),
             (_("SSC Employee Contrib"), 20),
+            (_("Absent"), 16),
+            (_("Lateness"), 16),
         ]
 
         fixed_comp_cols = [
@@ -483,6 +485,14 @@ class HrPayslipRun(models.Model):
 
             rule_keys = col_info["rule_keys"]
             input_type_ids = col_info["input_type_ids"]
+
+            # Replaced by the Absent and Lateness worked-day columns
+            if (
+                "attendance deduction" in c_name_lower
+                or "undertime" in c_name_lower
+                or any(str(k).upper() == "DED_UNDERTIME" for k in rule_keys)
+            ):
+                continue
 
             # Calculate total across all selected payslips prioritizing computed rule lines over input lines
             col_total = 0.0
@@ -718,6 +728,13 @@ class HrPayslipRun(models.Model):
                 absent_hrs = summary["absent_hrs"]
                 lateness_hrs = summary["lateness_hrs"]
                 out_of_contract_days = summary["out_of_contract_days"]
+                absent_amt = lateness_amt = 0.0
+                for wd in worked_days:
+                    kind = payslip._xlsx_classify_worked_day(wd)
+                    if kind == "absent":
+                        absent_amt += wd.amount or 0.0
+                    elif kind == "lateness":
+                        lateness_amt += wd.amount or 0.0
                 worked_hrs = sum(worked_days.mapped("number_of_hours"))
                 ot_hrs = sum(worked_days.filtered(
                     lambda wd: any(
@@ -791,6 +808,8 @@ class HrPayslipRun(models.Model):
                 # Write DEDUCTION Section
                 sheet1.write_number(data_row, col_curr, tax_val, number_fmt); col_curr += 1
                 sheet1.write_number(data_row, col_curr, ssce_val, number_fmt); col_curr += 1
+                sheet1.write_number(data_row, col_curr, absent_amt, number_fmt); col_curr += 1
+                sheet1.write_number(data_row, col_curr, lateness_amt, number_fmt); col_curr += 1
 
                 for ded_val in dyn_ded_vals:
                     sheet1.write_number(data_row, col_curr, ded_val, number_fmt)

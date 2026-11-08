@@ -42,6 +42,23 @@ class HrLeaveAllocation(models.Model):
             return earliest_start
         return self.date_from
 
+    def _add_days_to_allocation(self, current_level, current_level_maximum_leave, leaves_taken, period_start, period_end):
+        days_to_add = self._process_accrual_plan_level(
+            current_level, period_start, self.lastcall, period_end, self.nextcall)
+        if current_level.cap_accrued_time_yearly:
+            maximum_leave_yearly = current_level.maximum_leave_yearly\
+                if current_level.added_value_type != 'hour'\
+                else current_level.maximum_leave_yearly / self.employee_id._get_hours_per_day(self.date_from)
+            yearly_remaining_amount = max(0.0, maximum_leave_yearly - self.yearly_accrued_amount)
+            days_to_add = min(days_to_add, yearly_remaining_amount)
+        if current_level.cap_accrued_time:
+            capped_total_balance = leaves_taken + current_level_maximum_leave
+            days_to_add = min(days_to_add, max(0.0, capped_total_balance - self.number_of_days))
+        # Accrual should never deduct days from an existing balance
+        days_to_add = max(0.0, days_to_add)
+        self.number_of_days += days_to_add
+        self.yearly_accrued_amount += days_to_add
+
     def _get_current_accrual_plan_level_id(self, date, level_ids=False):
         """
         Override to use milestone reference date (allocation or contract start) instead of date_from.
@@ -289,7 +306,12 @@ class HrLeaveAllocation(models.Model):
                     level._get_level_transition_date(ref_date_start): level
                     for level in allocation.accrual_plan_id.level_ids
                 }
-                current_level = level_start.get(allocation.actual_lastcall) or current_level or allocation.accrual_plan_id.level_ids[0]
+                current_level = (
+                    level_start.get(allocation.actual_lastcall)
+                    or current_level
+                    or allocation._get_current_accrual_plan_level_id(allocation.actual_lastcall or allocation.nextcall)[0]
+                    or allocation.accrual_plan_id.level_ids[0]
+                )
                 period_start = current_level._get_previous_date(allocation.actual_lastcall)
                 if current_level.cap_accrued_time:
                     if current_level.added_value_type == "day":
