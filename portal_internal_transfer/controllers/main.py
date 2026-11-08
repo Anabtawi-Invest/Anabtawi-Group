@@ -101,31 +101,6 @@ class PortalInternalTransfer(http.Controller):
             raise UserError(_("No internal transfer operation type is configured."))
         return picking_type
 
-    def _validate_picking_fully(self, picking):
-        """Confirm, set done qty, validate so push rules create the next transfer."""
-        if picking.state == "draft":
-            picking.action_confirm()
-        if picking.state in ("confirmed", "assigned", "waiting"):
-            picking.action_assign()
-        for move in picking.move_ids.filtered(lambda m: m.state not in ("done", "cancel")):
-            if move.product_uom_qty and not move.quantity:
-                move.quantity = move.product_uom_qty
-        picking.move_ids.filtered(lambda m: m.state not in ("done", "cancel")).picked = True
-        result = picking.with_context(
-            skip_backorder=True,
-            skip_sms=True,
-            skip_sanity_check=True,
-        ).button_validate()
-        if isinstance(result, dict):
-            # Unexpected wizard — force done path when possible
-            picking.with_context(
-                skip_backorder=True,
-                cancel_backorder=True,
-                skip_sms=True,
-                skip_sanity_check=True,
-            )._action_done()
-        return picking
-
     # ------------------------------------------------------------------
     # Pages
     # ------------------------------------------------------------------
@@ -354,13 +329,10 @@ class PortalInternalTransfer(http.Controller):
                 }
             )
         )
-        # Validate first leg so push creates second INT (transit → van stock) as assigned
-        self._validate_picking_fully(picking)
-        next_pickings = picking.move_ids.move_dest_ids.picking_id
+        # Keep draft: warehouse validates later; push route then creates transit → van stock.
         return {
             "picking_id": picking.id,
             "picking_name": picking.name,
-            "next_picking_names": next_pickings.mapped("name"),
             "redirect_url": f"/my/transfers/{picking.id}",
         }
 

@@ -123,13 +123,13 @@
                     <div class="card-header fw-bold">3. Confirm</div>
                     <div class="card-body">
                         <p class="text-muted mb-3">
-                            Confirming validates the transfer into your transit location.
-                            A second transfer to van stock is created automatically and left
-                            waiting for warehouse validation (same as branches).
+                            Confirming saves the transfer as a draft (source → transit).
+                            When Inventory validates it, the push route creates the next
+                            transfer to van stock.
                         </p>
                         <button type="button" class="btn btn-success btn-lg" id="btn_confirm_transfer"
                                 t-att-disabled="not dest_location">
-                            Confirm Transfer
+                            Create Draft Transfer
                         </button>
                         <div id="confirm_error" class="alert alert-danger mt-3 d-none mb-0"/>
                     </div>
@@ -224,8 +224,11 @@
                 </div>
 
                 <div t-if="picking.state == 'cancel'" class="alert alert-warning">This transfer is cancelled.</div>
-                <div t-elif="picking.state not in ('draft', 'cancel')" class="alert alert-success">
-                    Transfer confirmed successfully.
+                <div t-elif="picking.state == 'draft'" class="alert alert-info">
+                    Transfer saved as draft. Validate it in Inventory to move stock and create the next transfer via the route.
+                </div>
+                <div t-elif="picking.state == 'done'" class="alert alert-success">
+                    Transfer validated successfully.
                 </div>
 
                 <div class="card mb-3">
