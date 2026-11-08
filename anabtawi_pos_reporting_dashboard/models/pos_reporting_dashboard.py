@@ -2290,7 +2290,7 @@ class PosReportingDashboard(models.TransientModel):
             where_label = _("Match — asked, sent, and received agree")
         elif parts == ["send"]:
             where = "send"
-            where_label = _("Hub sent less than asked")
+            where_label = _("تسليم الطلبيات sent less than asked")
         elif parts == ["receive"]:
             where = "receive"
             where_label = _("Branch received less than sent")
@@ -2299,10 +2299,10 @@ class PosReportingDashboard(models.TransientModel):
             where_label = _("Branch receipt not validated yet")
         elif "send" in parts and "waiting" in parts:
             where = "send_waiting"
-            where_label = _("Hub short + receipt not validated")
+            where_label = _("تسليم الطلبيات short + receipt not validated")
         elif "send" in parts and "receive" in parts:
             where = "both"
-            where_label = _("Short at hub and again at branch")
+            where_label = _("Short at تسليم الطلبيات and again at branch")
         else:
             where = "mixed"
             where_label = _("Mixed issue")

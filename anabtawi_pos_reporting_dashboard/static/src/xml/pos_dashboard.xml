@@ -510,13 +510,13 @@
                             <t t-esc="transfers.error"/>
                         </div>
                         <div class="small text-muted mb-2">
-                            Requested = demand. Sent by hub = quantity done on the send. Received at branch = quantity validated on the receipt.
-                            “What happened” explains whether the shortage is at the hub, at the branch, or still waiting validation.
+                            Requested = demand. Sent by تسليم الطلبيات = quantity done on the send. Received at branch = quantity validated on the receipt.
+                            “What happened” explains whether the shortage is at تسليم الطلبيات, at the branch, or still waiting validation.
                         </div>
                         <div class="o_product_summary mb-3">
                             <span class="badge bg-light text-dark border me-2"><t t-esc="transfers.summary.line_count || 0"/> lines</span>
                             <span class="badge bg-primary me-2">Requested <t t-esc="formatDecimal(transfers.summary.asked || 0, 3)"/></span>
-                            <span class="badge bg-info me-2">Sent by hub <t t-esc="formatDecimal(transfers.summary.sent || 0, 3)"/></span>
+                            <span class="badge bg-info me-2">Sent by تسليم الطلبيات <t t-esc="formatDecimal(transfers.summary.sent || 0, 3)"/></span>
                             <span class="badge bg-success me-2">Received at branch <t t-esc="formatDecimal(transfers.summary.received || 0, 3)"/></span>
                             <span class="badge bg-danger me-2">Problem lines <t t-esc="transfers.summary.mismatch_count || 0"/></span>
                             <span class="badge bg-warning text-dark me-2">Not validated <t t-esc="transfers.summary.not_approved_count || 0"/></span>
@@ -526,7 +526,7 @@
                                 <button type="button" class="btn btn-sm" t-att-class="state.transferFilter === 'all' ? 'btn-primary' : 'btn-outline-primary'" t-on-click="() => this.setTransferFilter('all')">All</button>
                                 <button type="button" class="btn btn-sm" t-att-class="state.transferFilter === 'mismatch' ? 'btn-primary' : 'btn-outline-primary'" t-on-click="() => this.setTransferFilter('mismatch')">Differences</button>
                                 <button type="button" class="btn btn-sm" t-att-class="state.transferFilter === 'not_approved' ? 'btn-primary' : 'btn-outline-primary'" t-on-click="() => this.setTransferFilter('not_approved')">Not validated</button>
-                                <button type="button" class="btn btn-sm" t-att-class="state.transferFilter === 'send' ? 'btn-primary' : 'btn-outline-primary'" t-on-click="() => this.setTransferFilter('send')">Hub short</button>
+                                <button type="button" class="btn btn-sm" t-att-class="state.transferFilter === 'send' ? 'btn-primary' : 'btn-outline-primary'" t-on-click="() => this.setTransferFilter('send')">تسليم الطلبيات short</button>
                                 <button type="button" class="btn btn-sm" t-att-class="state.transferFilter === 'receive' ? 'btn-primary' : 'btn-outline-primary'" t-on-click="() => this.setTransferFilter('receive')">Branch short</button>
                             </div>
                             <input type="search" class="form-control filter_input" style="max-width: 280px;" placeholder="Search branch, product, transfer..." t-att-value="state.transferSearch" t-on-input="onTransferSearch"/>
@@ -538,12 +538,12 @@
                                         <th class="sortable_th" t-on-click="() => this.sortTransfers('branch_name')">Branch</th>
                                         <th class="sortable_th" t-on-click="() => this.sortTransfers('product_name')">Product</th>
                                         <th class="text-end sortable_th" t-on-click="() => this.sortTransfers('asked')" title="Demand quantity">Requested</th>
-                                        <th class="text-end sortable_th" t-on-click="() => this.sortTransfers('sent')" title="Quantity done when hub sent">Sent by hub</th>
+                                        <th class="text-end sortable_th" t-on-click="() => this.sortTransfers('sent')" title="Quantity done when تسليم الطلبيات sent">Sent by تسليم الطلبيات</th>
                                         <th class="text-end sortable_th" t-on-click="() => this.sortTransfers('received')" title="Quantity validated at the branch">Received at branch</th>
                                         <th class="text-end sortable_th" t-on-click="() => this.sortTransfers('send_gap')" title="Requested minus sent">Not sent</th>
                                         <th class="text-end sortable_th" t-on-click="() => this.sortTransfers('receive_gap')" title="Sent minus received">Not received</th>
                                         <th class="sortable_th" t-on-click="() => this.sortTransfers('where')">What happened</th>
-                                        <th class="sortable_th" t-on-click="() => this.sortTransfers('request_picking_name')">Hub request</th>
+                                        <th class="sortable_th" t-on-click="() => this.sortTransfers('request_picking_name')">تسليم الطلبيات request</th>
                                         <th class="sortable_th" t-on-click="() => this.sortTransfers('receipt_picking_name')">Branch receipt</th>
                                         <th>Receipt status</th>
                                     </tr>
