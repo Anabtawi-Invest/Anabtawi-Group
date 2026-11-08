@@ -124,6 +124,14 @@ function initCreatePage(root) {
         partnerResults.innerHTML = "";
     }
 
+    function cancelPartnerSearch() {
+        clearTimeout(searchTimer);
+        searchSeq += 1;
+        hidePartnerResults();
+    }
+
+    const partnerSearchWrap = partnerSearch.closest(".o_portal_partner_autocomplete");
+
     function hidePaymentTerms() {
         state.paymentTermId = null;
         if (paymentTermWrap) {
@@ -172,7 +180,11 @@ function initCreatePage(root) {
         selectedLabel.textContent = `${partner.name}${partner.phone ? " — " + partner.phone : ""}${partner.email ? " — " + partner.email : ""}`;
         selectedBox.classList.remove("d-none");
         partnerSearch.value = "";
-        hidePartnerResults();
+        // Drop pending/in-flight searches so results don't reopen after click.
+        cancelPartnerSearch();
+        if (partnerSearchWrap) {
+            partnerSearchWrap.classList.add("d-none");
+        }
         if (partner.portal_allow_payment_term) {
             showPaymentTerms(partner).catch((err) => {
                 console.error("portal_sale_order_create: failed to load payment terms", err);
@@ -288,8 +300,9 @@ function initCreatePage(root) {
                 )
                 .join("");
             qsa("button", partnerResults).forEach((btn) => {
-                btn.addEventListener("mousedown", (ev) => {
+                const pick = (ev) => {
                     ev.preventDefault();
+                    ev.stopPropagation();
                     const defaultTerm = parseInt(btn.dataset.defaultPaymentTermId || "", 10);
                     selectPartner({
                         id: parseInt(btn.dataset.id, 10),
@@ -299,7 +312,10 @@ function initCreatePage(root) {
                         portal_allow_payment_term: btn.dataset.allowPaymentTerm === "1",
                         default_payment_term_id: defaultTerm || false,
                     });
-                });
+                };
+                // mousedown avoids blur-before-click; click covers touch / keyboard activate.
+                btn.addEventListener("mousedown", pick);
+                btn.addEventListener("click", pick);
             });
         } catch (e) {
             if (seq !== searchSeq) {
@@ -319,6 +335,10 @@ function initCreatePage(root) {
 
     function schedulePartnerSearch() {
         clearTimeout(searchTimer);
+        if (state.partner) {
+            hidePartnerResults();
+            return;
+        }
         const term = partnerSearch.value.trim();
         if (term.length < 1) {
             hidePartnerResults();
@@ -461,6 +481,11 @@ function initCreatePage(root) {
     qs("#btn_clear_partner", root)?.addEventListener("click", () => {
         state.partner = null;
         selectedBox?.classList.add("d-none");
+        cancelPartnerSearch();
+        if (partnerSearchWrap) {
+            partnerSearchWrap.classList.remove("d-none");
+        }
+        partnerSearch.focus();
         hidePaymentTerms();
     });
 
