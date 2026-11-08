@@ -72,7 +72,7 @@ class InventoryAsOfBatch(models.Model):
     )
     as_of_stock_xlsx = fields.Binary(
         string="As-of Stock Excel",
-        attachment=True,
+        attachment=False,
         copy=False,
         help="Excel of products with on-hand > 0 at the default location on the as-of date.",
     )
@@ -187,20 +187,34 @@ class InventoryAsOfBatch(models.Model):
         as_of_label = fields.Datetime.to_string(self.as_of_datetime).replace(":", "-")
         location_label = (self.location_id.name or "location").replace("/", "-")
         filename = "As_of_Stock_%s_%s.xlsx" % (location_label, as_of_label)
+        # Store on the record (not as a separate attachment) so the binary
+        # widget can show the file after the form reloads.
         self.write(
             {
                 "as_of_stock_xlsx": base64.b64encode(xlsx_bytes),
                 "as_of_stock_xlsx_filename": filename,
             }
         )
+        download_url = (
+            "/web/content/?model=%s&id=%s&field=as_of_stock_xlsx"
+            "&filename_field=as_of_stock_xlsx_filename&download=true"
+            % (self._name, self.id)
+        )
+        # Download without leaving the page, then reload the form so the
+        # As-of Stock Excel field shows the saved file.
         return {
             "type": "ir.actions.act_url",
-            "url": (
-                "/web/content/?model=%s&id=%s&field=as_of_stock_xlsx"
-                "&filename=%s&download=true"
-                % (self._name, self.id, filename)
-            ),
-            "target": "self",
+            "url": download_url,
+            "target": "download",
+            "next": {
+                "type": "ir.actions.act_window",
+                "name": _("As-of Inventory Adjustment"),
+                "res_model": self._name,
+                "res_id": self.id,
+                "view_mode": "form",
+                "views": [(False, "form")],
+                "target": "current",
+            },
         }
 
     def _prepare_as_of_stock_rows(self):
