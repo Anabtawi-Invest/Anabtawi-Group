@@ -33,16 +33,43 @@ function start() {
     initDetailPage();
 }
 
-async function fetchPartners(term) {
+async function fetchPartners(term, saleMode) {
+    const mode = saleMode || "cash";
     try {
-        return await rpc("/my/sales/api/partners", { term });
+        return await rpc("/my/sales/api/partners", { term, sale_mode: mode });
     } catch (e1) {
-        const url = `/my/sales/api/partners/http?term=${encodeURIComponent(term)}`;
+        const url =
+            `/my/sales/api/partners/http?term=${encodeURIComponent(term)}` +
+            `&sale_mode=${encodeURIComponent(mode)}`;
         const response = await fetch(url, { credentials: "same-origin" });
         if (!response.ok) {
             throw e1;
         }
         return await response.json();
+    }
+}
+
+async function createCashCustomer(payload) {
+    try {
+        return await rpc("/my/sales/api/cash_customers/create", payload);
+    } catch (e1) {
+        if (e1 && e1.data && e1.data.message) {
+            throw e1;
+        }
+        const response = await fetch("/my/sales/api/cash_customers/create/http", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        });
+        if (!response.ok) {
+            throw e1;
+        }
+        const result = await response.json();
+        if (result && result.error) {
+            throw result.error;
+        }
+        return result.result !== undefined ? result.result : result;
     }
 }
 
@@ -61,6 +88,8 @@ async function fetchPaymentTerms() {
 }
 
 function initCreatePage(root) {
+    const saleMode = (root.dataset.saleMode || "cash").toLowerCase();
+    const isCredit = saleMode === "credit";
     const state = {
         partner: null,
         paymentTermId: null,
@@ -77,8 +106,11 @@ function initCreatePage(root) {
     const selectedLabel = qs("#selected_partner_label", root);
     const paymentTermWrap = qs("#payment_term_wrap", root);
     const paymentTermSelect = qs("#payment_term_id", root);
-    const paymentAmountWrap = qs("#payment_amount_wrap", root);
-    const paymentAmountInput = qs("#payment_amount", root);
+    const cashNameInput = qs("#cash_customer_name", root);
+    const cashPhoneInput = qs("#cash_customer_phone", root);
+    const cashEmailInput = qs("#cash_customer_email", root);
+    const cashCreateBtn = qs("#btn_create_cash_customer", root);
+    const cashCreateError = qs("#cash_customer_error", root);
     const cartBody = qs("#cart_body", root);
     const cartEmpty = qs("#cart_empty", root);
     const cartWrap = qs("#cart_table_wrap", root);
@@ -136,17 +168,11 @@ function initCreatePage(root) {
 
     function hidePaymentTerms() {
         state.paymentTermId = null;
-        if (paymentTermWrap) {
+        if (!isCredit && paymentTermWrap) {
             paymentTermWrap.classList.add("d-none");
         }
         if (paymentTermSelect) {
             paymentTermSelect.value = "";
-        }
-        if (paymentAmountWrap) {
-            paymentAmountWrap.classList.add("d-none");
-        }
-        if (paymentAmountInput) {
-            paymentAmountInput.value = "";
         }
     }
 
@@ -166,17 +192,11 @@ function initCreatePage(root) {
     }
 
     async function showPaymentTerms(partner) {
-        if (!paymentTermWrap || !paymentTermSelect) {
+        if (!isCredit || !paymentTermWrap || !paymentTermSelect) {
             return;
         }
         await ensurePaymentTermsOptions();
         paymentTermWrap.classList.remove("d-none");
-        if (paymentAmountWrap) {
-            paymentAmountWrap.classList.remove("d-none");
-        }
-        if (paymentAmountInput) {
-            paymentAmountInput.value = "";
-        }
         const defaultId = partner.default_payment_term_id
             ? String(partner.default_payment_term_id)
             : "";
@@ -199,7 +219,7 @@ function initCreatePage(root) {
         if (partnerSearchWrap) {
             partnerSearchWrap.classList.add("d-none");
         }
-        if (partner.portal_allow_payment_term) {
+        if (isCredit) {
             showPaymentTerms(partner).catch((err) => {
                 console.error("portal_sale_order_create: failed to load payment terms", err);
                 hidePaymentTerms();
@@ -207,6 +227,12 @@ function initCreatePage(root) {
         } else {
             hidePaymentTerms();
         }
+    }
+
+    if (isCredit) {
+        ensurePaymentTermsOptions().catch((err) => {
+            console.error("portal_sale_order_create: failed to preload payment terms", err);
+        });
     }
 
     function renderCart() {
@@ -273,18 +299,26 @@ function initCreatePage(root) {
         const seq = ++searchSeq;
         partnerResults.innerHTML = `<div class="list-group-item text-muted">جاري البحث... / Searching...</div>`;
         try {
-            const partners = await fetchPartners(term);
+            const partners = await fetchPartners(term, saleMode);
             if (seq !== searchSeq) {
                 return;
             }
             if (!partners.length) {
-                partnerResults.innerHTML = `
+                partnerResults.innerHTML = isCredit
+                    ? `
                     <div class="list-group-item o_portal_partner_empty">
                         <div class="fw-semibold mb-1">لا يوجد عميل مطابق</div>
                         <div class="small text-muted mb-0">
-                            لم يتم العثور على عميل بهذا الاسم أو رقم الهاتف أو الإيميل ضمن جهات الاتصال المخصصة لك.
-                            لطلب عميل جديد استخدم بوابة طلب العميل.
-                            <a href="/my/customer-requests/create">طلب عميل جديد / Request customer</a>
+                            No credit customer found with you as salesperson.
+                            <a href="/my/customer-requests/create">Request Credit Customer</a>
+                        </div>
+                    </div>`
+                    : `
+                    <div class="list-group-item o_portal_partner_empty">
+                        <div class="fw-semibold mb-1">لا يوجد عميل مطابق</div>
+                        <div class="small text-muted mb-0">
+                            No walk-in customer found under your van customer.
+                            Create one using the form below.
                         </div>
                     </div>`;
                 return;
@@ -339,9 +373,7 @@ function initCreatePage(root) {
                 <div class="list-group-item o_portal_partner_empty">
                     <div class="fw-semibold mb-1">لا يوجد عميل مطابق</div>
                     <div class="small text-muted mb-0">
-                        لم يتم العثور على نتائج. جرّب اسمًا أو رقم هاتف أو إيميل آخر،
-                        أو اطلب عميلًا جديدًا من
-                        <a href="/my/customer-requests/create">بوابة طلب العميل</a>.
+                        Search failed. Try another name, phone or email.
                     </div>
                 </div>`;
         }
@@ -553,28 +585,51 @@ function initCreatePage(root) {
         }
     });
 
+    if (cashCreateBtn) {
+        cashCreateBtn.addEventListener("click", async () => {
+            if (cashCreateError) {
+                cashCreateError.classList.add("d-none");
+                cashCreateError.textContent = "";
+            }
+            const name = (cashNameInput && cashNameInput.value) || "";
+            if (!name.trim()) {
+                if (cashCreateError) {
+                    cashCreateError.textContent = "Customer name is required.";
+                    cashCreateError.classList.remove("d-none");
+                }
+                return;
+            }
+            cashCreateBtn.disabled = true;
+            try {
+                const partner = await createCashCustomer({
+                    name,
+                    phone: (cashPhoneInput && cashPhoneInput.value) || "",
+                    email: (cashEmailInput && cashEmailInput.value) || "",
+                });
+                if (cashNameInput) cashNameInput.value = "";
+                if (cashPhoneInput) cashPhoneInput.value = "";
+                if (cashEmailInput) cashEmailInput.value = "";
+                selectPartner(partner);
+            } catch (err) {
+                if (cashCreateError) {
+                    cashCreateError.textContent = extractError(err);
+                    cashCreateError.classList.remove("d-none");
+                }
+            } finally {
+                cashCreateBtn.disabled = false;
+            }
+        });
+    }
+
     qs("#btn_confirm_order", root).addEventListener("click", async () => {
         confirmError.classList.add("d-none");
         if (!state.partner) {
             showError(confirmError, "Please select a customer.");
             return;
         }
-        if (state.partner.portal_allow_payment_term && !state.paymentTermId) {
+        if (isCredit && !state.paymentTermId) {
             showError(confirmError, "Please select payment terms.");
             return;
-        }
-        let paymentAmount = null;
-        if (state.partner.portal_allow_payment_term && paymentAmountInput) {
-            const raw = (paymentAmountInput.value || "").trim();
-            if (raw !== "") {
-                paymentAmount = parseFloat(raw);
-                if (Number.isNaN(paymentAmount) || paymentAmount < 0) {
-                    showError(confirmError, "Please enter a valid payment amount (0 or more).");
-                    return;
-                }
-            } else {
-                paymentAmount = 0;
-            }
         }
         const lines = Object.values(state.cart).map((i) => ({ product_id: i.id, qty: i.qty }));
         if (!lines.length) {
@@ -596,10 +651,10 @@ function initCreatePage(root) {
             const payload = {
                 partner_id: state.partner.id,
                 lines,
+                sale_mode: saleMode,
             };
-            if (state.partner.portal_allow_payment_term) {
+            if (isCredit) {
                 payload.payment_term_id = state.paymentTermId;
-                payload.payment_amount = paymentAmount;
             }
             const result = await rpc("/my/sales/api/confirm", payload);
             window.location.href = result.redirect_url;

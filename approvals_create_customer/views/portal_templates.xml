@@ -8,8 +8,8 @@
                     <a href="/my/customer-requests/create"
                        class="d-flex gap-2 gap-md-3 py-3 pe-2 px-md-3 h-100 rounded text-decoration-none border bg-white">
                         <div>
-                            <h5 class="mb-0">Request New Customer</h5>
-                            <p class="mt-1 mb-0 opacity-75">Submit a customer for approval</p>
+                            <h5 class="mb-0">Request Credit Customer</h5>
+                            <p class="mt-1 mb-0 opacity-75">Submit a payment-term customer for approval</p>
                         </div>
                     </a>
                 </div>
@@ -17,8 +17,8 @@
                     <a href="/my/customer-requests"
                        class="d-flex gap-2 gap-md-3 py-3 pe-2 px-md-3 h-100 rounded text-decoration-none border bg-white">
                         <div>
-                            <h5 class="mb-0">My Customer Requests</h5>
-                            <p class="mt-1 mb-0 opacity-75">Track and cancel your requests</p>
+                            <h5 class="mb-0">My Credit Customer Requests</h5>
+                            <p class="mt-1 mb-0 opacity-75">Track and cancel your credit customer requests</p>
                         </div>
                     </a>
                 </div>
@@ -29,13 +29,13 @@
     <template id="portal_breadcrumbs_customer_request" inherit_id="portal.portal_breadcrumbs">
         <xpath expr="//ol" position="inside">
             <li t-if="page_name == 'portal_customer_request_create'" class="breadcrumb-item">
-                <a href="/my/customer-requests/create">Request New Customer</a>
+                <a href="/my/customer-requests/create">Request Credit Customer</a>
             </li>
             <li t-if="page_name == 'portal_customer_request_list'" class="breadcrumb-item">
-                <a href="/my/customer-requests">My Customer Requests</a>
+                <a href="/my/customer-requests">My Credit Customer Requests</a>
             </li>
             <li t-if="page_name == 'portal_customer_request_detail'" class="breadcrumb-item">
-                <a href="/my/customer-requests">My Customer Requests</a>
+                <a href="/my/customer-requests">My Credit Customer Requests</a>
             </li>
             <li t-if="page_name == 'portal_customer_request_detail' and approval" class="breadcrumb-item active">
                 <t t-esc="approval.name"/>
@@ -43,19 +43,20 @@
         </xpath>
     </template>
 
-    <template id="portal_customer_request_create" name="Request New Customer">
+    <template id="portal_customer_request_create" name="Request Credit Customer">
         <t t-call="portal.portal_layout">
             <div class="container o_portal_customer_request_create py-4">
                 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-                    <h3 class="mb-0">Request New Customer</h3>
-                    <a href="/my/customer-requests" class="btn btn-secondary">My Customer Requests</a>
+                    <h3 class="mb-0">Request Credit Customer</h3>
+                    <a href="/my/customer-requests" class="btn btn-secondary">My Credit Customer Requests</a>
                 </div>
 
                 <div class="card mb-3">
-                    <div class="card-header fw-bold">Customer details</div>
+                    <div class="card-header fw-bold">Credit customer details</div>
                     <div class="card-body">
                         <p class="text-muted">
-                            Your request will be sent for approval. The customer is created only after approval.
+                            Credit customers are created after approval as standalone customers
+                            with you as salesperson. Use Cash Sale to create walk-in delivery addresses.
                         </p>
                         <div class="row g-3">
                             <div class="col-md-6">
@@ -73,24 +74,11 @@
                                 <input type="email" class="form-control" id="customer_email"
                                        placeholder="Email address" autocomplete="email"/>
                             </div>
-                            <div class="col-md-6">
-                                <div class="form-check mt-4">
-                                    <input class="form-check-input" type="checkbox"
-                                           id="customer_portal_allow_payment_term"/>
-                                    <label class="form-check-label" for="customer_portal_allow_payment_term">
-                                        Allow Payment Term
-                                    </label>
-                                </div>
-                                <div class="form-text">
-                                    Credit customers: portal sales will ask for a payment amount
-                                    instead of auto full payment.
-                                </div>
-                            </div>
-                            <div class="col-md-6 d-none" id="customer_payment_term_wrap">
+                            <div class="col-md-6" id="customer_payment_term_wrap">
                                 <label class="form-label" for="customer_payment_term_id">
                                     Default Payment Term <span class="text-danger">*</span>
                                 </label>
-                                <select class="form-select" id="customer_payment_term_id">
+                                <select class="form-select" id="customer_payment_term_id" required="required">
                                     <option value="">Select payment terms...</option>
                                     <t t-foreach="payment_terms" t-as="term">
                                         <option t-att-value="term.id" t-esc="term.name"/>
@@ -127,8 +115,8 @@
         <t t-call="portal.portal_layout">
             <div class="container o_portal_customer_request_list py-4">
                 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-                    <h3 class="mb-0">My Customer Requests</h3>
-                    <a href="/my/customer-requests/create" class="btn btn-primary">Request New Customer</a>
+                    <h3 class="mb-0">My Credit Customer Requests</h3>
+                    <a href="/my/customer-requests/create" class="btn btn-primary">Request Credit Customer</a>
                 </div>
 
                 <t t-if="not approvals">
@@ -207,10 +195,6 @@
                                 <div><t t-esc="approval.customer_email or '-'"/></div>
                             </div>
                             <div class="col-md-6">
-                                <div class="text-muted">Allow Payment Term</div>
-                                <div t-esc="'Yes' if approval.customer_portal_allow_payment_term else 'No'"/>
-                            </div>
-                            <div class="col-md-6" t-if="approval.customer_portal_allow_payment_term">
                                 <div class="text-muted">Default Payment Term</div>
                                 <div t-esc="approval.customer_payment_term_id.display_name or '-'"/>
                             </div>

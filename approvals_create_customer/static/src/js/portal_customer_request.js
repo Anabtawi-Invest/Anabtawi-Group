@@ -118,8 +118,6 @@ function initCreatePage(root) {
     const nameInput = qs("#customer_name", root);
     const phoneInput = qs("#customer_phone", root);
     const emailInput = qs("#customer_email", root);
-    const allowTermInput = qs("#customer_portal_allow_payment_term", root);
-    const paymentTermWrap = qs("#customer_payment_term_wrap", root);
     const paymentTermSelect = qs("#customer_payment_term_id", root);
     const fileInput = qs("#commercial_register_files", root);
     const fileList = qs("#commercial_register_file_list", root);
@@ -129,21 +127,6 @@ function initCreatePage(root) {
 
     if (!submitBtn) {
         return;
-    }
-
-    function syncPaymentTermVisibility() {
-        const allow = !!(allowTermInput && allowTermInput.checked);
-        if (paymentTermWrap) {
-            paymentTermWrap.classList.toggle("d-none", !allow);
-        }
-        if (!allow && paymentTermSelect) {
-            paymentTermSelect.value = "";
-        }
-    }
-
-    if (allowTermInput) {
-        allowTermInput.addEventListener("change", syncPaymentTermVisibility);
-        syncPaymentTermVisibility();
     }
 
     function renderFileList() {
@@ -206,7 +189,6 @@ function initCreatePage(root) {
         const name = (nameInput && nameInput.value) || "";
         const phone = (phoneInput && phoneInput.value) || "";
         const email = (emailInput && emailInput.value) || "";
-        const portalAllowPaymentTerm = !!(allowTermInput && allowTermInput.checked);
         const paymentTermId = paymentTermSelect && paymentTermSelect.value
             ? parseInt(paymentTermSelect.value, 10)
             : null;
@@ -217,10 +199,9 @@ function initCreatePage(root) {
             }
             return;
         }
-        if (portalAllowPaymentTerm && !paymentTermId) {
+        if (!paymentTermId) {
             if (errorEl) {
-                errorEl.textContent =
-                    "Please select a Default Payment Term when Allow Payment Term is enabled.";
+                errorEl.textContent = "Please select a Default Payment Term.";
                 errorEl.classList.remove("d-none");
             }
             return;
@@ -244,8 +225,8 @@ function initCreatePage(root) {
                 phone,
                 email,
                 attachments,
-                portal_allow_payment_term: portalAllowPaymentTerm,
-                payment_term_id: portalAllowPaymentTerm ? paymentTermId : null,
+                portal_allow_payment_term: true,
+                payment_term_id: paymentTermId,
             });
             window.location.href = result.redirect_url || "/my/customer-requests";
         } catch (err) {

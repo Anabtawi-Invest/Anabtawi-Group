@@ -145,11 +145,32 @@ class PortalSaleOrderCreate(http.Controller):
             return user.van_customer_id
         return user.partner_id
 
-    def _is_allowed_portal_customer(self, partner):
+    def _normalize_sale_mode(self, sale_mode=None):
+        mode = (sale_mode or "cash").strip().lower()
+        if mode not in ("cash", "credit"):
+            raise ValidationError(_("Invalid sale mode."))
+        return mode
+
+    def _is_allowed_cash_customer(self, partner):
         parent = self._get_assigned_parent()
-        if not partner or not parent:
+        if not partner or not parent or not partner.active:
             return False
-        return bool(partner.active and partner.parent_id.id == parent.id)
+        if partner.parent_id.id != parent.id:
+            return False
+        return not bool(getattr(partner, "portal_allow_payment_term", False))
+
+    def _is_allowed_credit_customer(self, partner):
+        if not partner or not partner.active:
+            return False
+        if not bool(getattr(partner, "portal_allow_payment_term", False)):
+            return False
+        return partner.user_id.id == request.env.user.id
+
+    def _is_allowed_portal_customer(self, partner, sale_mode="cash"):
+        mode = self._normalize_sale_mode(sale_mode)
+        if mode == "credit":
+            return self._is_allowed_credit_customer(partner)
+        return self._is_allowed_cash_customer(partner)
 
     def _available_qty_by_product(self, location, product_ids=None):
         """Map product_id -> available qty (on hand - reserved) in location tree."""
@@ -190,6 +211,20 @@ class PortalSaleOrderCreate(http.Controller):
             "portal_sale_order_create.portal_sale_create",
             {
                 "page_name": "portal_sale_create",
+                "sale_mode": "cash",
+                "currency": request.env.company.currency_id,
+                "draft_mode": self._is_draft_portal_user(),
+            },
+        )
+
+    @http.route("/my/sales/credit/create", type="http", auth="user", website=True)
+    def portal_sale_credit_create(self, **kwargs):
+        self._ensure_sales_portal()
+        return request.render(
+            "portal_sale_order_create.portal_sale_create",
+            {
+                "page_name": "portal_sale_credit_create",
+                "sale_mode": "credit",
                 "currency": request.env.company.currency_id,
                 "draft_mode": self._is_draft_portal_user(),
             },
@@ -235,24 +270,21 @@ class PortalSaleOrderCreate(http.Controller):
         )
 
     @http.route(["/my/sales/api/partners", "/my/sales/api/partners/json"], type="jsonrpc", auth="user", website=True)
-    def api_partners(self, term="", **kwargs):
+    def api_partners(self, term="", sale_mode="cash", **kwargs):
         self._ensure_sales_portal()
-        return self._search_partners(term)
+        return self._search_partners(term, sale_mode=sale_mode)
 
     @http.route("/my/sales/api/partners/http", type="http", auth="user", website=True, methods=["GET"], csrf=False)
-    def api_partners_http(self, term="", **kwargs):
+    def api_partners_http(self, term="", sale_mode="cash", **kwargs):
         self._ensure_sales_portal()
-        return request.make_json_response(self._search_partners(term))
+        return request.make_json_response(self._search_partners(term, sale_mode=sale_mode))
 
-    def _search_partners(self, term):
-        """Search only contacts under the portal user's assigned parent contact."""
+    def _search_partners(self, term, sale_mode="cash"):
+        """Cash: delivery contacts under van customer. Credit: salesperson = van."""
         term = (term or "").strip()
         if len(term) < 1:
             return []
-
-        parent = self._get_assigned_parent()
-        if not parent:
-            return []
+        mode = self._normalize_sale_mode(sale_mode)
 
         try:
             Partner = request.env["res.partner"].sudo()
@@ -265,10 +297,20 @@ class PortalSaleOrderCreate(http.Controller):
             if len(digits) >= 2:
                 or_clauses.append(("phone", "ilike", digits))
 
-            domain = [
-                ("active", "=", True),
-                ("parent_id", "=", parent.id),
-            ]
+            domain = [("active", "=", True)]
+            if mode == "credit":
+                domain += [
+                    ("user_id", "=", request.env.user.id),
+                    ("portal_allow_payment_term", "=", True),
+                ]
+            else:
+                parent = self._get_assigned_parent()
+                if not parent:
+                    return []
+                domain += [
+                    ("parent_id", "=", parent.id),
+                    ("portal_allow_payment_term", "=", False),
+                ]
             for _ in range(len(or_clauses) - 1):
                 domain.append("|")
             domain.extend(or_clauses)
@@ -288,6 +330,66 @@ class PortalSaleOrderCreate(http.Controller):
         except Exception:
             _logger.exception("portal_sale_order_create: partner search failed for term=%r", term)
             return []
+
+    @http.route("/my/sales/api/cash_customers/create", type="jsonrpc", auth="user", website=True)
+    def api_create_cash_customer(self, name="", phone="", email="", **kwargs):
+        self._ensure_sales_portal()
+        return self._create_cash_customer(name, phone, email)
+
+    @http.route(
+        "/my/sales/api/cash_customers/create/http",
+        type="http",
+        auth="user",
+        website=True,
+        methods=["POST"],
+        csrf=False,
+    )
+    def api_create_cash_customer_http(self, **kwargs):
+        self._ensure_sales_portal()
+        payload = request.get_json_data() if request.httprequest.is_json else kwargs
+        return request.make_json_response(
+            self._create_cash_customer(
+                payload.get("name", ""),
+                payload.get("phone", ""),
+                payload.get("email", ""),
+            )
+        )
+
+    def _create_cash_customer(self, name, phone, email):
+        name = (name or "").strip()
+        phone = (phone or "").strip()
+        email = (email or "").strip()
+        if not name:
+            raise ValidationError(_("Customer name is required."))
+        parent = self._get_assigned_parent()
+        if not parent:
+            raise UserError(
+                _("No van customer is assigned on your user. Contact an administrator.")
+            )
+        user = request.env.user.sudo()
+        company = user.company_id or parent.company_id or request.env.company
+        vals = {
+            "name": name,
+            "phone": phone or False,
+            "email": email or False,
+            "parent_id": parent.id,
+            "type": "delivery",
+            "customer_rank": 1,
+            "is_company": False,
+            "company_id": company.id if company else False,
+            "portal_allow_payment_term": False,
+            "property_payment_term_id": False,
+        }
+        Partner = request.env["res.partner"].sudo()
+        partner = Partner.with_company(company).create(vals) if company else Partner.create(vals)
+        return {
+            "id": partner.id,
+            "name": partner.display_name or partner.name,
+            "phone": partner.phone or "",
+            "email": partner.email or "",
+            "portal_allow_payment_term": False,
+            "default_payment_term_id": False,
+        }
 
     @http.route("/my/sales/api/products", type="jsonrpc", auth="user", website=True)
     def api_products(self, term="", offset=0, limit=60, **kwargs):
@@ -496,10 +598,11 @@ class PortalSaleOrderCreate(http.Controller):
         partner_id=None,
         lines=None,
         payment_term_id=None,
-        payment_amount=None,
+        sale_mode="cash",
         **kwargs,
     ):
         self._ensure_sales_portal()
+        mode = self._normalize_sale_mode(sale_mode)
         lines = lines or []
         if not lines:
             raise ValidationError(_("Please add at least one product."))
@@ -507,21 +610,20 @@ class PortalSaleOrderCreate(http.Controller):
         if not partner_id:
             raise ValidationError(_("Please select a customer."))
         partner = request.env["res.partner"].sudo().browse(int(partner_id)).exists()
-        if not partner or not self._is_allowed_portal_customer(partner):
+        if not partner or not self._is_allowed_portal_customer(partner, sale_mode=mode):
             raise ValidationError(
-                _("Customer not found among your assigned contacts.")
+                _("Customer not found among your allowed %(mode)s customers.")
+                % {"mode": mode}
             )
 
-        payment_term = self._resolve_payment_term(partner, payment_term_id)
-        allow_term = bool(getattr(partner, "portal_allow_payment_term", False))
-        partial_amount = None
-        if allow_term and payment_amount not in (None, "", False):
-            try:
-                partial_amount = float(payment_amount)
-            except (TypeError, ValueError) as exc:
-                raise ValidationError(_("Invalid payment amount.")) from exc
-            if partial_amount < 0:
-                raise ValidationError(_("Payment amount cannot be negative."))
+        if mode == "credit":
+            payment_term = self._resolve_payment_term(partner, payment_term_id)
+        else:
+            payment_term = self._get_immediate_payment_term()
+            if not payment_term:
+                raise ValidationError(
+                    _("No payment terms found. Please configure Immediate Payment.")
+                )
 
         van_location = self._get_van_stock_location()
         van_warehouse = self._get_van_warehouse()
@@ -608,14 +710,7 @@ class PortalSaleOrderCreate(http.Controller):
         invoices = order._create_invoices()
         invoices.action_post()
         invoice = invoices[:1]
-        if invoice:
-            journal = self._get_van_payment_journal()
-            if allow_term:
-                # Credit customers: pay only the entered amount (0/empty = leave open).
-                if partial_amount:
-                    self._pay_invoice_amount(invoice, journal, amount=partial_amount)
-            else:
-                self._pay_invoice_fully(invoice, journal)
+        # Invoices stay unpaid; backend marks them paid.
         return {
             "order_id": order.id,
             "order_name": order.name,

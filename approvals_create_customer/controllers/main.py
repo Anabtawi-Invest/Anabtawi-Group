@@ -344,21 +344,17 @@ class PortalCustomerRequest(http.Controller):
         if email and not EMAIL_RE.match(email):
             raise UserError(_("Please enter a valid email address."))
 
-        allow_term = bool(portal_allow_payment_term)
-        term = request.env["account.payment.term"]
-        if allow_term:
-            if not payment_term_id:
-                raise UserError(
-                    _("Please select a Default Payment Term when Allow Payment Term is enabled.")
-                )
-            term = (
-                request.env["account.payment.term"]
-                .sudo()
-                .browse(int(payment_term_id))
-                .exists()
-            )
-            if not term:
-                raise UserError(_("Invalid payment terms selected."))
+        # Credit customer requests always require a payment term.
+        if not payment_term_id:
+            raise UserError(_("Please select a Default Payment Term."))
+        term = (
+            request.env["account.payment.term"]
+            .sudo()
+            .browse(int(payment_term_id))
+            .exists()
+        )
+        if not term:
+            raise UserError(_("Invalid payment terms selected."))
 
         cleaned_attachments = self._normalize_attachments(attachments)
         if not cleaned_attachments:
@@ -369,7 +365,7 @@ class PortalCustomerRequest(http.Controller):
         company = self._portal_company()
         if not company:
             raise UserError(_("Your user has no company. Please contact an administrator."))
-        if term and term.company_id and term.company_id != company:
+        if term.company_id and term.company_id != company:
             raise UserError(_("Invalid payment terms selected."))
         category = self._get_category(company)
         Approval = request.env["approval.request"].sudo().with_company(company)
@@ -380,9 +376,9 @@ class PortalCustomerRequest(http.Controller):
             "customer_name": name,
             "customer_phone": phone or False,
             "customer_email": email or False,
-            "customer_portal_allow_payment_term": allow_term,
-            "customer_payment_term_id": term.id if allow_term and term else False,
-            "reason": _("Portal customer request: %(name)s", name=name),
+            "customer_portal_allow_payment_term": True,
+            "customer_payment_term_id": term.id,
+            "reason": _("Portal credit customer request: %(name)s", name=name),
         }
         if not category.automated_sequence:
             vals["name"] = _("New Customer: %(name)s", name=name)

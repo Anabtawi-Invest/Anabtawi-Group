@@ -8,8 +8,17 @@
                     <a href="/my/sales/create"
                        class="d-flex gap-2 gap-md-3 py-3 pe-2 px-md-3 h-100 rounded text-decoration-none border bg-white">
                         <div>
-                            <h5 class="mb-0">Create Sale Order</h5>
-                            <p class="mt-1 mb-0 opacity-75">Create a sale order and invoice for a customer</p>
+                            <h5 class="mb-0">Cash Sale</h5>
+                            <p class="mt-1 mb-0 opacity-75">Sell to walk-in delivery addresses under your van customer</p>
+                        </div>
+                    </a>
+                </div>
+                <div class="col-12 col-md-6">
+                    <a href="/my/sales/credit/create"
+                       class="d-flex gap-2 gap-md-3 py-3 pe-2 px-md-3 h-100 rounded text-decoration-none border bg-white">
+                        <div>
+                            <h5 class="mb-0">Credit Sale</h5>
+                            <p class="mt-1 mb-0 opacity-75">Sell to payment-term customers assigned to you as salesperson</p>
                         </div>
                     </a>
                 </div>
@@ -29,7 +38,10 @@
     <template id="portal_breadcrumbs_sale" inherit_id="portal.portal_breadcrumbs">
         <xpath expr="//ol" position="inside">
             <li t-if="page_name == 'portal_sale_create'" class="breadcrumb-item">
-                <a href="/my/sales/create">Create Sale Order</a>
+                <a href="/my/sales/create">Cash Sale</a>
+            </li>
+            <li t-if="page_name == 'portal_sale_credit_create'" class="breadcrumb-item">
+                <a href="/my/sales/credit/create">Credit Sale</a>
             </li>
             <li t-if="page_name == 'portal_sale_orders'" class="breadcrumb-item">
                 <a href="/my/sales/orders">My Sale Orders</a>
@@ -45,9 +57,13 @@
 
     <template id="portal_sale_create" name="Create Sale Order">
         <t t-call="portal.portal_layout">
-            <div class="container o_portal_sale_create py-4">
+            <div class="container o_portal_sale_create py-4"
+                 t-att-data-sale-mode="sale_mode or 'cash'">
                 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-                    <h3 class="mb-0">Create Sale Order</h3>
+                    <h3 class="mb-0">
+                        <t t-if="sale_mode == 'credit'">Credit Sale</t>
+                        <t t-else="">Cash Sale</t>
+                    </h3>
                     <a href="/my/sales/orders" class="btn btn-secondary">My Sale Orders</a>
                 </div>
 
@@ -63,10 +79,14 @@
                                            autocomplete="off"/>
                                     <div id="partner_results" class="o_portal_partner_results list-group mt-2"></div>
                                 </div>
-                                <div class="form-text">
-                                    Only contacts under your assigned contact are shown.
-                                    New customers must be requested from the
-                                    <a href="/my/customer-requests/create">Customer Request</a> portal.
+                                <div class="form-text" t-if="sale_mode == 'credit'">
+                                    Only credit customers with you as salesperson are shown.
+                                    Request new ones from
+                                    <a href="/my/customer-requests/create">Request Credit Customer</a>.
+                                </div>
+                                <div class="form-text" t-else="">
+                                    Only delivery addresses under your van customer are shown.
+                                    Create a new walk-in customer below (no approval).
                                 </div>
                             </div>
                         </div>
@@ -75,20 +95,35 @@
                             <span id="selected_partner_label"/>
                             <button type="button" class="btn btn-sm btn-link" id="btn_clear_partner">Change</button>
                         </div>
-                        <div id="payment_term_wrap" class="mt-3 d-none">
+                        <div t-if="sale_mode != 'credit'" id="cash_customer_create" class="border rounded p-3 mt-3">
+                            <div class="fw-semibold mb-2">New walk-in customer</div>
+                            <div class="row g-2">
+                                <div class="col-md-4">
+                                    <input type="text" class="form-control" id="cash_customer_name"
+                                           placeholder="Name *"/>
+                                </div>
+                                <div class="col-md-3">
+                                    <input type="tel" class="form-control" id="cash_customer_phone"
+                                           placeholder="Phone"/>
+                                </div>
+                                <div class="col-md-3">
+                                    <input type="email" class="form-control" id="cash_customer_email"
+                                           placeholder="Email"/>
+                                </div>
+                                <div class="col-md-2">
+                                    <button type="button" class="btn btn-outline-primary w-100" id="btn_create_cash_customer">
+                                        Create
+                                    </button>
+                                </div>
+                            </div>
+                            <div id="cash_customer_error" class="alert alert-danger mt-2 d-none mb-0"/>
+                        </div>
+                        <div id="payment_term_wrap"
+                             t-att-class="'mt-3' + ('' if sale_mode == 'credit' else ' d-none')">
                             <label class="form-label" for="payment_term_id">Payment Terms <span class="text-danger">*</span></label>
                             <select class="form-select" id="payment_term_id">
                                 <option value="">Select payment terms...</option>
                             </select>
-                        </div>
-                        <div id="payment_amount_wrap" class="mt-3 d-none">
-                            <label class="form-label" for="payment_amount">Amount to pay now</label>
-                            <input type="number" class="form-control" id="payment_amount"
-                                   min="0" step="0.01" placeholder="0.00"/>
-                            <div class="form-text">
-                                This customer allows payment terms. Enter how much to collect now
-                                (0 or empty leaves the invoice open / unpaid).
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -139,9 +174,8 @@
                         </t>
                         <t t-else="">
                             <p class="text-muted mb-3">
-                                Confirming creates the sale order, confirms it, and posts the invoice.
-                                Cash customers are fully paid automatically. Credit customers
-                                (Allow Payment Term) use the amount entered above.
+                                Confirming creates the sale order, confirms it, and posts the invoice unpaid.
+                                Backend staff will mark the invoice as paid.
                             </p>
                             <button type="button" class="btn btn-success btn-lg" id="btn_confirm_order">
                                 Confirm &amp; Invoice
@@ -183,7 +217,8 @@
             <div class="container py-4">
                 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
                     <h3 class="mb-0">My Sale Orders</h3>
-                    <a href="/my/sales/create" class="btn btn-primary">Create Sale Order</a>
+                    <a href="/my/sales/create" class="btn btn-primary">Cash Sale</a>
+                    <a href="/my/sales/credit/create" class="btn btn-outline-primary ms-2">Credit Sale</a>
                 </div>
                 <t t-if="not orders">
                     <div class="alert alert-info">You have not created any sale orders yet.</div>
