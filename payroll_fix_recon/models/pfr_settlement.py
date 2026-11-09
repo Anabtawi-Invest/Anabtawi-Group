@@ -199,9 +199,14 @@ class PfrSettlement(models.AbstractModel):
 
         # worked more regular days than the monthly target (full periods only)
         active = L.active_days
+        target_wd = 0 if (emp.employee_work_station or 'factory') == 'factory' else 4
+        month_rest_cap = (
+            U.MONTHLY_REST_ALLOWANCE if emp._pfr_is_fixed_schedule()
+            else sum(1 for d in U.daterange(L.eff_from, L.eff_to) if d.weekday() == target_wd)
+        )
         if not getattr(slip, 'termination_clearance', False) and active >= 25:
             regular_days = [d for d in L.physical_dates if d not in L.holiday_dates]
-            extra_days = len(regular_days) - (active - active // 7)
+            extra_days = len(regular_days) - (active - month_rest_cap)
             if extra_days > 0:
                 approved_days = sum(1 for d in L.physical_dates if approved.get((emp.id, d), 0) > 0)
                 extra_day_hours = min(extra_days, approved_days) * U.DAILY_HOURS * U.OT_RATE
@@ -221,11 +226,11 @@ class PfrSettlement(models.AbstractModel):
                 allowance = U.MONTHLY_REST_ALLOWANCE
             else:
                 # flexible (factory Monday / retail Friday): the weekday only sets HOW MANY rest days were
-                # earned (never more than check-ins // 6); rest days actually taken are the unpunched days
-                # of the contract window that are not leave or public holidays.
+                # earned (full cap when worked >= 24, else check-ins // 6); rest days actually taken are the
+                # unpunched days of the contract window that are not leave or public holidays.
                 target = 0 if (emp.employee_work_station or 'factory') == 'factory' else 4
                 cap = sum(1 for d in U.daterange(L.eff_from, L.eff_to) if d.weekday() == target)
-                allowance = min(cap, worked // U.REST_CYCLE_DAYS)
+                allowance = cap if worked >= 24 else min(cap, worked // U.REST_CYCLE_DAYS)
                 rest_taken = sum(1 for d in U.daterange(L.eff_from, L.eff_to)
                                  if d not in L.physical_dates
                                  and d not in L.leave_calendar_dates and d not in L.holiday_dates)
