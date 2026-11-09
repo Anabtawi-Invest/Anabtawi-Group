@@ -226,14 +226,11 @@ class PfrSettlement(models.AbstractModel):
                 allowance = U.MONTHLY_REST_ALLOWANCE
             else:
                 # flexible (factory Monday / retail Friday): the weekday only sets HOW MANY rest days were
-                # earned (never more than (check-ins + cap) // 6); rest days actually taken are the unpunched days
-                # of the contract window that are not leave or public holidays.
+                # earned (full cap when worked >= 24, else check-ins // 6); rest days actually taken are the
+                # unpunched days of the contract window that are not leave or public holidays.
                 target = 0 if (emp.employee_work_station or 'factory') == 'factory' else 4
                 cap = sum(1 for d in U.daterange(L.eff_from, L.eff_to) if d.weekday() == target)
-                allowance = (
-                    min(cap, (worked + cap) // U.REST_CYCLE_DAYS)
-                    if worked >= U.REST_CYCLE_DAYS else 0
-                )
+                allowance = cap if worked >= 24 else min(cap, worked // U.REST_CYCLE_DAYS)
                 rest_taken = sum(1 for d in U.daterange(L.eff_from, L.eff_to)
                                  if d not in L.physical_dates
                                  and d not in L.leave_calendar_dates and d not in L.holiday_dates)
