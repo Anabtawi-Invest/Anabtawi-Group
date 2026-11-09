@@ -44,6 +44,48 @@ class PortalVanUserCreate(models.TransientModel):
         domain="[('type', 'in', ('cash', 'bank')), '|', ('company_id', '=', False), ('company_id', '=', company_id)]",
         help="Cash/bank journal used to fully pay portal sale invoices for this van.",
     )
+    van_source_location_id = fields.Many2one(
+        "stock.location",
+        string="Default Source Location",
+        required=True,
+        domain="[('usage', '=', 'internal'), ('active', '=', True), '|', ('company_id', '=', False), ('company_id', '=', company_id)]",
+        help="Default Source on portal Create Internal Transfer for this van.",
+    )
+
+    @api.model
+    def default_get(self, fields_list):
+        res = super().default_get(fields_list)
+        company = self.env["res.company"].browse(res.get("company_id")) or self.env.company
+        if company and (
+            "van_source_location_id" in fields_list or not fields_list
+        ):
+            location = self._default_source_for_company(company)
+            if location:
+                res["van_source_location_id"] = location.id
+        return res
+
+    def _default_source_for_company(self, company):
+        if not company:
+            return self.env["stock.location"]
+        user = self.env.user.sudo()
+        if hasattr(user, "_van_get_supplier_warehouse"):
+            supplier = user._van_get_supplier_warehouse(company)
+            location = supplier.lot_stock_id if supplier else self.env["stock.location"]
+            if location and location.usage == "internal" and location.active:
+                return location
+        warehouse = (
+            self.env["stock.warehouse"]
+            .sudo()
+            .search([("company_id", "=", company.id)], order="id asc", limit=1)
+        )
+        location = warehouse.lot_stock_id if warehouse else self.env["stock.location"]
+        if location and location.usage == "internal" and location.active:
+            return location
+        return self.env["stock.location"]
+
+    @api.onchange("company_id")
+    def _onchange_company_id_source(self):
+        self.van_source_location_id = self._default_source_for_company(self.company_id)
 
     @api.constrains("login")
     def _check_login(self):
@@ -61,6 +103,18 @@ class PortalVanUserCreate(models.TransientModel):
         company = self.company_id
         if not company:
             raise UserError(_("Please select a company."))
+        if not self.van_source_location_id:
+            raise UserError(_("Please select a Default Source Location."))
+        source = self.van_source_location_id
+        if source.usage != "internal" or not source.active:
+            raise UserError(
+                _("Default Source Location must be an active internal location.")
+            )
+        if source.company_id and source.company_id != company:
+            raise UserError(
+                _("Default Source Location must belong to company %s.")
+                % company.display_name
+            )
 
         Warehouse = self.env["stock.warehouse"].sudo()
         if not Warehouse.search_count([("company_id", "=", company.id)], limit=1):
@@ -115,6 +169,7 @@ class PortalVanUserCreate(models.TransientModel):
             "company_id": company.id,
             "company_ids": [(6, 0, [company.id])],
             "group_ids": group_cmds,
+            "van_source_location_id": source.id,
         }
         if self.van_customer_id:
             user_vals["van_customer_id"] = self.van_customer_id.id
@@ -135,12 +190,14 @@ class PortalVanUserCreate(models.TransientModel):
             "User: %(user)s\n"
             "Warehouse: %(wh)s\n"
             "Transit: %(transit)s\n"
-            "Stock: %(stock)s"
+            "Stock: %(stock)s\n"
+            "Source: %(source)s"
         ) % {
             "user": user.login,
             "wh": user.van_warehouse_id.display_name,
             "transit": user.van_transit_location_id.display_name,
             "stock": user.van_warehouse_id.lot_stock_id.display_name,
+            "source": user.van_source_location_id.display_name,
         }
         return {
             "type": "ir.actions.act_window",

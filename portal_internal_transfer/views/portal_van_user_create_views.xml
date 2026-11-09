@@ -16,6 +16,9 @@
                             <field name="login" placeholder="van12@example.com"/>
                             <field name="phone"/>
                             <field name="company_id"/>
+                            <field name="van_source_location_id"
+                                      options="{'no_create': True}"
+                                      placeholder="Default Source for portal transfers"/>
                             <field name="van_customer_id"
                                       placeholder="Commercial customer for van sales"/>
                             <field name="van_payment_journal_id"

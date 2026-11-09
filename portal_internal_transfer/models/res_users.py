@@ -46,6 +46,15 @@ class ResUsers(models.Model):
         domain="[('type', 'in', ('cash', 'bank'))]",
         help="Cash/bank journal used to mark portal van sale invoices as fully paid.",
     )
+    van_source_location_id = fields.Many2one(
+        "stock.location",
+        string="Default Source Location",
+        copy=False,
+        check_company=False,
+        domain="[('usage', '=', 'internal'), ('active', '=', True)]",
+        help="Default Source on portal Create Internal Transfer. "
+        "Van can still Change to another internal location per transfer.",
+    )
     # Kept for older DBs; portal now uses van_customer_id.property_product_pricelist
     van_pricelist_id = fields.Many2one(
         "product.pricelist",

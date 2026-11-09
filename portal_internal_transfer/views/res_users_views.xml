@@ -29,12 +29,17 @@
                                     confirm="Create warehouse, transit, push route and portal mapping for this portal user?"/>
                             <field name="van_warehouse_id" invisible="not van_warehouse_id"/>
                             <field name="van_transit_location_id" invisible="not van_transit_location_id"/>
+                            <field name="van_source_location_id"
+                                      options="{'no_create': True}"
+                                      placeholder="Default Source for portal transfers"/>
                             <field name="van_customer_id"
                                       options="{'no_create': False}"
                                       placeholder="Commercial customer for van sales"/>
                             <field name="van_payment_journal_id"
                                       placeholder="Cash/bank journal for paid sales"/>
                             <div class="text-muted" colspan="2">
+                                Default Source Location is pre-selected on portal
+                                Create Internal Transfer (van can still Change).
                                 Pricelist comes from the van customer contact
                                 (Sales &amp; Purchase → Pricelist). Used for portal
                                 sales prices and for filtering transfer products.

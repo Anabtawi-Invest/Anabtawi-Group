@@ -57,13 +57,18 @@ class PortalInternalTransfer(http.Controller):
         return location
 
     def _get_default_source_location(self, dest_location=None):
-        """Supplier/main warehouse stock used when the van portal was set up."""
+        """Prefer user Default Source Location; else supplier/main WH stock."""
         user = request.env.user.sudo()
-        company = user.company_id or request.env.company
-        if not company or not hasattr(user, "_van_get_supplier_warehouse"):
-            return request.env["stock.location"]
-        supplier = user._van_get_supplier_warehouse(company)
-        location = supplier.lot_stock_id if supplier else request.env["stock.location"]
+        location = request.env["stock.location"]
+        if "van_source_location_id" in user._fields and user.van_source_location_id:
+            location = user.van_source_location_id
+        else:
+            company = user.company_id or request.env.company
+            if company and hasattr(user, "_van_get_supplier_warehouse"):
+                supplier = user._van_get_supplier_warehouse(company)
+                location = (
+                    supplier.lot_stock_id if supplier else request.env["stock.location"]
+                )
         if not location or location.usage != "internal" or not location.active:
             return request.env["stock.location"]
         if dest_location and location.id == dest_location.id:
