@@ -27,7 +27,7 @@ class AccountLoan(models.Model):
         string='Analytic Account',
         tracking=True,
         check_company=True,
-        help='Applied at 100%% on murabaha/expense journal items when confirming the loan.',
+        help='Applied at 100%% on journal items that use the Expense Account when confirming the loan.',
     )
     bayaan = fields.Char(
         string='Label',
@@ -172,7 +172,7 @@ class AccountLoan(models.Model):
                 ],
             })
 
-            # Separate murabaha / interest entry — analytic on both lines when set
+            # Separate murabaha / interest entry — analytic on the Expense Account line only
             if float_compare(line.interest, 0.0, precision_rounding=loan.currency_id.rounding) > 0:
                 expense_line_vals = {
                     'account_id': loan.expense_account_id.id,
@@ -186,7 +186,6 @@ class AccountLoan(models.Model):
                 }
                 if analytic_distribution:
                     expense_line_vals['analytic_distribution'] = analytic_distribution
-                    murabaha_liability_line_vals['analytic_distribution'] = analytic_distribution
                 murabaha_moves_values.append({
                     'company_id': loan.company_id.id,
                     'auto_post': 'at_date',
