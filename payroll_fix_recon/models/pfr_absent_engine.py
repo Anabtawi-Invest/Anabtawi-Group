@@ -138,8 +138,8 @@ class HrEmployee(models.Model):
 
     def _pfr_pick_rest_days(self, candidates, month_worked_days, eff_from, eff_to, after_night=()):
         """Candidate days that stay empty (earned rest days).
-        The quota (number of Fridays / Mondays, capped by (worked_days + cap) // 6) sets HOW MANY rest days there are,
-        where worked days include physical check-ins and approved paid leaves (annual, sick, etc.).
+        The quota (number of Fridays / Mondays when worked_days >= 24, else worked_days // 6) sets HOW MANY
+        rest days there are, where worked days include physical check-ins and approved paid leaves.
         Any unpunched day may be taken. Days after an overnight shift are taken first, then the target
         weekday, then the rest. Candidates beyond the quota stay absent."""
         station = self.employee_work_station or 'factory'
@@ -151,10 +151,7 @@ class HrEmployee(models.Model):
             return {d for d in candidates if d.weekday() not in working}
         target = 0 if station == 'factory' else 4                    # Monday / Friday
         cap = sum(1 for d in U.daterange(eff_from, eff_to) if d.weekday() == target)
-        earned = (
-            min(cap, (month_worked_days + cap) // U.REST_CYCLE_DAYS)
-            if month_worked_days >= U.REST_CYCLE_DAYS else 0
-        )
+        earned = cap if month_worked_days >= 24 else min(cap, month_worked_days // U.REST_CYCLE_DAYS)
         picked = [d for d in candidates if d in after_night][:earned]          # day after a night shift
         if len(picked) < earned:                                              # then the target weekday
             picked += [d for d in candidates if d.weekday() == target and d not in picked][:earned - len(picked)]
