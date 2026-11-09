@@ -200,13 +200,22 @@ function initCreatePage(root) {
         const defaultId = partner.default_payment_term_id
             ? String(partner.default_payment_term_id)
             : "";
-        if (defaultId && paymentTermSelect.querySelector(`option[value="${defaultId}"]`)) {
+        if (defaultId) {
+            // Ensure customer's term exists in the dropdown, then select it.
+            if (!paymentTermSelect.querySelector(`option[value="${defaultId}"]`)) {
+                const label = partner.default_payment_term_name || defaultId;
+                paymentTermSelect.insertAdjacentHTML(
+                    "beforeend",
+                    `<option value="${defaultId}">${escapeHtml(label)}</option>`
+                );
+            }
             paymentTermSelect.value = defaultId;
-            state.paymentTermId = partner.default_payment_term_id;
-        } else {
-            paymentTermSelect.value = "";
-            state.paymentTermId = null;
+            state.paymentTermId = parseInt(defaultId, 10);
+            return;
         }
+        // No term on customer: leave empty so the van can choose.
+        paymentTermSelect.value = "";
+        state.paymentTermId = null;
     }
 
     function selectPartner(partner) {
@@ -338,7 +347,8 @@ function initCreatePage(root) {
                         data-id="${p.id}" data-name="${escapeAttr(p.name)}"
                         data-phone="${escapeAttr(p.phone)}" data-email="${escapeAttr(p.email)}"
                         data-allow-payment-term="${p.portal_allow_payment_term ? "1" : "0"}"
-                        data-default-payment-term-id="${p.default_payment_term_id || ""}">
+                        data-default-payment-term-id="${p.default_payment_term_id || ""}"
+                        data-default-payment-term-name="${escapeAttr(p.default_payment_term_name || "")}">
                         <strong>${highlight(p.name)}</strong>
                         <div class="small text-muted">
                             ${p.phone ? highlight(p.phone) : ""}
@@ -358,7 +368,10 @@ function initCreatePage(root) {
                         phone: btn.dataset.phone,
                         email: btn.dataset.email,
                         portal_allow_payment_term: btn.dataset.allowPaymentTerm === "1",
-                        default_payment_term_id: defaultTerm || false,
+                        default_payment_term_id: Number.isFinite(defaultTerm) && defaultTerm > 0
+                            ? defaultTerm
+                            : false,
+                        default_payment_term_name: btn.dataset.defaultPaymentTermName || "",
                     });
                 };
                 // mousedown avoids blur-before-click; click covers touch / keyboard activate.

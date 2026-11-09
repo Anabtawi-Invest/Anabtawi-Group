@@ -317,18 +317,27 @@ class PortalSaleOrderCreate(http.Controller):
                 domain.append("|")
             domain.extend(or_clauses)
 
-            partners = Partner.search(domain, limit=25, order="name, id")
-            return [
-                {
-                    "id": p.id,
-                    "name": p.display_name or p.name,
-                    "phone": p.phone or "",
-                    "email": p.email or "",
-                    "portal_allow_payment_term": bool(p.portal_allow_payment_term),
-                    "default_payment_term_id": p.property_payment_term_id.id or False,
-                }
-                for p in partners
-            ]
+            company = request.env.user.company_id or request.env.company
+            partners = Partner.with_company(company).search(domain, limit=25, order="name, id")
+            result = []
+            for p in partners:
+                # property_payment_term_id is company-dependent
+                p_comp = p.with_company(company)
+                term = p_comp.property_payment_term_id
+                result.append(
+                    {
+                        "id": p.id,
+                        "name": p.display_name or p.name,
+                        "phone": p.phone or "",
+                        "email": p.email or "",
+                        "portal_allow_payment_term": bool(p_comp.portal_allow_payment_term),
+                        "default_payment_term_id": term.id if term else False,
+                        "default_payment_term_name": (
+                            term.display_name or term.name if term else ""
+                        ),
+                    }
+                )
+            return result
         except Exception:
             _logger.exception("portal_sale_order_create: partner search failed for term=%r", term)
             return []
@@ -487,7 +496,7 @@ class PortalSaleOrderCreate(http.Controller):
         return request.make_json_response(self._get_payment_terms())
 
     def _get_payment_terms(self):
-        company = request.env.company
+        company = request.env.user.company_id or request.env.company
         terms = (
             request.env["account.payment.term"]
             .sudo()
@@ -495,7 +504,7 @@ class PortalSaleOrderCreate(http.Controller):
                 [
                     "|",
                     ("company_id", "=", False),
-                    ("company_id", "=", company.id),
+                    ("company_id", "=", company.id if company else False),
                 ],
                 order="name, id",
             )
@@ -571,14 +580,17 @@ class PortalSaleOrderCreate(http.Controller):
     def _resolve_payment_term(self, partner, payment_term_id=None):
         """Selected term, else partner default, else Immediate Payment."""
         Term = request.env["account.payment.term"].sudo()
+        company = request.env.user.company_id or request.env.company
+        partner = partner.with_company(company)
         payment_term = Term
         if partner.portal_allow_payment_term:
-            if not payment_term_id:
-                raise ValidationError(_("Please select payment terms."))
-            payment_term = Term.browse(int(payment_term_id)).exists()
+            if payment_term_id:
+                payment_term = Term.browse(int(payment_term_id)).exists()
+            if not payment_term and partner.property_payment_term_id:
+                payment_term = partner.property_payment_term_id
             if not payment_term:
-                raise ValidationError(_("Invalid payment terms selected."))
-            if payment_term.company_id and payment_term.company_id != request.env.company:
+                raise ValidationError(_("Please select payment terms."))
+            if payment_term.company_id and company and payment_term.company_id != company:
                 raise ValidationError(_("Invalid payment terms selected."))
             return payment_term
 
