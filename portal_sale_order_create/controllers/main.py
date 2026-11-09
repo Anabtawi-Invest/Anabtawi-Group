@@ -155,6 +155,7 @@ class PortalSaleOrderCreate(http.Controller):
         parent = self._get_assigned_parent()
         if not partner or not parent or not partner.active:
             return False
+        # Any child under the van customer, regardless of company_id.
         if partner.parent_id.id != parent.id:
             return False
         return not bool(getattr(partner, "portal_allow_payment_term", False))
@@ -282,14 +283,22 @@ class PortalSaleOrderCreate(http.Controller):
         return request.make_json_response(self._search_partners(term, sale_mode=sale_mode))
 
     def _search_partners(self, term, sale_mode="cash"):
-        """Cash: delivery contacts under van customer. Credit: salesperson = van."""
+        """Cash: children under van customer (any company). Credit: van portal user."""
         term = (term or "").strip()
         if len(term) < 1:
             return []
         mode = self._normalize_sale_mode(sale_mode)
 
         try:
-            Partner = request.env["res.partner"].sudo()
+            # Bypass company record-rules / allowed_company_ids filtering so
+            # delivery addresses under a "Visible to all" van customer always show.
+            user = request.env.user.sudo()
+            allowed = list(user.company_ids.ids) or []
+            Partner = (
+                request.env["res.partner"]
+                .sudo()
+                .with_context(allowed_company_ids=allowed or [user.company_id.id])
+            )
             digits = re.sub(r"\D", "", term)
             or_clauses = [
                 ("name", "ilike", term),
@@ -309,32 +318,36 @@ class PortalSaleOrderCreate(http.Controller):
                 parent = self._get_assigned_parent()
                 if not parent:
                     return []
+                # Direct children of the van customer; do not filter by company_id.
+                # != True includes False/unset so older contacts still match.
                 domain += [
                     ("parent_id", "=", parent.id),
-                    ("portal_allow_payment_term", "=", False),
+                    ("portal_allow_payment_term", "!=", True),
                 ]
             for _ in range(len(or_clauses) - 1):
                 domain.append("|")
             domain.extend(or_clauses)
 
-            company = request.env.user.company_id or request.env.company
-            partners = Partner.with_company(company).search(domain, limit=25, order="name, id")
+            partners = Partner.search(domain, limit=25, order="name, id")
             result = []
             for p in partners:
-                term = self._get_partner_sale_payment_term(p)
-                result.append(
-                    {
-                        "id": p.id,
-                        "name": p.display_name or p.name,
-                        "phone": p.phone or "",
-                        "email": p.email or "",
-                        "portal_allow_payment_term": bool(p.portal_allow_payment_term),
-                        "default_payment_term_id": term.id if term else False,
-                        "default_payment_term_name": (
-                            term.display_name or term.name if term else ""
-                        ),
-                    }
-                )
+                row = {
+                    "id": p.id,
+                    "name": p.display_name or p.name,
+                    "phone": p.phone or "",
+                    "email": p.email or "",
+                    "portal_allow_payment_term": bool(p.portal_allow_payment_term),
+                    "default_payment_term_id": False,
+                    "default_payment_term_name": "",
+                }
+                if mode == "credit":
+                    pay_term = self._get_partner_sale_payment_term(p)
+                    if pay_term:
+                        row["default_payment_term_id"] = pay_term.id
+                        row["default_payment_term_name"] = (
+                            pay_term.display_name or pay_term.name
+                        )
+                result.append(row)
             return result
         except Exception:
             _logger.exception("portal_sale_order_create: partner search failed for term=%r", term)
@@ -375,8 +388,9 @@ class PortalSaleOrderCreate(http.Controller):
             raise UserError(
                 _("No van customer is assigned on your user. Contact an administrator.")
             )
-        user = request.env.user.sudo()
-        company = user.company_id or parent.company_id or request.env.company
+        # Inherit parent company visibility (False = Visible to all) so the
+        # delivery address stays searchable from any company on Cash Sale.
+        company = parent.company_id
         vals = {
             "name": name,
             "phone": phone or False,
@@ -387,10 +401,11 @@ class PortalSaleOrderCreate(http.Controller):
             "is_company": False,
             "company_id": company.id if company else False,
             "portal_allow_payment_term": False,
-            "property_payment_term_id": False,
         }
         Partner = request.env["res.partner"].sudo()
-        partner = Partner.with_company(company).create(vals) if company else Partner.create(vals)
+        partner = (
+            Partner.with_company(company).create(vals) if company else Partner.create(vals)
+        )
         return {
             "id": partner.id,
             "name": partner.display_name or partner.name,

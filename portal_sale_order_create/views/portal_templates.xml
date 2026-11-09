@@ -85,8 +85,8 @@
                                     <a href="/my/customer-requests/create">Request Credit Customer</a>.
                                 </div>
                                 <div class="form-text" t-else="">
-                                    Only delivery addresses under your van customer are shown.
-                                    Create a new walk-in customer below (no approval).
+                                    Delivery addresses under your van customer are shown
+                                    (all companies). Create a new walk-in customer below (no approval).
                                 </div>
                             </div>
                         </div>

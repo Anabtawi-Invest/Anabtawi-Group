@@ -364,7 +364,7 @@ function initCreatePage(root) {
                     <div class="list-group-item o_portal_partner_empty">
                         <div class="fw-semibold mb-1">لا يوجد عميل مطابق</div>
                         <div class="small text-muted mb-0">
-                            لا يوجد عميل نقدي تحت عميل الشاحنة.
+                            لا يوجد عنوان تسليم مطابق تحت عميل الشاحنة.
                             أنشئ عميلًا جديدًا من النموذج أدناه.
                         </div>
                     </div>`;

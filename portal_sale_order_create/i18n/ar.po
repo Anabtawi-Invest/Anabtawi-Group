@@ -127,13 +127,8 @@ msgstr "طلب عميل آجل"
 
 #. module: portal_sale_order_create
 #: model_terms:ir.ui.view,arch_db:portal_sale_order_create.portal_sale_create
-msgid "Only delivery addresses under your van customer are shown."
-msgstr "يُعرض فقط عناوين التسليم التابعة لعميل الشاحنة."
-
-#. module: portal_sale_order_create
-#: model_terms:ir.ui.view,arch_db:portal_sale_order_create.portal_sale_create
-msgid "Create a new walk-in customer below (no approval)."
-msgstr "أنشئ عميلًا نقديًا جديدًا أدناه (بدون موافقة)."
+msgid "Delivery addresses under your van customer are shown (all companies). Create a new walk-in customer below (no approval)."
+msgstr "تُعرض عناوين التسليم التابعة لعميل الشاحنة (كل الشركات). أنشئ عميلًا نقديًا جديدًا أدناه (بدون موافقة)."
 
 #. module: portal_sale_order_create
 #: model_terms:ir.ui.view,arch_db:portal_sale_order_create.portal_sale_create
