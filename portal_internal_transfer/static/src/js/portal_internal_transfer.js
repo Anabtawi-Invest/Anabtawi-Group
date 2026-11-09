@@ -128,11 +128,22 @@ function initCreatePage(root) {
             hideResults();
         }
 
+        function showPicker() {
+            state[stateKey] = null;
+            selectedBox.classList.add("d-none");
+            if (searchWrap) {
+                searchWrap.classList.remove("d-none");
+            }
+            input.value = "";
+            input.focus();
+            search("");
+        }
+
         async function search(term) {
             const current = ++seq;
             results.innerHTML = `<div class="list-group-item text-muted">Searching...</div>`;
             try {
-                const locations = await fetchLocations(term);
+                const locations = await fetchLocations(term || "");
                 if (current !== seq) return;
                 if (!locations.length) {
                     results.innerHTML = `
@@ -142,7 +153,7 @@ function initCreatePage(root) {
                         </div>`;
                     return;
                 }
-                const safeTerm = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+                const safeTerm = (term || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
                 const re = safeTerm ? new RegExp(`(${safeTerm})`, "ig") : null;
                 const highlight = (text) => {
                     const value = String(text || "");
@@ -179,27 +190,30 @@ function initCreatePage(root) {
         function schedule() {
             clearTimeout(timer);
             const term = input.value.trim();
-            if (term.length < 1) {
-                hideResults();
-                return;
-            }
             timer = setTimeout(() => search(term), 120);
         }
 
         input.addEventListener("input", schedule);
         input.addEventListener("keyup", schedule);
-        input.addEventListener("focus", schedule);
-        clearBtn.addEventListener("click", () => {
-            state[stateKey] = null;
-            selectedBox.classList.add("d-none");
-            if (searchWrap) {
-                searchWrap.classList.remove("d-none");
+        input.addEventListener("focus", () => {
+            if (!input.value.trim()) {
+                search("");
+            } else {
+                schedule();
             }
-            input.focus();
         });
+        clearBtn.addEventListener("click", (ev) => {
+            ev.preventDefault();
+            showPicker();
+        });
+
+        // Keep selected Source visible when the page loaded with a default.
+        if (state[stateKey]) {
+            selectLocation(state[stateKey]);
+        }
     }
 
-    // Destination comes from backend mapping; source defaults to supplier WH stock.
+    // Destination is mapped; source defaults from Van Stock Setup / create wizard.
     setupLocationSearch({
         inputId: "#location_src_search",
         resultsId: "#location_src_results",

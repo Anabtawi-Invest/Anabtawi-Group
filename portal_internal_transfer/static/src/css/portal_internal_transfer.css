@@ -45,6 +45,12 @@
     overflow: visible !important;
 }
 
+.o_portal_loc_search_input {
+    background: #fff !important;
+    color: #111827 !important;
+    border: 1px solid #9ca3af !important;
+}
+
 .o_portal_loc_results:empty {
     display: none;
 }

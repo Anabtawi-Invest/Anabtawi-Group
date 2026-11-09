@@ -65,18 +65,20 @@
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label class="form-label">Source location</label>
-                                <div t-attf-class="o_portal_loc_autocomplete#{source_location and ' d-none' or ''}">
-                                    <input type="text" class="form-control" id="location_src_search"
-                                           placeholder="Type location name..." autocomplete="off"
-                                           t-att-disabled="not dest_location"/>
-                                    <div id="location_src_results" class="o_portal_loc_results list-group mt-2"></div>
-                                </div>
                                 <div id="selected_location_src"
-                                     t-attf-class="alert alert-success mt-2 mb-0#{source_location and '' or ' d-none'}">
+                                     t-att-class="'alert alert-success mt-2 mb-0' + ('' if source_location else ' d-none')">
                                     <strong>From:</strong>
                                     <span id="selected_location_src_label"
                                           t-esc="source_location.complete_name if source_location else ''"/>
                                     <button type="button" class="btn btn-sm btn-link" id="btn_clear_location_src">Change</button>
+                                </div>
+                                <div t-att-class="'o_portal_loc_autocomplete' + (' d-none' if source_location else '')">
+                                    <input type="text" class="form-control o_portal_loc_search_input" id="location_src_search"
+                                           placeholder="Type location name to change Source..."
+                                           autocomplete="off"
+                                           t-att-disabled="not dest_location"/>
+                                    <div id="location_src_results" class="o_portal_loc_results list-group mt-2"></div>
+                                    <div class="form-text">Search and select any internal location.</div>
                                 </div>
                             </div>
                             <div class="col-md-6">
