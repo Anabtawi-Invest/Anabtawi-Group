@@ -2358,8 +2358,112 @@ class PosReportingDashboard(models.TransientModel):
         if not self.env.user.has_group("anabtawi_pos_reporting_dashboard.group_pos_dashboard_transfers"):
             raise AccessError(_("You are not allowed to view the Transfers section of the POS dashboard."))
 
+    def _transfer_prefetch_pairing_graph(self, pickings):
+        """Warm ORM cache for moves and 1-hop chain links (avoids N+1 in pairing)."""
+        if not pickings:
+            return self.env["stock.move"].browse()
+        moves = pickings.mapped("move_ids")
+        related = moves.mapped("move_dest_ids") | moves.mapped("move_orig_ids")
+        related_pickings = related.mapped("picking_id")
+        warm = pickings | related_pickings
+        warm.mapped("move_ids")
+        warm.mapped("move_ids.product_id")
+        warm.mapped("move_ids.move_dest_ids")
+        warm.mapped("move_ids.move_orig_ids")
+        warm.mapped("location_id")
+        warm.mapped("location_dest_id")
+        warm.mapped("picking_type_id")
+        warm.mapped("origin")
+        return moves | related
+
+    def _transfer_filter_sort_paginate_rows(
+        self, rows, row_filter="all", row_search="", sort_key="where", sort_order="asc",
+        page=1, page_size=50,
+    ):
+        """Apply Transfers table filter/search/sort then slice one page."""
+        row_filter = (row_filter or "all").strip()
+        query = (row_search or "").strip().lower()
+        filtered = rows
+        if row_filter == "mismatch":
+            filtered = [r for r in filtered if r.get("where") != "ok"]
+        elif row_filter == "not_approved":
+            filtered = [r for r in filtered if r.get("not_approved")]
+        elif row_filter == "send":
+            filtered = [r for r in filtered if abs(float(r.get("send_gap") or 0.0)) > 0.0005]
+        elif row_filter == "receive":
+            filtered = [
+                r for r in filtered
+                if not r.get("not_approved") and abs(float(r.get("receive_gap") or 0.0)) > 0.0005
+            ]
+        if query:
+            def _match(r):
+                blob = " ".join([
+                    r.get("product_name") or "",
+                    r.get("branch_name") or "",
+                    r.get("request_picking_name") or "",
+                    r.get("receipt_picking_name") or "",
+                    r.get("where_label") or "",
+                ]).lower()
+                return query in blob
+            filtered = [r for r in filtered if _match(r)]
+
+        where_rank = {
+            "waiting": 0,
+            "send_waiting": 1,
+            "both": 2,
+            "send": 3,
+            "receive": 4,
+            "mixed": 5,
+            "ok": 6,
+        }
+        key = sort_key or "where"
+        reverse = (sort_order or "asc") == "desc"
+
+        def _sort_key_fn(r):
+            if key == "where":
+                return (0, where_rank.get(r.get("where"), 9), "")
+            val = r.get(key)
+            if isinstance(val, str):
+                return (1, 0, (val or "").lower())
+            if val is None:
+                return (2, 0, "")
+            try:
+                return (0, float(val), "")
+            except (TypeError, ValueError):
+                return (1, 0, str(val).lower())
+
+        filtered.sort(key=_sort_key_fn, reverse=reverse)
+
+        page_size = max(10, min(int(page_size or 50), 200))
+        page = max(1, int(page or 1))
+        total = len(filtered)
+        total_pages = max(1, (total + page_size - 1) // page_size) if total else 1
+        if page > total_pages:
+            page = total_pages
+        start = (page - 1) * page_size
+        page_rows = filtered[start:start + page_size]
+        return page_rows, {
+            "page": page,
+            "page_size": page_size,
+            "total_rows": total,
+            "total_pages": total_pages,
+            "has_prev": page > 1,
+            "has_next": page < total_pages,
+        }
+
     @api.model
-    def get_transfer_dashboard_data(self, date_from=None, date_to=None, config_ids=None):
+    def get_transfer_dashboard_data(
+        self,
+        date_from=None,
+        date_to=None,
+        config_ids=None,
+        page=1,
+        page_size=50,
+        row_filter="all",
+        row_search="",
+        sort_key="where",
+        sort_order="asc",
+    ):
         """Branch request → تسليم الطلبيات send → branch receive, per product line."""
         self._check_transfer_dashboard_access()
         period = self._parse_period(date_from, date_to)
@@ -2437,13 +2541,43 @@ class PosReportingDashboard(models.TransientModel):
             ],
             order="scheduled_date desc, id desc",
         )
+        # Only asks that leave a mapped branch location (skips unrelated hub traffic).
         request_pickings = Picking.search(
             base_domain
             + [
                 ("location_dest_id", "in", list(hub_ids)),
+                ("location_id", "in", list(branch_location_ids)),
             ],
             order="scheduled_date desc, id desc",
         )
+
+        self._transfer_prefetch_pairing_graph(request_pickings | receipt_pickings)
+
+        # One shot for origin-name pairing instead of per-move searches.
+        origin_names = {
+            (p.origin or "").strip()
+            for p in receipt_pickings
+            if (p.origin or "").strip() and not (p.origin or "").strip().lower().startswith("return of")
+        }
+        origin_pickings = Picking.browse()
+        if origin_names:
+            origin_pickings = Picking.search([
+                ("name", "in", list(origin_names)),
+                ("state", "!=", "cancel"),
+                ("picking_type_code", "=", "internal"),
+            ])
+            self._transfer_prefetch_pairing_graph(origin_pickings)
+        picking_by_name = {p.name: p for p in (request_pickings | origin_pickings) if p.name}
+
+        # Reverse chain index: receipt_move.id → request/send move (from prefetched dest links).
+        dest_move_to_request = {}
+        for req_picking in request_pickings:
+            for req_move in req_picking.move_ids:
+                if req_move.state == "cancel" or not req_move.product_id:
+                    continue
+                for dest_move in req_move.move_dest_ids:
+                    if dest_move.state != "cancel":
+                        dest_move_to_request.setdefault(dest_move.id, req_move)
 
         def _config_for_pair(request_picking=False, receipt_picking=False):
             if receipt_picking:
@@ -2462,6 +2596,33 @@ class PosReportingDashboard(models.TransientModel):
                     if request_picking.location_id.id in loc_ids:
                         return candidate
             return False
+
+        def _request_move_fast(receipt_move):
+            """In-memory request lookup; avoids per-line Move/Picking.search."""
+            Move = self.env["stock.move"].sudo()
+            if not receipt_move or not receipt_move.product_id:
+                return Move.browse()
+            product = receipt_move.product_id
+            cached = dest_move_to_request.get(receipt_move.id)
+            if cached and cached.product_id == product:
+                return cached
+            orig = receipt_move.move_orig_ids.filtered(
+                lambda m: m.state != "cancel" and m.product_id == product
+            )
+            if orig:
+                return orig[:1]
+            receipt_picking = receipt_move.picking_id
+            origin = (receipt_picking.origin or "").strip() if receipt_picking else ""
+            if origin and not origin.lower().startswith("return of"):
+                req_picking = picking_by_name.get(origin)
+                if req_picking:
+                    req_move = req_picking.move_ids.filtered(
+                        lambda m: m.state != "cancel" and m.product_id == product
+                    )[:1]
+                    if req_move:
+                        return req_move
+            # Rare fallback (reference_ids / odd chains).
+            return self._resolve_request_move_for_receipt(receipt_move, hub_ids)
 
         rows = []
         seen = set()
@@ -2598,7 +2759,7 @@ class PosReportingDashboard(models.TransientModel):
                         paired_receipt_move_ids.add(next_receipt.id)
                         continue
 
-                request_move = self._resolve_request_move_for_receipt(move, hub_ids)
+                request_move = _request_move_fast(move)
                 request_picking = request_move.picking_id if request_move else False
                 if request_picking and self._transfer_is_return_picking(request_picking):
                     request_move = self.env["stock.move"].browse()
@@ -2660,6 +2821,15 @@ class PosReportingDashboard(models.TransientModel):
             "not_approved_count": sum(1 for r in rows if r["not_approved"]),
             "mismatch_count": sum(1 for r in rows if r["where"] != "ok"),
         }
+        page_rows, pagination = self._transfer_filter_sort_paginate_rows(
+            rows,
+            row_filter=row_filter,
+            row_search=row_search,
+            sort_key=sort_key,
+            sort_order=sort_order,
+            page=page,
+            page_size=page_size,
+        )
         warning = ""
         if not mapped_configs:
             warning = _(
@@ -2678,7 +2848,8 @@ class PosReportingDashboard(models.TransientModel):
             "date_to": period["date_to"].isoformat(),
             "all_branches": [{"id": c.id, "name": c.name} for c in all_configs],
             "summary": summary,
-            "rows": rows,
+            "rows": page_rows,
+            "pagination": pagination,
             "error": warning,
         }
 

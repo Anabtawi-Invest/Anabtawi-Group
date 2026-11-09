@@ -43,6 +43,8 @@ export class PosReportingDashboard extends Component {
             transferSearch: "",
             transferSortKey: "where",
             transferSortOrder: "asc",
+            transferPage: 1,
+            transferPageSize: 50,
             compareLoading: false,
             compare_date_from_a: "",
             compare_date_to_a: "",
@@ -90,6 +92,8 @@ export class PosReportingDashboard extends Component {
                         transferSearch: this.state.transferSearch,
                         transferSortKey: this.state.transferSortKey,
                         transferSortOrder: this.state.transferSortOrder,
+                        transferPage: this.state.transferPage,
+                        transferPageSize: this.state.transferPageSize,
                         compare_date_from_a: this.state.compare_date_from_a,
                         compare_date_to_a: this.state.compare_date_to_a,
                         compare_date_from_b: this.state.compare_date_from_b,
@@ -120,7 +124,16 @@ export class PosReportingDashboard extends Component {
             loadedKey: "",
             summary: {},
             rows: [],
+            pagination: {
+                page: 1,
+                page_size: 50,
+                total_rows: 0,
+                total_pages: 1,
+                has_prev: false,
+                has_next: false,
+            },
             error: "",
+            _searchTimer: null,
         });
 
         this.compare = useState({
@@ -208,6 +221,7 @@ export class PosReportingDashboard extends Component {
             return;
         }
         if (this.state.view === "transfers") {
+            this.state.transferPage = 1;
             await this.fetchTransferData();
             return;
         }
@@ -496,10 +510,17 @@ export class PosReportingDashboard extends Component {
 
     setTransferFilter(filter) {
         this.state.transferFilter = filter;
+        this.state.transferPage = 1;
+        this.fetchTransferData();
     }
 
     onTransferSearch(ev) {
         this.state.transferSearch = ev.target.value || "";
+        this.state.transferPage = 1;
+        if (this.transfers._searchTimer) {
+            clearTimeout(this.transfers._searchTimer);
+        }
+        this.transfers._searchTimer = setTimeout(() => this.fetchTransferData(), 350);
     }
 
     async fetchTransferData() {
@@ -515,10 +536,25 @@ export class PosReportingDashboard extends Component {
                     date_from: this.state.date_from,
                     date_to: this.state.date_to,
                     config_ids: this.state.config_ids || [],
+                    page: this.state.transferPage || 1,
+                    page_size: this.state.transferPageSize || 50,
+                    row_filter: this.state.transferFilter || "all",
+                    row_search: this.state.transferSearch || "",
+                    sort_key: this.state.transferSortKey || "where",
+                    sort_order: this.state.transferSortOrder || "asc",
                 }
             );
             this.transfers.summary = res.summary || {};
             this.transfers.rows = res.rows || [];
+            this.transfers.pagination = res.pagination || {
+                page: 1,
+                page_size: 50,
+                total_rows: 0,
+                total_pages: 1,
+                has_prev: false,
+                has_next: false,
+            };
+            this.state.transferPage = this.transfers.pagination.page || 1;
             this.transfers.error = res.error || "";
             this.transfers.loadedKey = this._filterKey();
             if (res.all_branches && res.all_branches.length) {
@@ -541,59 +577,8 @@ export class PosReportingDashboard extends Component {
     }
 
     get sortedTransfers() {
-        const query = (this.state.transferSearch || "").trim().toLowerCase();
-        const filter = this.state.transferFilter;
-        let rows = [...(this.transfers.rows || [])];
-        if (filter === "mismatch") {
-            rows = rows.filter((row) => row.where !== "ok");
-        } else if (filter === "not_approved") {
-            rows = rows.filter((row) => row.not_approved);
-        } else if (filter === "send") {
-            rows = rows.filter((row) => Math.abs(row.send_gap || 0) > 0.0005);
-        } else if (filter === "receive") {
-            rows = rows.filter((row) => !row.not_approved && Math.abs(row.receive_gap || 0) > 0.0005);
-        }
-        if (query) {
-            rows = rows.filter((row) =>
-                (row.product_name || "").toLowerCase().includes(query)
-                || (row.branch_name || "").toLowerCase().includes(query)
-                || (row.request_picking_name || "").toLowerCase().includes(query)
-                || (row.receipt_picking_name || "").toLowerCase().includes(query)
-                || (row.where_label || "").toLowerCase().includes(query)
-            );
-        }
-        const key = this.state.transferSortKey;
-        const isAsc = this.state.transferSortOrder === "asc";
-        const whereRank = {
-            waiting: 0,
-            send_waiting: 1,
-            both: 2,
-            send: 3,
-            receive: 4,
-            mixed: 5,
-            ok: 6,
-        };
-        rows.sort((a, b) => {
-            let valA = a[key];
-            let valB = b[key];
-            if (key === "where") {
-                valA = whereRank[a.where] ?? 9;
-                valB = whereRank[b.where] ?? 9;
-            }
-            if (typeof valA === "string" || typeof valB === "string") {
-                valA = (valA || "").toLowerCase();
-                valB = (valB || "").toLowerCase();
-                return isAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
-            }
-            const missingA = valA === null || valA === undefined;
-            const missingB = valB === null || valB === undefined;
-            if (missingA || missingB) {
-                if (missingA && missingB) return 0;
-                return missingA ? 1 : -1;
-            }
-            return isAsc ? valA - valB : valB - valA;
-        });
-        return rows;
+        // Server already filters / sorts / paginates Transfers rows.
+        return this.transfers.rows || [];
     }
 
     sortTransfers(key) {
@@ -609,6 +594,34 @@ export class PosReportingDashboard extends Component {
                 || key === "receipt_picking_name"
             ) ? "asc" : "desc";
         }
+        this.state.transferPage = 1;
+        this.fetchTransferData();
+    }
+
+    goTransferPage(page) {
+        const total = this.transfers.pagination?.total_pages || 1;
+        const next = Math.max(1, Math.min(total, Number(page) || 1));
+        if (next === this.state.transferPage && this.transfers.rows?.length) {
+            return;
+        }
+        this.state.transferPage = next;
+        this.fetchTransferData();
+    }
+
+    transferPageFrom() {
+        const p = this.transfers.pagination || {};
+        if (!(p.total_rows > 0)) {
+            return 0;
+        }
+        return ((p.page - 1) * p.page_size) + 1;
+    }
+
+    transferPageTo() {
+        const p = this.transfers.pagination || {};
+        if (!(p.total_rows > 0)) {
+            return 0;
+        }
+        return Math.min(p.page * p.page_size, p.total_rows);
     }
 
     async openTransferPicking(pickingId) {
@@ -810,6 +823,7 @@ export class PosReportingDashboard extends Component {
         } else {
             this.state.config_ids = [branchId];
         }
+        this.state.transferPage = 1;
         this.fetchDashboardData();
     }
 
@@ -840,6 +854,7 @@ export class PosReportingDashboard extends Component {
 
         this.state.date_from = this._formatLocalDate(fromDate);
         this.state.date_to = this._formatLocalDate(toDate);
+        this.state.transferPage = 1;
         this.fetchDashboardData();
     }
 

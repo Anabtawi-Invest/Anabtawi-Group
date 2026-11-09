@@ -591,6 +591,31 @@
                                 </tbody>
                             </table>
                         </div>
+                        <div t-if="transfers.pagination &amp;&amp; (transfers.pagination.total_rows || 0) > 0" class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-2">
+                            <div class="small text-muted">
+                                Showing
+                                <t t-esc="transferPageFrom()"/>–
+                                <t t-esc="transferPageTo()"/>
+                                of
+                                <t t-esc="transfers.pagination.total_rows"/>
+                                (summary is for the full period)
+                            </div>
+                            <div class="btn-group" role="group">
+                                <button type="button" class="btn btn-sm btn-outline-primary"
+                                        t-att-disabled="!transfers.pagination.has_prev || state.transferLoading"
+                                        t-on-click="() => this.goTransferPage(state.transferPage - 1)">
+                                    Prev
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" disabled="1">
+                                    Page <t t-esc="transfers.pagination.page"/> / <t t-esc="transfers.pagination.total_pages"/>
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-primary"
+                                        t-att-disabled="!transfers.pagination.has_next || state.transferLoading"
+                                        t-on-click="() => this.goTransferPage(state.transferPage + 1)">
+                                    Next
+                                </button>
+                            </div>
+                        </div>
                     </t>
                 </t>
                 <t t-else="">
