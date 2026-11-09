@@ -9,6 +9,17 @@ class ApprovalRequest(models.Model):
     customer_name = fields.Char(string="Customer Name")
     customer_phone = fields.Char(string="Customer Phone")
     customer_email = fields.Char(string="Customer Email")
+    customer_portal_allow_payment_term = fields.Boolean(
+        string="Allow Payment Term",
+        default=False,
+        help="If enabled, portal sales for this customer require choosing payment terms "
+        "and are not auto fully paid.",
+    )
+    customer_payment_term_id = fields.Many2one(
+        "account.payment.term",
+        string="Default Payment Term",
+        help="Default payment term written on the customer when Allow Payment Term is enabled.",
+    )
     created_partner_id = fields.Many2one(
         "res.partner",
         string="Created Customer",
@@ -16,13 +27,27 @@ class ApprovalRequest(models.Model):
         copy=False,
     )
 
-    @api.constrains("approval_type", "customer_name", "request_status")
+    @api.constrains(
+        "approval_type",
+        "customer_name",
+        "customer_portal_allow_payment_term",
+        "customer_payment_term_id",
+        "request_status",
+    )
     def _check_create_customer_fields(self):
         for request in self:
             if request.approval_type != "create_customer":
                 continue
             if request.request_status in ("pending", "approved") and not (request.customer_name or "").strip():
                 raise ValidationError(_("Customer Name is required for Create Customer requests."))
+            if (
+                request.request_status in ("pending", "approved")
+                and request.customer_portal_allow_payment_term
+                and not request.customer_payment_term_id
+            ):
+                raise ValidationError(
+                    _("Default Payment Term is required when Allow Payment Term is enabled.")
+                )
 
     def action_confirm(self):
         for request in self:
@@ -30,6 +55,10 @@ class ApprovalRequest(models.Model):
                 continue
             if not (request.customer_name or "").strip():
                 raise UserError(_("Please enter the customer name before submitting."))
+            if request.customer_portal_allow_payment_term and not request.customer_payment_term_id:
+                raise UserError(
+                    _("Please set a Default Payment Term when Allow Payment Term is enabled.")
+                )
             # Count via sudo search — more reliable than attachment_number for portal/sudo flows.
             attachment_count = (
                 self.env["ir.attachment"]
@@ -103,6 +132,7 @@ class ApprovalRequest(models.Model):
                         request_company=company.display_name,
                     )
                 )
+            allow_term = bool(request.customer_portal_allow_payment_term)
             vals = {
                 "name": name,
                 "phone": (request.customer_phone or "").strip() or False,
@@ -112,6 +142,12 @@ class ApprovalRequest(models.Model):
                 "type": "contact",
                 "is_company": False,
                 "company_id": company.id if company else False,
+                "portal_allow_payment_term": allow_term,
+                "property_payment_term_id": (
+                    request.customer_payment_term_id.id
+                    if allow_term and request.customer_payment_term_id
+                    else False
+                ),
             }
             partner = Partner.with_company(company).create(vals) if company else Partner.create(vals)
             request.sudo().write(

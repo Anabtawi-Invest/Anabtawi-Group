@@ -20,13 +20,20 @@
                 <field name="customer_name"
                         invisible="approval_type != 'create_customer'"
                         required="approval_type == 'create_customer'"
-                        readonly="request_status != 'new'"/>
+                        readonly="request_status not in ('new', 'pending')"/>
                 <field name="customer_phone"
                         invisible="approval_type != 'create_customer'"
-                        readonly="request_status != 'new'"/>
+                        readonly="request_status not in ('new', 'pending')"/>
                 <field name="customer_email"
                         invisible="approval_type != 'create_customer'"
-                        readonly="request_status != 'new'"/>
+                        readonly="request_status not in ('new', 'pending')"/>
+                <field name="customer_portal_allow_payment_term"
+                        invisible="approval_type != 'create_customer'"
+                        readonly="request_status not in ('new', 'pending')"/>
+                <field name="customer_payment_term_id"
+                        invisible="approval_type != 'create_customer' or not customer_portal_allow_payment_term"
+                        required="approval_type == 'create_customer' and customer_portal_allow_payment_term"
+                        readonly="request_status not in ('new', 'pending')"/>
                 <field name="created_partner_id"
                         invisible="approval_type != 'create_customer' or not created_partner_id"/>
             </xpath>

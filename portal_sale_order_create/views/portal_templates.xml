@@ -81,6 +81,15 @@
                                 <option value="">Select payment terms...</option>
                             </select>
                         </div>
+                        <div id="payment_amount_wrap" class="mt-3 d-none">
+                            <label class="form-label" for="payment_amount">Amount to pay now</label>
+                            <input type="number" class="form-control" id="payment_amount"
+                                   min="0" step="0.01" placeholder="0.00"/>
+                            <div class="form-text">
+                                This customer allows payment terms. Enter how much to collect now
+                                (0 or empty leaves the invoice open / unpaid).
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -130,7 +139,9 @@
                         </t>
                         <t t-else="">
                             <p class="text-muted mb-3">
-                                Confirming will create the sale order, confirm it, and post the invoice automatically.
+                                Confirming creates the sale order, confirms it, and posts the invoice.
+                                Cash customers are fully paid automatically. Credit customers
+                                (Allow Payment Term) use the amount entered above.
                             </p>
                             <button type="button" class="btn btn-success btn-lg" id="btn_confirm_order">
                                 Confirm &amp; Invoice

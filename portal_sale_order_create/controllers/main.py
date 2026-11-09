@@ -77,8 +77,12 @@ class PortalSaleOrderCreate(http.Controller):
             return user.salesperson_cash_journal_id
         return request.env["account.journal"]
 
-    def _pay_invoice_fully(self, invoice, journal):
-        """Register full payment on posted invoice using the van journal."""
+    def _pay_invoice_amount(self, invoice, journal, amount=None):
+        """Register a payment on posted invoice using the van journal.
+
+        ``amount`` defaults to the residual (full pay). Pass a smaller amount for
+        credit customers who only pay part now.
+        """
         invoice.ensure_one()
         if not invoice or invoice.state != "posted":
             return
@@ -87,6 +91,16 @@ class PortalSaleOrderCreate(http.Controller):
         residual = invoice.amount_residual
         if residual <= 0:
             return
+        pay_amount = residual if amount is None else float(amount)
+        if pay_amount <= 0:
+            return
+        if pay_amount > residual + 1e-6:
+            raise ValidationError(
+                _(
+                    "Payment amount %(amount)s cannot exceed the invoice residual %(residual)s."
+                )
+                % {"amount": pay_amount, "residual": residual}
+            )
         if not journal:
             raise UserError(
                 _(
@@ -95,8 +109,9 @@ class PortalSaleOrderCreate(http.Controller):
                 )
             )
         _logger.info(
-            "portal_sale paying invoice=%s residual=%s journal=%s",
+            "portal_sale paying invoice=%s amount=%s residual=%s journal=%s",
             invoice.name,
+            pay_amount,
             residual,
             journal.display_name,
         )
@@ -107,12 +122,16 @@ class PortalSaleOrderCreate(http.Controller):
             .create(
                 {
                     "journal_id": journal.id,
-                    "amount": residual,
+                    "amount": pay_amount,
                     "payment_date": fields.Date.context_today(invoice),
                 }
             )
         )
         payment_register.action_create_payments()
+
+    def _pay_invoice_fully(self, invoice, journal):
+        """Register full payment on posted invoice using the van journal."""
+        self._pay_invoice_amount(invoice, journal, amount=None)
 
     def _product_portal_price(self, product, pricelist=None):
         if pricelist:
@@ -477,6 +496,7 @@ class PortalSaleOrderCreate(http.Controller):
         partner_id=None,
         lines=None,
         payment_term_id=None,
+        payment_amount=None,
         **kwargs,
     ):
         self._ensure_sales_portal()
@@ -493,6 +513,15 @@ class PortalSaleOrderCreate(http.Controller):
             )
 
         payment_term = self._resolve_payment_term(partner, payment_term_id)
+        allow_term = bool(getattr(partner, "portal_allow_payment_term", False))
+        partial_amount = None
+        if allow_term and payment_amount not in (None, "", False):
+            try:
+                partial_amount = float(payment_amount)
+            except (TypeError, ValueError) as exc:
+                raise ValidationError(_("Invalid payment amount.")) from exc
+            if partial_amount < 0:
+                raise ValidationError(_("Payment amount cannot be negative."))
 
         van_location = self._get_van_stock_location()
         van_warehouse = self._get_van_warehouse()
@@ -580,7 +609,13 @@ class PortalSaleOrderCreate(http.Controller):
         invoices.action_post()
         invoice = invoices[:1]
         if invoice:
-            self._pay_invoice_fully(invoice, self._get_van_payment_journal())
+            journal = self._get_van_payment_journal()
+            if allow_term:
+                # Credit customers: pay only the entered amount (0/empty = leave open).
+                if partial_amount:
+                    self._pay_invoice_amount(invoice, journal, amount=partial_amount)
+            else:
+                self._pay_invoice_fully(invoice, journal)
         return {
             "order_id": order.id,
             "order_name": order.name,

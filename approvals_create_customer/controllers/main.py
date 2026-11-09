@@ -185,12 +185,30 @@ class PortalCustomerRequest(http.Controller):
             )
         approval.invalidate_recordset(["attachment_number", "attachment_ids"])
 
+    def _get_payment_terms(self):
+        company = self._portal_company()
+        return (
+            request.env["account.payment.term"]
+            .sudo()
+            .search(
+                [
+                    "|",
+                    ("company_id", "=", False),
+                    ("company_id", "=", company.id if company else False),
+                ],
+                order="name, id",
+            )
+        )
+
     @http.route("/my/customer-requests/create", type="http", auth="user", website=True)
     def portal_customer_request_create(self, **kwargs):
         self._ensure_access()
         return request.render(
             "approvals_create_customer.portal_customer_request_create",
-            {"page_name": "portal_customer_request_create"},
+            {
+                "page_name": "portal_customer_request_create",
+                "payment_terms": self._get_payment_terms(),
+            },
         )
 
     @http.route(
@@ -268,9 +286,25 @@ class PortalCustomerRequest(http.Controller):
         return request.env["ir.binary"]._get_stream_from(attachment).get_response(as_attachment=True)
 
     @http.route("/my/customer-requests/api/submit", type="jsonrpc", auth="user", website=True)
-    def api_submit(self, name="", phone="", email="", attachments=None, **kwargs):
+    def api_submit(
+        self,
+        name="",
+        phone="",
+        email="",
+        attachments=None,
+        portal_allow_payment_term=False,
+        payment_term_id=None,
+        **kwargs,
+    ):
         self._ensure_access()
-        return self._submit_request(name, phone, email, attachments)
+        return self._submit_request(
+            name,
+            phone,
+            email,
+            attachments,
+            portal_allow_payment_term=portal_allow_payment_term,
+            payment_term_id=payment_term_id,
+        )
 
     @http.route(
         "/my/customer-requests/api/submit/http",
@@ -288,10 +322,20 @@ class PortalCustomerRequest(http.Controller):
             payload.get("phone", ""),
             payload.get("email", ""),
             payload.get("attachments"),
+            portal_allow_payment_term=payload.get("portal_allow_payment_term", False),
+            payment_term_id=payload.get("payment_term_id"),
         )
         return request.make_json_response(result)
 
-    def _submit_request(self, name, phone, email, attachments=None):
+    def _submit_request(
+        self,
+        name,
+        phone,
+        email,
+        attachments=None,
+        portal_allow_payment_term=False,
+        payment_term_id=None,
+    ):
         name = (name or "").strip()
         phone = (phone or "").strip()
         email = (email or "").strip()
@@ -299,6 +343,22 @@ class PortalCustomerRequest(http.Controller):
             raise UserError(_("Customer name is required."))
         if email and not EMAIL_RE.match(email):
             raise UserError(_("Please enter a valid email address."))
+
+        allow_term = bool(portal_allow_payment_term)
+        term = request.env["account.payment.term"]
+        if allow_term:
+            if not payment_term_id:
+                raise UserError(
+                    _("Please select a Default Payment Term when Allow Payment Term is enabled.")
+                )
+            term = (
+                request.env["account.payment.term"]
+                .sudo()
+                .browse(int(payment_term_id))
+                .exists()
+            )
+            if not term:
+                raise UserError(_("Invalid payment terms selected."))
 
         cleaned_attachments = self._normalize_attachments(attachments)
         if not cleaned_attachments:
@@ -309,6 +369,8 @@ class PortalCustomerRequest(http.Controller):
         company = self._portal_company()
         if not company:
             raise UserError(_("Your user has no company. Please contact an administrator."))
+        if term and term.company_id and term.company_id != company:
+            raise UserError(_("Invalid payment terms selected."))
         category = self._get_category(company)
         Approval = request.env["approval.request"].sudo().with_company(company)
         vals = {
@@ -318,6 +380,8 @@ class PortalCustomerRequest(http.Controller):
             "customer_name": name,
             "customer_phone": phone or False,
             "customer_email": email or False,
+            "customer_portal_allow_payment_term": allow_term,
+            "customer_payment_term_id": term.id if allow_term and term else False,
             "reason": _("Portal customer request: %(name)s", name=name),
         }
         if not category.automated_sequence:

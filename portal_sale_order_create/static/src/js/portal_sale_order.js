@@ -77,6 +77,8 @@ function initCreatePage(root) {
     const selectedLabel = qs("#selected_partner_label", root);
     const paymentTermWrap = qs("#payment_term_wrap", root);
     const paymentTermSelect = qs("#payment_term_id", root);
+    const paymentAmountWrap = qs("#payment_amount_wrap", root);
+    const paymentAmountInput = qs("#payment_amount", root);
     const cartBody = qs("#cart_body", root);
     const cartEmpty = qs("#cart_empty", root);
     const cartWrap = qs("#cart_table_wrap", root);
@@ -140,6 +142,12 @@ function initCreatePage(root) {
         if (paymentTermSelect) {
             paymentTermSelect.value = "";
         }
+        if (paymentAmountWrap) {
+            paymentAmountWrap.classList.add("d-none");
+        }
+        if (paymentAmountInput) {
+            paymentAmountInput.value = "";
+        }
     }
 
     async function ensurePaymentTermsOptions() {
@@ -163,6 +171,12 @@ function initCreatePage(root) {
         }
         await ensurePaymentTermsOptions();
         paymentTermWrap.classList.remove("d-none");
+        if (paymentAmountWrap) {
+            paymentAmountWrap.classList.remove("d-none");
+        }
+        if (paymentAmountInput) {
+            paymentAmountInput.value = "";
+        }
         const defaultId = partner.default_payment_term_id
             ? String(partner.default_payment_term_id)
             : "";
@@ -549,6 +563,19 @@ function initCreatePage(root) {
             showError(confirmError, "Please select payment terms.");
             return;
         }
+        let paymentAmount = null;
+        if (state.partner.portal_allow_payment_term && paymentAmountInput) {
+            const raw = (paymentAmountInput.value || "").trim();
+            if (raw !== "") {
+                paymentAmount = parseFloat(raw);
+                if (Number.isNaN(paymentAmount) || paymentAmount < 0) {
+                    showError(confirmError, "Please enter a valid payment amount (0 or more).");
+                    return;
+                }
+            } else {
+                paymentAmount = 0;
+            }
+        }
         const lines = Object.values(state.cart).map((i) => ({ product_id: i.id, qty: i.qty }));
         if (!lines.length) {
             showError(confirmError, "Please add at least one product.");
@@ -572,6 +599,7 @@ function initCreatePage(root) {
             };
             if (state.partner.portal_allow_payment_term) {
                 payload.payment_term_id = state.paymentTermId;
+                payload.payment_amount = paymentAmount;
             }
             const result = await rpc("/my/sales/api/confirm", payload);
             window.location.href = result.redirect_url;
