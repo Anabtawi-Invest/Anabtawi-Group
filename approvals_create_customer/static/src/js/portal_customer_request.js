@@ -194,14 +194,14 @@ function initCreatePage(root) {
             : null;
         if (!name.trim()) {
             if (errorEl) {
-                errorEl.textContent = "Customer name is required.";
+                errorEl.textContent = "اسم العميل مطلوب.";
                 errorEl.classList.remove("d-none");
             }
             return;
         }
         if (!paymentTermId) {
             if (errorEl) {
-                errorEl.textContent = "Please select a Default Payment Term.";
+                errorEl.textContent = "يرجى اختيار شرط الدفع الافتراضي.";
                 errorEl.classList.remove("d-none");
             }
             return;
@@ -209,7 +209,7 @@ function initCreatePage(root) {
         if (!selectedFiles.length) {
             if (errorEl) {
                 errorEl.textContent =
-                    "Please attach at least one Commercial Register (السجل التجاري) document.";
+                    "يرجى إرفاق مستند واحد على الأقل من السجل التجاري.";
                 errorEl.classList.remove("d-none");
             }
             return;
@@ -247,7 +247,7 @@ function initDetailPage(root) {
     }
     const requestId = parseInt(root.dataset.requestId, 10);
     cancelBtn.addEventListener("click", async () => {
-        if (!window.confirm("Cancel this customer request?")) {
+        if (!window.confirm("إلغاء طلب العميل هذا؟")) {
             return;
         }
         if (errorEl) {

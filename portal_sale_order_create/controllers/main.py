@@ -164,7 +164,9 @@ class PortalSaleOrderCreate(http.Controller):
             return False
         if not bool(getattr(partner, "portal_allow_payment_term", False)):
             return False
-        return partner.user_id.id == request.env.user.id
+        if "van_portal_user_id" not in partner._fields:
+            return False
+        return partner.van_portal_user_id.id == request.env.user.id
 
     def _is_allowed_portal_customer(self, partner, sale_mode="cash"):
         mode = self._normalize_sale_mode(sale_mode)
@@ -300,7 +302,7 @@ class PortalSaleOrderCreate(http.Controller):
             domain = [("active", "=", True)]
             if mode == "credit":
                 domain += [
-                    ("user_id", "=", request.env.user.id),
+                    ("van_portal_user_id", "=", request.env.user.id),
                     ("portal_allow_payment_term", "=", True),
                 ]
             else:

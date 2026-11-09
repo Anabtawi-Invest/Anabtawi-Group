@@ -118,9 +118,9 @@ class ApprovalRequest(models.Model):
                 "type": "contact",
                 "is_company": True,
                 "company_id": company.id,
-                "user_id": owner.id,
                 "portal_allow_payment_term": True,
                 "property_payment_term_id": request.customer_payment_term_id.id,
+                "van_portal_user_id": owner.id,
             }
             partner = Partner.with_company(company).create(vals)
             request.sudo().write(
@@ -132,7 +132,7 @@ class ApprovalRequest(models.Model):
             )
             request.message_post(
                 body=_(
-                    "Credit customer %(name)s has been created with salesperson %(user)s.",
+                    "Credit customer %(name)s has been created for van portal user %(user)s.",
                     name=partner.display_name,
                     user=owner.display_name,
                 )

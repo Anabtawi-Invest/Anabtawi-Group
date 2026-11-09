@@ -181,7 +181,7 @@ function initCreatePage(root) {
             return;
         }
         const terms = await fetchPaymentTerms();
-        const options = ['<option value="">Select payment terms...</option>'].concat(
+        const options = ['<option value="">اختر شروط الدفع...</option>'].concat(
             (terms || []).map(
                 (term) =>
                     `<option value="${term.id}">${escapeHtml(term.name)}</option>`
@@ -309,16 +309,16 @@ function initCreatePage(root) {
                     <div class="list-group-item o_portal_partner_empty">
                         <div class="fw-semibold mb-1">لا يوجد عميل مطابق</div>
                         <div class="small text-muted mb-0">
-                            No credit customer found with you as salesperson.
-                            <a href="/my/customer-requests/create">Request Credit Customer</a>
+                            لا يوجد عميل آجل مرتبط بمستخدم بوابة الشاحنة.
+                            <a href="/my/customer-requests/create">طلب عميل آجل</a>
                         </div>
                     </div>`
                     : `
                     <div class="list-group-item o_portal_partner_empty">
                         <div class="fw-semibold mb-1">لا يوجد عميل مطابق</div>
                         <div class="small text-muted mb-0">
-                            No walk-in customer found under your van customer.
-                            Create one using the form below.
+                            لا يوجد عميل نقدي تحت عميل الشاحنة.
+                            أنشئ عميلًا جديدًا من النموذج أدناه.
                         </div>
                     </div>`;
                 return;
@@ -373,7 +373,7 @@ function initCreatePage(root) {
                 <div class="list-group-item o_portal_partner_empty">
                     <div class="fw-semibold mb-1">لا يوجد عميل مطابق</div>
                     <div class="small text-muted mb-0">
-                        Search failed. Try another name, phone or email.
+                        فشل البحث. جرّب اسمًا أو رقم هاتف أو إيميل آخر.
                     </div>
                 </div>`;
         }
@@ -431,7 +431,7 @@ function initCreatePage(root) {
             };
             renderCart();
             const addBtn = qs(".product-add", card);
-            addBtn.textContent = "Added";
+            addBtn.textContent = "تمت الإضافة";
             addBtn.classList.remove("btn-primary");
             addBtn.classList.add("btn-success");
         });
@@ -441,7 +441,7 @@ function initCreatePage(root) {
         const inCart = state.cart[p.id];
         const hasStockInfo = p.qty_available != null && p.qty_available !== false;
         const stockLine = hasStockInfo
-            ? `<div class="o_product_stock text-success small">Available: ${escapeHtml(p.qty_available_display || String(p.qty_available))}</div>`
+            ? `<div class="o_product_stock text-success small">المتاح: ${escapeHtml(p.qty_available_display || String(p.qty_available))}</div>`
             : "";
         const maxAttr = hasStockInfo ? ` max="${p.qty_available}"` : "";
         const startQty = inCart ? inCart.qty : 1;
@@ -453,7 +453,7 @@ function initCreatePage(root) {
             <div class="o_qty_row">
                 <input type="number" min="1" step="1" value="${startQty}"${maxAttr} class="form-control form-control-sm product-qty"/>
                 <button type="button" class="btn btn-sm ${inCart ? "btn-success" : "btn-primary"} product-add">
-                    ${inCart ? "Added" : "Add"}
+                    ${inCart ? "تمت الإضافة" : "إضافة"}
                 </button>
             </div>
         </div>`;
@@ -463,26 +463,26 @@ function initCreatePage(root) {
         if (productCount) {
             const shown = productGrid.querySelectorAll(".o_portal_product_card").length;
             productCount.textContent = state.productTotal
-                ? `Showing ${shown} of ${state.productTotal} products`
+                ? `عرض ${shown} من ${state.productTotal} منتج`
                 : "";
         }
         if (loadMoreBtn) {
             loadMoreBtn.classList.toggle("d-none", !hasMore);
             loadMoreBtn.disabled = false;
-            loadMoreBtn.textContent = "Load more products";
+            loadMoreBtn.textContent = "تحميل المزيد من المنتجات";
         }
     }
 
     async function loadProducts({ reset = true } = {}) {
         if (reset) {
             state.productOffset = 0;
-            productGrid.innerHTML = `<div class="text-muted">Loading...</div>`;
+            productGrid.innerHTML = `<div class="text-muted">جاري التحميل...</div>`;
             if (loadMoreBtn) {
                 loadMoreBtn.classList.add("d-none");
             }
         } else if (loadMoreBtn) {
             loadMoreBtn.disabled = true;
-            loadMoreBtn.textContent = "Loading...";
+            loadMoreBtn.textContent = "جاري التحميل...";
         }
 
         const payload = await rpc("/my/sales/api/products", {
@@ -498,7 +498,7 @@ function initCreatePage(root) {
         state.productOffset += products.length;
 
         if (reset && !products.length) {
-            productGrid.innerHTML = `<div class="text-muted">No products found</div>`;
+            productGrid.innerHTML = `<div class="text-muted">لا توجد منتجات</div>`;
             updateProductMeta(false);
             return;
         }
@@ -594,7 +594,7 @@ function initCreatePage(root) {
             const name = (cashNameInput && cashNameInput.value) || "";
             if (!name.trim()) {
                 if (cashCreateError) {
-                    cashCreateError.textContent = "Customer name is required.";
+                    cashCreateError.textContent = "اسم العميل مطلوب.";
                     cashCreateError.classList.remove("d-none");
                 }
                 return;
@@ -624,23 +624,23 @@ function initCreatePage(root) {
     qs("#btn_confirm_order", root).addEventListener("click", async () => {
         confirmError.classList.add("d-none");
         if (!state.partner) {
-            showError(confirmError, "Please select a customer.");
+            showError(confirmError, "يرجى اختيار عميل.");
             return;
         }
         if (isCredit && !state.paymentTermId) {
-            showError(confirmError, "Please select payment terms.");
+            showError(confirmError, "يرجى اختيار شروط الدفع.");
             return;
         }
         const lines = Object.values(state.cart).map((i) => ({ product_id: i.id, qty: i.qty }));
         if (!lines.length) {
-            showError(confirmError, "Please add at least one product.");
+            showError(confirmError, "يرجى إضافة منتج واحد على الأقل.");
             return;
         }
         for (const item of Object.values(state.cart)) {
             if (item.qty_available != null && item.qty > item.qty_available) {
                 showError(
                     confirmError,
-                    `Not enough stock for ${item.name}. Available: ${item.qty_available}.`
+                    `الكمية غير كافية للمنتج ${item.name}. المتاح: ${item.qty_available}.`
                 );
                 return;
             }
@@ -676,7 +676,7 @@ function initDetailPage() {
                 const res = await rpc("/my/sales/api/send_email", {
                     order_id: parseInt(emailBtn.dataset.orderId, 10),
                 });
-                showMessage(msg, res.message || "Sent.", "success");
+                showMessage(msg, res.message || "تم الإرسال.", "success");
             } catch (e) {
                 showMessage(msg, extractError(e), "danger");
             }
@@ -687,8 +687,8 @@ function initDetailPage() {
         cancelBtn.addEventListener("click", async () => {
             const isDraft = cancelBtn.dataset.isDraft === "1";
             const confirmMsg = isDraft
-                ? "Cancel this draft quotation?"
-                : "Cancel this order and reverse its invoice?";
+                ? "إلغاء مسودة عرض السعر هذه؟"
+                : "إلغاء هذا الأمر وعكس فاتورته؟";
             if (!window.confirm(confirmMsg)) {
                 return;
             }
@@ -718,7 +718,7 @@ function showMessage(el, text, type) {
 }
 
 function extractError(err) {
-    if (!err) return "Unexpected error";
+    if (!err) return "حدث خطأ غير متوقع";
     if (typeof err === "string") return err;
     return err.data?.message || err.message || String(err);
 }

@@ -49,15 +49,29 @@ msgstr "هذه مسودة عرض سعر. سيقوم موظفو النظام با
 
 #. module: portal_sale_order_create
 #: model_terms:ir.ui.view,arch_db:portal_sale_order_create.portal_sale_create
+#: model_terms:ir.ui.view,arch_db:portal_sale_order_create.portal_sale_orders
 #: model_terms:ir.ui.view,arch_db:portal_sale_order_create.portal_breadcrumbs_sale
 #: model_terms:ir.ui.view,arch_db:portal_sale_order_create.portal_my_home_sale_cards
-msgid "Create Sale Order"
-msgstr "إنشاء أمر بيع"
+msgid "Cash Sale"
+msgstr "بيع نقدي"
 
 #. module: portal_sale_order_create
 #: model_terms:ir.ui.view,arch_db:portal_sale_order_create.portal_my_home_sale_cards
-msgid "Create a sale order and invoice for a customer"
-msgstr "إنشاء أمر بيع وفاتورة للعميل"
+msgid "Sell to walk-in delivery addresses under your van customer"
+msgstr "البيع لعناوين التسليم التابعة لعميل الشاحنة"
+
+#. module: portal_sale_order_create
+#: model_terms:ir.ui.view,arch_db:portal_sale_order_create.portal_sale_create
+#: model_terms:ir.ui.view,arch_db:portal_sale_order_create.portal_sale_orders
+#: model_terms:ir.ui.view,arch_db:portal_sale_order_create.portal_breadcrumbs_sale
+#: model_terms:ir.ui.view,arch_db:portal_sale_order_create.portal_my_home_sale_cards
+msgid "Credit Sale"
+msgstr "بيع آجل"
+
+#. module: portal_sale_order_create
+#: model_terms:ir.ui.view,arch_db:portal_sale_order_create.portal_my_home_sale_cards
+msgid "Sell to payment-term customers linked to your van portal user"
+msgstr "البيع لعملاء شروط الدفع المرتبطين بمستخدم بوابة الشاحنة"
 
 #. module: portal_sale_order_create
 #: model_terms:ir.ui.view,arch_db:portal_sale_order_create.portal_sale_orders
@@ -98,8 +112,28 @@ msgstr "اكتب الاسم أو الهاتف أو الإيميل..."
 
 #. module: portal_sale_order_create
 #: model_terms:ir.ui.view,arch_db:portal_sale_order_create.portal_sale_create
-msgid "New customers must be requested from the Customer Request portal card."
-msgstr "يجب طلب العملاء الجدد من بطاقة طلب العميل في البوابة."
+msgid "Only credit customers linked to your van portal user are shown."
+msgstr "يُعرض فقط عملاء الآجل المرتبطون بمستخدم بوابة الشاحنة."
+
+#. module: portal_sale_order_create
+#: model_terms:ir.ui.view,arch_db:portal_sale_order_create.portal_sale_create
+msgid "Request new ones from"
+msgstr "اطلب عملاء جدد من"
+
+#. module: portal_sale_order_create
+#: model_terms:ir.ui.view,arch_db:portal_sale_order_create.portal_sale_create
+msgid "Request Credit Customer"
+msgstr "طلب عميل آجل"
+
+#. module: portal_sale_order_create
+#: model_terms:ir.ui.view,arch_db:portal_sale_order_create.portal_sale_create
+msgid "Only delivery addresses under your van customer are shown."
+msgstr "يُعرض فقط عناوين التسليم التابعة لعميل الشاحنة."
+
+#. module: portal_sale_order_create
+#: model_terms:ir.ui.view,arch_db:portal_sale_order_create.portal_sale_create
+msgid "Create a new walk-in customer below (no approval)."
+msgstr "أنشئ عميلًا نقديًا جديدًا أدناه (بدون موافقة)."
 
 #. module: portal_sale_order_create
 #: model_terms:ir.ui.view,arch_db:portal_sale_order_create.portal_sale_create
@@ -112,6 +146,16 @@ msgid "Change"
 msgstr "تغيير"
 
 #. module: portal_sale_order_create
+#: model_terms:ir.ui.view,arch_db:portal_sale_order_create.portal_sale_create
+msgid "New walk-in customer"
+msgstr "عميل نقدي جديد"
+
+#. module: portal_sale_order_create
+#: model_terms:ir.ui.view,arch_db:portal_sale_order_create.portal_sale_create
+msgid "Create"
+msgstr "إنشاء"
+
+#. module: portal_sale_order_create
 #: model:ir.model.fields,field_description:portal_sale_order_create.field_res_partner__portal_allow_payment_term
 msgid "Allow Portal Payment Terms"
 msgstr "السماح بشروط الدفع من البوابة"
@@ -120,6 +164,16 @@ msgstr "السماح بشروط الدفع من البوابة"
 #: model:ir.model.fields,help:portal_sale_order_create.field_res_partner__portal_allow_payment_term
 msgid "If enabled, Sales Portal users can choose payment terms when creating a sale order for this customer."
 msgstr "عند التفعيل، يمكن لمستخدمي بوابة المبيعات اختيار شروط الدفع عند إنشاء أمر بيع لهذا العميل."
+
+#. module: portal_sale_order_create
+#: model:ir.model.fields,field_description:portal_sale_order_create.field_res_partner__van_portal_user_id
+msgid "Van Portal User"
+msgstr "مستخدم بوابة الشاحنة"
+
+#. module: portal_sale_order_create
+#: model:ir.model.fields,help:portal_sale_order_create.field_res_partner__van_portal_user_id
+msgid "Portal van user who owns this credit customer. Used for Credit Sale listing (not the standard Salesperson field)."
+msgstr "مستخدم بوابة الشاحنة المرتبط بعميل الآجل. يُستخدم لعرض البيع الآجل (وليس حقل مندوب المبيعات القياسي)."
 
 #. module: portal_sale_order_create
 #: model_terms:ir.ui.view,arch_db:portal_sale_order_create.portal_sale_create
@@ -157,11 +211,6 @@ msgstr "الهاتف"
 #: model_terms:ir.ui.view,arch_db:portal_sale_order_create.portal_sale_create
 msgid "Email"
 msgstr "البريد الإلكتروني"
-
-#. module: portal_sale_order_create
-#: model_terms:ir.ui.view,arch_db:portal_sale_order_create.portal_sale_create
-msgid "Save customer"
-msgstr "حفظ العميل"
 
 #. module: portal_sale_order_create
 #: model_terms:ir.ui.view,arch_db:portal_sale_order_create.portal_sale_create
@@ -204,8 +253,13 @@ msgstr "الإجمالي"
 
 #. module: portal_sale_order_create
 #: model_terms:ir.ui.view,arch_db:portal_sale_order_create.portal_sale_create
-msgid "Confirming will create the sale order, confirm it, and post the invoice automatically."
-msgstr "عند التأكيد سيتم إنشاء أمر البيع وتأكيده وترحيل الفاتورة تلقائياً."
+msgid "Confirming creates the sale order, confirms it, and posts the invoice unpaid."
+msgstr "عند التأكيد سيتم إنشاء أمر البيع وتأكيده وترحيل الفاتورة دون سداد."
+
+#. module: portal_sale_order_create
+#: model_terms:ir.ui.view,arch_db:portal_sale_order_create.portal_sale_create
+msgid "Backend staff will mark the invoice as paid."
+msgstr "سيقوم موظفو النظام بتسجيل الفاتورة كمدفوعة."
 
 #. module: portal_sale_order_create
 #: model_terms:ir.ui.view,arch_db:portal_sale_order_create.portal_sale_create
@@ -287,3 +341,27 @@ msgstr "يرجى إضافة منتج واحد على الأقل."
 #: code:addons/portal_sale_order_create/controllers/main.py:0
 msgid "Invoice sent by email."
 msgstr "تم إرسال الفاتورة بالبريد الإلكتروني."
+
+#. module: portal_sale_order_create
+#. odoo-python
+#: code:addons/portal_sale_order_create/controllers/main.py:0
+msgid "Invalid sale mode."
+msgstr "وضع البيع غير صالح."
+
+#. module: portal_sale_order_create
+#. odoo-python
+#: code:addons/portal_sale_order_create/controllers/main.py:0
+msgid "No van customer is assigned on your user. Contact an administrator."
+msgstr "لا يوجد عميل شاحنة معيّن على المستخدم. يرجى التواصل مع المسؤول."
+
+#. module: portal_sale_order_create
+#. odoo-python
+#: code:addons/portal_sale_order_create/controllers/main.py:0
+msgid "Customer not found among your allowed %(mode)s customers."
+msgstr "العميل غير موجود ضمن عملاء %(mode)s المسموح بهم لك."
+
+#. module: portal_sale_order_create
+#. odoo-python
+#: code:addons/portal_sale_order_create/controllers/main.py:0
+msgid "No payment terms found. Please configure Immediate Payment."
+msgstr "لا توجد شروط دفع. يرجى إعداد الدفع الفوري."

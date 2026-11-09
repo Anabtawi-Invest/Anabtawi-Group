@@ -1,4 +1,4 @@
-# Translation of Odoo Server.
+﻿# Translation of Odoo Server.
 # This file contains the translation of the following modules:
 # 	* approvals_create_customer
 #
@@ -9,7 +9,7 @@ msgstr ""
 "POT-Creation-Date: 2026-03-26 00:00:00\n"
 "PO-Revision-Date: 2026-03-26 00:00:00\n"
 "Language-Team: Arabic\n"
-"Language: ar\n"
+"Language: ar_001\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
@@ -64,36 +64,36 @@ msgstr "العميل"
 #: model_terms:ir.ui.view,arch_db:approvals_create_customer.portal_customer_request_create
 #: model_terms:ir.ui.view,arch_db:approvals_create_customer.portal_breadcrumbs_customer_request
 #: model_terms:ir.ui.view,arch_db:approvals_create_customer.portal_customer_request_list
-msgid "Request New Customer"
-msgstr "طلب عميل جديد"
+msgid "Request Credit Customer"
+msgstr "طلب عميل آجل"
 
 #. module: approvals_create_customer
 #: model_terms:ir.ui.view,arch_db:approvals_create_customer.portal_my_home_customer_request_cards
-msgid "Submit a customer for approval"
-msgstr "إرسال عميل للموافقة"
+msgid "Submit a payment-term customer for approval"
+msgstr "إرسال عميل بشروط دفع للموافقة"
 
 #. module: approvals_create_customer
 #: model_terms:ir.ui.view,arch_db:approvals_create_customer.portal_my_home_customer_request_cards
 #: model_terms:ir.ui.view,arch_db:approvals_create_customer.portal_customer_request_list
 #: model_terms:ir.ui.view,arch_db:approvals_create_customer.portal_breadcrumbs_customer_request
 #: model_terms:ir.ui.view,arch_db:approvals_create_customer.portal_customer_request_create
-msgid "My Customer Requests"
-msgstr "طلبات العملاء الخاصة بي"
+msgid "My Credit Customer Requests"
+msgstr "طلبات عملاء الآجل الخاصة بي"
 
 #. module: approvals_create_customer
 #: model_terms:ir.ui.view,arch_db:approvals_create_customer.portal_my_home_customer_request_cards
-msgid "Track and cancel your requests"
-msgstr "تتبع طلباتك وإلغاؤها"
+msgid "Track and cancel your credit customer requests"
+msgstr "تتبع طلبات عملاء الآجل وإلغاؤها"
 
 #. module: approvals_create_customer
 #: model_terms:ir.ui.view,arch_db:approvals_create_customer.portal_customer_request_create
-msgid "Customer details"
-msgstr "تفاصيل العميل"
+msgid "Credit customer details"
+msgstr "تفاصيل عميل الآجل"
 
 #. module: approvals_create_customer
 #: model_terms:ir.ui.view,arch_db:approvals_create_customer.portal_customer_request_create
-msgid "Your request will be sent for approval. The customer is created only after approval."
-msgstr "سيتم إرسال طلبك للموافقة. يتم إنشاء العميل فقط بعد الموافقة."
+msgid "Credit customers are created after approval as standalone customers linked to your van portal user. Use Cash Sale to create walk-in delivery addresses."
+msgstr "يتم إنشاء عملاء الآجل بعد الموافقة كعملاء مستقلين مرتبطين بمستخدم بوابة الشاحنة. استخدم البيع النقدي لإنشاء عناوين التسليم."
 
 #. module: approvals_create_customer
 #: model_terms:ir.ui.view,arch_db:approvals_create_customer.portal_customer_request_create
@@ -273,3 +273,70 @@ msgstr "ملغى"
 #: code:addons/approvals_create_customer/static/src/js/portal_customer_request.js:0
 msgid "Cancel this customer request?"
 msgstr "إلغاء طلب العميل هذا؟"
+
+#. module: approvals_create_customer
+#: model:ir.model.fields,field_description:approvals_create_customer.field_approval_request__customer_portal_allow_payment_term
+msgid "Allow Payment Term"
+msgstr "السماح بشروط الدفع"
+
+#. module: approvals_create_customer
+#: model:ir.model.fields,field_description:approvals_create_customer.field_approval_request__customer_payment_term_id
+#: model_terms:ir.ui.view,arch_db:approvals_create_customer.portal_customer_request_create
+#: model_terms:ir.ui.view,arch_db:approvals_create_customer.portal_customer_request_detail
+msgid "Default Payment Term"
+msgstr "شرط الدفع الافتراضي"
+
+#. module: approvals_create_customer
+#: model_terms:ir.ui.view,arch_db:approvals_create_customer.portal_customer_request_create
+msgid "Select payment terms..."
+msgstr "اختر شروط الدفع..."
+
+#. module: approvals_create_customer
+#. odoo-python
+#: code:addons/approvals_create_customer/controllers/main.py:0
+#: code:addons/approvals_create_customer/models/approval_request.py:0
+msgid "Please select a Default Payment Term."
+msgstr "يرجى اختيار شرط الدفع الافتراضي."
+
+#. module: approvals_create_customer
+#. odoo-python
+#: code:addons/approvals_create_customer/models/approval_request.py:0
+msgid "Default Payment Term is required for credit customer requests."
+msgstr "شرط الدفع الافتراضي مطلوب لطلبات عملاء الآجل."
+
+#. module: approvals_create_customer
+#. odoo-python
+#: code:addons/approvals_create_customer/models/approval_request.py:0
+msgid "Please set a Default Payment Term before submitting."
+msgstr "يرجى تعيين شرط الدفع الافتراضي قبل الإرسال."
+
+#. module: approvals_create_customer
+#. odoo-python
+#: code:addons/approvals_create_customer/models/approval_request.py:0
+msgid "Default Payment Term is required to create the credit customer."
+msgstr "شرط الدفع الافتراضي مطلوب لإنشاء عميل الآجل."
+
+#. module: approvals_create_customer
+#. odoo-python
+#: code:addons/approvals_create_customer/models/approval_request.py:0
+msgid "The requester has no company; cannot create the customer."
+msgstr "مقدّم الطلب بلا شركة؛ لا يمكن إنشاء العميل."
+
+#. module: approvals_create_customer
+#. odoo-python
+#: code:addons/approvals_create_customer/models/approval_request.py:0
+msgid "Credit customer %(name)s has been created for van portal user %(user)s."
+msgstr "تم إنشاء عميل الآجل %(name)s لمستخدم بوابة الشاحنة %(user)s."
+
+#. module: approvals_create_customer
+#. odoo-python
+#: code:addons/approvals_create_customer/controllers/main.py:0
+msgid "Portal credit customer request: %(name)s"
+msgstr "طلب عميل آجل من البوابة: %(name)s"
+
+#. module: approvals_create_customer
+#. odoo-python
+#: code:addons/approvals_create_customer/controllers/main.py:0
+msgid "Invalid payment terms selected."
+msgstr "شروط الدفع المحددة غير صالحة."
+

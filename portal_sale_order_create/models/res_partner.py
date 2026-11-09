@@ -10,3 +10,12 @@ class ResPartner(models.Model):
         help="If enabled, Sales Portal users can choose payment terms when creating a sale order for this customer.",
         default=False,
     )
+    van_portal_user_id = fields.Many2one(
+        "res.users",
+        string="Van Portal User",
+        copy=False,
+        index=True,
+        domain="[('share', '=', True)]",
+        help="Portal van user who owns this credit customer. "
+        "Used for Credit Sale listing (not the standard Salesperson field).",
+    )

@@ -18,7 +18,7 @@
                        class="d-flex gap-2 gap-md-3 py-3 pe-2 px-md-3 h-100 rounded text-decoration-none border bg-white">
                         <div>
                             <h5 class="mb-0">Credit Sale</h5>
-                            <p class="mt-1 mb-0 opacity-75">Sell to payment-term customers assigned to you as salesperson</p>
+                            <p class="mt-1 mb-0 opacity-75">Sell to payment-term customers linked to your van portal user</p>
                         </div>
                     </a>
                 </div>
@@ -80,7 +80,7 @@
                                     <div id="partner_results" class="o_portal_partner_results list-group mt-2"></div>
                                 </div>
                                 <div class="form-text" t-if="sale_mode == 'credit'">
-                                    Only credit customers with you as salesperson are shown.
+                                    Only credit customers linked to your van portal user are shown.
                                     Request new ones from
                                     <a href="/my/customer-requests/create">Request Credit Customer</a>.
                                 </div>

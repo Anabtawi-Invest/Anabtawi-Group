@@ -126,6 +126,56 @@ msgstr "اكتب اسم الموقع..."
 
 #. module: portal_internal_transfer
 #: model_terms:ir.ui.view,arch_db:portal_internal_transfer.portal_transfer_create
+msgid "Type location name to change Source..."
+msgstr "اكتب اسم الموقع لتغيير المصدر..."
+
+#. module: portal_internal_transfer
+#: model_terms:ir.ui.view,arch_db:portal_internal_transfer.portal_transfer_create
+msgid "Search and select any internal location."
+msgstr "ابحث واختر أي موقع داخلي."
+
+#. module: portal_internal_transfer
+#: model:ir.model.fields,field_description:portal_internal_transfer.field_res_users__van_source_location_id
+#: model:ir.model.fields,field_description:portal_internal_transfer.field_portal_van_user_create__van_source_location_id
+msgid "Default Source Location"
+msgstr "موقع المصدر الافتراضي"
+
+#. module: portal_internal_transfer
+#: model:ir.model.fields,help:portal_internal_transfer.field_res_users__van_source_location_id
+msgid "Default Source on portal Create Internal Transfer. Van can still Change to another internal location per transfer."
+msgstr "المصدر الافتراضي في إنشاء تحويل داخلي من البوابة. يمكن للشاحنة تغييره لكل تحويل."
+
+#. module: portal_internal_transfer
+#: model_terms:ir.ui.view,arch_db:portal_internal_transfer.view_users_form_portal_van_setup
+#: model_terms:ir.ui.view,arch_db:portal_internal_transfer.view_portal_van_user_create_form
+msgid "Default Source for portal transfers"
+msgstr "المصدر الافتراضي لتحويلات البوابة"
+
+#. module: portal_internal_transfer
+#: model_terms:ir.ui.view,arch_db:portal_internal_transfer.view_users_form_portal_van_setup
+msgid "Default Source Location is pre-selected on portal Create Internal Transfer (van can still Change)."
+msgstr "يتم تحديد موقع المصدر الافتراضي مسبقًا في إنشاء التحويل الداخلي من البوابة (يمكن للشاحنة تغييره)."
+
+#. module: portal_internal_transfer
+#. odoo-python
+#: code:addons/portal_internal_transfer/wizard/portal_van_user_create.py:0
+msgid "Please select a Default Source Location."
+msgstr "يرجى اختيار موقع المصدر الافتراضي."
+
+#. module: portal_internal_transfer
+#. odoo-python
+#: code:addons/portal_internal_transfer/wizard/portal_van_user_create.py:0
+msgid "Default Source Location must be an active internal location."
+msgstr "يجب أن يكون موقع المصدر الافتراضي موقعًا داخليًا نشطًا."
+
+#. module: portal_internal_transfer
+#. odoo-python
+#: code:addons/portal_internal_transfer/wizard/portal_van_user_create.py:0
+msgid "Default Source Location must belong to company %s."
+msgstr "يجب أن ينتمي موقع المصدر الافتراضي إلى الشركة %s."
+
+#. module: portal_internal_transfer
+#: model_terms:ir.ui.view,arch_db:portal_internal_transfer.portal_transfer_create
 msgid "From:"
 msgstr "من:"
 
