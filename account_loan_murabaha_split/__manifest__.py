@@ -1,6 +1,6 @@
 {
     'name': 'Loan Murabaha Split',
-    'version': '19.0.1.5.2',
+    'version': '19.0.1.5.1',
     'category': 'Accounting/Accounting',
     'summary': 'Split loan principal and murabaha interest into separate journal entries',
     'description': """
