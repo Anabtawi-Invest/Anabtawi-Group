@@ -606,9 +606,9 @@
                                         t-on-click="() => this.goTransferPage(state.transferPage - 1)">
                                     Prev
                                 </button>
-                                <button type="button" class="btn btn-sm btn-outline-secondary" disabled="1">
+                                <span class="btn btn-sm btn-primary disabled" style="pointer-events: none; opacity: 1;">
                                     Page <t t-esc="transfers.pagination.page"/> / <t t-esc="transfers.pagination.total_pages"/>
-                                </button>
+                                </span>
                                 <button type="button" class="btn btn-sm btn-outline-primary"
                                         t-att-disabled="!transfers.pagination.has_next || state.transferLoading"
                                         t-on-click="() => this.goTransferPage(state.transferPage + 1)">
