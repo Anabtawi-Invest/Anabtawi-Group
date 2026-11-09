@@ -321,16 +321,14 @@ class PortalSaleOrderCreate(http.Controller):
             partners = Partner.with_company(company).search(domain, limit=25, order="name, id")
             result = []
             for p in partners:
-                # property_payment_term_id is company-dependent
-                p_comp = p.with_company(company)
-                term = p_comp.property_payment_term_id
+                term = self._get_partner_sale_payment_term(p)
                 result.append(
                     {
                         "id": p.id,
                         "name": p.display_name or p.name,
                         "phone": p.phone or "",
                         "email": p.email or "",
-                        "portal_allow_payment_term": bool(p_comp.portal_allow_payment_term),
+                        "portal_allow_payment_term": bool(p.portal_allow_payment_term),
                         "default_payment_term_id": term.id if term else False,
                         "default_payment_term_name": (
                             term.display_name or term.name if term else ""
@@ -511,6 +509,85 @@ class PortalSaleOrderCreate(http.Controller):
         )
         return [{"id": term.id, "name": term.display_name or term.name} for term in terms]
 
+    def _get_partner_sale_payment_term(self, partner):
+        """Read Sales Payment Terms (company property) for a partner.
+
+        Tries the van user's company first, then other allowed companies, then
+        a direct ir.property lookup — website/company context often misses it.
+        """
+        partner = partner.sudo()
+        if not partner:
+            return request.env["account.payment.term"]
+        commercial = partner.commercial_partner_id or partner
+        user = request.env.user.sudo()
+        companies = user.company_ids | (user.company_id or request.env.company)
+        # Prefer current company first.
+        ordered = (user.company_id or request.env.company) | companies
+        for company in ordered:
+            if not company:
+                continue
+            term = commercial.with_company(company).property_payment_term_id
+            if term:
+                return term.sudo()
+        # Fallback: ir.property row for this partner (any company).
+        Property = request.env["ir.property"].sudo()
+        domain = [
+            ("name", "=", "property_payment_term_id"),
+            ("type", "=", "many2one"),
+            ("res_id", "=", f"res.partner,{commercial.id}"),
+        ]
+        prop = Property.search(domain, order="company_id desc, id desc", limit=1)
+        if prop and prop.value_reference:
+            # value_reference like "account.payment.term,15"
+            try:
+                model_name, res_id = prop.value_reference.split(",")
+                if model_name == "account.payment.term":
+                    term = (
+                        request.env["account.payment.term"]
+                        .sudo()
+                        .browse(int(res_id))
+                        .exists()
+                    )
+                    if term:
+                        return term
+            except Exception:
+                _logger.exception(
+                    "portal_sale: failed parsing payment term property for partner %s",
+                    commercial.id,
+                )
+        return request.env["account.payment.term"]
+
+    @http.route("/my/sales/api/partner_payment_term", type="jsonrpc", auth="user", website=True)
+    def api_partner_payment_term(self, partner_id=None, sale_mode="credit", **kwargs):
+        self._ensure_sales_portal()
+        return self._api_partner_payment_term(partner_id, sale_mode=sale_mode)
+
+    @http.route(
+        "/my/sales/api/partner_payment_term/http",
+        type="http",
+        auth="user",
+        website=True,
+        methods=["GET"],
+        csrf=False,
+    )
+    def api_partner_payment_term_http(self, partner_id=None, sale_mode="credit", **kwargs):
+        self._ensure_sales_portal()
+        return request.make_json_response(
+            self._api_partner_payment_term(partner_id, sale_mode=sale_mode)
+        )
+
+    def _api_partner_payment_term(self, partner_id, sale_mode="credit"):
+        if not partner_id:
+            return {"id": False, "name": ""}
+        partner = request.env["res.partner"].sudo().browse(int(partner_id)).exists()
+        if not partner or not self._is_allowed_portal_customer(partner, sale_mode=sale_mode):
+            raise ValidationError(_("Customer not found among your allowed customers."))
+        term = self._get_partner_sale_payment_term(partner)
+        return {
+            "id": term.id if term else False,
+            "name": (term.display_name or term.name) if term else "",
+        }
+
     def _validate_sale_deliveries(self, order):
         """Validate outgoing deliveries so van stock on-hand decreases immediately."""
         pickings = order.picking_ids.filtered(
@@ -581,13 +658,12 @@ class PortalSaleOrderCreate(http.Controller):
         """Selected term, else partner default, else Immediate Payment."""
         Term = request.env["account.payment.term"].sudo()
         company = request.env.user.company_id or request.env.company
-        partner = partner.with_company(company)
         payment_term = Term
         if partner.portal_allow_payment_term:
             if payment_term_id:
                 payment_term = Term.browse(int(payment_term_id)).exists()
-            if not payment_term and partner.property_payment_term_id:
-                payment_term = partner.property_payment_term_id
+            if not payment_term:
+                payment_term = self._get_partner_sale_payment_term(partner)
             if not payment_term:
                 raise ValidationError(_("Please select payment terms."))
             if payment_term.company_id and company and payment_term.company_id != company:
@@ -596,8 +672,8 @@ class PortalSaleOrderCreate(http.Controller):
 
         if payment_term_id:
             payment_term = Term.browse(int(payment_term_id)).exists()
-        if not payment_term and partner.property_payment_term_id:
-            payment_term = partner.property_payment_term_id
+        if not payment_term:
+            payment_term = self._get_partner_sale_payment_term(partner)
         if not payment_term:
             payment_term = self._get_immediate_payment_term()
         if not payment_term:

@@ -87,6 +87,25 @@ async function fetchPaymentTerms() {
     }
 }
 
+async function fetchPartnerPaymentTerm(partnerId, saleMode) {
+    const mode = saleMode || "credit";
+    try {
+        return await rpc("/my/sales/api/partner_payment_term", {
+            partner_id: partnerId,
+            sale_mode: mode,
+        });
+    } catch (e1) {
+        const url =
+            `/my/sales/api/partner_payment_term/http?partner_id=${encodeURIComponent(partnerId)}` +
+            `&sale_mode=${encodeURIComponent(mode)}`;
+        const response = await fetch(url, { credentials: "same-origin" });
+        if (!response.ok) {
+            throw e1;
+        }
+        return await response.json();
+    }
+}
+
 function initCreatePage(root) {
     const saleMode = (root.dataset.saleMode || "cash").toLowerCase();
     const isCredit = saleMode === "credit";
@@ -191,19 +210,11 @@ function initCreatePage(root) {
         state.paymentTermsLoaded = true;
     }
 
-    async function showPaymentTerms(partner) {
-        if (!isCredit || !paymentTermWrap || !paymentTermSelect) {
-            return;
-        }
-        await ensurePaymentTermsOptions();
-        paymentTermWrap.classList.remove("d-none");
-        const defaultId = partner.default_payment_term_id
-            ? String(partner.default_payment_term_id)
-            : "";
+    function applyPaymentTermSelection(termId, termName) {
+        const defaultId = termId ? String(termId) : "";
         if (defaultId) {
-            // Ensure customer's term exists in the dropdown, then select it.
             if (!paymentTermSelect.querySelector(`option[value="${defaultId}"]`)) {
-                const label = partner.default_payment_term_name || defaultId;
+                const label = termName || defaultId;
                 paymentTermSelect.insertAdjacentHTML(
                     "beforeend",
                     `<option value="${defaultId}">${escapeHtml(label)}</option>`
@@ -213,9 +224,32 @@ function initCreatePage(root) {
             state.paymentTermId = parseInt(defaultId, 10);
             return;
         }
-        // No term on customer: leave empty so the van can choose.
         paymentTermSelect.value = "";
         state.paymentTermId = null;
+    }
+
+    async function showPaymentTerms(partner) {
+        if (!isCredit || !paymentTermWrap || !paymentTermSelect) {
+            return;
+        }
+        await ensurePaymentTermsOptions();
+        paymentTermWrap.classList.remove("d-none");
+
+        // Prefer a fresh server read of the customer's Sales Payment Terms.
+        let termId = partner.default_payment_term_id || false;
+        let termName = partner.default_payment_term_name || "";
+        try {
+            const fresh = await fetchPartnerPaymentTerm(partner.id, saleMode);
+            if (fresh && fresh.id) {
+                termId = fresh.id;
+                termName = fresh.name || termName;
+                partner.default_payment_term_id = termId;
+                partner.default_payment_term_name = termName;
+            }
+        } catch (err) {
+            console.error("portal_sale_order_create: partner payment term fetch failed", err);
+        }
+        applyPaymentTermSelection(termId, termName);
     }
 
     function selectPartner(partner) {
@@ -231,7 +265,11 @@ function initCreatePage(root) {
         if (isCredit) {
             showPaymentTerms(partner).catch((err) => {
                 console.error("portal_sale_order_create: failed to load payment terms", err);
-                hidePaymentTerms();
+                // Keep dropdown usable; do not wipe the section on error.
+                if (paymentTermSelect) {
+                    paymentTermSelect.value = "";
+                }
+                state.paymentTermId = null;
             });
         } else {
             hidePaymentTerms();
