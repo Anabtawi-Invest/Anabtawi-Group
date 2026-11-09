@@ -1,6 +1,6 @@
 {
     'name': 'Loan Murabaha Split',
-    'version': '19.0.1.5.1',
+    'version': '19.0.1.5.2',
     'category': 'Accounting/Accounting',
     'summary': 'Split loan principal and murabaha interest into separate journal entries',
     'description': """
@@ -9,9 +9,8 @@ When enabled on a loan, Confirm creates:
 - Separate murabaha entry: Dr Expense / Cr selected short-term liability (interest)
 - LT-ST reclassification/reversal using payment (principal + interest) for the next 12 lines
 
-Optional analytic account on the loan is applied at 100%:
-- Checkbox off: expense line only
-- Checkbox on: both murabaha expense and murabaha liability lines
+Optional analytic account on the loan is applied at 100% on journal items
+that use the Expense Account only (checkbox on or off).
 
 Optional Label (البيان) field under Asset Group:
 - Checkbox off: label on all 3 lines of the Principal & Interest entry
