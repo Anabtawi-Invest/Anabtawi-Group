@@ -64,6 +64,7 @@ msgid "Friday"
 msgstr "الجمعة"
 
 #. module: check_payment_entry_date
+#: model:ir.model.fields,field_description:check_payment_entry_date.field_account_payment__is_check_payment
 #: model:ir.model.fields,field_description:check_payment_entry_date.field_account_payment_method_line__is_check_payment
 msgid "Check"
 msgstr "شيك"

@@ -8,6 +8,11 @@ from .check_payment_blocked_date import BLOCKED_WEEKDAY_FIELDS
 class AccountPayment(models.Model):
     _inherit = 'account.payment'
 
+    is_check_payment = fields.Boolean(
+        related='payment_method_line_id.is_check_payment',
+        string='Check',
+    )
+
     def _applies_check_entry_date(self):
         """True when the payment method line is marked as a check."""
         self.ensure_one()
