@@ -1640,7 +1640,11 @@ class PosReportingDashboard(models.TransientModel):
                 on_shelf = stock_known and (product.id, location.id) in available
                 in_stock = stock_known and (product.id, location.id) in in_stock_now
                 percentage = rates.get(category.id) if category else None
-                category_profit = (sales - cost * (percentage / 100.0)) if percentage is not None else None
+                # With a rate: sales − cost × %/100. Without a rate: sales − full cost.
+                if percentage is not None:
+                    category_profit = sales - cost * (percentage / 100.0)
+                else:
+                    category_profit = sales - cost
                 rows.append({
                     "row_key": "%s-%s" % (config.id, product.id),
                     "product_id": product.id,
@@ -1654,7 +1658,7 @@ class PosReportingDashboard(models.TransientModel):
                     "profit": round(profit, 3) if profit is not None else None,
                     "margin": round(margin * 100.0, 1) if margin is not None else None,
                     "percentage": round(percentage, 2) if percentage is not None else None,
-                    "category_profit": round(category_profit, 3) if category_profit is not None else None,
+                    "category_profit": round(category_profit, 3),
                     "order_count": stat.get("order_count", 0),
                     "on_shelf": bool(on_shelf),
                     "in_stock": bool(in_stock),
@@ -1702,11 +1706,11 @@ class PosReportingDashboard(models.TransientModel):
             if row["margin"] is not None and row["profit"] is not None
         )
         avg_margin = (profit_with_margin / sales_with_margin * 100.0) if sales_with_margin else 0.0
-        rated_rows = [row for row in rows if row["category_profit"] is not None]
-        category_profit_total = sum(row["category_profit"] for row in rated_rows)
+        with_percentage = [row for row in rows if row["percentage"] is not None]
+        category_profit_total = sum(row["category_profit"] for row in rows)
         category_buckets = {}
         product_buckets = {}
-        for row in rated_rows:
+        for row in rows:
             bucket = category_buckets.setdefault(row["category"], {
                 "name": row["category"],
                 "category_profit": 0.0,
@@ -1743,7 +1747,7 @@ class PosReportingDashboard(models.TransientModel):
             reverse=True,
         )[:5]
         worst_in_stock = sorted(
-            (row for row in rated_rows if row["in_stock"]),
+            (row for row in rows if row["in_stock"]),
             key=lambda row: row["category_profit"],
         )[:5]
         category_cards = {
@@ -1802,8 +1806,8 @@ class PosReportingDashboard(models.TransientModel):
                 "total_profit": round(profit_with_margin, 3),
                 "avg_margin": round(avg_margin, 1),
                 "category_profit_total": round(category_profit_total, 3),
-                "category_rated_count": len(rated_rows),
-                "category_missing_count": len(rows) - len(rated_rows),
+                "category_rated_count": len(with_percentage),
+                "category_missing_count": len(rows) - len(with_percentage),
             },
             "cards": {
                 "stock_more": _top("stock_more", "qty"),

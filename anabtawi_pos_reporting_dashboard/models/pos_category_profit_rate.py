@@ -25,7 +25,8 @@ class PosCategoryProfitRate(models.Model):
         required=True,
         digits=(16, 2),
         help="150 means the cost is multiplied by 1.50. "
-             "Category profit is untaxed sales minus cost times this percentage.",
+             "Category profit is untaxed sales minus cost times this percentage. "
+             "If a category has no percentage, full cost is used (sales − cost).",
     )
 
     _pos_categ_uniq = models.Constraint(

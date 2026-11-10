@@ -327,9 +327,9 @@
                                             <td><t t-esc="row.branch_name"/></td>
                                             <td class="text-muted"><t t-esc="row.category"/></td>
                                             <td class="text-end"><t t-esc="row.percentage === null ? '—' : formatDecimal(row.percentage, 2) + '%'"/></td>
-                                            <td class="text-end"><t t-esc="row.percentage === null ? '—' : formatCurrency(row.cost || 0)"/></td>
+                                            <td class="text-end"><t t-esc="row.cost === null ? '—' : formatCurrency(row.cost || 0)"/></td>
                                             <td class="text-end"><t t-esc="formatCurrency(row.sales)"/></td>
-                                            <td class="text-end"><t t-esc="row.category_profit === null ? '—' : formatCurrency(row.category_profit)"/></td>
+                                            <td class="text-end"><t t-esc="formatCurrency(row.category_profit || 0)"/></td>
                                         </tr>
                                         <tr t-if="!sortedCategoryRows.length">
                                             <td colspan="7" class="text-center text-muted p-4">No products match this search.</td>
