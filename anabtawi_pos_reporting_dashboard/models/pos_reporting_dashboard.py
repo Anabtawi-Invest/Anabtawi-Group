@@ -1327,9 +1327,10 @@ class PosReportingDashboard(models.TransientModel):
             qty_b = float(b.get("qty") or 0.0)
             orders_a = int(a.get("order_count") or 0)
             orders_b = int(b.get("order_count") or 0)
-            sales_delta = self._compare_delta(sales_a, sales_b)
-            qty_delta = self._compare_delta(qty_a, qty_b)
-            orders_delta = self._compare_delta(orders_a, orders_b)
+            # Δ = Period B − Period A (B is the focus period).
+            sales_delta = self._compare_delta(sales_b, sales_a)
+            qty_delta = self._compare_delta(qty_b, qty_a)
+            orders_delta = self._compare_delta(orders_b, orders_a)
             rows.append({
                 "row_key": "%s-%s" % (product_id_key, config_id),
                 "product_id": product_id_key,
@@ -1367,9 +1368,9 @@ class PosReportingDashboard(models.TransientModel):
             "orders_a": int(sum(r["orders_a"] for r in rows)),
             "orders_b": int(sum(r["orders_b"] for r in rows)),
         }
-        summary["sales_delta"] = self._compare_delta(summary["sales_a"], summary["sales_b"])
-        summary["qty_delta"] = self._compare_delta(summary["qty_a"], summary["qty_b"])
-        summary["orders_delta"] = self._compare_delta(summary["orders_a"], summary["orders_b"])
+        summary["sales_delta"] = self._compare_delta(summary["sales_b"], summary["sales_a"])
+        summary["qty_delta"] = self._compare_delta(summary["qty_b"], summary["qty_a"])
+        summary["orders_delta"] = self._compare_delta(summary["orders_b"], summary["orders_a"])
 
         return {
             "date_from_a": period_a["date_from"].isoformat(),
