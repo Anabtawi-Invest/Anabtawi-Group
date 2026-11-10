@@ -1510,6 +1510,114 @@ class PosReportingDashboard(models.TransientModel):
         sheet.set_column(2, 13, 12)
         sheet.set_column(14, 14, 12)
         sheet.freeze_panes(header_row + 1, 0)
+
+        # --- Sheet 2: Sales Comparison per Branch ---
+        branch_sheet = workbook.add_worksheet(_("Sales Comparison per Branch"))
+        branch_sheet.write(0, 0, _("Sales Comparison per Branch"), title_fmt)
+        branch_sheet.write(1, 0, _("Period A: %s") % period_a_label, sub_fmt)
+        branch_sheet.write(2, 0, _("Period B: %s") % period_b_label, sub_fmt)
+        branch_headers = [
+            _("Branch"),
+            _("Period A Sales"),
+            _("Period B Sales"),
+            _("Diff."),
+            _("%"),
+        ]
+        for col, label in enumerate(branch_headers):
+            branch_sheet.write(4, col, label, header_fmt)
+
+        branch_totals = defaultdict(lambda: {"sales_a": 0.0, "sales_b": 0.0})
+        for row in rows:
+            name = row.get("branch_name") or _("Unknown")
+            branch_totals[name]["sales_a"] += float(row.get("sales_a") or 0.0)
+            branch_totals[name]["sales_b"] += float(row.get("sales_b") or 0.0)
+
+        branch_rows = []
+        for name in sorted(branch_totals.keys()):
+            sales_a = round(branch_totals[name]["sales_a"], 3)
+            sales_b = round(branch_totals[name]["sales_b"], 3)
+            delta = self._compare_delta(sales_b, sales_a)
+            branch_rows.append((name, sales_a, sales_b, delta))
+
+        total_a = 0.0
+        total_b = 0.0
+        for idx, (name, sales_a, sales_b, delta) in enumerate(branch_rows):
+            r = 5 + idx
+            total_a += sales_a
+            total_b += sales_b
+            branch_sheet.write(r, 0, name, text_fmt)
+            branch_sheet.write_number(r, 1, sales_a, num_fmt)
+            branch_sheet.write_number(r, 2, sales_b, num_fmt)
+            branch_sheet.write_number(r, 3, float(delta["amount"]), _delta_fmt(delta["direction"]))
+            branch_sheet.write_number(r, 4, float(delta["percent"]), pct_fmt)
+
+        total_row = 5 + len(branch_rows)
+        total_fmt = workbook.add_format({
+            "bold": True, "border": 1, "num_format": "#,##0.000", "align": "right", "bg_color": "#E8EEF4",
+        })
+        total_text_fmt = workbook.add_format({
+            "bold": True, "border": 1, "align": "left", "bg_color": "#E8EEF4",
+        })
+        total_delta = self._compare_delta(total_b, total_a)
+        branch_sheet.write(total_row, 0, _("Total"), total_text_fmt)
+        branch_sheet.write_number(total_row, 1, round(total_a, 3), total_fmt)
+        branch_sheet.write_number(total_row, 2, round(total_b, 3), total_fmt)
+        branch_sheet.write_number(total_row, 3, float(total_delta["amount"]), total_fmt)
+        branch_sheet.write_number(total_row, 4, float(total_delta["percent"]), total_fmt)
+        branch_sheet.set_column(0, 0, 28)
+        branch_sheet.set_column(1, 4, 16)
+        branch_sheet.freeze_panes(5, 0)
+
+        # --- Sheet 3: Sales Comparison per Product (all selected branches) ---
+        product_sheet = workbook.add_worksheet(_("Sales Comparison per Product"))
+        product_sheet.write(0, 0, _("Sales Comparison per Product"), title_fmt)
+        product_sheet.write(1, 0, _("Period A: %s") % period_a_label, sub_fmt)
+        product_sheet.write(2, 0, _("Period B: %s") % period_b_label, sub_fmt)
+        product_sheet.write(3, 0, _("Scope ALL = selected branches combined per product."), sub_fmt)
+        product_headers = [
+            _("Scope"),
+            _("Product"),
+            _("Period A Sale"),
+            _("Period B Sale"),
+            _("Diff."),
+            _("%"),
+        ]
+        for col, label in enumerate(product_headers):
+            product_sheet.write(5, col, label, header_fmt)
+
+        product_totals = {}
+        for row in rows:
+            product_id = row.get("product_id") or 0
+            bucket = product_totals.setdefault(product_id, {
+                "name": row.get("product_name") or "",
+                "sales_a": 0.0,
+                "sales_b": 0.0,
+            })
+            bucket["sales_a"] += float(row.get("sales_a") or 0.0)
+            bucket["sales_b"] += float(row.get("sales_b") or 0.0)
+
+        product_rows = []
+        for product_id, bucket in product_totals.items():
+            sales_a = round(bucket["sales_a"], 3)
+            sales_b = round(bucket["sales_b"], 3)
+            delta = self._compare_delta(sales_b, sales_a)
+            product_rows.append((bucket["name"], sales_a, sales_b, delta))
+        product_rows.sort(key=lambda item: (item[0] or "").lower())
+
+        for idx, (name, sales_a, sales_b, delta) in enumerate(product_rows):
+            r = 6 + idx
+            product_sheet.write(r, 0, _("ALL"), text_fmt)
+            product_sheet.write(r, 1, name, text_fmt)
+            product_sheet.write_number(r, 2, sales_a, num_fmt)
+            product_sheet.write_number(r, 3, sales_b, num_fmt)
+            product_sheet.write_number(r, 4, float(delta["amount"]), _delta_fmt(delta["direction"]))
+            product_sheet.write_number(r, 5, float(delta["percent"]), pct_fmt)
+
+        product_sheet.set_column(0, 0, 10)
+        product_sheet.set_column(1, 1, 42)
+        product_sheet.set_column(2, 5, 16)
+        product_sheet.freeze_panes(6, 0)
+
         workbook.close()
         return output.getvalue()
 
