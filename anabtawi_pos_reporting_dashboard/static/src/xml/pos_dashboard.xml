@@ -355,7 +355,7 @@
                         <div class="o_compare_filters card border-0 shadow-sm mb-3 p-3">
                             <div class="row g-3 align-items-end">
                                 <div class="col-lg-3">
-                                    <label class="form-label fw-semibold">Period A (current)</label>
+                                    <label class="form-label fw-semibold">Period A (baseline)</label>
                                     <div class="btn-group btn-group-sm mb-2 d-flex" role="group">
                                         <button type="button" class="btn btn-outline-primary" t-on-click="() => this.setComparePreset('a', 'this_month')">This month</button>
                                         <button type="button" class="btn btn-outline-primary" t-on-click="() => this.setComparePreset('a', 'prev_month')">Prev month</button>
@@ -368,7 +368,7 @@
                                     </div>
                                 </div>
                                 <div class="col-lg-3">
-                                    <label class="form-label fw-semibold">Period B (compare with)</label>
+                                    <label class="form-label fw-semibold">Period B (current)</label>
                                     <div class="btn-group btn-group-sm mb-2 d-flex" role="group">
                                         <button type="button" class="btn btn-outline-primary" t-on-click="() => this.setComparePreset('b', 'prev_month')">Prev month</button>
                                         <button type="button" class="btn btn-outline-primary" t-on-click="() => this.setComparePreset('b', 'this_month')">This month</button>
