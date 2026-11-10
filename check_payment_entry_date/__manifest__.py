@@ -6,7 +6,9 @@
 Check Payment Entry Date
 ========================
 
-While a check payment is still in draft, its accounting date stays on today.
+Tick Check on a journal payment method (Incoming or Outgoing Payments).
+Confirming a payment that uses a ticked method sets the journal entry date to today.
+While that payment is still in draft, its accounting date stays on today.
 The printed cheque keeps the separate Check Date from Print Check.
 
 Weekdays ticked under Invoicing settings, Vendor Payments, cannot be used as
@@ -22,6 +24,7 @@ is the journal entry date and Check Date is only the date printed on the cheque.
     'depends': ['print_check'],
     'data': [
         'views/account_payment_views.xml',
+        'views/account_journal_views.xml',
         'views/res_config_settings_views.xml',
     ],
     'installable': True,
