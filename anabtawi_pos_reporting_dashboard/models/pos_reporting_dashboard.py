@@ -1427,6 +1427,16 @@ class PosReportingDashboard(models.TransientModel):
         num_fmt = workbook.add_format({"border": 1, "num_format": "#,##0.000", "align": "right"})
         int_fmt = workbook.add_format({"border": 1, "num_format": "#,##0", "align": "right"})
         pct_fmt = workbook.add_format({"border": 1, "num_format": '0.0"%"', "align": "right"})
+        # Whole-number % like the sample: %-18 / %38
+        pct_whole_fmt = workbook.add_format({
+            "border": 1, "num_format": '"%"0;"%"-0;"%"0', "align": "right",
+        })
+        pct_whole_up_fmt = workbook.add_format({
+            "border": 1, "num_format": '"%"0;"%"-0;"%"0', "align": "right", "font_color": "#15803D",
+        })
+        pct_whole_down_fmt = workbook.add_format({
+            "border": 1, "num_format": '"%"0;"%"-0;"%"0', "align": "right", "font_color": "#B91C1C",
+        })
         up_fmt = workbook.add_format({
             "border": 1, "num_format": "#,##0.000", "align": "right", "font_color": "#15803D", "bold": True,
         })
@@ -1485,21 +1495,31 @@ class PosReportingDashboard(models.TransientModel):
                 return down_fmt
             return flat_fmt
 
+        def _pct_whole_fmt(direction):
+            if direction == "up":
+                return pct_whole_up_fmt
+            if direction == "down":
+                return pct_whole_down_fmt
+            return pct_whole_fmt
+
+        def _pct_whole(value):
+            return int(round(float(value or 0.0)))
+
         for row_idx, row in enumerate(rows, start=header_row + 1):
             sheet.write(row_idx, 0, row.get("product_name") or "", text_fmt)
             sheet.write(row_idx, 1, row.get("branch_name") or "", text_fmt)
             sheet.write_number(row_idx, 2, float(row.get("sales_a") or 0.0), num_fmt)
             sheet.write_number(row_idx, 3, float(row.get("sales_b") or 0.0), num_fmt)
             sheet.write_number(row_idx, 4, float(row.get("sales_delta") or 0.0), _delta_fmt(row.get("sales_direction")))
-            sheet.write_number(row_idx, 5, float(row.get("sales_delta_pct") or 0.0), pct_fmt)
+            sheet.write_number(row_idx, 5, _pct_whole(row.get("sales_delta_pct")), _pct_whole_fmt(row.get("sales_direction")))
             sheet.write_number(row_idx, 6, float(row.get("qty_a") or 0.0), num_fmt)
             sheet.write_number(row_idx, 7, float(row.get("qty_b") or 0.0), num_fmt)
             sheet.write_number(row_idx, 8, float(row.get("qty_delta") or 0.0), _delta_fmt(row.get("qty_direction")))
-            sheet.write_number(row_idx, 9, float(row.get("qty_delta_pct") or 0.0), pct_fmt)
+            sheet.write_number(row_idx, 9, _pct_whole(row.get("qty_delta_pct")), _pct_whole_fmt(row.get("qty_direction")))
             sheet.write_number(row_idx, 10, int(row.get("orders_a") or 0), int_fmt)
             sheet.write_number(row_idx, 11, int(row.get("orders_b") or 0), int_fmt)
             sheet.write_number(row_idx, 12, float(row.get("orders_delta") or 0.0), _delta_fmt(row.get("orders_direction")))
-            sheet.write_number(row_idx, 13, float(row.get("orders_delta_pct") or 0.0), pct_fmt)
+            sheet.write_number(row_idx, 13, _pct_whole(row.get("orders_delta_pct")), _pct_whole_fmt(row.get("orders_direction")))
             trend = {"up": _("Increase"), "down": _("Decrease"), "flat": _("No change")}.get(
                 row.get("sales_direction"), _("No change")
             )
@@ -1549,7 +1569,7 @@ class PosReportingDashboard(models.TransientModel):
             branch_sheet.write_number(r, 1, sales_a, num_fmt)
             branch_sheet.write_number(r, 2, sales_b, num_fmt)
             branch_sheet.write_number(r, 3, float(delta["amount"]), _delta_fmt(delta["direction"]))
-            branch_sheet.write_number(r, 4, float(delta["percent"]), pct_fmt)
+            branch_sheet.write_number(r, 4, _pct_whole(delta["percent"]), _pct_whole_fmt(delta["direction"]))
 
         total_row = 5 + len(branch_rows)
         total_fmt = workbook.add_format({
@@ -1558,12 +1578,15 @@ class PosReportingDashboard(models.TransientModel):
         total_text_fmt = workbook.add_format({
             "bold": True, "border": 1, "align": "left", "bg_color": "#E8EEF4",
         })
+        total_pct_fmt = workbook.add_format({
+            "bold": True, "border": 1, "num_format": '"%"0;"%"-0;"%"0', "align": "right", "bg_color": "#E8EEF4",
+        })
         total_delta = self._compare_delta(total_b, total_a)
         branch_sheet.write(total_row, 0, _("Total"), total_text_fmt)
         branch_sheet.write_number(total_row, 1, round(total_a, 3), total_fmt)
         branch_sheet.write_number(total_row, 2, round(total_b, 3), total_fmt)
         branch_sheet.write_number(total_row, 3, float(total_delta["amount"]), total_fmt)
-        branch_sheet.write_number(total_row, 4, float(total_delta["percent"]), total_fmt)
+        branch_sheet.write_number(total_row, 4, _pct_whole(total_delta["percent"]), total_pct_fmt)
         branch_sheet.set_column(0, 0, 28)
         branch_sheet.set_column(1, 4, 16)
         branch_sheet.freeze_panes(5, 0)
@@ -1611,7 +1634,7 @@ class PosReportingDashboard(models.TransientModel):
             product_sheet.write_number(r, 2, sales_a, num_fmt)
             product_sheet.write_number(r, 3, sales_b, num_fmt)
             product_sheet.write_number(r, 4, float(delta["amount"]), _delta_fmt(delta["direction"]))
-            product_sheet.write_number(r, 5, float(delta["percent"]), pct_fmt)
+            product_sheet.write_number(r, 5, _pct_whole(delta["percent"]), _pct_whole_fmt(delta["direction"]))
 
         product_sheet.set_column(0, 0, 10)
         product_sheet.set_column(1, 1, 42)
