@@ -10,7 +10,7 @@
                         string="🖨️ Print Check / طباعة شيك"
                         type="object"
                         class="btn-secondary"
-                        invisible="payment_type != 'outbound'"/>
+                        invisible="state == 'draft' or payment_type != 'outbound'"/>
             </xpath>
 
             <xpath expr="//group[@name='group1']/field[@name='date']" position="after">
