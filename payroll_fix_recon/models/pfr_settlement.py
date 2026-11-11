@@ -101,19 +101,17 @@ class PfrSettlement(models.AbstractModel):
         types = self.leave_types(slips[:1].company_id)
         type_ids = list((types['extra'] | types['annual'] | types['pto']).ids)
         pre = {'types': types, 'balance': self.balance_hours(emp_ids, type_ids),
-               'approved_ot': defaultdict(float), 'banked': defaultdict(float), 'recon_alloc': {},
+               'approved_ot': defaultdict(float), 'recon_alloc': {},
                'ot_lines_by_date': defaultdict(list)}
         if 'hr.attendance.overtime.line' in self.env:
             lines = self.env['hr.attendance.overtime.line'].sudo().search([
-                ('employee_id', 'in', emp_ids), ('compensable_as_leave', '=', True), ('status', '=', 'approved')])
+                ('employee_id', 'in', emp_ids), ('compensable_as_leave', '=', True), ('status', '=', 'approved'),
+                ('date', '>=', d_min), ('date', '<=', d_max)])
             for line in lines:
-                if line.date < d_min:
-                    pre['banked'][line.employee_id.id] += line.duration
-                elif line.date <= d_max:
-                    dur = (line.manual_duration if 'manual_duration' in line._fields else 0.0) or line.duration
-                    if dur > 0:
-                        pre['approved_ot'][(line.employee_id.id, line.date)] = dur
-                        pre['ot_lines_by_date'][(line.employee_id.id, line.date)].append(line)
+                dur = (line.manual_duration if 'manual_duration' in line._fields else 0.0) or line.duration
+                if dur > 0:
+                    pre['approved_ot'][(line.employee_id.id, line.date)] = dur
+                    pre['ot_lines_by_date'][(line.employee_id.id, line.date)].append(line)
         recon_types = types['extra'] | types['pto']
         if recon_types:
             for alloc in self.env['hr.leave.allocation'].sudo().search([
@@ -262,23 +260,19 @@ class PfrSettlement(models.AbstractModel):
         gross_ot = round(reg_ot + ph_ot + rest_ot, 2)        # all OT earned (audit)
         gross_ut = round(punch + L.absent_hours, 2)          # absent days are settled like lateness
 
-        # Extra Hours = previous bank + regular OT only (x1.25)
+        # Extra Hours = previous Time Off bank + regular OT (already weighted x1.25)
         types = pre['types']
         bal = pre['balance']
         current_recon = max((slip.extra_hours_allocated_days or 0.0) * 8.0,
                             pre['recon_alloc'].get((emp.id, recon_alloc_name(slip)), 0.0))
         prior_alloc = max(0.0, sum(bal.get((emp.id, t), 0.0) for t in types['extra'].ids) - current_recon)
-        prev_extra = max(prior_alloc, round(pre['banked'].get(emp.id, 0.0), 2))
-        total_avail = round(prev_extra + reg_ot, 2)
+        total_avail = round(prior_alloc + reg_ot, 2)
 
         covered_extra = round(min(gross_ut, total_avail), 2)                       # step 1
         remaining = round(gross_ut - covered_extra, 2)
-        # Stored bank and total_avail are weighted (x1.25). The remaining balance
-        # displays REAL physical hours (divided by 1.25).
-        net_extra_weighted = max(0.0, total_avail - covered_extra)
-        remaining_extra_real = round(net_extra_weighted / U.OT_RATE, 2)
+        remaining_extra_real = round(max(0.0, total_avail - covered_extra), 2)
 
-        # PTO = previous bank + public holiday (x1.5) + unused rest days (12h)
+        # PTO = previous Time Off bank + public holiday (x1.5) + unused rest days (12h)
         current_pto_recon = max((slip.pto_allocated_days or 0.0) * 8.0,
                                 pre['recon_alloc'].get((emp.id, pto_recon_alloc_name(slip)), 0.0))
         prior_pto = max(0.0, sum(bal.get((emp.id, t), 0.0) for t in types['pto'].ids) - current_pto_recon)
@@ -288,10 +282,7 @@ class PfrSettlement(models.AbstractModel):
         if remaining > 0.01 and total_pto > 0.01 and emp.allow_pto_lateness_deduction:  # step 2
             covered_pto = round(min(remaining, math.floor(total_pto * 100) / 100.0), 2)
             remaining = round(remaining - covered_pto, 2)
-        # Stored bank and total_pto are weighted (x1.5). The remaining balance
-        # displays REAL physical hours (divided by 1.5).
-        net_pto_weighted = max(0.0, total_pto - covered_pto)
-        remaining_pto_real = round(net_pto_weighted / U.PH_RATE, 2)
+        remaining_pto_real = round(max(0.0, total_pto - covered_pto), 2)
 
         covered_annual = 0.0
         if remaining > 0.01 and emp.allow_annual_leave_lateness_deduction:        # step 3
