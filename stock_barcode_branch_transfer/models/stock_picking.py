@@ -1,4 +1,4 @@
-from odoo import api, fields, models
+from odoo import fields, models
 from odoo.exceptions import UserError
 
 
@@ -76,13 +76,45 @@ class StockPicking(models.Model):
         }
 
     def _align_branch_move_lines(self, role, location):
-        lines = self.move_line_ids.filtered(lambda line: line.state not in ("done", "cancel"))
         field_name = "location_dest_id" if role == "dest" else "location_id"
-        lines = lines.filtered(lambda line: line[field_name] != location)
+        moves = self.move_ids.filtered(
+            lambda move: move.state not in ("done", "cancel") and move[field_name] != location
+        )
+        if moves:
+            moves.with_context(skip_branch_location_check=True).write({field_name: location.id})
+        lines = self.move_line_ids.filtered(
+            lambda line: line.state not in ("done", "cancel") and line[field_name] != location
+        )
         if lines:
-            lines.with_context(skip_branch_location_check=True).write(
-                {field_name: location.id}
-            )
+            lines.with_context(skip_branch_location_check=True).write({field_name: location.id})
+
+    def _lock_branch_location(self, role, location):
+        """Lock and override the picking location from the first accepted scan."""
+        self.ensure_one()
+        self._check_branch_scanned_location(location)
+        locked = (
+            self.barcode_locked_dest_location_id
+            if role == "dest"
+            else self.barcode_locked_source_location_id
+        )
+        if locked and locked != location:
+            raise UserError(self._branch_location_mismatch_message(role, locked))
+        if locked:
+            return self._branch_location_payload(role)
+        vals = (
+            {
+                "barcode_locked_dest_location_id": location.id,
+                "location_dest_id": location.id,
+            }
+            if role == "dest"
+            else {
+                "barcode_locked_source_location_id": location.id,
+                "location_id": location.id,
+            }
+        )
+        self.with_context(skip_branch_location_check=True).write(vals)
+        self._align_branch_move_lines(role, location)
+        return self._branch_location_payload(role)
 
     def apply_branch_barcode_location(self, location_id, role):
         """Replace the transfer location on the first scan and reject a different one."""
@@ -91,34 +123,27 @@ class StockPicking(models.Model):
             return {"applied": False}
 
         location = self.env["stock.location"].browse(location_id).exists()
-        self._check_branch_scanned_location(location)
-
         if not self.barcode_locked_source_location_id:
             role = "source"
         elif role not in ("source", "dest"):
             role = "source"
         if role == "dest" and self.picking_type_id.restrict_scan_dest_location == "no":
             role = "source"
+        return self._lock_branch_location(role, location)
 
+    def _apply_branch_location_from_line(self, role, location):
+        """Fallback when barcode wrote a line location before JS could lock the picking."""
+        self.ensure_one()
+        if not location or not self._branch_location_override_enabled():
+            return
         locked = (
             self.barcode_locked_dest_location_id
             if role == "dest"
             else self.barcode_locked_source_location_id
         )
-        if locked and locked != location:
-            raise UserError(self._branch_location_mismatch_message(role, locked))
-        if not locked:
-            vals = (
-                {
-                    "barcode_locked_dest_location_id": location.id,
-                    "location_dest_id": location.id,
-                }
-                if role == "dest"
-                else {
-                    "barcode_locked_source_location_id": location.id,
-                    "location_id": location.id,
-                }
-            )
-            self.write(vals)
-            self._align_branch_move_lines(role, location)
-        return self._branch_location_payload(role)
+        if locked:
+            if location != locked:
+                raise UserError(self._branch_location_mismatch_message(role, locked))
+            return
+        # First concrete line location becomes the locked override for that role.
+        self._lock_branch_location(role, location)
