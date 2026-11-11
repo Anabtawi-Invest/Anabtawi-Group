@@ -14,25 +14,35 @@ class HrPayslip(models.Model):
         return bool(getattr(self, 'termination_clearance', False) or 'termination' in name or 'تيرمنيشن' in name)
 
     def _pfr_leave_balance_days(self, leave_types, balance_hours):
-        """Remaining days of the given leave types (native balance first, allocations as fallback)."""
+        """Remaining days of the given leave types (matching Time Off Dashboard including excess_days & negative allocations)."""
         emp = self.employee_id
-        target = self.date_to or fields.Date.today()
-        net_bal_days = sum(balance_hours.get((emp.id, t.id), 0.0) for t in leave_types) / U.DAILY_HOURS
-        if net_bal_days < 0:
-            return net_bal_days
+        bal_days = sum(balance_hours.get((emp.id, t.id), 0.0) for t in leave_types) / U.DAILY_HOURS
         days = 0.0
+        got_native = False
         for ltype in leave_types:
             try:
-                data, _ = emp._get_consumed_leaves(ltype, target_date=target)
+                data, to_recheck = emp._get_consumed_leaves(ltype)
                 content = data.get(emp, {}).get(ltype, {})
-                val = content.get('virtual_remaining_leaves') or content.get('remaining_leaves') or 0.0
-                days += float(val or sum(v.get('virtual_remaining_leaves', 0.0)
-                                         for v in content.values() if isinstance(v, dict)))
+                recheck = to_recheck.get(emp, {}).get(ltype, {}) if isinstance(to_recheck, dict) else {}
+                if 'virtual_remaining_leaves' in content or 'remaining_leaves' in content:
+                    rem = float(content.get('virtual_remaining_leaves') or content.get('remaining_leaves') or 0.0)
+                else:
+                    rem = sum(
+                        float(v.get('virtual_remaining_leaves', 0.0) or 0.0)
+                        for v in content.values()
+                        if isinstance(v, dict)
+                    )
+                excess = float(recheck.get('excess_days', 0.0) or 0.0)
+                days += (rem - excess)
+                got_native = True
             except Exception:
                 pass
-        if days != 0.0:
+        if got_native:
+            # If negative allocations exist that _get_consumed_leaves ignored, bal_days will reflect the full net balance
+            if bal_days < days and abs(bal_days - days) > 0.001:
+                return bal_days
             return days
-        return net_bal_days
+        return bal_days
 
     def _pfr_set_input(self, code, quantity, amount):
         itype = self.env['hr.payslip.input.type'].sudo().search([('code', '=', code)], limit=1)
@@ -50,8 +60,7 @@ class HrPayslip(models.Model):
             vals['quantity'] = quantity
         line = self.input_line_ids.filtered(lambda l: l.input_type_id == itype)[:1]
         if line:
-            # Respect user's manual input if already present on the payslip
-            return
+            line.sudo().write(vals)
         else:
             self.input_line_ids = [(0, 0, dict(vals, input_type_id=itype.id))]
 
