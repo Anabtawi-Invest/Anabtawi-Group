@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="stock_barcode_view_picking_type_form" model="ir.ui.view">
+        <field name="name">stock.picking.type.form.branch.transfer</field>
+        <field name="model">stock.picking.type</field>
+        <field name="inherit_id" ref="stock_barcode.stock_barcode_view_picking_type_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='restrict_scan_source_location']" position="after">
+                <field name="barcode_override_scanned_locations"
+                       invisible="restrict_scan_source_location != 'mandatory'"/>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>
