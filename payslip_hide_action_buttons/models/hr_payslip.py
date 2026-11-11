@@ -24,7 +24,10 @@ class HrPayslip(models.Model):
             return res
 
         arch = etree.fromstring(res["arch"])
-        keep_names = {"action_export_payslip"}
+        keep_names = {
+            "action_export_payslip",      # Export XLSX
+            "action_export_payrun_excel",  # PayRun Audit
+        }
         for button in arch.xpath("//header/button"):
             if button.get("name") in keep_names:
                 continue
