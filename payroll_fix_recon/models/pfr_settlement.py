@@ -82,7 +82,7 @@ class PfrSettlement(models.AbstractModel):
 
     @api.model
     def balance_hours(self, emp_ids, type_ids):
-        """{(emp_id, type_id): allocated hours - validated leave hours}."""
+        """{(emp_id, type_id): allocated hours - validated leave hours (matching Time Off Dashboard)}."""
         bal = defaultdict(float)
         if not type_ids or not emp_ids:
             return bal
@@ -91,6 +91,33 @@ class PfrSettlement(models.AbstractModel):
             bal[(alloc.employee_id.id, alloc.holiday_status_id.id)] += leave_hours(alloc)
         for lve in self.env['hr.leave'].sudo().search(dom):
             bal[(lve.employee_id.id, lve.holiday_status_id.id)] -= leave_hours(lve)
+
+        # Match the Time Off Dashboard (_get_consumed_leaves) when leaves are pending/active,
+        # while still preserving manual negative allocations that _get_consumed_leaves may ignore.
+        employees = self.env['hr.employee'].sudo().browse(emp_ids).exists()
+        leave_types = self.env['hr.leave.type'].sudo().browse(type_ids).exists()
+        for emp in employees:
+            for ltype in leave_types:
+                try:
+                    data, to_recheck = emp._get_consumed_leaves(ltype)
+                    content = data.get(emp, {}).get(ltype, {})
+                    recheck = to_recheck.get(emp, {}).get(ltype, {}) if isinstance(to_recheck, dict) else {}
+                    if 'virtual_remaining_leaves' in content or 'remaining_leaves' in content:
+                        rem = float(content.get('virtual_remaining_leaves') or content.get('remaining_leaves') or 0.0)
+                    else:
+                        rem = sum(
+                            float(v.get('virtual_remaining_leaves', 0.0) or 0.0)
+                            for v in content.values()
+                            if isinstance(v, dict)
+                        )
+                    excess = float(recheck.get('excess_days', 0.0) or 0.0)
+                    native_hours = round((rem - excess) * U.DAILY_HOURS, 2)
+                    manual_hours = round(bal[(emp.id, ltype.id)], 2)
+                    # Take the lower (more conservative) of native dashboard balance and manual net balance
+                    # so both pending/approved dashboard leaves AND negative allocations are respected.
+                    bal[(emp.id, ltype.id)] = min(native_hours, manual_hours)
+                except Exception:
+                    pass
         return bal
 
     @api.model
@@ -101,19 +128,17 @@ class PfrSettlement(models.AbstractModel):
         types = self.leave_types(slips[:1].company_id)
         type_ids = list((types['extra'] | types['annual'] | types['pto']).ids)
         pre = {'types': types, 'balance': self.balance_hours(emp_ids, type_ids),
-               'approved_ot': defaultdict(float), 'banked': defaultdict(float), 'recon_alloc': {},
+               'approved_ot': defaultdict(float), 'recon_alloc': {},
                'ot_lines_by_date': defaultdict(list)}
         if 'hr.attendance.overtime.line' in self.env:
             lines = self.env['hr.attendance.overtime.line'].sudo().search([
-                ('employee_id', 'in', emp_ids), ('compensable_as_leave', '=', True), ('status', '=', 'approved')])
+                ('employee_id', 'in', emp_ids), ('compensable_as_leave', '=', True), ('status', '=', 'approved'),
+                ('date', '>=', d_min), ('date', '<=', d_max)])
             for line in lines:
-                if line.date < d_min:
-                    pre['banked'][line.employee_id.id] += line.duration
-                elif line.date <= d_max:
-                    dur = (line.manual_duration if 'manual_duration' in line._fields else 0.0) or line.duration
-                    if dur > 0:
-                        pre['approved_ot'][(line.employee_id.id, line.date)] = dur
-                        pre['ot_lines_by_date'][(line.employee_id.id, line.date)].append(line)
+                dur = (line.manual_duration if 'manual_duration' in line._fields else 0.0) or line.duration
+                if dur > 0:
+                    pre['approved_ot'][(line.employee_id.id, line.date)] = dur
+                    pre['ot_lines_by_date'][(line.employee_id.id, line.date)].append(line)
         recon_types = types['extra'] | types['pto']
         if recon_types:
             for alloc in self.env['hr.leave.allocation'].sudo().search([
@@ -226,8 +251,8 @@ class PfrSettlement(models.AbstractModel):
                 allowance = U.MONTHLY_REST_ALLOWANCE
             else:
                 # flexible (factory Monday / retail Friday): the weekday only sets HOW MANY rest days were
-                # earned (full cap when worked >= 24, else check-ins // 6); rest days actually taken are the
-                # unpunched days of the contract window that are not leave or public holidays.
+                # earned (never more than (check-ins + cap) // 6); rest days actually taken are the unpunched days
+                # of the contract window that are not leave or public holidays.
                 target = 0 if (emp.employee_work_station or 'factory') == 'factory' else 4
                 cap = sum(1 for d in U.daterange(L.eff_from, L.eff_to) if d.weekday() == target)
                 allowance = cap if worked >= 24 else min(cap, worked // U.REST_CYCLE_DAYS)
@@ -236,83 +261,4 @@ class PfrSettlement(models.AbstractModel):
                                  and d not in L.leave_calendar_dates and d not in L.holiday_dates)
             rest_total = max(0, allowance - rest_taken) * U.REST_DAY_OT_HOURS
             total += rest_total
-            return total, float(rest_taken), (ph_total, reg_total, rest_total)
-        return total, 0.0, (ph_total, reg_total, rest_total)
-
-    # ------------------------------------------------------------------
-    # Settlement
-    # ------------------------------------------------------------------
-    @api.model
-    def compute(self, slip, L, pre):
-        """Values for the payslip reconciliation fields."""
-        emp = slip.employee_id
-        company = slip.company_id or self.env.company
-        exempt = emp.is_manager_exempt()
-
-        gross_ot, rest_taken, punch = 0.0, 0.0, 0.0
-        ot_parts = (0.0, 0.0, 0.0)
-        if not exempt:                                       # managers: no hourly lateness / overtime
-            if getattr(company, 'enable_overtime_calculation', True):
-                gross_ot, rest_taken, ot_parts = self.overtime_hours(slip, L, pre)
-            punch = sum(a.daily_undertime_hours for d, a in L.attendances
-                        if not a.is_public_holiday and d in L.days and L.days[d] != 'OUT')
-        ph_ot = round(ot_parts[0], 2)
-        reg_ot = round(ot_parts[1], 2)
-        rest_ot = round(ot_parts[2], 2)
-        gross_ot = round(reg_ot + ph_ot + rest_ot, 2)        # all OT earned (audit)
-        gross_ut = round(punch + L.absent_hours, 2)          # absent days are settled like lateness
-
-        # Extra Hours = previous bank + regular OT only (x1.25)
-        types = pre['types']
-        bal = pre['balance']
-        current_recon = max((slip.extra_hours_allocated_days or 0.0) * 8.0,
-                            pre['recon_alloc'].get((emp.id, recon_alloc_name(slip)), 0.0))
-        prior_alloc = max(0.0, sum(bal.get((emp.id, t), 0.0) for t in types['extra'].ids) - current_recon)
-        prev_extra = max(prior_alloc, round(pre['banked'].get(emp.id, 0.0), 2))
-        total_avail = round(prev_extra + reg_ot, 2)
-
-        covered_extra = round(min(gross_ut, total_avail), 2)                       # step 1
-        remaining = round(gross_ut - covered_extra, 2)
-        # Stored bank and total_avail are weighted (x1.25). The remaining balance
-        # displays REAL physical hours (divided by 1.25).
-        net_extra_weighted = max(0.0, total_avail - covered_extra)
-        remaining_extra_real = round(net_extra_weighted / U.OT_RATE, 2)
-
-        # PTO = previous bank + public holiday (x1.5) + unused rest days (12h)
-        current_pto_recon = max((slip.pto_allocated_days or 0.0) * 8.0,
-                                pre['recon_alloc'].get((emp.id, pto_recon_alloc_name(slip)), 0.0))
-        prior_pto = max(0.0, sum(bal.get((emp.id, t), 0.0) for t in types['pto'].ids) - current_pto_recon)
-        pto_earned = round(ph_ot + rest_ot, 2)
-        total_pto = round(prior_pto + pto_earned, 2)
-        covered_pto = 0.0
-        if remaining > 0.01 and total_pto > 0.01 and emp.allow_pto_lateness_deduction:  # step 2
-            covered_pto = round(min(remaining, math.floor(total_pto * 100) / 100.0), 2)
-            remaining = round(remaining - covered_pto, 2)
-        # Stored bank and total_pto are weighted (x1.5). The remaining balance
-        # displays REAL physical hours (divided by 1.5).
-        net_pto_weighted = max(0.0, total_pto - covered_pto)
-        remaining_pto_real = round(net_pto_weighted / U.PH_RATE, 2)
-
-        covered_annual = 0.0
-        if remaining > 0.01 and emp.allow_annual_leave_lateness_deduction:        # step 3
-            annual = max(0.0, sum(bal.get((emp.id, t), 0.0) for t in types['annual'].ids))
-            covered_annual = min(remaining, math.floor(annual * 100) / 100.0)   # never above the real balance
-            remaining = round(remaining - covered_annual, 2)
-        return {
-            'attendance_gross_overtime': gross_ot,
-            'overtime_holiday_hours': ph_ot,
-            'overtime_regular_hours': reg_ot,
-            'overtime_rest_hours': rest_ot,
-            'overtime_pto_hours': pto_earned,
-            'rest_days_taken': rest_taken,
-            'attendance_gross_undertime': gross_ut,
-            'attendance_net_reconciled': round(gross_ot - gross_ut, 2),
-            'total_extra_hours_available': total_avail,
-            'lateness_covered_by_extra_hours': covered_extra,
-            'remaining_extra_hours_balance': remaining_extra_real,
-            'total_pto_available': total_pto,
-            'lateness_covered_by_pto': covered_pto,
-            'remaining_pto_balance': remaining_pto_real,
-            'lateness_covered_by_annual_leave': covered_annual,
-            'undertime_cash_deduction_hours': remaining if remaining >= 0.01 else 0.0,   # step 4
-        }
+            return total, float(rest_taken), (ph_total, reg
