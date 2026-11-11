@@ -64,17 +64,6 @@ msgid "Friday"
 msgstr "الجمعة"
 
 #. module: check_payment_entry_date
-#: model:ir.model.fields,field_description:check_payment_entry_date.field_account_payment__is_check_payment
-#: model:ir.model.fields,field_description:check_payment_entry_date.field_account_payment_method_line__is_check_payment
-msgid "Check"
-msgstr "شيك"
-
-#. module: check_payment_entry_date
-#: model:ir.model.fields,help:check_payment_entry_date.field_account_payment_method_line__is_check_payment
-msgid "Confirming a payment that uses this method sets the journal entry date to today."
-msgstr "عند تأكيد دفعة تستخدم هذه الطريقة، يصبح تاريخ قيد اليومية هو تاريخ اليوم."
-
-#. module: check_payment_entry_date
 #. odoo-python
 #: code:addons/check_payment_entry_date/models/account_payment.py:0
 msgid "You cannot cash a check on this day."
