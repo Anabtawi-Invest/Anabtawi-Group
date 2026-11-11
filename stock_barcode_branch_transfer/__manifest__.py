@@ -1,6 +1,6 @@
 {
     "name": "Stock Barcode Branch Transfer",
-    "version": "19.0.1.0.4",
+    "version": "19.0.1.0.5",
     "category": "Inventory/Inventory",
     "summary": "Override and lock barcode transfer locations from the first scanned source and destination",
     "author": "Anabtawi",
