@@ -24,7 +24,10 @@ class HrPayslip(models.Model):
             return res
 
         arch = etree.fromstring(res["arch"])
+        keep_names = {"action_export_payslip"}
         for button in arch.xpath("//header/button"):
+            if button.get("name") in keep_names:
+                continue
             button.getparent().remove(button)
         res["arch"] = etree.tostring(arch, encoding="unicode")
         return res
