@@ -91,30 +91,11 @@ class AccountLoan(models.Model):
                 if label and move.line_ids:
                     move.line_ids.write({'name': label})
 
-    def _realign_standard_payment_moves_to_line_date(self):
-        """Checkbox OFF: date Principal & Interest on the loan-line date; leave LT-ST reclass/reversal."""
-        today = fields.Date.context_today(self)
-        for loan in self:
-            payment_moves = loan.line_ids.generated_move_ids.filtered(
-                lambda m: m.is_loan_payment_move and m.generating_loan_line_id
-            )
-            for move in payment_moves:
-                installment_date = move.generating_loan_line_id.date
-                if not installment_date or move.date == installment_date:
-                    continue
-                was_posted = move.state == 'posted'
-                if was_posted:
-                    move.button_draft()
-                move.write({'date': installment_date})
-                if installment_date <= today:
-                    move.action_post()
-
     def action_confirm(self):
         normal_loans = self.filtered(lambda loan: not loan.split_murabaha_interest)
         split_loans = self - normal_loans
         if normal_loans:
             super(AccountLoan, normal_loans).action_confirm()
-            normal_loans._realign_standard_payment_moves_to_line_date()
             normal_loans._apply_analytic_on_expense_lines()
             normal_loans._apply_bayaan_on_payment_move_lines()
         for loan in split_loans:
@@ -157,10 +138,8 @@ class AccountLoan(models.Model):
                 continue
 
             period_label = format_date(self.env, line.date, date_format='MM/y')
-            # Installment Due / murabaha on the contractual line date; LT-ST reclass stays month-end.
-            installment_date = line.date
-            month_end_date = line.date + relativedelta(day=31)
-            bayaan_label = loan._get_bayaan_line_label(installment_date)
+            move_date = line.date + relativedelta(day=31)
+            bayaan_label = loan._get_bayaan_line_label(move_date)
 
             principal_name = bayaan_label or f"{loan.name} - {_('Principal')} {period_label}"
             due_name = bayaan_label or (
@@ -176,7 +155,7 @@ class AccountLoan(models.Model):
                 'auto_post': 'at_date',
                 'generating_loan_line_id': line.id,
                 'is_loan_payment_move': True,
-                'date': installment_date,
+                'date': move_date,
                 'journal_id': loan.journal_id.id,
                 'ref': f"{loan.name} - {_('Principal & Interest')} {period_label}",
                 'line_ids': [
@@ -212,7 +191,7 @@ class AccountLoan(models.Model):
                     'auto_post': 'at_date',
                     'generating_loan_line_id': line.id,
                     'is_loan_payment_move': False,
-                    'date': installment_date,
+                    'date': move_date,
                     'journal_id': loan.journal_id.id,
                     'ref': f"{loan.name} - {_('Murabaha')} {period_label}",
                     'line_ids': [
@@ -238,7 +217,7 @@ class AccountLoan(models.Model):
             payment_sum = sum(next_lines.mapped('payment'))
             reclassification_moves_values.append({
                 **common_reclassification_values,
-                'date': month_end_date,
+                'date': move_date,
                 'ref': f"{loan.name} - {_('Reclassification LT - ST')} {from_date} to {to_date}",
                 'line_ids': [
                     Command.create({
@@ -255,7 +234,7 @@ class AccountLoan(models.Model):
             })
             reclassification_reversed_moves_values.append({
                 **common_reclassification_values,
-                'date': month_end_date + relativedelta(days=1),
+                'date': move_date + relativedelta(days=1),
                 'ref': f"{loan.name} - {_('Reversal reclassification LT - ST')} {from_date} to {to_date}",
                 'line_ids': [
                     Command.create({
