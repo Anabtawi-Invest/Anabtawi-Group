@@ -721,7 +721,8 @@ class HrPayslipRun(models.Model):
                     issues.append(_("Negative Net Salary (%.2f JOD)") % net_sal)
 
                 # Attendance Days = every paid line merged (attendance, public holiday, annual, sick,
-                # paid time off, travel, work injury x pay %). Absent / lateness / unpaid never count.
+                # paid time off, travel, work injury x pay %), capped at the period.
+                # Extra Hours days are added after that cap. Absent / lateness / unpaid never count.
                 worked_days = payslip.worked_days_line_ids
                 summary = payslip._xlsx_attendance_summary()
                 att_days = summary["att_days"]
