@@ -24,14 +24,17 @@ class HrPayslip(models.Model):
             return res
 
         arch = etree.fromstring(res["arch"])
+        keep_names = {
+            "action_export_payslip",       # Export XLSX
+            "action_export_payrun_excel",  # PayRun Audit
+            "compute_sheet",               # Compute Sheet
+        }
         for button in arch.xpath("//header/button"):
+            if button.get("name") in keep_names:
+                continue
             button.getparent().remove(button)
         res["arch"] = etree.tostring(arch, encoding="unicode")
         return res
-
-    def compute_sheet(self):
-        self._check_payslip_action_button_access()
-        return super().compute_sheet()
 
     def action_payslip_done(self):
         self._check_payslip_action_button_access()
