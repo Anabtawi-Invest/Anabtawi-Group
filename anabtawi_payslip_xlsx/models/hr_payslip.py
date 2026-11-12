@@ -126,15 +126,29 @@ class HrPayslip(models.Model):
             or "اصابة عمل" in text
         )
 
+    def _xlsx_is_extra_hours_days(self, wd):
+        """'Extra Hours days' is a paid day line added on top of the month.
+
+        Overtime and extra-hour lines stay ignored; only this day line is added
+        to Attendance Days, and only after the period cap.
+        """
+        code = self._xlsx_entry_code(wd).upper().replace(" ", "_").replace("-", "_")
+        text = f"{wd.name or ''} {self._xlsx_entry_name(wd)}".lower()
+        return code in ("EXTRA_HOURS_DAYS", "EXTRAHOURSDAY") or "extra hours day" in text
+
     def _xlsx_attendance_summary(self):
         """Attendance days = every paid line (attendance, public holiday and all paid leaves merged),
         weighted by its pay %, capped at the days of the period. Absent and lateness never count.
-        Work Injury paid (in) is added at full days (not the 7.5% pay factor)."""
+        Work Injury paid (in) is added at full days (not the 7.5% pay factor).
+        Extra Hours days are added after that cap so a full month does not cut them back."""
         self.ensure_one()
-        att_days = absent_hrs = lateness_hrs = out_days = 0.0
+        att_days = absent_hrs = lateness_hrs = out_days = extra_days = 0.0
         for wd in self.worked_days_line_ids:
             if self._xlsx_is_travel_suspension(wd):
                 continue  # travel suspension deduction days are not attendance
+            if self._xlsx_is_extra_hours_days(wd):
+                extra_days += (wd.number_of_days or 0.0) * self._xlsx_pay_factor(wd)
+                continue
             kind = self._xlsx_classify_worked_day(wd)
             if kind == "paid":
                 days = wd.number_of_days or 0.0
@@ -149,6 +163,7 @@ class HrPayslip(models.Model):
                 out_days += wd.number_of_days if wd.number_of_days else ((wd.number_of_hours or 0.0) / 8.0)
         if self.date_from and self.date_to:
             att_days = min(att_days, float((self.date_to - self.date_from).days + 1))
+        att_days += extra_days
         return {
             "att_days": round(att_days, 2),
             "absent_hrs": absent_hrs,
