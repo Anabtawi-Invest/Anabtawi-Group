@@ -83,7 +83,7 @@
                             <field name="employee_app_registered_at" readonly="1"/>
                             <field name="employee_app_last_login" readonly="1"/>
                             <button name="action_reset_employee_app_device" type="object" string="Reset Employee App Device" class="btn-primary"
-                                    confirm="This will allow the employee to register the Employee App on a different device." groups="hr.group_hr_manager"/>
+                                    confirm="This will allow the employee to register the Employee App on a different device." groups="hr.group_hr_user"/>
                         </group>
                     </group>
                 </page>
