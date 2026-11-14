@@ -9,7 +9,7 @@
     'category': 'Portal',
     'author': "Enbtawi Sweet",
     'website': "Enbtawi Sweet",
-    'version': '1.2',
+    'version': '1.3',
     'depends': ['base', 'hr', 'hr_payroll', 'base_portal', 'hr_holidays', 'resource'],
     'data': [
         'security/ir.model.access.csv',
