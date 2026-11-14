@@ -73,6 +73,26 @@ def _code128_image(value):
     return stream, width, height
 
 
+def _code128_image_stream(value, cache):
+    """Return a new PNG stream for value, reusing encoded bytes from cache.
+
+    xlsxwriter reads each image stream when the workbook is closed, so every
+    cell needs its own stream even when the barcode is the same.
+    """
+    if value not in cache:
+        image = _code128_image(value)
+        if not image:
+            cache[value] = None
+        else:
+            stream, width, height = image
+            cache[value] = (stream.getvalue(), width, height)
+    cached = cache[value]
+    if not cached:
+        return None
+    data, width, height = cached
+    return io.BytesIO(data), width, height
+
+
 class InternalTransferReportWizard(models.TransientModel):
     _name = 'internal.transfer.report.wizard'
     _description = 'Internal Transfer Report Wizard'
@@ -247,6 +267,7 @@ class InternalTransferReportWizard(models.TransientModel):
             rows.append({
                 'transfer_reference': picking.name or '',
                 'product_name': move.product_id.display_name,
+                'product_barcode': move.product_id.barcode or '',
                 'factory_plan_category': self._get_factory_plan_category_display(move.product_id),
                 'created_by': picking.create_uid.display_name or self.env._('Undefined'),
                 'creating_date': picking.create_date,
@@ -309,9 +330,17 @@ class InternalTransferReportWizard(models.TransientModel):
             'border': 1,
             'align': 'center',
         })
-        text_style = workbook.add_format({'border': 1})
-        number_style = workbook.add_format({'border': 1, 'num_format': '#,##0.00'})
-        datetime_style = workbook.add_format({'border': 1, 'num_format': 'yyyy-mm-dd hh:mm:ss'})
+        text_style = workbook.add_format({'border': 1, 'valign': 'vcenter'})
+        number_style = workbook.add_format({
+            'border': 1,
+            'valign': 'vcenter',
+            'num_format': '#,##0.00',
+        })
+        datetime_style = workbook.add_format({
+            'border': 1,
+            'valign': 'vcenter',
+            'num_format': 'yyyy-mm-dd hh:mm:ss',
+        })
 
         sheet1 = workbook.add_worksheet(self.env._('Details'))
         sheet1.right_to_left()
@@ -320,6 +349,7 @@ class InternalTransferReportWizard(models.TransientModel):
         sheet1_headers = [
             self.env._('Reference'),
             self.env._('Product'),
+            self.env._('Barcode'),
             self.env._('Factory Plan Category'),
             self.env._('Created By'),
             self.env._('Creating Date'),
@@ -331,29 +361,52 @@ class InternalTransferReportWizard(models.TransientModel):
 
         sheet1.set_column(0, 0, 22)
         sheet1.set_column(1, 1, 45)
-        sheet1.set_column(2, 2, 25)
-        sheet1.set_column(3, 3, 30)
-        sheet1.set_column(4, 4, 22)
-        sheet1.set_column(5, 5, 18)
-        sheet1.set_column(6, 6, 16)
+        sheet1.set_column(2, 2, 36)
+        sheet1.set_column(3, 3, 25)
+        sheet1.set_column(4, 4, 30)
+        sheet1.set_column(5, 5, 22)
+        sheet1.set_column(6, 6, 18)
+        sheet1.set_column(7, 7, 16)
 
         row = 1
         sheet1_rows = self._get_sheet1_data()
+        barcode_images = {}
+        max_barcode_width = 0
         if not sheet1_rows:
             sheet1.write(row, 0, self.env._('No data for selected filters.'), text_style)
         else:
             for data in sheet1_rows:
                 sheet1.write(row, 0, data['transfer_reference'], text_style)
                 sheet1.write(row, 1, data['product_name'], text_style)
-                sheet1.write(row, 2, data['factory_plan_category'], text_style)
-                sheet1.write(row, 3, data['created_by'], text_style)
-                if data['creating_date']:
-                    sheet1.write_datetime(row, 4, data['creating_date'], datetime_style)
+                product_barcode = data['product_barcode']
+                image = (
+                    _code128_image_stream(product_barcode, barcode_images)
+                    if product_barcode else None
+                )
+                if image:
+                    stream, width, height = image
+                    sheet1.write(row, 2, '', text_style)
+                    sheet1.set_row(row, (height + 8) * 72 / 96)
+                    sheet1.insert_image(row, 2, 'product-barcode-%s.png' % row, {
+                        'image_data': stream,
+                        'x_offset': 4,
+                        'y_offset': 4,
+                    })
+                    max_barcode_width = max(max_barcode_width, width)
                 else:
-                    sheet1.write(row, 4, '', text_style)
-                sheet1.write_number(row, 5, data['demand'], number_style)
-                sheet1.write(row, 6, data['product_uom'], text_style)
+                    sheet1.write(row, 2, product_barcode, text_style)
+                sheet1.write(row, 3, data['factory_plan_category'], text_style)
+                sheet1.write(row, 4, data['created_by'], text_style)
+                if data['creating_date']:
+                    sheet1.write_datetime(row, 5, data['creating_date'], datetime_style)
+                else:
+                    sheet1.write(row, 5, '', text_style)
+                sheet1.write_number(row, 6, data['demand'], number_style)
+                sheet1.write(row, 7, data['product_uom'], text_style)
                 row += 1
+
+        if max_barcode_width:
+            sheet1.set_column(2, 2, max((max_barcode_width + 12 - 5) / 7, 18))
 
         sheet2 = workbook.add_worksheet(self.env._('Summary'))
         sheet2.right_to_left()
