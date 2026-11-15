@@ -2,7 +2,7 @@
 
 import { patch } from "@web/core/utils/patch";
 import { uuidv4 } from "@point_of_sale/utils";
-import { browser } from "@web/core/browser/browser";
+import { rpcBus } from "@web/core/network/rpc";
 import { PosStore } from "@point_of_sale/app/services/pos_store";
 import { ControlButtons } from "@point_of_sale/app/screens/product_screen/control_buttons/control_buttons";
 import { captureDangerNotifications } from "@pos_local_sql_backup/app/pos_store_patch";
@@ -23,25 +23,11 @@ function receiptLines(lines) {
     }));
 }
 
-function requestUrl(url) {
-    return typeof url === "string" ? url : url?.url || "";
-}
-
-function requestParams(body) {
-    if (typeof body !== "string") {
-        return null;
-    }
-    try {
-        return JSON.parse(body)?.params || null;
-    } catch {
-        return null;
-    }
-}
-
-// The advance button calls Odoo directly. The request body is the form the
-// cashier already confirmed, so it can be copied before the network answers.
+// Odoo 19 sends these calls with XMLHttpRequest, not fetch. The RPC bus
+// fires as soon as the request is built, so the form can be copied even when
+// the connection is already down.
 function advanceAction(url, params) {
-    const path = requestUrl(url);
+    const path = typeof url === "string" ? url : "";
     if (!params) {
         return null;
     }
@@ -138,24 +124,22 @@ patch(ControlButtons.prototype, {
 
     // Watch the Odoo call made by the advance button and store the form first.
     async _capturingAdvanceRequests(callback) {
-        const originalFetch = browser.fetch.bind(browser);
-        browser.fetch = async (url, options = {}) => {
+        const onRequest = ({ detail }) => {
             try {
-                this._captureAdvanceRequest(url, options);
+                this._captureAdvanceRequest(detail?.url, detail?.data?.params);
             } catch (error) {
                 console.warn("[LOCAL_BACKUP] Could not copy the advance before sending it:", error);
             }
-            return originalFetch(url, options);
         };
+        rpcBus.addEventListener("RPC:REQUEST", onRequest);
         try {
             return await callback();
         } finally {
-            browser.fetch = originalFetch;
+            rpcBus.removeEventListener("RPC:REQUEST", onRequest);
         }
     },
 
-    _captureAdvanceRequest(url, options) {
-        const params = requestParams(options?.body);
+    _captureAdvanceRequest(url, params) {
         const action = advanceAction(url, params);
         if (!action) {
             return;
