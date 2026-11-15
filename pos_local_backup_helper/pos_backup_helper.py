@@ -49,7 +49,7 @@ DB_ERRORS = (sqlite3.Error, sqlcipher.Error) if sqlcipher else (sqlite3.Error,)
 
 APP_NAME = "AnabtawiPOS"
 APP_TITLE = "Anabtawi POS Local Backup"
-VERSION = "1.2.4"
+VERSION = "1.2.5"
 TASK_NAME = "AnabtawiPOSBackup"
 IS_WINDOWS = os.name == "nt"
 MAX_BODY_BYTES = 10 * 1024 * 1024
@@ -1138,6 +1138,29 @@ class BackupDB:
         key = advance_key(advance_id)
 
         if action == "advance_created":
+            existing_row = self.conn.execute(
+                "SELECT state, pending_action FROM pos_advance WHERE advance_id = ?",
+                (advance_id,),
+            ).fetchone()
+            # Offline create+complete: do not drop Pending completion when create syncs first.
+            keep_pending_complete = bool(
+                existing_row
+                and (
+                    existing_row["pending_action"] == "complete"
+                    or existing_row["state"] == "pending_completion"
+                )
+            )
+            keep_pending_refund = bool(
+                existing_row
+                and (
+                    existing_row["pending_action"] == "refund"
+                    or existing_row["state"] == "pending_refund"
+                )
+            )
+            if keep_pending_complete:
+                values["state"] = "pending_completion"
+            elif keep_pending_refund:
+                values["state"] = "pending_refund"
             values.update({
                 "session_id": _integer(event.get("session_id")),
                 "session_name": event.get("session_name"),
@@ -1149,7 +1172,18 @@ class BackupDB:
                 "created_at": ts,
             })
             self._upsert_row("pos_advance", "advance_id", advance_id, values)
-            self._clear_advance_pending(advance_id)
+            if keep_pending_complete:
+                self.conn.execute(
+                    "UPDATE pos_advance SET pending_action = 'complete' WHERE advance_id = ?",
+                    (advance_id,),
+                )
+            elif keep_pending_refund:
+                self.conn.execute(
+                    "UPDATE pos_advance SET pending_action = 'refund' WHERE advance_id = ?",
+                    (advance_id,),
+                )
+            else:
+                self._clear_advance_pending(advance_id)
             self.conn.execute("DELETE FROM pos_advance_line WHERE advance_id = ?", (advance_id,))
             for line in event.get("lines") or []:
                 self.conn.execute(
@@ -1161,7 +1195,12 @@ class BackupDB:
             self.log(
                 "info", "advance_created",
                 f"deposit {_money(values['advance_amount'])} of {_money(values['amount_total'])} "
-                f"via {values['payment_method_name'] or '-'}, customer {values['partner_name'] or '-'}",
+                f"via {values['payment_method_name'] or '-'}, customer {values['partner_name'] or '-'}"
+                + (
+                    " (completion still waiting to sync)"
+                    if keep_pending_complete
+                    else (" (refund still waiting to sync)" if keep_pending_refund else "")
+                ),
                 order_uuid=key, order_ref=reference, commit=False,
             )
         elif action == "advance_completed":

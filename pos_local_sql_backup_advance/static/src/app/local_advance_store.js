@@ -408,11 +408,20 @@ patch(PosStore.prototype, {
         if (!localUuid || !current) {
             throw new Error("Local advance not found.");
         }
+        const remainingForComplete = toNumber(
+            popupPayload.amount_remaining,
+            current.amount_remaining
+        );
+        const rawTendered = Number(popupPayload.amount_tendered);
         const completion = {
             local_uuid: uuidv4(),
             payment_method_id: popupPayload.payment_method_id,
             payment_method_name: popupPayload.payment_method_name || "",
-            amount_tendered: toNumber(popupPayload.amount_tendered, current.amount_remaining),
+            // 0 is a valid Number but means "use remaining" for offline complete.
+            amount_tendered:
+                Number.isFinite(rawTendered) && rawTendered > 0
+                    ? rawTendered
+                    : remainingForComplete,
             change_amount: toNumber(popupPayload.change_amount),
             partner_name:
                 partnerInfo.partner_name ||
@@ -604,7 +613,9 @@ patch(PosStore.prototype, {
             (row) =>
                 row.pending_action === "create" ||
                 row.pending_action === "complete" ||
-                row.pending_action === "refund"
+                row.pending_action === "refund" ||
+                // Recover stuck offline completes after create-only sync (older builds).
+                (row.completion && !row.server_completed && row.server_id)
         );
         if (!pending.length) {
             await this.syncPendingPledgeReturns?.();
@@ -636,13 +647,25 @@ patch(PosStore.prototype, {
             if (current.server_refunded || current.state === "cancelled_local") {
                 return;
             }
-            const result = await rpc("/pos/create_advance_order", {
-                ...current.create_payload,
+            const createPayload = {
+                ...(current.create_payload || {}),
                 local_uuid: current.local_uuid,
-            });
+                // Always use the session open now, not the offline snapshot session.
+                deposit_pos_session_id: this.session?.id || current.create_payload?.deposit_pos_session_id,
+                from_pos_config_id:
+                    this.config?.id || current.create_payload?.from_pos_config_id,
+            };
+            const result = await rpc("/pos/create_advance_order", createPayload);
             current = this.markLocalAdvanceCreated(current.local_uuid, result) || current;
             // Create may unlock a completion that was confirmed while offline.
             current = getLocalAdvance(this, row.local_uuid) || current;
+            if (current.completion && current.pending_action !== "complete") {
+                current = upsertLocalAdvance(this, {
+                    ...current,
+                    state: "pending_completion",
+                    pending_action: "complete",
+                });
+            }
             this.recordLocalBackupEvent("advance_created", {
                 advance: {
                     id: result?.id || null,
@@ -660,17 +683,34 @@ patch(PosStore.prototype, {
                     payment_method_name: current.payment_method_name,
                 },
                 lines: current.lines,
+                // Tell the helper a local completion is still waiting to sync.
+                keep_pending_complete: Boolean(current.completion),
             });
             this.refreshRefundableAdvanceCache?.();
             this.refreshActivePledgeCache?.();
         }
         current = getLocalAdvance(this, row.local_uuid) || current;
-        if (current.server_id && current.completion && current.pending_action === "complete") {
+        // Complete whenever we have a stored completion and a server AO, even if
+        // pending_action was cleared by an older build after create-only sync.
+        if (
+            current.server_id &&
+            current.completion &&
+            !current.server_completed &&
+            (current.pending_action === "complete" || current.state === "pending_completion")
+        ) {
+            let tendered = toNumber(current.completion.amount_tendered);
+            const remaining = toNumber(
+                current.amount_remaining,
+                toNumber(current.completion.amount_tendered)
+            );
+            if (tendered <= 0 && remaining > 0) {
+                tendered = remaining;
+            }
             const result = await rpc("/pos/complete_advance_order", {
                 advance_order_id: current.server_id,
                 pos_config_id: this.config.id,
                 payment_method_id: current.completion.payment_method_id,
-                amount_tendered: current.completion.amount_tendered,
+                amount_tendered: tendered,
                 local_uuid: current.local_uuid,
             });
             upsertLocalAdvance(this, {
