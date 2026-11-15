@@ -19,6 +19,102 @@ function lineSubtotal(line) {
     );
 }
 
+function productIdOf(value) {
+    if (!value) {
+        return null;
+    }
+    if (typeof value === "number") {
+        return value;
+    }
+    if (Array.isArray(value)) {
+        return value[0] || null;
+    }
+    return value.id || null;
+}
+
+function pledgeUnitAmount(product) {
+    if (!product) {
+        return 0;
+    }
+    const pledgeAmount = toNumber(product.pledge_amount);
+    if (pledgeAmount > 0) {
+        return pledgeAmount;
+    }
+    return toNumber(product.lst_price ?? product.list_price);
+}
+
+/**
+ * Mirror the server expand: when Site Service is not checked on the advance,
+ * mapped menu products get their pledge products appended for local display.
+ * The create payload sent to Odoo stays without these lines so the server does
+ * not double-add them on sync.
+ */
+export function expandAdvanceLinesWithPledges(pos, lines, siteServiceEnabled) {
+    const baseLines = Array.isArray(lines) ? lines : [];
+    if (siteServiceEnabled || !baseLines.length) {
+        return {
+            lines: baseLines.map((line) => ({ ...line, subtotal: lineSubtotal(line) })),
+            pledge_amount: 0,
+        };
+    }
+    const mappingLines = pos.models?.["pos.site.service.product.line"]?.getAll?.() || [];
+    const map = new Map();
+    for (const row of mappingLines) {
+        const menuId = productIdOf(row.product_id);
+        const pledgeId = productIdOf(row.pledge_product_id);
+        if (menuId && pledgeId) {
+            map.set(menuId, pledgeId);
+        }
+    }
+    const productModel = pos.models?.["product.product"];
+    const expanded = [];
+    let pledgeAmount = 0;
+    for (const line of baseLines) {
+        const normalized = {
+            ...line,
+            qty: toNumber(line.qty),
+            price_unit: toNumber(line.price_unit),
+            discount: toNumber(line.discount),
+            subtotal: lineSubtotal(line),
+            is_site_service_pledge_line: Boolean(line.is_site_service_pledge_line),
+            is_pledge_line: Boolean(line.is_pledge_line || line.is_site_service_pledge_line),
+        };
+        expanded.push(normalized);
+        if (normalized.is_site_service_pledge_line) {
+            continue;
+        }
+        const pledgeId = map.get(normalized.product_id);
+        if (!pledgeId) {
+            continue;
+        }
+        const pledgeProduct = productModel?.get?.(pledgeId);
+        const priceUnit = pledgeUnitAmount(pledgeProduct);
+        const qty = normalized.qty;
+        if (qty <= 0 || priceUnit < 0) {
+            continue;
+        }
+        const subtotal = qty * priceUnit;
+        pledgeAmount += subtotal;
+        expanded.push({
+            product_id: pledgeId,
+            product_name:
+                pledgeProduct?.display_name ||
+                pledgeProduct?.name ||
+                `Pledge ${pledgeId}`,
+            qty,
+            product_qty: qty,
+            price_unit: priceUnit,
+            discount: 0,
+            subtotal,
+            price_subtotal_incl: subtotal,
+            is_site_service_pledge_line: true,
+            is_pledge_line: true,
+            source_menu_product_id: normalized.product_id,
+        });
+    }
+    return { lines: expanded, pledge_amount: pledgeAmount };
+}
+
 export function localAdvanceStoreKey(pos) {
     return `pos_local_advances_${odoo.info?.db || ""}_${pos?.config?.id || 0}`;
 }
@@ -90,7 +186,9 @@ export function localAdvancesForComplete(pos) {
             discount_id: row.create_payload?.discount_id || false,
             discount_amount: 0,
             pledge_amount: toNumber(row.pledge_amount),
-            pledge_count: 0,
+            pledge_count: (row.lines || []).filter(
+                (line) => line.is_pledge_line || line.is_site_service_pledge_line
+            ).length,
             lines: row.lines || [],
             state: row.state,
         }));
@@ -108,10 +206,15 @@ patch(PosStore.prototype, {
     },
 
     saveLocalAdvanceFromCreate(params, localUuid, extra = {}) {
-        const lines = params.lines || [];
+        const siteService = Boolean(params.site_service);
+        const { lines, pledge_amount } = expandAdvanceLinesWithPledges(
+            this,
+            params.lines || [],
+            siteService
+        );
         const total =
             extra.amount_total ??
-            lines.reduce((sum, line) => sum + lineSubtotal(line), 0);
+            lines.reduce((sum, line) => sum + toNumber(line.subtotal, lineSubtotal(line)), 0);
         const advanceAmount = toNumber(params.advance_amount);
         return upsertLocalAdvance(this, {
             local_uuid: localUuid,
@@ -125,18 +228,26 @@ patch(PosStore.prototype, {
             amount_total: total,
             advance_amount: advanceAmount,
             amount_remaining: Math.max(total - advanceAmount, 0),
+            pledge_amount: toNumber(extra.pledge_amount, pledge_amount),
             payment_method_name: params.payment_method_name || "",
+            // Keep original cart lines for sync; server adds pledge lines itself.
             create_payload: { ...params, local_uuid: localUuid },
             lines: lines.map((line) => ({
                 product_id: line.product_id || null,
                 product_name: line.product_name || line.full_product_name || "",
                 product_id_name: line.product_name || line.full_product_name || "",
                 qty: toNumber(line.qty),
-                product_qty: toNumber(line.qty),
+                product_qty: toNumber(line.qty ?? line.product_qty),
                 price_unit: toNumber(line.price_unit),
                 discount: toNumber(line.discount),
-                subtotal: lineSubtotal(line),
-                price_subtotal_incl: lineSubtotal(line),
+                subtotal: toNumber(line.subtotal, lineSubtotal(line)),
+                price_subtotal_incl: toNumber(
+                    line.price_subtotal_incl,
+                    toNumber(line.subtotal, lineSubtotal(line))
+                ),
+                is_site_service_pledge_line: Boolean(line.is_site_service_pledge_line),
+                is_pledge_line: Boolean(line.is_pledge_line || line.is_site_service_pledge_line),
+                source_menu_product_id: line.source_menu_product_id || null,
             })),
             completion: null,
             created_at: new Date().toISOString(),

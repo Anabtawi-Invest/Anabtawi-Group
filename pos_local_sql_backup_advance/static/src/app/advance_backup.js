@@ -9,6 +9,7 @@ import { PosStore } from "@point_of_sale/app/services/pos_store";
 import { ControlButtons } from "@point_of_sale/app/screens/product_screen/control_buttons/control_buttons";
 import { CompleteAdvanceOrderPopup } from "@pos_advance_order/app/screens/product_screen/control_buttons/advance_order_button/complete_advance_order_popup";
 import { captureDangerNotifications } from "@pos_local_sql_backup/app/pos_store_patch";
+import { expandAdvanceLinesWithPledges } from "@pos_local_sql_backup_advance/app/local_advance_store";
 
 function toNumber(value, fallback = 0) {
     const num = Number(value);
@@ -211,8 +212,15 @@ patch(ControlButtons.prototype, {
     _advanceSnapshot(action, params, localUuid) {
         const partner = this._getOrderPartner?.(this._getCurrentOrder?.());
         if (action === "advance_created") {
-            const lines = params.lines || [];
-            const total = lines.reduce((sum, line) => sum + lineSubtotal(line), 0);
+            const { lines, pledge_amount } = expandAdvanceLinesWithPledges(
+                this.pos,
+                params.lines || [],
+                Boolean(params.site_service)
+            );
+            const total = lines.reduce(
+                (sum, line) => sum + toNumber(line.subtotal, lineSubtotal(line)),
+                0
+            );
             const advanceAmount = toNumber(params.advance_amount);
             return {
                 advance: {
@@ -223,6 +231,7 @@ patch(ControlButtons.prototype, {
                     advance_amount: advanceAmount,
                     amount_tendered: toNumber(params.amount_tendered, advanceAmount),
                     amount_remaining: Math.max(total - advanceAmount, 0),
+                    pledge_amount,
                     payment_method_name: params.payment_method_name || "",
                 },
                 lines: lines.map((line) => ({
@@ -231,7 +240,10 @@ patch(ControlButtons.prototype, {
                     qty: toNumber(line.qty),
                     price_unit: toNumber(line.price_unit),
                     discount: toNumber(line.discount),
-                    subtotal: lineSubtotal(line),
+                    subtotal: toNumber(line.subtotal, lineSubtotal(line)),
+                    is_pledge_line: Boolean(
+                        line.is_pledge_line || line.is_site_service_pledge_line
+                    ),
                 })),
             };
         }
