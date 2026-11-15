@@ -25,12 +25,27 @@ class HrPayslip(models.Model):
 
         arch = etree.fromstring(res["arch"])
         keep_names = {
-            "action_export_payslip",       # Export XLSX
-            "action_export_payrun_excel",  # PayRun Audit
-            "compute_sheet",               # Compute Sheet
+            "action_export_payslip",                 # Export XLSX
+            "action_export_payrun_excel",            # PayRun Audit
+            "compute_sheet",                         # Compute Sheet
+            "action_export_bank_xlsx",               # Export Bank File
+            "action_reconcile_lateness_no_ot_bank",  # Reconcile Lateness
+            "action_reset_lateness_reconciliation",  # Reset Reconciliation
+            "action_print_payslip",                  # Print (method)
+        }
+        keep_strings = {
+            "Print",
+            "Export Bank File",
+            "Reconcile Lateness",
+            "Reset Reconciliation",
         }
         for button in arch.xpath("//header/button"):
-            if button.get("name") in keep_names:
+            name = button.get("name") or ""
+            string = (button.get("string") or "").strip()
+            if name in keep_names or string in keep_strings:
+                continue
+            # Keep report Print buttons: name is often a report action xmlid/id
+            if string == "Print" or "report_payslip" in name or name.endswith("action_report_payslip"):
                 continue
             button.getparent().remove(button)
         res["arch"] = etree.tostring(arch, encoding="unicode")
