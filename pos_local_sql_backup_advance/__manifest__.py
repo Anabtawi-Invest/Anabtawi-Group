@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "POS Local SQL Backup - Advance Orders",
-    "version": "19.0.1.3.1",
+    "version": "19.0.1.4.0",
     "category": "Point of Sale",
     "summary": "Copy advance orders and pledge returns to the cashier PC backup",
     "description": """
@@ -17,11 +17,11 @@ creates for them, to the "Anabtawi POS Local Backup" helper.
 The copy is taken from the form before Odoo is called, so a create, completion,
 or refund is stored on the cashier PC even when the shop cannot reach Odoo.
 When Odoo answers, the same local row receives the official advance number.
-Failed attempts are recorded too.
 
-When the POS session opens, the advance form lists (registers, discounts,
-pricelist) are saved in the browser. If the shop goes offline later, the
-create form can still open from that saved copy.
+When the POS session opens, the advance form lists are saved in the browser.
+Offline create keeps a local advance. That local advance can be completed on
+this register while still offline. When the connection returns, create is
+synced first (by local_uuid), then completion.
 
 Events wait in the browser storage while the helper is not reachable and are
 sent as soon as it is back.
@@ -31,8 +31,10 @@ sent as soon as it is back.
     "depends": ["pos_local_sql_backup", "pos_advance_order", "pos_pledge_order"],
     "assets": {
         "point_of_sale._assets_pos": [
+            "pos_local_sql_backup_advance/static/src/app/local_advance_store.js",
             "pos_local_sql_backup_advance/static/src/app/advance_backup.js",
             "pos_local_sql_backup_advance/static/src/app/advance_popup_cache.js",
+            "pos_local_sql_backup_advance/static/src/app/complete_advance_offline.js",
             "pos_local_sql_backup_advance/static/src/app/pledge_return_backup.js",
         ],
     },

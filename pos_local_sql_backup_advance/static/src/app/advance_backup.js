@@ -2,9 +2,12 @@
 
 import { patch } from "@web/core/utils/patch";
 import { uuidv4 } from "@point_of_sale/utils";
-import { rpcBus } from "@web/core/network/rpc";
+import { rpc, ConnectionLostError } from "@web/core/network/rpc";
+import { _t } from "@web/core/l10n/translation";
+import { makeAwaitable } from "@point_of_sale/app/utils/make_awaitable_dialog";
 import { PosStore } from "@point_of_sale/app/services/pos_store";
 import { ControlButtons } from "@point_of_sale/app/screens/product_screen/control_buttons/control_buttons";
+import { CompleteAdvanceOrderPopup } from "@pos_advance_order/app/screens/product_screen/control_buttons/advance_order_button/complete_advance_order_popup";
 import { captureDangerNotifications } from "@pos_local_sql_backup/app/pos_store_patch";
 
 function toNumber(value, fallback = 0) {
@@ -114,6 +117,23 @@ patch(ControlButtons.prototype, {
                         error: errors.join(" | "),
                         advance: failedAction === "create" ? { partner_name: partner?.name || "" } : {},
                     });
+                } else if (
+                    failedAction === "create" &&
+                    this._advanceCopyRecorded &&
+                    errors.length
+                ) {
+                    // The form was copied locally. Clear the cart like a normal create.
+                    const currentOrder = this._getCurrentOrder?.();
+                    if (currentOrder) {
+                        this.pos.removeOrder(currentOrder);
+                    }
+                    this.pos.addNewOrder?.();
+                    this.notification.add(
+                        _t(
+                            "Advance saved on this register. It will sync when the connection is back."
+                        ),
+                        { type: "warning" }
+                    );
                 }
                 return result;
             });
@@ -123,20 +143,43 @@ patch(ControlButtons.prototype, {
     },
 
     // Watch the Odoo call made by the advance button and store the form first.
+    // rpc._rpc is patched so local_uuid is sent to Odoo for later idempotent sync.
     async _capturingAdvanceRequests(callback) {
-        const onRequest = ({ detail }) => {
-            try {
-                this._captureAdvanceRequest(detail?.url, detail?.data?.params);
-            } catch (error) {
-                console.warn("[LOCAL_BACKUP] Could not copy the advance before sending it:", error);
+        const originalRpc = rpc._rpc;
+        const self = this;
+        rpc._rpc = function (url, params = {}, settings = {}) {
+            const action = advanceAction(url, params);
+            if (action) {
+                try {
+                    params = self._prepareAdvanceRpcParams(action, params);
+                    self._captureAdvanceRequest(url, params);
+                } catch (error) {
+                    console.warn(
+                        "[LOCAL_BACKUP] Could not copy the advance before sending it:",
+                        error
+                    );
+                }
             }
+            return originalRpc.call(this, url, params, settings);
         };
-        rpcBus.addEventListener("RPC:REQUEST", onRequest);
         try {
             return await callback();
         } finally {
-            rpcBus.removeEventListener("RPC:REQUEST", onRequest);
+            rpc._rpc = originalRpc;
         }
+    },
+
+    _prepareAdvanceRpcParams(action, params) {
+        const next = { ...params };
+        if (action === "advance_created") {
+            next.local_uuid = next.local_uuid || uuidv4();
+        } else if (action === "advance_completed") {
+            next.local_uuid = next.local_uuid || uuidv4();
+        } else if (action === "advance_refunded") {
+            next.kwargs = { ...(next.kwargs || {}) };
+            // Refund keeps the request unchanged for the server signature.
+        }
+        return next;
     },
 
     _captureAdvanceRequest(url, params) {
@@ -144,9 +187,19 @@ patch(ControlButtons.prototype, {
         if (!action) {
             return;
         }
-        const localUuid = uuidv4();
-        // The number stays on this computer. The request sent to Odoo is left
-        // unchanged, so a refund is not rejected for an unknown argument.
+        const localUuid =
+            params.local_uuid ||
+            params.kwargs?.local_uuid ||
+            uuidv4();
+        if (action === "advance_created") {
+            const partner = this._getOrderPartner?.(this._getCurrentOrder?.());
+            this.pos.saveLocalAdvanceFromCreate(params, localUuid, {
+                partner_name: partner?.name || "",
+                partner_phone: partner?.phone || "",
+                state: "waiting",
+                pending_action: "create",
+            });
+        }
         this.pos.recordLocalBackupEvent(action, {
             ...this._advanceSnapshot(action, params, localUuid),
             local_only: true,
@@ -218,9 +271,80 @@ patch(ControlButtons.prototype, {
     },
 
     async onClickCompleteAdvanceOrder() {
-        return this._runWithAdvanceBackup("complete", () =>
-            super.onClickCompleteAdvanceOrder(...arguments)
-        );
+        return this._runWithAdvanceBackup("complete", async () => {
+            const popupPayload = await makeAwaitable(this.dialog, CompleteAdvanceOrderPopup, {
+                posConfigId: this.pos.config.id,
+                pos: this.pos,
+            });
+            if (!popupPayload) {
+                return;
+            }
+            if (popupPayload.is_local || (popupPayload.local_uuid && !(popupPayload.advance_order_id > 0))) {
+                this.pos.completeLocalAdvance(popupPayload);
+                this._advanceCopyRecorded = true;
+                this.notification.add(
+                    _t(
+                        "Advance completion saved on this register. It will sync when the connection is back."
+                    ),
+                    { type: "warning" }
+                );
+                return;
+            }
+            try {
+                const result = await rpc("/pos/complete_advance_order", {
+                    advance_order_id: popupPayload.advance_order_id,
+                    pos_config_id: this.pos.config.id,
+                    payment_method_id: popupPayload.payment_method_id,
+                    amount_tendered: popupPayload.amount_tendered,
+                });
+                this.notification.add(_t("Advance order completed successfully."), {
+                    type: "success",
+                });
+                try {
+                    const receiptPayload =
+                        result && typeof result === "object" && result.name ? result : null;
+                    if (receiptPayload) {
+                        const printResult = await this._printAdvanceReceipt(
+                            this._buildCompletionReceiptData({
+                                result: receiptPayload,
+                                popupPayload,
+                            })
+                        );
+                        if (!printResult?.printed) {
+                            this.notification.add(
+                                _t("Advance order completed but receipt printing failed."),
+                                { type: "warning" }
+                            );
+                        }
+                    }
+                } catch (printError) {
+                    const printMessage =
+                        printError?.message === "POPUP_BLOCKED"
+                            ? _t("Please allow pop-ups to print the completion receipt.")
+                            : printError?.body ||
+                              printError?.message ||
+                              _t("Advance order completed but receipt printing failed.");
+                    this.notification.add(printMessage, { type: "warning" });
+                }
+            } catch (error) {
+                if (error instanceof ConnectionLostError && popupPayload.local_uuid) {
+                    this.pos.completeLocalAdvance(popupPayload);
+                    this._advanceCopyRecorded = true;
+                    this.notification.add(
+                        _t(
+                            "Advance completion saved on this register. It will sync when the connection is back."
+                        ),
+                        { type: "warning" }
+                    );
+                    return;
+                }
+                const msg =
+                    error?.data?.message ||
+                    error?.message ||
+                    _t("Failed to complete advance order.");
+                this.notification.add(msg, { type: "danger" });
+            }
+        });
     },
 
     async onClickRefundAdvanceOrder() {
@@ -234,10 +358,14 @@ patch(ControlButtons.prototype, {
     _buildAdvanceReceiptData({ result, payload }) {
         const data = super._buildAdvanceReceiptData(...arguments);
         try {
+            const localUuid = this._localAdvanceUuid();
+            if (localUuid) {
+                this.pos.markLocalAdvanceCreated(localUuid, result || {});
+            }
             this.pos.recordLocalBackupEvent("advance_created", {
                 advance: {
                     id: result?.id || null,
-                    local_uuid: this._localAdvanceUuid(),
+                    local_uuid: localUuid,
                     reference: data.reference,
                     state: result?.state || "",
                     partner_name: data.customerName,
