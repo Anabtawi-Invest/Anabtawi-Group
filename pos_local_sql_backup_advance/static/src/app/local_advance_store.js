@@ -5,6 +5,7 @@ import { uuidv4 } from "@point_of_sale/utils";
 import { browser } from "@web/core/browser/browser";
 import { rpc } from "@web/core/network/rpc";
 import { PosStore } from "@point_of_sale/app/services/pos_store";
+import { removeCompletableAdvanceFromCache } from "@pos_local_sql_backup_advance/app/complete_advance_cache";
 
 function toNumber(value, fallback = 0) {
     const num = Number(value);
@@ -165,10 +166,9 @@ export function getLocalAdvance(pos, localUuid) {
 }
 
 export function localAdvancesForComplete(pos) {
+    // Only unfinished local creates. Online AOs come from the live/server cache list.
     return readLocalAdvances(pos)
-        .filter((row) => !row.server_completed)
-        .filter((row) => ["waiting", "pending_completion", "synced"].includes(row.state))
-        .filter((row) => row.state !== "synced" || row.completion)
+        .filter((row) => !row.server_completed && row.state === "waiting")
         .map((row) => ({
             id: row.server_id || negativeIdFromUuid(row.local_uuid),
             local_uuid: row.local_uuid,
@@ -273,16 +273,38 @@ patch(PosStore.prototype, {
     },
 
     completeLocalAdvance(popupPayload, partnerInfo = {}) {
-        const localUuid =
+        const serverId =
+            popupPayload.advance_order_id > 0 ? popupPayload.advance_order_id : null;
+        let localUuid =
             popupPayload.local_uuid ||
             readLocalAdvances(this).find(
-                (row) => negativeIdFromUuid(row.local_uuid) === popupPayload.advance_order_id
+                (row) =>
+                    (serverId && row.server_id === serverId) ||
+                    negativeIdFromUuid(row.local_uuid) === popupPayload.advance_order_id
             )?.local_uuid;
-        if (!localUuid) {
-            throw new Error("Local advance not found.");
+        let current = localUuid ? getLocalAdvance(this, localUuid) : null;
+        // Online AO taken from the cached complete list while offline.
+        if (!current && serverId) {
+            localUuid = localUuid || uuidv4();
+            current = upsertLocalAdvance(this, {
+                local_uuid: localUuid,
+                server_id: serverId,
+                name: popupPayload.reference || "",
+                state: "synced",
+                pending_action: null,
+                partner_name:
+                    partnerInfo.partner_name || popupPayload.partner_name || "",
+                partner_phone: popupPayload.partner_phone || "",
+                amount_total: toNumber(popupPayload.amount_total),
+                advance_amount: toNumber(popupPayload.advance_amount),
+                amount_remaining: toNumber(popupPayload.amount_remaining),
+                lines: popupPayload.lines || [],
+                create_payload: null,
+                completion: null,
+                created_at: new Date().toISOString(),
+            });
         }
-        const current = getLocalAdvance(this, localUuid);
-        if (!current) {
+        if (!localUuid || !current) {
             throw new Error("Local advance not found.");
         }
         const completion = {
@@ -291,21 +313,39 @@ patch(PosStore.prototype, {
             payment_method_name: popupPayload.payment_method_name || "",
             amount_tendered: toNumber(popupPayload.amount_tendered, current.amount_remaining),
             change_amount: toNumber(popupPayload.change_amount),
-            partner_name: partnerInfo.partner_name || current.partner_name,
+            partner_name:
+                partnerInfo.partner_name ||
+                popupPayload.partner_name ||
+                current.partner_name,
         };
         const updated = upsertLocalAdvance(this, {
             ...current,
+            server_id: current.server_id || serverId,
+            name: current.name || popupPayload.reference || "",
             state: "pending_completion",
-            pending_action: current.server_id ? "complete" : "create",
+            pending_action: current.server_id || serverId ? "complete" : "create",
             completion,
             partner_name: completion.partner_name,
+            partner_phone: popupPayload.partner_phone || current.partner_phone || "",
+            amount_total: toNumber(popupPayload.amount_total, current.amount_total),
+            advance_amount: toNumber(popupPayload.advance_amount, current.advance_amount),
+            amount_remaining: toNumber(
+                popupPayload.amount_remaining,
+                current.amount_remaining
+            ),
+            lines: (popupPayload.lines && popupPayload.lines.length
+                ? popupPayload.lines
+                : current.lines) || [],
         });
+        if (updated.server_id) {
+            removeCompletableAdvanceFromCache(this, updated.server_id);
+        }
         this.recordLocalBackupEvent("advance_completed", {
             local_only: true,
             advance: {
-                id: current.server_id || null,
+                id: updated.server_id || null,
                 local_uuid: localUuid,
-                reference: current.name || "",
+                reference: updated.name || "",
                 partner_name: updated.partner_name || "",
                 partner_phone: updated.partner_phone || "",
                 amount_total: updated.amount_total,
@@ -397,6 +437,8 @@ patch(PosStore.prototype, {
                 server_completed: true,
                 name: result?.name || current.name,
             });
+            removeCompletableAdvanceFromCache(this, current.server_id);
+            this.refreshCompletableAdvanceCache?.();
             this.recordLocalBackupEvent("advance_completed", {
                 advance: {
                     id: current.server_id,

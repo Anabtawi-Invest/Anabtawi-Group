@@ -291,7 +291,11 @@ patch(ControlButtons.prototype, {
             if (!popupPayload) {
                 return;
             }
-            if (popupPayload.is_local || (popupPayload.local_uuid && !(popupPayload.advance_order_id > 0))) {
+            if (
+                popupPayload.is_local ||
+                popupPayload.from_server_cache ||
+                (popupPayload.local_uuid && !(popupPayload.advance_order_id > 0))
+            ) {
                 this.pos.completeLocalAdvance(popupPayload);
                 this._advanceCopyRecorded = true;
                 this.notification.add(
@@ -312,6 +316,7 @@ patch(ControlButtons.prototype, {
                 this.notification.add(_t("Advance order completed successfully."), {
                     type: "success",
                 });
+                this.pos.refreshCompletableAdvanceCache?.();
                 try {
                     const receiptPayload =
                         result && typeof result === "object" && result.name ? result : null;
@@ -339,7 +344,7 @@ patch(ControlButtons.prototype, {
                     this.notification.add(printMessage, { type: "warning" });
                 }
             } catch (error) {
-                if (error instanceof ConnectionLostError && popupPayload.local_uuid) {
+                if (error instanceof ConnectionLostError) {
                     this.pos.completeLocalAdvance(popupPayload);
                     this._advanceCopyRecorded = true;
                     this.notification.add(
