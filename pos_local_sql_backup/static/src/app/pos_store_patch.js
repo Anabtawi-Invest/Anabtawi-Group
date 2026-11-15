@@ -118,6 +118,7 @@ function cashDeliveryObserver({ store, model, method, args, result, error }) {
     if (!kind) {
         return;
     }
+    // Offline sync / delivery-bridge button records its own single row.
     if (store._skipDeliveryBackupObserver) {
         return;
     }
@@ -126,6 +127,7 @@ function cashDeliveryObserver({ store, model, method, args, result, error }) {
         delivery_type: kind,
         amount: Number(amount) || 0,
         reason: kind === "cash_delivery" ? reason || "" : "",
+        local_uuid: store._deliveryLocalUuidInFlight || null,
     };
     if (error || (result && result.successful === false)) {
         store.recordLocalBackupEvent("cash_delivery_failed", {

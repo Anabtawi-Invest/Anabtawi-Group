@@ -49,7 +49,7 @@ DB_ERRORS = (sqlite3.Error, sqlcipher.Error) if sqlcipher else (sqlite3.Error,)
 
 APP_NAME = "AnabtawiPOS"
 APP_TITLE = "Anabtawi POS Local Backup"
-VERSION = "1.2.3"
+VERSION = "1.2.4"
 TASK_NAME = "AnabtawiPOSBackup"
 IS_WINDOWS = os.name == "nt"
 MAX_BODY_BYTES = 10 * 1024 * 1024
@@ -1563,11 +1563,21 @@ class BackupDB:
         queued = bool(event.get("queued_offline") or event.get("local_only"))
         local_uuid = str(event.get("local_uuid") or "").strip()[:64] or None
         move_key = f"delivery:{local_uuid}" if local_uuid else f"delivery:{event_uuid}"
+        origin = self._event_origin(event)
         existing = self.conn.execute(
             "SELECT id FROM pos_cash_move WHERE move_key = ?", (move_key,)
         ).fetchone()
+        # Sync confirm without the same move_key: reuse the waiting offline row.
+        if existing is None and not queued:
+            existing = self.conn.execute(
+                "SELECT id FROM pos_cash_move WHERE move_type = ? AND source = 'pos' "
+                "AND deleted = 0 AND queued_offline = 1 AND ABS(amount + ?) < 0.0005 "
+                "AND IFNULL(reason, '') = ? AND IFNULL(session_id, -1) = IFNULL(?, -1) "
+                "ORDER BY id DESC LIMIT 1",
+                (kind, amount, reason, origin.get("session_id")),
+            ).fetchone()
         values = {
-            **self._event_origin(event),
+            **origin,
             "ts": event.get("ts") or _now(),
             "move_type": kind,
             "amount": -amount,

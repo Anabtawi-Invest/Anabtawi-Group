@@ -118,8 +118,9 @@ patch(PosStore.prototype, {
         available_cash = null,
         delivered_before = null,
         queued_offline = true,
+        local_uuid = null,
     }) {
-        const localUuid = uuidv4();
+        const localUuid = local_uuid || uuidv4();
         const kind = delivery_type === "closing_delivery" ? "closing_delivery" : "cash_delivery";
         this.recordLocalBackupEvent(kind, {
             local_only: true,
@@ -132,14 +133,16 @@ patch(PosStore.prototype, {
             delivered_before,
         });
         const pending = readPendingDeliveries(this);
-        pending.push({
-            local_uuid: localUuid,
-            delivery_type: kind,
-            amount: Number(amount) || 0,
-            reason: kind === "cash_delivery" ? reason || "" : "",
-            created_at: new Date().toISOString(),
-        });
-        writePendingDeliveries(this, pending);
+        if (!pending.some((row) => row.local_uuid === localUuid)) {
+            pending.push({
+                local_uuid: localUuid,
+                delivery_type: kind,
+                amount: Number(amount) || 0,
+                reason: kind === "cash_delivery" ? reason || "" : "",
+                created_at: new Date().toISOString(),
+            });
+            writePendingDeliveries(this, pending);
+        }
         // Reduce cached available cash so the next offline popup is closer to reality.
         const cache = readDeliveryPopupCache(this);
         if (cache[kind] && typeof cache[kind].max_amount === "number") {
@@ -168,7 +171,9 @@ patch(PosStore.prototype, {
         try {
             for (const row of pending) {
                 try {
+                    // Block the base ORM observer for the whole sync call+confirm write.
                     this._skipDeliveryBackupObserver = true;
+                    this._deliveryLocalUuidInFlight = row.local_uuid;
                     let result;
                     if (row.delivery_type === "closing_delivery") {
                         result = await this.data.call(
@@ -187,20 +192,23 @@ patch(PosStore.prototype, {
                         remaining.push(row);
                         continue;
                     }
+                    // Same local_uuid as the offline row so the helper updates it
+                    // (queued → delivered) instead of inserting a second Cash moves line.
                     this.recordLocalBackupEvent(row.delivery_type, {
                         delivery_type: row.delivery_type,
                         amount: row.amount,
                         reason: row.reason || "",
                         local_uuid: row.local_uuid,
                         queued_offline: false,
+                        local_only: false,
                         receipt: result.receipt || null,
                     });
-                    this.syncLocalBackupCashMoves?.();
                 } catch (error) {
                     console.warn("[LOCAL_BACKUP] Could not sync cash delivery:", error);
                     remaining.push(row);
                 } finally {
                     this._skipDeliveryBackupObserver = false;
+                    this._deliveryLocalUuidInFlight = null;
                 }
             }
             writePendingDeliveries(this, remaining);
@@ -253,9 +261,11 @@ patch(ControlButtons.prototype, {
             return;
         }
 
+        const localUuid = uuidv4();
         try {
-            // Skip the base ORM observer so we store one row with popup cash context.
+            // One row only: skip base observer; stable local_uuid for helper upsert.
             this.pos._skipDeliveryBackupObserver = true;
+            this.pos._deliveryLocalUuidInFlight = localUuid;
             const response = await processDeliveryAmount(
                 this.pos,
                 this.dialog,
@@ -266,6 +276,7 @@ patch(ControlButtons.prototype, {
                 if (response && response.successful === false) {
                     this.pos.recordLocalBackupEvent("cash_delivery_failed", {
                         delivery_type: "cash_delivery",
+                        local_uuid: localUuid,
                         amount: Number(deliveryResult.amount) || 0,
                         reason: deliveryResult.reason || "",
                         available_cash: popupData.max_amount ?? null,
@@ -277,6 +288,7 @@ patch(ControlButtons.prototype, {
             }
             this.pos.recordLocalBackupEvent("cash_delivery", {
                 delivery_type: "cash_delivery",
+                local_uuid: localUuid,
                 amount: Number(deliveryResult.amount) || 0,
                 reason: deliveryResult.reason || "",
                 available_cash: popupData.max_amount ?? null,
@@ -297,6 +309,7 @@ patch(ControlButtons.prototype, {
                     available_cash: popupData.max_amount ?? null,
                     delivered_before: popupData.delivered_total ?? null,
                     queued_offline: true,
+                    local_uuid: localUuid,
                 });
                 this.notification.add(
                     _t(
@@ -308,6 +321,7 @@ patch(ControlButtons.prototype, {
             }
             this.pos.recordLocalBackupEvent("cash_delivery_failed", {
                 delivery_type: "cash_delivery",
+                local_uuid: localUuid,
                 amount: Number(deliveryResult.amount) || 0,
                 reason: deliveryResult.reason || "",
                 available_cash: popupData.max_amount ?? null,
@@ -317,6 +331,7 @@ patch(ControlButtons.prototype, {
             throw error;
         } finally {
             this.pos._skipDeliveryBackupObserver = false;
+            this.pos._deliveryLocalUuidInFlight = null;
         }
     },
 });

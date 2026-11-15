@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "POS Local SQL Backup - Cash Delivery",
-    "version": "19.0.1.1.1",
+    "version": "19.0.1.1.2",
     "category": "Point of Sale",
     "summary": "Copy cash deliveries to the cashier PC backup",
     "description": """
