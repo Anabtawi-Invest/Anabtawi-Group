@@ -49,7 +49,7 @@ DB_ERRORS = (sqlite3.Error, sqlcipher.Error) if sqlcipher else (sqlite3.Error,)
 
 APP_NAME = "AnabtawiPOS"
 APP_TITLE = "Anabtawi POS Local Backup"
-VERSION = "1.2.1"
+VERSION = "1.2.2"
 TASK_NAME = "AnabtawiPOSBackup"
 IS_WINDOWS = os.name == "nt"
 MAX_BODY_BYTES = 10 * 1024 * 1024
@@ -669,6 +669,16 @@ class BackupDB:
             self.conn.execute(
                 "CREATE UNIQUE INDEX IF NOT EXISTS pos_advance_local_uuid_idx ON pos_advance (local_uuid)"
             )
+            # Older waiting refunds/completes kept Deposit paid; show the pending status.
+            self.conn.execute(
+                "UPDATE pos_advance SET state = 'pending_refund' "
+                "WHERE pending_action = 'refund' AND IFNULL(state, '') NOT IN ('refunded', 'pending_refund')"
+            )
+            self.conn.execute(
+                "UPDATE pos_advance SET state = 'pending_completion' "
+                "WHERE pending_action = 'complete' "
+                "AND IFNULL(state, '') NOT IN ('completed', 'pending_completion')"
+            )
             self.conn.commit()
 
     def _migrate_event_table(self):
@@ -1032,17 +1042,13 @@ class BackupDB:
             "advance_completed": "complete",
             "advance_refunded": "refund",
         }[action]
-        existing = self.conn.execute(
-            "SELECT state FROM pos_advance WHERE advance_id = ?", (advance_id,)
-        ).fetchone()
-        if action == "advance_created" or not existing:
-            state = {
-                "advance_created": "waiting",
-                "advance_completed": "pending_completion",
-                "advance_refunded": "pending_refund",
-            }[action]
-        else:
-            state = existing["state"]
+        # Always show the pending status on the Advance list (do not keep Deposit paid
+        # while a complete/refund is waiting for Odoo).
+        state = {
+            "advance_created": "waiting",
+            "advance_completed": "pending_completion",
+            "advance_refunded": "pending_refund",
+        }[action]
         completion = event.get("completion") if isinstance(event.get("completion"), dict) else {}
         refund = event.get("refund") if isinstance(event.get("refund"), dict) else {}
         values = {
@@ -1064,6 +1070,11 @@ class BackupDB:
             "payment_method_name": advance.get("payment_method_name") or refund.get("payment_method_name"),
             "remaining_paid": _number(completion.get("remaining_paid")),
         }
+        if action == "advance_refunded":
+            values.update({
+                "refund_amount": _number(refund.get("amount")),
+                "refund_payment_method": refund.get("payment_method_name"),
+            })
         self._upsert_row("pos_advance", "advance_id", advance_id, values)
         lines = event.get("lines") or []
         if lines:
@@ -1924,7 +1935,14 @@ TABS = [
     ("cash-moves", "Cash moves"), ("logs", "Logs"), ("export", "Export"),
 ]
 
-ADVANCE_STATE_LABELS = {"deposited": "Deposit paid", "completed": "Completed", "refunded": "Refunded"}
+ADVANCE_STATE_LABELS = {
+    "waiting": "waiting",
+    "deposited": "Deposit paid",
+    "pending_completion": "Pending completion",
+    "completed": "Completed",
+    "pending_refund": "Pending refund",
+    "refunded": "Refunded",
+}
 
 # Readable names for stored codes, used in lists and in "Group by" results.
 GROUP_VALUE_LABELS = {
@@ -1989,7 +2007,14 @@ def advances_subnav(active):
 
 
 def advance_state_badge(state):
-    css = {"deposited": "b-warning", "completed": "b-yes", "refunded": "b-error"}.get(state, "b-draft")
+    css = {
+        "waiting": "b-draft",
+        "deposited": "b-warning",
+        "pending_completion": "b-info",
+        "completed": "b-yes",
+        "pending_refund": "b-warning",
+        "refunded": "b-error",
+    }.get(state, "b-draft")
     return f"<span class='badge {css}'>{esc(ADVANCE_STATE_LABELS.get(state, state))}</span>"
 
 
