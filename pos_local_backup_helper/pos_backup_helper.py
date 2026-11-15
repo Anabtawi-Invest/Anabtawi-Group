@@ -49,7 +49,7 @@ DB_ERRORS = (sqlite3.Error, sqlcipher.Error) if sqlcipher else (sqlite3.Error,)
 
 APP_NAME = "AnabtawiPOS"
 APP_TITLE = "Anabtawi POS Local Backup"
-VERSION = "1.2.2"
+VERSION = "1.2.3"
 TASK_NAME = "AnabtawiPOSBackup"
 IS_WINDOWS = os.name == "nt"
 MAX_BODY_BYTES = 10 * 1024 * 1024
@@ -1560,7 +1560,13 @@ class BackupDB:
             )
             return
         reason = event.get("reason") or ""
-        row_id = self._insert_cash_move(f"delivery:{event_uuid}", {
+        queued = bool(event.get("queued_offline") or event.get("local_only"))
+        local_uuid = str(event.get("local_uuid") or "").strip()[:64] or None
+        move_key = f"delivery:{local_uuid}" if local_uuid else f"delivery:{event_uuid}"
+        existing = self.conn.execute(
+            "SELECT id FROM pos_cash_move WHERE move_key = ?", (move_key,)
+        ).fetchone()
+        values = {
             **self._event_origin(event),
             "ts": event.get("ts") or _now(),
             "move_type": kind,
@@ -1568,12 +1574,33 @@ class BackupDB:
             "reason": reason,
             "source": "pos",
             "available_cash": available,
+            "queued_offline": 1 if queued else 0,
             "details_json": json.dumps(event, ensure_ascii=False, default=str),
-        })
+            "last_update": _now(),
+        }
+        if existing is not None:
+            row_id = existing["id"]
+            self.conn.execute(
+                "UPDATE pos_cash_move SET session_id = ?, session_name = ?, config_id = ?, config_name = ?, "
+                "cashier = ?, move_type = ?, amount = ?, reason = ?, available_cash = ?, queued_offline = ?, "
+                "details_json = ?, last_update = ? WHERE id = ?",
+                (
+                    values.get("session_id"), values.get("session_name"), values.get("config_id"),
+                    values.get("config_name"), values.get("cashier"), values["move_type"], values["amount"],
+                    values["reason"], values["available_cash"], values["queued_offline"],
+                    values["details_json"], values["last_update"], row_id,
+                ),
+            )
+        else:
+            row_id = self._insert_cash_move(move_key, {
+                **{k: v for k, v in values.items() if k != "last_update"},
+                "ts": values["ts"],
+            })
         self.log(
             "info", kind,
             (f"{_money(amount)} delivered" if amount else "zero amount confirmed by the cashier")
-            + (f" '{reason}'" if reason else "") + context,
+            + (f" '{reason}'" if reason else "") + context
+            + (" - no connection, waiting to sync to Odoo" if queued else ""),
             order_uuid=cash_move_key(row_id), order_ref=CASH_MOVE_TYPES[kind], commit=False,
         )
 
@@ -2026,12 +2053,12 @@ def cake_state_badge(state):
 def cash_move_status(row):
     if row["deleted"]:
         return "<span class='badge b-error'>deleted</span>"
+    if row["queued_offline"]:
+        return "<span class='badge b-warning'>waiting for connection</span>"
     if row["move_type"] in ("cash_delivery", "closing_delivery"):
         return "<span class='badge b-yes'>delivered</span>"
     if row["statement_line_id"]:
         return "<span class='badge b-yes'>in Odoo</span>"
-    if row["queued_offline"]:
-        return "<span class='badge b-warning'>waiting for connection</span>"
     return "<span class='badge b-draft'>sent</span>"
 
 
