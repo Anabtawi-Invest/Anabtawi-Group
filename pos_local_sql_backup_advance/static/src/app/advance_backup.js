@@ -8,6 +8,7 @@ import { makeAwaitable } from "@point_of_sale/app/utils/make_awaitable_dialog";
 import { PosStore } from "@point_of_sale/app/services/pos_store";
 import { ControlButtons } from "@point_of_sale/app/screens/product_screen/control_buttons/control_buttons";
 import { CompleteAdvanceOrderPopup } from "@pos_advance_order/app/screens/product_screen/control_buttons/advance_order_button/complete_advance_order_popup";
+import { RefundAdvanceOrderPopup } from "@pos_advance_order/app/screens/product_screen/control_buttons/advance_order_button/refund_advance_order_popup";
 import { captureDangerNotifications } from "@pos_local_sql_backup/app/pos_store_patch";
 import { expandAdvanceLinesWithPledges } from "@pos_local_sql_backup_advance/app/local_advance_store";
 
@@ -365,9 +366,84 @@ patch(ControlButtons.prototype, {
     },
 
     async onClickRefundAdvanceOrder() {
-        return this._runWithAdvanceBackup("refund", () =>
-            super.onClickRefundAdvanceOrder(...arguments)
-        );
+        return this._runWithAdvanceBackup("refund", async () => {
+            const popupPayload = await makeAwaitable(this.dialog, RefundAdvanceOrderPopup, {
+                posConfigId: this.pos.config.id,
+                pos: this.pos,
+            });
+            if (!popupPayload?.advance_order_id) {
+                return;
+            }
+            if (
+                popupPayload.is_local ||
+                popupPayload.from_server_cache ||
+                (popupPayload.local_uuid && !(popupPayload.advance_order_id > 0))
+            ) {
+                this.pos.refundLocalAdvance(popupPayload);
+                this._advanceCopyRecorded = true;
+                this.notification.add(
+                    _t(
+                        "Advance refund saved on this register. It will sync when the connection is back."
+                    ),
+                    { type: "warning" }
+                );
+                return;
+            }
+            try {
+                const result = await this.orm.call(
+                    "pos.advance.order",
+                    "action_refund_advance_payment",
+                    [[popupPayload.advance_order_id]],
+                    {
+                        pos_config_id: this.pos.config.id,
+                        pos_payment_method_id: popupPayload.payment_method_id,
+                        refund_pos_session_id: this.pos.session?.id,
+                    }
+                );
+                this.notification.add(
+                    _t("Advance refunded: %s", result?.name || popupPayload.reference || ""),
+                    { type: "success" }
+                );
+                this.pos.refreshRefundableAdvanceCache?.();
+                this.pos.refreshCompletableAdvanceCache?.();
+                this.pos.refreshActivePledgeCache?.();
+                try {
+                    const printResult = await this._printAdvanceReceipt(
+                        this._buildRefundReceiptData({ result, popupPayload })
+                    );
+                    if (!printResult?.printed) {
+                        this.notification.add(_t("Advance refunded but receipt printing failed."), {
+                            type: "warning",
+                        });
+                    }
+                } catch (printError) {
+                    const printMessage =
+                        printError?.message === "POPUP_BLOCKED"
+                            ? _t("Please allow pop-ups to print the refund receipt.")
+                            : printError?.body ||
+                              printError?.message ||
+                              _t("Advance refunded but receipt printing failed.");
+                    this.notification.add(printMessage, { type: "warning" });
+                }
+            } catch (error) {
+                if (error instanceof ConnectionLostError) {
+                    this.pos.refundLocalAdvance(popupPayload);
+                    this._advanceCopyRecorded = true;
+                    this.notification.add(
+                        _t(
+                            "Advance refund saved on this register. It will sync when the connection is back."
+                        ),
+                        { type: "warning" }
+                    );
+                    return;
+                }
+                const msg =
+                    error?.data?.message ||
+                    error?.message ||
+                    _t("Failed to refund advance order.");
+                this.notification.add(msg, { type: "danger" });
+            }
+        });
     },
 
     // The receipt builders run only after the server confirmed the action.

@@ -6,6 +6,7 @@ import { browser } from "@web/core/browser/browser";
 import { rpc } from "@web/core/network/rpc";
 import { PosStore } from "@point_of_sale/app/services/pos_store";
 import { removeCompletableAdvanceFromCache } from "@pos_local_sql_backup_advance/app/complete_advance_cache";
+import { removeRefundableAdvanceFromCache } from "@pos_local_sql_backup_advance/app/refund_advance_cache";
 
 function toNumber(value, fallback = 0) {
     const num = Number(value);
@@ -165,33 +166,133 @@ export function getLocalAdvance(pos, localUuid) {
     return readLocalAdvances(pos).find((row) => row.local_uuid === localUuid) || null;
 }
 
+function mapLocalAdvanceRow(row) {
+    return {
+        id: row.server_id || negativeIdFromUuid(row.local_uuid),
+        local_uuid: row.local_uuid,
+        is_local: !row.server_id,
+        name: row.name || `Local ${row.local_uuid.slice(0, 8)}`,
+        partner_id: row.partner_id
+            ? [row.partner_id, row.partner_name || ""]
+            : [false, row.partner_name || ""],
+        partner_phone: row.partner_phone || "",
+        amount_total: toNumber(row.amount_total),
+        advance_amount: toNumber(row.advance_amount),
+        amount_remaining: toNumber(row.amount_remaining),
+        picking_date: row.created_at || "",
+        site_service: Boolean(row.create_payload?.site_service),
+        discount_id: row.create_payload?.discount_id || false,
+        discount_amount: 0,
+        pledge_amount: toNumber(row.pledge_amount),
+        pledge_count: (row.lines || []).filter(
+            (line) => line.is_pledge_line || line.is_site_service_pledge_line
+        ).length,
+        lines: row.lines || [],
+        state: row.state,
+        pos_payment_method_id: row.create_payload?.payment_method_id
+            ? [row.create_payload.payment_method_id, row.payment_method_name || ""]
+            : false,
+        payment_method_name: row.payment_method_name || "",
+    };
+}
+
 export function localAdvancesForComplete(pos) {
     // Only unfinished local creates. Online AOs come from the live/server cache list.
     return readLocalAdvances(pos)
-        .filter((row) => !row.server_completed && row.state === "waiting")
-        .map((row) => ({
-            id: row.server_id || negativeIdFromUuid(row.local_uuid),
-            local_uuid: row.local_uuid,
-            is_local: !row.server_id,
-            name: row.name || `Local ${row.local_uuid.slice(0, 8)}`,
-            partner_id: row.partner_id
-                ? [row.partner_id, row.partner_name || ""]
-                : [false, row.partner_name || ""],
-            partner_phone: row.partner_phone || "",
-            amount_total: toNumber(row.amount_total),
-            advance_amount: toNumber(row.advance_amount),
-            amount_remaining: toNumber(row.amount_remaining),
-            picking_date: row.created_at || "",
-            site_service: Boolean(row.create_payload?.site_service),
-            discount_id: row.create_payload?.discount_id || false,
-            discount_amount: 0,
-            pledge_amount: toNumber(row.pledge_amount),
-            pledge_count: (row.lines || []).filter(
-                (line) => line.is_pledge_line || line.is_site_service_pledge_line
-            ).length,
-            lines: row.lines || [],
-            state: row.state,
-        }));
+        .filter(
+            (row) =>
+                !row.server_completed &&
+                !row.server_refunded &&
+                row.state === "waiting" &&
+                row.pending_action !== "refund"
+        )
+        .map(mapLocalAdvanceRow);
+}
+
+export function localAdvancesForRefund(pos) {
+    // Waiting local creates (not yet completed/refunded) can be refunded/cancelled locally.
+    return readLocalAdvances(pos)
+        .filter(
+            (row) =>
+                !row.server_completed &&
+                !row.server_refunded &&
+                row.state === "waiting" &&
+                row.pending_action !== "complete" &&
+                row.pending_action !== "refund"
+        )
+        .map(mapLocalAdvanceRow);
+}
+
+/**
+ * Pledge lines from local waiting advances, shaped like Return Pledge rows.
+ */
+export function localPledgesForReturn(pos, partnerId = null) {
+    const rows = [];
+    for (const advance of readLocalAdvances(pos)) {
+        if (
+            advance.server_completed ||
+            advance.server_refunded ||
+            advance.state === "pending_refund" ||
+            advance.pending_action === "refund"
+        ) {
+            continue;
+        }
+        const returnedKeys = new Set(advance.returned_local_pledge_keys || []);
+        const partnerOk =
+            !partnerId ||
+            advance.partner_id === partnerId ||
+            (!advance.partner_id && !partnerId);
+        if (!partnerOk) {
+            continue;
+        }
+        const pledgeLines = (advance.lines || []).filter(
+            (line) => line.is_pledge_line || line.is_site_service_pledge_line
+        );
+        pledgeLines.forEach((line, index) => {
+            const productId = productIdOf(line.product_id);
+            const key = `${advance.local_uuid}:${productId}:${index}`;
+            if (returnedKeys.has(key)) {
+                return;
+            }
+            const qty = toNumber(line.qty ?? line.product_qty);
+            const unit = toNumber(line.price_unit);
+            const subtotal = toNumber(line.subtotal ?? line.price_subtotal_incl, qty * unit);
+            const syntheticId = negativeIdFromUuid(`${advance.local_uuid}-pledge-${index}`);
+            rows.push({
+                id: syntheticId,
+                local_uuid: advance.local_uuid,
+                local_pledge_key: key,
+                is_local: true,
+                from_server_cache: false,
+                order_id: [
+                    advance.server_id || negativeIdFromUuid(advance.local_uuid),
+                    advance.name || `Local ${advance.local_uuid.slice(0, 8)}`,
+                ],
+                pos_order_id: false,
+                partner_id: advance.partner_id
+                    ? [advance.partner_id, advance.partner_name || ""]
+                    : [false, advance.partner_name || ""],
+                partner_phone: advance.partner_phone || "",
+                employee_id: false,
+                employee_name: "",
+                product_id: productId
+                    ? [productId, line.product_name || line.product_id_name || ""]
+                    : false,
+                pledge_qty: qty,
+                pledge_amount_unit: unit,
+                pledge_subtotal: subtotal,
+                pledge_amount: subtotal,
+                create_date: advance.created_at || "",
+                state: "active",
+                return_date: false,
+                name: advance.name || `Local ${advance.local_uuid.slice(0, 8)}`,
+                employee_amount: 0,
+                delivery_amount: 0,
+                case_type: "case2",
+            });
+        });
+    }
+    return rows;
 }
 
 patch(PosStore.prototype, {
@@ -364,14 +465,149 @@ patch(PosStore.prototype, {
         return updated;
     },
 
+    refundLocalAdvance(popupPayload) {
+        const serverId =
+            popupPayload.advance_order_id > 0 ? popupPayload.advance_order_id : null;
+        let localUuid =
+            popupPayload.local_uuid ||
+            readLocalAdvances(this).find(
+                (row) =>
+                    (serverId && row.server_id === serverId) ||
+                    negativeIdFromUuid(row.local_uuid) === popupPayload.advance_order_id
+            )?.local_uuid;
+        let current = localUuid ? getLocalAdvance(this, localUuid) : null;
+        if (!current && serverId) {
+            localUuid = localUuid || uuidv4();
+            current = upsertLocalAdvance(this, {
+                local_uuid: localUuid,
+                server_id: serverId,
+                name: popupPayload.reference || "",
+                state: "synced",
+                pending_action: null,
+                partner_name: popupPayload.partner_name || "",
+                partner_phone: popupPayload.partner_phone || "",
+                amount_total: toNumber(popupPayload.amount_total),
+                advance_amount: toNumber(popupPayload.advance_amount),
+                lines: [],
+                create_payload: null,
+                completion: null,
+                refund: null,
+                created_at: new Date().toISOString(),
+            });
+        }
+        if (!localUuid || !current) {
+            throw new Error("Local advance not found for refund.");
+        }
+        // Never-synced local create: cancel locally; nothing to refund on Odoo.
+        if (!current.server_id && current.create_payload) {
+            const updated = upsertLocalAdvance(this, {
+                ...current,
+                state: "cancelled_local",
+                pending_action: null,
+                server_refunded: true,
+                refund: {
+                    payment_method_id: popupPayload.payment_method_id,
+                    payment_method_name: popupPayload.payment_method_name || "",
+                    amount: toNumber(popupPayload.advance_amount, current.advance_amount),
+                },
+            });
+            this.recordLocalBackupEvent("advance_refunded", {
+                local_only: true,
+                advance: {
+                    id: null,
+                    local_uuid: localUuid,
+                    reference: updated.name || "",
+                    partner_name: updated.partner_name || "",
+                    partner_phone: updated.partner_phone || "",
+                    amount_total: updated.amount_total,
+                    advance_amount: updated.advance_amount,
+                },
+                refund: {
+                    amount: updated.refund.amount,
+                    payment_method_name: updated.refund.payment_method_name,
+                },
+            });
+            return updated;
+        }
+        const refund = {
+            payment_method_id: popupPayload.payment_method_id,
+            payment_method_name: popupPayload.payment_method_name || "",
+            amount: toNumber(popupPayload.advance_amount, current.advance_amount),
+        };
+        const updated = upsertLocalAdvance(this, {
+            ...current,
+            server_id: current.server_id || serverId,
+            name: current.name || popupPayload.reference || "",
+            state: "pending_refund",
+            pending_action: "refund",
+            refund,
+            partner_name: popupPayload.partner_name || current.partner_name || "",
+            partner_phone: popupPayload.partner_phone || current.partner_phone || "",
+            amount_total: toNumber(popupPayload.amount_total, current.amount_total),
+            advance_amount: toNumber(popupPayload.advance_amount, current.advance_amount),
+        });
+        if (updated.server_id) {
+            removeRefundableAdvanceFromCache(this, updated.server_id);
+            removeCompletableAdvanceFromCache(this, updated.server_id);
+        }
+        this.recordLocalBackupEvent("advance_refunded", {
+            local_only: true,
+            advance: {
+                id: updated.server_id || null,
+                local_uuid: localUuid,
+                reference: updated.name || "",
+                partner_name: updated.partner_name || "",
+                partner_phone: updated.partner_phone || "",
+                amount_total: updated.amount_total,
+                advance_amount: updated.advance_amount,
+            },
+            refund: {
+                amount: refund.amount,
+                payment_method_name: refund.payment_method_name,
+            },
+        });
+        this.syncLocalAdvances();
+        return updated;
+    },
+
+    markLocalPledgesReturned(pledges) {
+        const byUuid = new Map();
+        for (const pledge of pledges || []) {
+            if (!pledge?.local_uuid || !pledge.local_pledge_key) {
+                continue;
+            }
+            const list = byUuid.get(pledge.local_uuid) || [];
+            list.push(pledge.local_pledge_key);
+            byUuid.set(pledge.local_uuid, list);
+        }
+        for (const [localUuid, keys] of byUuid.entries()) {
+            const current = getLocalAdvance(this, localUuid);
+            if (!current) {
+                continue;
+            }
+            const returned = new Set([
+                ...(current.returned_local_pledge_keys || []),
+                ...keys,
+            ]);
+            upsertLocalAdvance(this, {
+                ...current,
+                returned_local_pledge_keys: [...returned],
+            });
+        }
+    },
+
     async syncLocalAdvances() {
         if (this._localAdvanceSyncing) {
             return;
         }
         const pending = readLocalAdvances(this).filter(
-            (row) => row.pending_action === "create" || row.pending_action === "complete"
+            (row) =>
+                row.pending_action === "create" ||
+                row.pending_action === "complete" ||
+                row.pending_action === "refund"
         );
         if (!pending.length) {
+            await this.syncPendingPledgeReturns?.();
             return;
         }
         this._localAdvanceSyncing = true;
@@ -387,6 +623,7 @@ patch(PosStore.prototype, {
                     );
                 }
             }
+            await this.syncPendingPledgeReturns?.();
         } finally {
             this._localAdvanceSyncing = false;
         }
@@ -395,6 +632,10 @@ patch(PosStore.prototype, {
     async _syncOneLocalAdvance(row) {
         let current = getLocalAdvance(this, row.local_uuid) || row;
         if (current.pending_action === "create" || (!current.server_id && current.create_payload)) {
+            // Locally cancelled before sync: drop create, nothing to send.
+            if (current.server_refunded || current.state === "cancelled_local") {
+                return;
+            }
             const result = await rpc("/pos/create_advance_order", {
                 ...current.create_payload,
                 local_uuid: current.local_uuid,
@@ -420,6 +661,8 @@ patch(PosStore.prototype, {
                 },
                 lines: current.lines,
             });
+            this.refreshRefundableAdvanceCache?.();
+            this.refreshActivePledgeCache?.();
         }
         current = getLocalAdvance(this, row.local_uuid) || current;
         if (current.server_id && current.completion && current.pending_action === "complete") {
@@ -438,7 +681,9 @@ patch(PosStore.prototype, {
                 name: result?.name || current.name,
             });
             removeCompletableAdvanceFromCache(this, current.server_id);
+            removeRefundableAdvanceFromCache(this, current.server_id);
             this.refreshCompletableAdvanceCache?.();
+            this.refreshRefundableAdvanceCache?.();
             this.recordLocalBackupEvent("advance_completed", {
                 advance: {
                     id: current.server_id,
@@ -457,6 +702,51 @@ patch(PosStore.prototype, {
                     change_amount: result?.remaining_change_amount,
                     payment_method_name:
                         result?.payment_method_name || current.completion.payment_method_name,
+                },
+            });
+        }
+        current = getLocalAdvance(this, row.local_uuid) || current;
+        if (current.server_id && current.refund && current.pending_action === "refund") {
+            const orm = this.env?.services?.orm || this.data?.orm;
+            if (!orm) {
+                throw new Error("ORM not available for refund sync.");
+            }
+            const result = await orm.call(
+                "pos.advance.order",
+                "action_refund_advance_payment",
+                [[current.server_id]],
+                {
+                    pos_config_id: this.config.id,
+                    pos_payment_method_id: current.refund.payment_method_id,
+                    refund_pos_session_id: this.session?.id,
+                }
+            );
+            upsertLocalAdvance(this, {
+                ...current,
+                state: "refunded_local",
+                pending_action: null,
+                server_refunded: true,
+                name: result?.name || current.name,
+            });
+            removeRefundableAdvanceFromCache(this, current.server_id);
+            removeCompletableAdvanceFromCache(this, current.server_id);
+            this.refreshRefundableAdvanceCache?.();
+            this.refreshCompletableAdvanceCache?.();
+            this.refreshActivePledgeCache?.();
+            this.recordLocalBackupEvent("advance_refunded", {
+                advance: {
+                    id: current.server_id,
+                    local_uuid: current.local_uuid,
+                    reference: result?.name || current.name,
+                    state: result?.state || "",
+                    partner_name: current.partner_name,
+                    partner_phone: current.partner_phone,
+                    amount_total: current.amount_total,
+                    advance_amount: current.advance_amount,
+                },
+                refund: {
+                    amount: current.refund.amount,
+                    payment_method_name: current.refund.payment_method_name,
                 },
             });
         }
