@@ -103,6 +103,49 @@ function cashMovesObserver({ store, model, method, args, result, error }) {
 
 localBackupCallObservers.push(cashMovesObserver);
 
+// Cash Delivery lives in pos_delivery_amount. Record it from the base backup
+// module so Cash moves still fill when the optional delivery bridge is not installed.
+const DELIVERY_PROCESS_METHODS = {
+    action_process_delivery_amount: "cash_delivery",
+    action_process_closing_delivery_amount: "closing_delivery",
+};
+
+function cashDeliveryObserver({ store, model, method, args, result, error }) {
+    if (model !== "pos.session") {
+        return;
+    }
+    const kind = DELIVERY_PROCESS_METHODS[method];
+    if (!kind) {
+        return;
+    }
+    if (store._skipDeliveryBackupObserver) {
+        return;
+    }
+    const [, amount, reason] = args || [];
+    const details = {
+        delivery_type: kind,
+        amount: Number(amount) || 0,
+        reason: kind === "cash_delivery" ? reason || "" : "",
+    };
+    if (error || (result && result.successful === false)) {
+        store.recordLocalBackupEvent("cash_delivery_failed", {
+            ...details,
+            error: error ? serverErrorMessage(error) : result?.message || "Refused by the server",
+        });
+        return;
+    }
+    // Successful online delivery (result.successful true) or zero-amount success.
+    if (result?.successful) {
+        store.recordLocalBackupEvent(kind, {
+            ...details,
+            receipt: result.receipt || null,
+        });
+        store.syncLocalBackupCashMoves();
+    }
+}
+
+localBackupCallObservers.push(cashDeliveryObserver);
+
 // Odoo names a new session "/" and renames it when the opening cash is confirmed,
 // without telling the open POS page.
 function sessionNameObserver({ store, model, method, result, error }) {

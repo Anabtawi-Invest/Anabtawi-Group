@@ -7,10 +7,7 @@ import { _t } from "@web/core/l10n/translation";
 import { ConnectionLostError } from "@web/core/network/rpc";
 import { PosStore } from "@point_of_sale/app/services/pos_store";
 import { ControlButtons } from "@point_of_sale/app/screens/product_screen/control_buttons/control_buttons";
-import {
-    localBackupCallObservers,
-    serverErrorMessage,
-} from "@pos_local_sql_backup/app/pos_store_patch";
+import { localBackupCallObservers } from "@pos_local_sql_backup/app/pos_store_patch";
 import {
     askDeliveryAmount,
     fetchClosingDeliveryPopupData,
@@ -22,11 +19,6 @@ import {
 const POPUP_METHODS = {
     get_delivery_amount_popup_data: "cash_delivery",
     get_closing_delivery_popup_data: "closing_delivery",
-};
-
-const PROCESS_METHODS = {
-    action_process_delivery_amount: "cash_delivery",
-    action_process_closing_delivery_amount: "closing_delivery",
 };
 
 // Available cash shown in the last delivery popup, per kind of delivery.
@@ -73,49 +65,17 @@ function writePendingDeliveries(pos, rows) {
     }
 }
 
-function deliveryObserver({ store, model, method, args, result, error }) {
-    if (model !== "pos.session") {
+function deliveryPopupObserver({ store, model, method, result, error }) {
+    if (model !== "pos.session" || error || !POPUP_METHODS[method]) {
         return;
     }
-    if (POPUP_METHODS[method]) {
-        if (!error) {
-            lastPopupData[POPUP_METHODS[method]] = result || {};
-            const cache = readDeliveryPopupCache(store);
-            cache[POPUP_METHODS[method]] = result || {};
-            writeDeliveryPopupCache(store, cache);
-        }
-        return;
-    }
-    const kind = PROCESS_METHODS[method];
-    if (!kind) {
-        return;
-    }
-    // Offline path records its own event; sync also records a confirmed copy.
-    if (store._skipDeliveryBackupObserver) {
-        return;
-    }
-    const [, amount, reason] = args;
-    const popup = lastPopupData[kind] || readDeliveryPopupCache(store)[kind] || {};
-    delete lastPopupData[kind];
-    const details = {
-        delivery_type: kind,
-        amount: Number(amount) || 0,
-        reason: kind === "cash_delivery" ? reason || "" : "",
-        available_cash: popup.max_amount ?? null,
-        delivered_before: popup.delivered_total ?? null,
-    };
-    if (error || !result?.successful) {
-        store.recordLocalBackupEvent("cash_delivery_failed", {
-            ...details,
-            error: error ? serverErrorMessage(error) : result?.message || "Refused by the server",
-        });
-        return;
-    }
-    store.recordLocalBackupEvent(kind, { ...details, receipt: result.receipt || null });
-    store.syncLocalBackupCashMoves();
+    lastPopupData[POPUP_METHODS[method]] = result || {};
+    const cache = readDeliveryPopupCache(store);
+    cache[POPUP_METHODS[method]] = result || {};
+    writeDeliveryPopupCache(store, cache);
 }
 
-localBackupCallObservers.push(deliveryObserver);
+localBackupCallObservers.push(deliveryPopupObserver);
 
 patch(PosStore.prototype, {
     async afterProcessServerData() {
@@ -294,6 +254,8 @@ patch(ControlButtons.prototype, {
         }
 
         try {
+            // Skip the base ORM observer so we store one row with popup cash context.
+            this.pos._skipDeliveryBackupObserver = true;
             const response = await processDeliveryAmount(
                 this.pos,
                 this.dialog,
@@ -301,8 +263,27 @@ patch(ControlButtons.prototype, {
                 deliveryResult.reason
             );
             if (!response?.successful) {
+                if (response && response.successful === false) {
+                    this.pos.recordLocalBackupEvent("cash_delivery_failed", {
+                        delivery_type: "cash_delivery",
+                        amount: Number(deliveryResult.amount) || 0,
+                        reason: deliveryResult.reason || "",
+                        available_cash: popupData.max_amount ?? null,
+                        delivered_before: popupData.delivered_total ?? null,
+                        error: response.message || "Refused by the server",
+                    });
+                }
                 return;
             }
+            this.pos.recordLocalBackupEvent("cash_delivery", {
+                delivery_type: "cash_delivery",
+                amount: Number(deliveryResult.amount) || 0,
+                reason: deliveryResult.reason || "",
+                available_cash: popupData.max_amount ?? null,
+                delivered_before: popupData.delivered_total ?? null,
+                receipt: response.receipt || null,
+            });
+            this.pos.syncLocalBackupCashMoves?.();
             await printDeliveryAmountReceipt(this.pos, response.receipt);
             this.notification.add(_t("Delivery Amount processed successfully."), {
                 type: "success",
@@ -325,7 +306,17 @@ patch(ControlButtons.prototype, {
                 );
                 return;
             }
+            this.pos.recordLocalBackupEvent("cash_delivery_failed", {
+                delivery_type: "cash_delivery",
+                amount: Number(deliveryResult.amount) || 0,
+                reason: deliveryResult.reason || "",
+                available_cash: popupData.max_amount ?? null,
+                delivered_before: popupData.delivered_total ?? null,
+                error: error?.data?.message || error?.message || String(error),
+            });
             throw error;
+        } finally {
+            this.pos._skipDeliveryBackupObserver = false;
         }
     },
 });
