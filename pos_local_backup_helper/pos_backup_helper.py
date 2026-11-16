@@ -49,7 +49,7 @@ DB_ERRORS = (sqlite3.Error, sqlcipher.Error) if sqlcipher else (sqlite3.Error,)
 
 APP_NAME = "AnabtawiPOS"
 APP_TITLE = "Anabtawi POS Local Backup"
-VERSION = "1.2.5"
+VERSION = "1.2.6"
 TASK_NAME = "AnabtawiPOSBackup"
 IS_WINDOWS = os.name == "nt"
 MAX_BODY_BYTES = 10 * 1024 * 1024
@@ -1992,7 +1992,8 @@ th{background:#fafafa}
 .card{background:#fff;padding:16px;border-radius:6px;margin-bottom:16px;box-shadow:0 1px 2px rgba(0,0,0,.08)}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
 .metric{font-size:28px;font-weight:700}
-.badge{padding:2px 8px;border-radius:10px;font-size:12px;color:#fff}
+.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:12px;color:#fff;white-space:nowrap;vertical-align:middle;line-height:1.4}
+.badge-group{display:inline-flex;flex-wrap:wrap;gap:4px;align-items:center;max-width:100%}
 .b-info{background:#2f80ed}.b-warning{background:#f2994a}.b-error{background:#eb5757}
 .b-yes{background:#27ae60}.b-no{background:#eb5757}.b-draft{background:#999}
 form.filters input,form.filters select{padding:5px;margin-right:6px}
@@ -2063,16 +2064,16 @@ def yes_no(flag):
 
 
 def state_badges(row):
-    badges = f"<span class='badge b-draft'>{esc(row['state'])}</span>"
+    parts = [f"<span class='badge b-draft'>{esc(row['state'])}</span>"]
     if row["deleted"]:
-        badges += " <span class='badge b-error'>deleted</span>"
+        parts.append("<span class='badge b-error'>deleted</span>")
     if row["source"] == "advance":
-        badges += " <span class='badge b-info'>from advance</span>"
+        parts.append("<span class='badge b-info'>from advance</span>")
     elif row["source"] == "pledge_return":
-        badges += " <span class='badge b-warning'>pledge return</span>"
+        parts.append("<span class='badge b-warning'>pledge return</span>")
     elif row["source"] == "cake":
-        badges += " <span class='badge b-info'>custom cake</span>"
-    return badges
+        parts.append("<span class='badge b-info'>custom cake</span>")
+    return f"<span class='badge-group'>{''.join(parts)}</span>"
 
 
 def advances_subnav(active):
