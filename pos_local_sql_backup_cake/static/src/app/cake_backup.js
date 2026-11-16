@@ -8,6 +8,7 @@ import { ControlButtons } from "@point_of_sale/app/screens/product_screen/contro
 import { captureDangerNotifications } from "@pos_local_sql_backup/app/pos_store_patch";
 import { readCakeConfigCache } from "@pos_local_sql_backup_cake/app/cake_config_cache";
 import { removeCakeOrderFromCache } from "@pos_local_sql_backup_cake/app/cake_orders_cache";
+import { negativeIdFromUuid } from "@pos_local_sql_backup_cake/app/local_cake_store";
 
 function toNumber(value, fallback = 0) {
     const num = Number(value);
@@ -156,13 +157,19 @@ patch(ControlButtons.prototype, {
                 pos_order_uuid: this._getCurrentOrder?.()?.uuid || null,
             };
         }
+        const sizeName = sizeNameFromPayload(this.pos, params);
+        const size = (readCakeConfigCache(this.pos)?.sizes || []).find(
+            (row) => Number(row.id) === Number(params?.cake_size_id)
+        );
         return {
             cake: {
+                // Synthetic id so the helper accepts the row before Odoo assigns a real id.
+                id: negativeIdFromUuid(localUuid),
                 local_uuid: localUuid,
                 partner_name: partner?.name || "",
                 partner_phone: partner?.phone || "",
-                product_name: "",
-                pieces: 0,
+                product_name: size?.product_name || "",
+                pieces: size?.pieces || 0,
                 sugar_paste: Boolean(params.sugar_paste),
                 note: params.note || "",
                 cake_base_cost: toNumber(prices.cake_base_cost),
@@ -170,7 +177,7 @@ patch(ControlButtons.prototype, {
                 price_before_tax: toNumber(prices.price_before_tax),
                 tax_amount: toNumber(prices.tax_amount),
                 final_price: toNumber(prices.final_price),
-                size_name: sizeNameFromPayload(this.pos, params),
+                size_name: sizeName,
             },
             form: {
                 phone: partner?.phone || "",

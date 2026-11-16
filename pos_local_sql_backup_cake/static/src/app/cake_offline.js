@@ -9,7 +9,7 @@ import { ControlButtons } from "@point_of_sale/app/screens/product_screen/contro
 import { CustomCakeFormPopup } from "@pos_custom_cake/app/screens/product_screen/control_buttons/cake_button/custom_cake_form_popup";
 import { CakeOrdersListPopup } from "@pos_custom_cake/app/screens/product_screen/control_buttons/cake_button/cake_orders_list_popup";
 import { serverErrorMessage } from "@pos_local_sql_backup/app/pos_store_patch";
-import { getLocalCake } from "@pos_local_sql_backup_cake/app/local_cake_store";
+import { getLocalCake, negativeIdFromUuid } from "@pos_local_sql_backup_cake/app/local_cake_store";
 import { readCakeConfigCache } from "@pos_local_sql_backup_cake/app/cake_config_cache";
 import { removeCakeOrderFromCache } from "@pos_local_sql_backup_cake/app/cake_orders_cache";
 
@@ -130,7 +130,9 @@ patch(ControlButtons.prototype, {
                     {
                         local_only: true,
                         cake: {
+                            id: negativeIdFromUuid(localUuid),
                             local_uuid: localUuid,
+                            reference: local?.name || `Local ${String(localUuid).slice(0, 8)}`,
                             partner_name: local?.partner_name,
                             partner_phone: local?.partner_phone,
                             product_name: local?.product_name,
@@ -149,6 +151,7 @@ patch(ControlButtons.prototype, {
                             size_name: local?.size_name,
                             components: local?.form_components || [],
                         },
+                        pos_order_uuid: this._getCurrentOrder?.()?.uuid || null,
                     }
                 );
                 this._cakeCopyRecorded = true;
@@ -174,6 +177,33 @@ patch(ControlButtons.prototype, {
                     if (order) {
                         order.pos_cake_local_uuid = localUuid;
                         this.pos.markLocalCakeLoaded(localUuid, order.uuid);
+                        // Refresh helper cake row with the POS ticket link.
+                        this.pos.recordLocalBackupEvent("cake_created", {
+                            local_only: true,
+                            cake: {
+                                id: negativeIdFromUuid(localUuid),
+                                local_uuid: localUuid,
+                                reference: local?.name || `Local ${String(localUuid).slice(0, 8)}`,
+                                partner_name: local?.partner_name,
+                                partner_phone: local?.partner_phone,
+                                product_name: local?.product_name,
+                                pieces: local?.pieces,
+                                sugar_paste: local?.sugar_paste,
+                                note: local?.note,
+                                cake_base_cost: local?.cake_base_cost,
+                                total_components_cost: local?.total_components_cost,
+                                price_before_tax: local?.price_before_tax,
+                                tax_amount: local?.tax_amount,
+                                final_price: local?.final_price,
+                                size_name: local?.size_name,
+                            },
+                            form: {
+                                phone: local?.partner_phone,
+                                size_name: local?.size_name,
+                                components: local?.form_components || [],
+                            },
+                            pos_order_uuid: order.uuid,
+                        });
                     }
                     this.notification.add(
                         _t(

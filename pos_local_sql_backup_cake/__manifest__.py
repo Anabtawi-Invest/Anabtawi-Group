@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "POS Local SQL Backup - Custom Cakes",
-    "version": "19.0.1.0.0",
+    "version": "19.0.1.0.1",
     "category": "Point of Sale",
     "summary": "Copy custom cake orders to the cashier PC backup and sync offline creates",
     "description": """
