@@ -26,7 +26,7 @@ class StockMoveLine(models.Model):
                 rounding_method="HALF-UP",
             )
 
-    def _picking_type_from_vals(self, vals):
+    def _prepare_demand_mode_vals(self, vals):
         picking = (
             self.env["stock.picking"].browse(vals["picking_id"])
             if vals.get("picking_id")
@@ -37,37 +37,17 @@ class StockMoveLine(models.Model):
             if vals.get("move_id")
             else self.env["stock.move"]
         )
-        if picking:
-            return picking.picking_type_id
-        if move:
-            return move.picking_type_id
-        return self.env["stock.picking.type"]
-
-    def _scanned_qty_without_demand(self, vals):
-        """Done quantity on a new barcode line that was not stored as demand.
-
-        Reservation creates a line with a quantity and picked=False. A product
-        scan creates a line with qty_done, or with quantity and picked=True.
-        """
-        if vals.get("demand_qty"):
-            return 0.0
-        if vals.get("qty_done"):
-            return vals["qty_done"]
-        if vals.get("picked") and vals.get("quantity"):
-            return vals["quantity"]
-        return 0.0
-
-    def _prepare_demand_mode_vals(self, vals):
-        picking_type = self._picking_type_from_vals(vals)
-        if not picking_type or not picking_type.barcode_show_demand_qty:
-            return
-        demand_qty = vals.get("demand_qty") or self._scanned_qty_without_demand(vals)
-        if not demand_qty:
-            return
-        vals["demand_qty"] = demand_qty
-        vals.pop("qty_done", None)
-        vals["quantity"] = 0
-        vals["picked"] = False
+        picking_type = (
+            picking.picking_type_id
+            if picking
+            else move.picking_type_id
+            if move
+            else self.env["stock.picking.type"]
+        )
+        if picking_type.barcode_show_demand_qty and vals.get("demand_qty"):
+            vals.pop("qty_done", None)
+            vals["quantity"] = 0
+            vals["picked"] = False
 
     @api.model_create_multi
     def create(self, vals_list):
