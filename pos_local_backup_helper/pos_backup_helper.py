@@ -49,7 +49,7 @@ DB_ERRORS = (sqlite3.Error, sqlcipher.Error) if sqlcipher else (sqlite3.Error,)
 
 APP_NAME = "AnabtawiPOS"
 APP_TITLE = "Anabtawi POS Local Backup"
-VERSION = "1.2.6"
+VERSION = "1.2.7"
 TASK_NAME = "AnabtawiPOSBackup"
 IS_WINDOWS = os.name == "nt"
 MAX_BODY_BYTES = 10 * 1024 * 1024
@@ -450,9 +450,12 @@ CREATE TABLE IF NOT EXISTS pos_cake (
     pay_later INTEGER DEFAULT 0,
     loaded_at TEXT,
     pos_order_uuid TEXT,
+    local_uuid TEXT,
+    pending_action TEXT,
     first_seen TEXT,
     last_update TEXT
 );
+CREATE UNIQUE INDEX IF NOT EXISTS pos_cake_local_uuid_idx ON pos_cake (local_uuid);
 """
 
 ADVANCE_STATE_BY_ACTION = {
@@ -678,6 +681,13 @@ class BackupDB:
                 "UPDATE pos_advance SET state = 'pending_completion' "
                 "WHERE pending_action = 'complete' "
                 "AND IFNULL(state, '') NOT IN ('completed', 'pending_completion')"
+            )
+            cake_columns = {row[1] for row in self.conn.execute("PRAGMA table_info(pos_cake)")}
+            for column in ("local_uuid", "pending_action"):
+                if column not in cake_columns:
+                    self.conn.execute(f"ALTER TABLE pos_cake ADD COLUMN {column} TEXT")
+            self.conn.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS pos_cake_local_uuid_idx ON pos_cake (local_uuid)"
             )
             self.conn.commit()
 
@@ -1385,6 +1395,39 @@ class BackupDB:
 
     # -- custom cakes ------------------------------------------------------------
 
+    def _link_cake_id(self, cake_id, local_uuid):
+        """Match a copy taken before Odoo answered with the official cake id."""
+        if local_uuid:
+            row = self.conn.execute(
+                "SELECT cake_id FROM pos_cake WHERE local_uuid = ?", (local_uuid,)
+            ).fetchone()
+            if row and cake_id and row["cake_id"] != cake_id:
+                old_id = row["cake_id"]
+                taken = self.conn.execute(
+                    "SELECT 1 FROM pos_cake WHERE cake_id = ?", (cake_id,)
+                ).fetchone()
+                if taken:
+                    self.conn.execute("DELETE FROM pos_cake WHERE cake_id = ?", (old_id,))
+                    self.conn.execute(
+                        "UPDATE pos_cake SET local_uuid = ? WHERE cake_id = ? AND local_uuid IS NULL",
+                        (local_uuid, cake_id),
+                    )
+                else:
+                    self.conn.execute(
+                        "UPDATE pos_cake SET cake_id = ? WHERE cake_id = ?",
+                        (cake_id, old_id),
+                    )
+                return cake_id
+            if row and cake_id is None:
+                return row["cake_id"]
+        if cake_id is not None:
+            return cake_id
+        if not local_uuid:
+            return None
+        row = self.conn.execute("SELECT MIN(cake_id) AS min_id FROM pos_cake").fetchone()
+        minimum = row["min_id"] if row and row["min_id"] is not None else 0
+        return minimum - 1 if minimum <= 0 else -1
+
     def _record_cake(self, event_uuid, action, event):
         ts = event.get("ts") or _now()
         if action == "cake_failed":
@@ -1396,19 +1439,20 @@ class BackupDB:
             return
         cake = event.get("cake") if isinstance(event.get("cake"), dict) else {}
         form = event.get("form") if isinstance(event.get("form"), dict) else {}
-        cake_id = _integer(cake.get("id"))
+        local_uuid = str(cake.get("local_uuid") or event.get("local_uuid") or "").strip()[:64] or None
+        cake_id = self._link_cake_id(_integer(cake.get("id")), local_uuid)
         if cake_id is None:
-            raise ValueError(f"{action} event without cake id")
+            raise ValueError(f"{action} event without cake id or local_uuid")
         components = ", ".join(
             f"{c.get('category')}: {c.get('product_name')}" if c.get("category") else str(c.get("product_name") or "")
             for c in form.get("components") or [] if isinstance(c, dict)
         )
         values = {
-            "reference": cake.get("reference"),
+            "reference": cake.get("reference") or (f"Local {local_uuid[:8]}" if local_uuid else None),
             "partner_name": cake.get("partner_name"),
-            "partner_phone": form.get("phone"),
+            "partner_phone": form.get("phone") or cake.get("partner_phone"),
             "product_name": cake.get("product_name"),
-            "size_name": form.get("size_name"),
+            "size_name": form.get("size_name") or cake.get("size_name"),
             "pieces": _integer(cake.get("pieces")),
             "sugar_paste": 1 if cake.get("sugar_paste") else 0,
             "components": components,
@@ -1419,28 +1463,55 @@ class BackupDB:
             "tax_amount": _number(cake.get("tax_amount")),
             "final_price": _number(cake.get("final_price")),
             "production_name": cake.get("production_name"),
+            "local_uuid": local_uuid,
         }
         if action == "cake_loaded":
             # Loading happens later, maybe on another register: keep where the cake was ordered.
-            values.update({"status": "in_order", "loaded_at": ts, "pos_order_uuid": event.get("pos_order_uuid")})
+            values.update({
+                "status": "in_order",
+                "loaded_at": ts,
+                "pos_order_uuid": event.get("pos_order_uuid"),
+                "pending_action": None,
+            })
             message = f"loaded for payment, {_money(values['final_price'])}, customer {values['partner_name'] or '-'}"
             level = "info"
         else:
             values.update(self._event_origin(event))
             values["created_at"] = ts
+            offline = bool(event.get("local_only")) and _integer(cake.get("id")) is None
             if action == "cake_pay_later":
-                values.update({"status": "waiting_payment", "pay_later": 1})
+                values.update({
+                    "status": "waiting_payment",
+                    "pay_later": 1,
+                    "pending_action": "create" if offline else None,
+                })
                 level, message = "warning", "saved to pay later"
             else:
-                values.update({"status": "in_order", "pos_order_uuid": event.get("pos_order_uuid")})
+                values.update({
+                    "status": "in_order",
+                    "pos_order_uuid": event.get("pos_order_uuid"),
+                    "pending_action": "create" if offline else None,
+                })
                 level, message = "info", "created and added to the POS order"
+            if offline:
+                message = "waiting for connection, " + message
+                level = "warning"
+            elif _integer(cake.get("id")) is not None:
+                values["pending_action"] = None
             message += (
                 f", {_money(values['final_price'])}, customer {values['partner_name'] or '-'}"
                 + (f", size {values['size_name']}" if values["size_name"] else "")
                 + (f", MO {values['production_name']}" if values["production_name"] else "")
             )
         self._upsert_row("pos_cake", "cake_id", cake_id, values)
-        self.log(level, action, message, order_uuid=cake_key(cake_id), order_ref=values["reference"], commit=False)
+        self.log(
+            level,
+            action,
+            message,
+            order_uuid=cake_key(cake_id),
+            order_ref=values["reference"] or local_uuid,
+            commit=False,
+        )
 
     # -- cash moves --------------------------------------------------------------
 
