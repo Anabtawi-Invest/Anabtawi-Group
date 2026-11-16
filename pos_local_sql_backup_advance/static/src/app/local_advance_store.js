@@ -4,6 +4,7 @@ import { patch } from "@web/core/utils/patch";
 import { uuidv4 } from "@point_of_sale/utils";
 import { browser } from "@web/core/browser/browser";
 import { rpc } from "@web/core/network/rpc";
+import { _t } from "@web/core/l10n/translation";
 import { PosStore } from "@point_of_sale/app/services/pos_store";
 import { removeCompletableAdvanceFromCache } from "@pos_local_sql_backup_advance/app/complete_advance_cache";
 import { removeRefundableAdvanceFromCache } from "@pos_local_sql_backup_advance/app/refund_advance_cache";
@@ -317,12 +318,22 @@ patch(PosStore.prototype, {
             extra.amount_total ??
             lines.reduce((sum, line) => sum + toNumber(line.subtotal, lineSubtotal(line)), 0);
         const advanceAmount = toNumber(params.advance_amount);
+        // Never wipe an offline completion if create is captured again for the same uuid.
+        const existing = getLocalAdvance(this, localUuid);
+        const keepCompletion = existing?.completion || null;
+        const hasPendingComplete = Boolean(keepCompletion && !existing?.server_completed);
         return upsertLocalAdvance(this, {
             local_uuid: localUuid,
-            server_id: extra.server_id || null,
-            name: extra.name || "",
-            state: extra.state || "waiting",
-            pending_action: extra.pending_action || "create",
+            server_id: extra.server_id || existing?.server_id || null,
+            name: extra.name || existing?.name || "",
+            state: hasPendingComplete
+                ? "pending_completion"
+                : extra.state || existing?.state || "waiting",
+            pending_action: hasPendingComplete
+                ? existing?.server_id || extra.server_id
+                    ? "complete"
+                    : "create"
+                : extra.pending_action || "create",
             partner_id: params.partner_id || null,
             partner_name: extra.partner_name || "",
             partner_phone: extra.partner_phone || "",
@@ -350,8 +361,8 @@ patch(PosStore.prototype, {
                 is_pledge_line: Boolean(line.is_pledge_line || line.is_site_service_pledge_line),
                 source_menu_product_id: line.source_menu_product_id || null,
             })),
-            completion: null,
-            created_at: new Date().toISOString(),
+            completion: keepCompletion,
+            created_at: existing?.created_at || new Date().toISOString(),
         });
     },
 
@@ -659,11 +670,16 @@ patch(PosStore.prototype, {
             current = this.markLocalAdvanceCreated(current.local_uuid, result) || current;
             // Create may unlock a completion that was confirmed while offline.
             current = getLocalAdvance(this, row.local_uuid) || current;
-            if (current.completion && current.pending_action !== "complete") {
+            if (current.completion && !current.server_completed) {
                 current = upsertLocalAdvance(this, {
                     ...current,
                     state: "pending_completion",
                     pending_action: "complete",
+                    // Prefer server remaining so complete tendered is high enough.
+                    amount_remaining: toNumber(
+                        result?.amount_remaining,
+                        current.amount_remaining
+                    ),
                 });
             }
             this.recordLocalBackupEvent("advance_created", {
@@ -683,67 +699,85 @@ patch(PosStore.prototype, {
                     payment_method_name: current.payment_method_name,
                 },
                 lines: current.lines,
-                // Tell the helper a local completion is still waiting to sync.
                 keep_pending_complete: Boolean(current.completion),
             });
             this.refreshRefundableAdvanceCache?.();
             this.refreshActivePledgeCache?.();
         }
         current = getLocalAdvance(this, row.local_uuid) || current;
-        // Complete whenever we have a stored completion and a server AO, even if
-        // pending_action was cleared by an older build after create-only sync.
-        if (
-            current.server_id &&
-            current.completion &&
-            !current.server_completed &&
-            (current.pending_action === "complete" || current.state === "pending_completion")
-        ) {
+        // Any stored offline completion must sync once the AO exists on the server.
+        if (current.server_id && current.completion && !current.server_completed) {
+            const pickingConfigId =
+                current.create_payload?.pos_config_id || this.config.id;
             let tendered = toNumber(current.completion.amount_tendered);
-            const remaining = toNumber(
-                current.amount_remaining,
-                toNumber(current.completion.amount_tendered)
-            );
-            if (tendered <= 0 && remaining > 0) {
+            const remaining = toNumber(current.amount_remaining);
+            if (tendered < remaining) {
                 tendered = remaining;
             }
-            const result = await rpc("/pos/complete_advance_order", {
-                advance_order_id: current.server_id,
-                pos_config_id: this.config.id,
-                payment_method_id: current.completion.payment_method_id,
-                amount_tendered: tendered,
-                local_uuid: current.local_uuid,
-            });
-            upsertLocalAdvance(this, {
-                ...current,
-                state: "completed_local",
-                pending_action: null,
-                server_completed: true,
-                name: result?.name || current.name,
-            });
-            removeCompletableAdvanceFromCache(this, current.server_id);
-            removeRefundableAdvanceFromCache(this, current.server_id);
-            this.refreshCompletableAdvanceCache?.();
-            this.refreshRefundableAdvanceCache?.();
-            this.recordLocalBackupEvent("advance_completed", {
-                advance: {
-                    id: current.server_id,
+            try {
+                const result = await rpc("/pos/complete_advance_order", {
+                    advance_order_id: current.server_id,
+                    // Must be the Picking POS — server rejects deposit POS when different.
+                    pos_config_id: pickingConfigId,
+                    payment_method_id: current.completion.payment_method_id,
+                    amount_tendered: tendered,
                     local_uuid: current.local_uuid,
-                    reference: result?.name || current.name,
-                    state: result?.state || "",
-                    partner_name: result?.partner_name || current.partner_name,
-                    partner_phone: result?.partner_phone || current.partner_phone,
-                    amount_total: result?.amount_total ?? current.amount_total,
-                    advance_amount: result?.advance_amount ?? current.advance_amount,
-                },
-                completion: {
-                    pos_order_name: result?.pos_order_name,
-                    remaining_paid: result?.remaining_paid,
-                    amount_tendered: result?.remaining_amount_tendered,
-                    change_amount: result?.remaining_change_amount,
-                    payment_method_name:
-                        result?.payment_method_name || current.completion.payment_method_name,
-                },
-            });
+                });
+                upsertLocalAdvance(this, {
+                    ...current,
+                    state: "completed_local",
+                    pending_action: null,
+                    server_completed: true,
+                    name: result?.name || current.name,
+                });
+                removeCompletableAdvanceFromCache(this, current.server_id);
+                removeRefundableAdvanceFromCache(this, current.server_id);
+                this.refreshCompletableAdvanceCache?.();
+                this.refreshRefundableAdvanceCache?.();
+                this.recordLocalBackupEvent("advance_completed", {
+                    advance: {
+                        id: current.server_id,
+                        local_uuid: current.local_uuid,
+                        reference: result?.name || current.name,
+                        state: result?.state || "",
+                        partner_name: result?.partner_name || current.partner_name,
+                        partner_phone: result?.partner_phone || current.partner_phone,
+                        amount_total: result?.amount_total ?? current.amount_total,
+                        advance_amount: result?.advance_amount ?? current.advance_amount,
+                    },
+                    completion: {
+                        pos_order_name: result?.pos_order_name,
+                        remaining_paid: result?.remaining_paid,
+                        amount_tendered: result?.remaining_amount_tendered,
+                        change_amount: result?.remaining_change_amount,
+                        payment_method_name:
+                            result?.payment_method_name ||
+                            current.completion.payment_method_name,
+                    },
+                });
+            } catch (error) {
+                // Keep pending so the next online/reload retries completion.
+                upsertLocalAdvance(this, {
+                    ...current,
+                    state: "pending_completion",
+                    pending_action: "complete",
+                });
+                console.warn(
+                    "[LOCAL_BACKUP] Could not sync advance completion",
+                    current.local_uuid,
+                    current.server_id,
+                    error
+                );
+                this.notification?.add?.(
+                    _t(
+                        "Advance %s deposit synced, but completion is still waiting. Open the Picking POS (or reload) to finish it. %s",
+                        current.name || current.server_id,
+                        error?.data?.message || error?.message || ""
+                    ),
+                    { type: "warning", sticky: true }
+                );
+                throw error;
+            }
         }
         current = getLocalAdvance(this, row.local_uuid) || current;
         if (current.server_id && current.refund && current.pending_action === "refund") {
