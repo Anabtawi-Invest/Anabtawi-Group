@@ -105,12 +105,22 @@ patch(BarcodePickingModel.prototype, {
         return Boolean(line && this._lineQtyDone(line) > 0 && !this.lastScanned?.destLocation);
     },
 
+    _branchProductWasScanned() {
+        return this._branchLines().some((line) => Boolean(line?.product_id));
+    },
+
+    _destLockConfirmed() {
+        return Boolean(this.record?.barcode_dest_locked_by_scan);
+    },
+
     _branchScanRole(location, forcedRole) {
         if (forcedRole === "source" || forcedRole === "dest") {
             return forcedRole;
         }
         const lockedSourceId = this._barcodeId(this.record?.barcode_locked_source_location_id);
-        const lockedDestId = this._barcodeId(this.record?.barcode_locked_dest_location_id);
+        const lockedDestId = this._destLockConfirmed()
+            ? this._barcodeId(this.record?.barcode_locked_dest_location_id)
+            : false;
         if (!lockedSourceId) {
             return "source";
         }
@@ -120,11 +130,15 @@ patch(BarcodePickingModel.prototype, {
         if (location.id === lockedSourceId && location.id !== lockedDestId) {
             return "source";
         }
-        const destMode = this.config?.restrict_scan_dest_location;
-        if (!destMode || destMode === "no" || destMode === false) {
-            return "source";
+        // The screen often still says "scan another product" after the source
+        // is locked. A different location at that point is the destination.
+        if (
+            location.id !== lockedSourceId &&
+            (this._expectsDestinationScan() || this._branchProductWasScanned() || lockedDestId)
+        ) {
+            return "dest";
         }
-        return this._expectsDestinationScan() ? "dest" : "source";
+        return "source";
     },
 
     _rpcErrorMessage(error) {
@@ -350,8 +364,23 @@ patch(BarcodePickingModel.prototype, {
         }
         const result = this._branchPendingRole
             ? null
-            : await this._runBranchLocationOverride(barcodeData, "source");
+            : await this._runBranchLocationOverride(barcodeData);
         if (result === false) {
+            return;
+        }
+        if (
+            result?.role === "dest" &&
+            typeof super._processLocationDestination === "function"
+        ) {
+            const restoreDestNotifications = this._suppressBranchLocationWarnings();
+            try {
+                await super._processLocationDestination(...arguments);
+            } catch (error) {
+                barcodeData.stopped = true;
+            } finally {
+                restoreDestNotifications();
+            }
+            await this._finishBranchLocationOverride(barcodeData, result);
             return;
         }
         const restoreNotifications = result ? this._suppressBranchLocationWarnings() : () => {};

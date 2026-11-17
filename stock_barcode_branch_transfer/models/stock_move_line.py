@@ -20,7 +20,12 @@ class StockMoveLine(models.Model):
                 raise UserError(
                     picking._branch_location_mismatch_message("source", locked_source)
                 )
-            if locked_dest and line.location_dest_id and line.location_dest_id != locked_dest:
+            if (
+                picking.barcode_dest_locked_by_scan
+                and locked_dest
+                and line.location_dest_id
+                and line.location_dest_id != locked_dest
+            ):
                 raise UserError(
                     picking._branch_location_mismatch_message("dest", locked_dest)
                 )
@@ -35,9 +40,9 @@ class StockMoveLine(models.Model):
             if "location_id" in vals or not picking.barcode_locked_source_location_id:
                 if line.location_id:
                     picking._apply_branch_location_from_line("source", line.location_id)
-            if "location_dest_id" in vals or not picking.barcode_locked_dest_location_id:
-                if line.location_dest_id:
-                    picking._apply_branch_location_from_line("dest", line.location_dest_id)
+            # Do not lock the destination from the operation-type default.
+            # Only an explicit destination barcode may lock it. A line whose
+            # destination differs from the picking after that lock is checked below.
 
     @api.model_create_multi
     def create(self, vals_list):
