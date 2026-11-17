@@ -34,3 +34,12 @@ class Website(models.Model):
             return super()._is_canonical_url()
         except ValueError:
             return False
+
+
+class SaleOrder(models.Model):
+    _inherit = 'sale.order'
+
+    def _allow_express_checkout(self):
+        """Prevent crashes when customized or legacy cart templates call _allow_express_checkout()."""
+        return False
+

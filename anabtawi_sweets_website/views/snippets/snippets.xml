@@ -41,7 +41,7 @@
         <field name="key">anabtawi_sweets_website.s_anabtawi_categories</field>
         <field name="arch" type="xml">
             <t t-name="anabtawi_sweets_website.s_anabtawi_categories">
-                <section class="s_anabtawi_categories anabtawi-section py-5" data-name="Anabtawi Product Categories" data-snippet="s_anabtawi_categories">
+                <section class="s_anabtawi_categories anabtawi-section py-5" id="anabtawi_categories" data-name="Anabtawi Product Categories" data-snippet="s_anabtawi_categories">
                     <div class="container py-4">
                         <div class="text-center mb-5">
                             <span class="anabtawi-eyebrow">Our specialties</span>
@@ -49,19 +49,20 @@
                         </div>
                         <div class="row g-4">
                             <t t-foreach="[
-                                ('category-kunafeh.png', 'Kunafeh and Warbat'),
-                                ('category-assorted.png', 'Assorted Sweets'),
-                                ('category-cakes.png', 'Cakes and Western Sweets'),
-                                ('category-mediterranean.png', 'Mediterranean Sweets'),
-                                ('category-chocolate.png', 'Chocolates and Gifts'),
-                                ('category-coffee.png', 'Coffee'),
-                                ('category-honey.png', 'Tryaq Honey'),
-                                ('category-maamoul.png', 'Maamoul and Cookies')
+                                ('category-kunafeh.png', 'Kunafeh and Warbat', 'كنافة ووربات', '/shop/category/1'),
+                                ('category-assorted.png', 'Assorted Sweets', 'بقلاوة وحلويات شرقية', '/shop/category/2'),
+                                ('category-cakes.png', 'Cakes and Western Sweets', 'كيك وحلويات غربية', '/shop/category/4'),
+                                ('category-mediterranean.png', 'Mediterranean Sweets', 'حلويات فاخرة', '/shop/category/2'),
+                                ('category-chocolate.png', 'Chocolates and Gifts', 'شوكولاتة وهدايا فاخرة', '/shop/category/5'),
+                                ('category-coffee.png', 'Coffee', 'قهوة عنبتاوي ومشروبات', '/shop/category/6'),
+                                ('category-honey.png', 'Tryaq Honey', 'عسل ومنتجات طبيعية', '/shop/category/7'),
+                                ('category-maamoul.png', 'Maamoul and Cookies', 'كعك ومعمول وبرازق', '/shop/category/3')
                             ]" t-as="category">
                                 <div class="col-6 col-md-4 col-lg-3">
-                                    <a href="/our-catalog" class="anabtawi-category-card d-block h-100 text-decoration-none">
-                                        <img t-att-src="'/anabtawi_sweets_website/static/src/img/content/%s' % category[0]" t-att-alt="category[1]" class="img-fluid" loading="lazy"/>
-                                        <h3 class="h6 mb-0 p-3 text-center" t-out="category[1]"/>
+                                    <a t-att-href="category[3]" class="anabtawi-category-card d-block h-100 text-decoration-none" t-att-title="category[1] + ' | ' + category[2]">
+                                        <div class="anabtawi-category-card-img-wrap">
+                                            <img t-att-src="'/anabtawi_sweets_website/static/src/img/content/%s' % category[0]" t-att-alt="category[1]" class="img-fluid" loading="lazy"/>
+                                        </div>
                                     </a>
                                 </div>
                             </t>

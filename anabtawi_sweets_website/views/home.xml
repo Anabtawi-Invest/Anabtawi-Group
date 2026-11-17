@@ -11,22 +11,34 @@
         <field name="arch" type="xml">
             <xpath expr="//div[@id='wrap']" position="replace">
                 <div id="wrap" class="oe_structure anabtawi-theme">
-                    <t t-call="anabtawi_sweets_website.s_anabtawi_hero"/>
-
-                    <section class="anabtawi-video-section py-5" data-name="Brand film" data-snippet="s_text_image">
-                        <div class="container py-4">
-                            <div class="row align-items-center g-5">
-                                <div class="col-lg-5">
-                                    <span class="anabtawi-eyebrow">Made with passion</span>
-                                    <h2 class="display-5 mt-2 mb-4">A tradition you can taste</h2>
-                                    <p class="lead mb-4">
-                                        From classic kunafeh and warbat to chocolates, cakes, coffee, and honey, every collection reflects our commitment to quality.
-                                    </p>
-                                    <a href="/aboutus" class="btn btn-outline-light">Discover our story</a>
-                                </div>
-                                <div class="col-lg-7">
-                                    <div class="ratio ratio-16x9 rounded overflow-hidden shadow-lg">
-                                        <iframe src="https://www.youtube-nocookie.com/embed/VORKhyJTVZM?rel=0&amp;modestbranding=1" title="Anabtawi Sweets brand film" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen="allowfullscreen"></iframe>
+                    <section class="s_title o_colored_level s_parallax_no_overflow_hidden o_background_video anabtawi-video-hero position-relative d-flex align-items-center justify-content-center" data-vcss="001" data-snippet="s_title" data-name="Title" data-scroll-background-ratio="0" style="position: relative; min-height: 85vh; padding: 140px 0; overflow: hidden;" data-bg-video-src="https://www.youtube.com/embed/VORKhyJTVZM?rel=0&amp;autoplay=1&amp;mute=1&amp;enablejsapi=1&amp;controls=0&amp;loop=1&amp;playlist=VORKhyJTVZM&amp;fs=0">
+                        <!-- Subtle dark vignette overlay for luxury contrast and legibility -->
+                        <div class="anabtawi-video-overlay position-absolute top-0 start-0 w-100 h-100" style="background: radial-gradient(circle, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.55) 100%); z-index: 1; pointer-events: none;"/>
+                        
+                        <div class="container position-relative" style="z-index: 2;">
+                            <div class="row justify-content-center text-center">
+                                <div class="col-12 col-md-8 col-lg-6 mx-auto">
+                                    <div class="anabtawi-hero-text-block text-white" style="direction: rtl; text-align: center; border: none; outline: none;">
+                                        <h1 class="anabtawi-hero-title mb-2" style="color: #ffffff; font-size: 3.4rem; font-weight: 800; line-height: 1.15; text-shadow: 0 4px 20px rgba(0,0,0,0.9); letter-spacing: 0.5px; border: none;">
+                                            42 سنة
+                                        </h1>
+                                        <h2 class="anabtawi-hero-subtitle mb-3" style="color: #ffffff; font-size: 2.1rem; font-weight: 600; text-shadow: 0 3px 16px rgba(0,0,0,0.9); border: none;">
+                                            من الانجازات
+                                        </h2>
+                                        <p class="anabtawi-hero-tagline mb-1" style="color: rgba(255,255,255,0.95); font-size: 1.5rem; font-weight: 400; text-shadow: 0 2px 12px rgba(0,0,0,0.85); border: none;">
+                                            اصل الحلو...
+                                        </p>
+                                        <p class="anabtawi-hero-brand mb-4" style="color: #ffffff; font-size: 1.7rem; font-weight: 700; text-shadow: 0 2px 12px rgba(0,0,0,0.85); border: none;">
+                                            عنبتاوي
+                                        </p>
+                                        
+                                        <!-- Glassmorphism Button: اكتشف المزيد -->
+                                        <div class="pt-3">
+                                            <a href="#anabtawi_categories" class="anabtawi-glass-btn d-inline-flex align-items-center gap-2 text-decoration-none" style="background: rgba(255, 255, 255, 0.18); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.45); color: #ffffff; font-size: 1.05rem; font-weight: 600; padding: 12px 34px; border-radius: 50px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); cursor: pointer;">
+                                                <span>اكتشف المزيد</span>
+                                                <i class="fa fa-chevron-down" style="font-size: 0.85rem; transition: transform 0.2s ease;"/>
+                                            </a>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

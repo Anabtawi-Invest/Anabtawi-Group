@@ -20,6 +20,19 @@
     text-transform: uppercase;
 }
 
+// Header Navbar Brand Logo
+#o_main_nav, .o_header_standard {
+    .navbar-brand.logo {
+        img {
+            max-height: 72px !important;
+            height: auto !important;
+            width: auto !important;
+            object-fit: contain;
+            border-radius: 4px;
+        }
+    }
+}
+
 // Top bar and social rail
 .anabtawi-topbar {
     background-color: var(--anabtawi-gold-dark);
@@ -95,12 +108,19 @@
 .anabtawi-certificates {
     display: flex;
     flex-wrap: wrap;
-    gap: 1rem;
+    gap: 1.25rem;
     justify-content: center;
+    align-items: center;
 
     img {
         max-height: 48px;
         width: auto;
+        object-fit: contain;
+        transition: transform 0.25s ease, filter 0.25s ease;
+
+        &:hover {
+            transform: scale(1.08);
+        }
     }
 }
 
@@ -172,21 +192,40 @@
 }
 
 .anabtawi-category-card {
-    background: #fff;
-    border: 1px solid rgba(94, 60, 50, 0.08);
-    border-radius: 0.5rem;
+    background: transparent;
+    border: 1px solid rgba(200, 146, 17, 0.25);
+    border-radius: 20px;
     overflow: hidden;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    transition: transform 0.35s cubic-bezier(0.165, 0.84, 0.44, 1), box-shadow 0.35s ease, border-color 0.35s ease;
+    cursor: pointer;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.15);
+    display: block;
 
     &:hover {
-        box-shadow: 0 0.75rem 2rem rgba(94, 60, 50, 0.12);
-        transform: translateY(-4px);
+        border-color: #dfa935 !important;
+        box-shadow: 0 16px 36px rgba(200, 146, 17, 0.35) !important;
+        transform: translateY(-8px);
+
+        img {
+            transform: scale(1.04);
+        }
+    }
+
+    .anabtawi-category-card-img-wrap {
+        width: 100%;
+        display: block;
+        background: transparent;
+        overflow: hidden;
+        border-radius: 19px;
     }
 
     img {
-        aspect-ratio: 1;
-        object-fit: cover;
+        aspect-ratio: 1188 / 1563;
+        object-fit: contain;
         width: 100%;
+        height: auto;
+        display: block;
+        transition: transform 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
     }
 }
 
@@ -260,5 +299,739 @@
 @media (max-width: 767.98px) {
     .anabtawi-social-rail {
         display: none !important;
+    }
+}
+
+// ========================================================
+// Anabtawi Sweets - Luxury Shop & Product Showcase Styling
+// ========================================================
+.anabtawi-shop-hero {
+    background: linear-gradient(135deg, #2b1f1a 0%, #15110f 100%);
+    border: 1px solid rgba(200, 146, 17, 0.25);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.anabtawi-category-pills {
+    .btn {
+        transition: all 0.25s ease;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        font-family: inherit;
+        
+        &:hover {
+            background-color: var(--anabtawi-gold);
+            border-color: var(--anabtawi-gold);
+            color: #111 !important;
+            transform: translateY(-2px);
+        }
+    }
+}
+
+// ==========================================
+// Rawan Cake Inspired Shop & Category Styles
+// ==========================================
+
+.anabtawi-shop-controls {
+    background: #ffffff;
+    border: 1px solid rgba(200, 146, 17, 0.2);
+    box-shadow: 0 8px 30px rgba(43, 31, 26, 0.05);
+
+    .form-control:focus,
+    .form-select:focus {
+        border-color: var(--anabtawi-gold);
+        box-shadow: 0 0 0 0.25rem rgba(200, 146, 17, 0.2);
+    }
+}
+
+// Category Radio Pill Buttons (Light Theme Optimized)
+.anabtawi-category-radio-container {
+    .anabtawi-cat-radio-btn {
+        background-color: #ffffff;
+        border: 1px solid #e2e8f0;
+        color: #334155;
+        font-size: 0.92rem;
+        font-weight: 600;
+        transition: all 0.22s ease-in-out;
+        cursor: pointer;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+
+        .anabtawi-radio-circle {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            border: 2px solid #94a3b8;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.22s ease;
+            flex-shrink: 0;
+
+            .anabtawi-radio-dot {
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                background-color: #dfa935;
+                transform: scale(0);
+                opacity: 0;
+                transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+            }
+        }
+
+        &:hover {
+            border-color: #dfa935;
+            color: #b8820a;
+            background-color: #fdfaf4;
+
+            .anabtawi-radio-circle {
+                border-color: #dfa935;
+            }
+        }
+
+        &.active {
+            background-color: rgba(223, 169, 53, 0.12);
+            border-color: #dfa935;
+            border-width: 1.5px;
+            color: #9c6c2d;
+            font-weight: 700;
+            box-shadow: 0 2px 10px rgba(223, 169, 53, 0.25);
+
+            .anabtawi-radio-circle {
+                border-color: #dfa935;
+                border-width: 2px;
+
+                .anabtawi-radio-dot {
+                    transform: scale(1);
+                    opacity: 1;
+                }
+            }
+        }
+    }
+}
+
+// ========================================================
+// Product Grid & Card Luxury Overrides (Light Theme with Gold Accents)
+// ========================================================
+
+// 1. Grid cell and wrapper: Stretch to ensure equal heights across columns
+.o_wsale_products_grid_table_wrapper {
+    .oe_product {
+        height: auto !important;
+        display: flex !important;
+        flex-direction: column !important;
+    }
+
+    .o_wsale_product_grid_wrapper {
+        height: 100% !important;
+        display: flex !important;
+        flex-direction: column !important;
+        flex-grow: 1 !important;
+    }
+}
+
+// 2. The Product Card: Pure white / light luxury card with soft warm border and bottom-aligned prices
+form.oe_product_cart,
+.oe_product_cart {
+    height: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    border-radius: 20px !important;
+    overflow: hidden !important;
+    border: 1px solid #ede8e3 !important;
+    background: #ffffff !important; // Light luxury card
+    box-shadow: 0 4px 18px rgba(94, 60, 50, 0.05) !important;
+    transition: transform 0.3s cubic-bezier(0.165, 0.84, 0.44, 1), box-shadow 0.3s ease, border-color 0.3s ease !important;
+
+    &:hover {
+        transform: translateY(-5px) !important;
+        border-color: #dfa935 !important;
+        box-shadow: 0 16px 36px rgba(200, 146, 17, 0.16) !important;
+
+        .anabtawi-quick-actions-overlay {
+            opacity: 1 !important;
+            pointer-events: auto !important;
+        }
+
+        .oe_product_image_img {
+            transform: scale(1.08) !important;
+        }
+    }
+
+    // Product Image Area
+    .oe_product_image {
+        position: relative !important;
+        overflow: hidden !important;
+        aspect-ratio: 1 !important;
+        background-color: #fbf9f6 !important; // Soft warm off-white
+
+        .oe_product_image_img {
+            transition: transform 0.45s ease !important;
+            object-fit: cover !important;
+            width: 100% !important;
+            height: 100% !important;
+        }
+    }
+
+    // Card Body / Information Section:
+    // Generous padding so text is never pressed against card edges!
+    .o_wsale_product_information {
+        --o-wsale-card-info-padding: 1.15rem 1.25rem 1.25rem 1.25rem !important;
+        padding: 1.15rem 1.25rem 1.25rem 1.25rem !important;
+        display: flex !important;
+        flex-direction: column !important;
+        flex-grow: 1 !important;
+        box-sizing: border-box !important;
+        width: 100% !important;
+        text-align: start !important;
+        background-color: #ffffff !important;
+    }
+
+    // Attributes and text wrapper: Expands to fill available space so price pushes down
+    .o_wsale_product_info_attributes_wrapper,
+    .o_wsale_product_information_text {
+        display: flex !important;
+        flex-direction: column !important;
+        flex-grow: 1 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    // Category Badge
+    .anabtawi-card-category-badge {
+        margin-bottom: 0.45rem !important;
+
+        .badge {
+            font-size: 0.72rem !important;
+            font-weight: 700 !important;
+            color: #9c6c2d !important;
+            background: rgba(200, 146, 17, 0.1) !important;
+            border: 1px solid rgba(200, 146, 17, 0.28) !important;
+            padding: 0.25rem 0.65rem !important;
+            border-radius: 999px !important;
+            letter-spacing: 0.02em !important;
+        }
+    }
+
+    // Product Title
+    .o_wsale_products_item_title {
+        font-size: 1.05rem !important;
+        font-weight: 700 !important;
+        line-height: 1.4 !important;
+        margin: 0 0 0.45rem 0 !important;
+        padding: 0 !important;
+
+        a {
+            color: #2b1f1a !important; // Deep luxury chocolate/black
+            text-decoration: none !important;
+            display: -webkit-box !important;
+            -webkit-line-clamp: 2 !important;
+            -webkit-box-orient: vertical !important;
+            overflow: hidden !important;
+            min-height: 2.8em !important; // Ensures titles take consistent vertical space
+            transition: color 0.2s ease !important;
+
+            &:hover {
+                color: #c89211 !important;
+            }
+        }
+
+        .btn-danger {
+            margin-top: 0.25rem;
+            font-size: 0.7rem;
+        }
+    }
+
+    // Product Subdescription
+    .oe_subdescription_wrapper {
+        margin-bottom: 0.65rem !important;
+        flex-grow: 1 !important;
+
+        .oe_subdescription {
+            color: #64748b !important; // Clean readable slate on light card
+            font-size: 0.82rem !important;
+            line-height: 1.45 !important;
+            display: -webkit-box !important;
+            -webkit-line-clamp: 2 !important;
+            -webkit-box-orient: vertical !important;
+            overflow: hidden !important;
+            min-height: 2.4em !important; // Ensures description block is uniform
+        }
+    }
+
+    // Price Section: Clean row locked to the bottom across all cards
+    .o_wsale_product_sub {
+        margin-top: auto !important; // Pushes price to the bottom edge!
+        padding-top: 0.75rem !important;
+        border-top: 1px solid #f1ece7 !important; // Subtle separator
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        width: 100% !important;
+
+        .product_price {
+            font-size: 1.25rem !important;
+            font-weight: 800 !important;
+            color: #c89211 !important; // Anabtawi Brand Gold
+            display: flex !important;
+            align-items: baseline !important;
+            gap: 0.35rem !important;
+            margin: 0 !important;
+
+            .oe_currency_value {
+                font-size: 1.25rem !important;
+                font-weight: 800 !important;
+                color: #c89211 !important;
+            }
+        }
+    }
+}
+
+// Quick Actions Overlay on Product Card (Eye icon like Rawan Cake)
+.anabtawi-quick-actions-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(10, 14, 26, 0.45);
+    backdrop-filter: blur(2px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+    z-index: 10;
+
+    .anabtawi-btn-quickview {
+        display: inline-flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.45rem;
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        text-decoration: none;
+        transform: translateY(6px);
+        transition: all 0.25s ease;
+
+        .anabtawi-quickview-icon-circle {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #dfa935 0%, #c89211 100%);
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            box-shadow: 0 8px 25px rgba(200, 146, 17, 0.45);
+            transition: transform 0.25s ease, background 0.25s ease;
+        }
+
+        .anabtawi-quickview-text {
+            background: rgba(18, 22, 34, 0.94);
+            color: #ffffff;
+            font-size: 0.78rem;
+            font-weight: 700;
+            padding: 0.28rem 0.75rem;
+            border-radius: 6px;
+            border: 1px solid rgba(223, 169, 53, 0.35);
+            letter-spacing: 0.02em;
+            white-space: nowrap;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+        }
+
+        &:hover {
+            transform: translateY(0);
+
+            .anabtawi-quickview-icon-circle {
+                background: linear-gradient(135deg, #f3be4d 0%, #dfa935 100%);
+                transform: scale(1.1);
+            }
+        }
+    }
+}
+
+// ========================================================
+// Rawan Cake Inspired Luxury Quick View Modal
+// ========================================================
+#anabtawiQuickViewModal.anabtawi-modal-backdrop {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    background: rgba(10, 14, 26, 0.85) !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+    z-index: 9999999 !important;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    box-sizing: border-box;
+    overflow-y: auto;
+
+    &.active {
+        display: flex !important;
+        animation: anabtawiModalFadeIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+}
+
+@keyframes anabtawiModalFadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.96);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.anabtawi-modal-card {
+    position: relative;
+    background: #141824; // Deep dark slate matching Rawan Cake
+    color: #ffffff;
+    border-radius: 28px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.7);
+    width: 100%;
+    max-width: 860px;
+    padding: 2.25rem;
+    box-sizing: border-box;
+    overflow: hidden;
+
+    @media (max-width: 768px) {
+        padding: 1.5rem;
+        border-radius: 20px;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+}
+
+.anabtawi-modal-close {
+    position: absolute;
+    top: 1.25rem;
+    inset-inline-end: 1.25rem;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    z-index: 10;
+
+    &:hover {
+        background: rgba(255, 255, 255, 0.2);
+        color: #ffffff;
+        transform: rotate(90deg);
+    }
+}
+
+.anabtawi-modal-grid {
+    display: grid;
+    grid-template-columns: 1fr 1.15fr;
+    gap: 2rem;
+    align-items: center;
+
+    @media (max-width: 768px) {
+        grid-template-columns: 1fr;
+        gap: 1.25rem;
+    }
+}
+
+.anabtawi-modal-media-col {
+    .anabtawi-modal-img-container {
+        position: relative;
+        aspect-ratio: 1;
+        border-radius: 22px;
+        overflow: hidden;
+        background: #1e2436;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+
+        .anabtawi-modal-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.4s ease;
+
+            &:hover {
+                transform: scale(1.05);
+            }
+        }
+    }
+}
+
+.anabtawi-modal-details-col {
+    display: flex;
+    flex-direction: column;
+
+    .anabtawi-modal-category {
+        color: #dfa935; // Anabtawi Brand Gold
+        font-size: 0.85rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin-bottom: 0.4rem;
+    }
+
+    .anabtawi-modal-title {
+        color: #ffffff;
+        font-size: 1.65rem;
+        font-weight: 800;
+        line-height: 1.3;
+        margin-bottom: 0.75rem;
+
+        @media (max-width: 768px) {
+            font-size: 1.35rem;
+        }
+    }
+
+    .anabtawi-modal-desc {
+        color: #94a3b8;
+        font-size: 0.92rem;
+        line-height: 1.6;
+        margin-bottom: 1.25rem;
+    }
+
+    .anabtawi-modal-price-section {
+        margin-bottom: 1.25rem;
+
+        .anabtawi-modal-price-label {
+            display: block;
+            color: #94a3b8;
+            font-size: 0.78rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.2rem;
+        }
+
+        .anabtawi-modal-price-val {
+            color: #ffffff;
+            font-size: 1.85rem;
+            font-weight: 800;
+            line-height: 1.1;
+
+            .anabtawi-modal-currency {
+                font-size: 1.1rem;
+                font-weight: 700;
+                color: #dfa935; // Anabtawi Brand Gold
+                margin-inline-start: 0.35rem;
+            }
+        }
+    }
+
+    .anabtawi-modal-size-section {
+        margin-bottom: 1.5rem;
+
+        .anabtawi-modal-size-label {
+            display: block;
+            color: #ffffff;
+            font-size: 0.88rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .anabtawi-modal-sizes-pills {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.6rem;
+
+            .anabtawi-size-pill {
+                padding: 0.5rem 1rem;
+                border-radius: 10px;
+                background: rgba(255, 255, 255, 0.04);
+                border: 1px solid rgba(255, 255, 255, 0.14);
+                color: #e2e8f0;
+                font-size: 0.85rem;
+                font-weight: 600;
+                cursor: pointer;
+                transition: all 0.2s ease;
+                user-select: none;
+
+                &:hover {
+                    background: rgba(200, 146, 17, 0.12);
+                    border-color: rgba(200, 146, 17, 0.4);
+                    color: #ffffff;
+                }
+
+                &.active {
+                    background: linear-gradient(135deg, #dfa935 0%, #c89211 100%);
+                    border-color: #f3be4d;
+                    color: #ffffff;
+                    font-weight: 700;
+                    box-shadow: 0 4px 18px rgba(200, 146, 17, 0.5);
+                }
+            }
+        }
+    }
+
+    .anabtawi-modal-actions-section {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-top: 0.25rem;
+
+        .anabtawi-modal-stepper {
+            display: inline-flex;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(200, 146, 17, 0.3);
+            border-radius: 12px;
+            height: 48px;
+            padding: 0 4px;
+
+            .anabtawi-stepper-btn {
+                width: 38px;
+                height: 38px;
+                background: transparent;
+                border: none;
+                color: #ffffff;
+                font-size: 1.25rem;
+                font-weight: 700;
+                cursor: pointer;
+                border-radius: 8px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: background 0.15s ease, color 0.15s ease;
+
+                &:hover {
+                    background: rgba(200, 146, 17, 0.15);
+                    color: #dfa935;
+                }
+            }
+
+            .anabtawi-stepper-val {
+                width: 44px;
+                text-align: center;
+                background: transparent;
+                border: none;
+                color: #ffffff;
+                font-size: 1.05rem;
+                font-weight: 700;
+                outline: none;
+            }
+        }
+
+        .anabtawi-modal-add-btn {
+            flex-grow: 1;
+            height: 48px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #dfa935 0%, #b8820a 100%);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 12px;
+            color: #ffffff;
+            font-size: 0.95rem;
+            font-weight: 800;
+            cursor: pointer;
+            box-shadow: 0 6px 22px rgba(200, 146, 17, 0.45);
+            transition: all 0.22s ease;
+
+            &:hover {
+                background: linear-gradient(135deg, #ecc056 0%, #dfa935 100%);
+                transform: translateY(-2px);
+                box-shadow: 0 8px 28px rgba(200, 146, 17, 0.65);
+            }
+
+            &:active {
+                transform: translateY(0);
+            }
+        }
+    }
+
+    .anabtawi-modal-feedback {
+        margin-top: 1rem;
+        padding: 0.75rem 1rem;
+        border-radius: 10px;
+        background: rgba(200, 146, 17, 0.15);
+        border: 1px solid rgba(200, 146, 17, 0.45);
+        color: #ffd67a;
+        font-size: 0.9rem;
+        font-weight: 700;
+        text-align: center;
+        animation: anabtawiModalFadeIn 0.2s ease;
+
+        a {
+            color: #ffffff;
+            text-decoration: underline;
+            font-weight: 800;
+            margin-inline-start: 0.5rem;
+            &:hover {
+                color: #ffd67a;
+            }
+        }
+    }
+}
+
+// Product detail page
+#product_detail {
+    .product_price {
+        font-size: 1.75rem;
+        font-weight: 800;
+        color: var(--anabtawi-gold-dark);
+    }
+
+    #add_to_cart {
+        background-color: var(--anabtawi-gold);
+        border-color: var(--anabtawi-gold);
+        color: #1a1714;
+        font-weight: 700;
+        padding: 0.75rem 2rem;
+        font-size: 1.1rem;
+        border-radius: 999px;
+        transition: all 0.25s ease;
+
+        &:hover {
+            background-color: var(--anabtawi-gold-dark);
+            border-color: var(--anabtawi-gold-dark);
+            color: #fff;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(156, 108, 45, 0.35);
+        }
+    }
+}
+
+/* Rolex-Style Glassmorphism Button & Smooth Scrolling */
+html {
+    scroll-behavior: smooth !important;
+}
+
+.anabtawi-glass-btn {
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+
+    &:hover {
+        background: rgba(255, 255, 255, 0.32) !important;
+        border-color: rgba(255, 255, 255, 0.8) !important;
+        color: #ffffff !important;
+        transform: translateY(-3px) scale(1.02) !important;
+        box-shadow: 0 12px 36px rgba(255, 255, 255, 0.25), 0 4px 16px rgba(0, 0, 0, 0.5) !important;
+
+        i {
+            transform: translateY(3px);
+        }
+    }
+
+    &:active {
+        transform: translateY(-1px) scale(0.99) !important;
+    }
+}
+
+.anabtawi-video-hero {
+    blockquote {
+        border: none !important;
+        border-left: none !important;
+        border-right: none !important;
     }
 }

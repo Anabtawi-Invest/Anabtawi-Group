@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Customize the Jobs right sidebar with Anabtawi Sweets official info and team photo -->
+    <template id="anabtawi_jobs_right_side_bar" inherit_id="website_hr_recruitment.job_right_side_bar" name="Anabtawi Jobs Sidebar">
+        <xpath expr="//div[@id='jobs_grid_right']//img[contains(@src, 'job_image_8')]" position="replace">
+            <img src="/anabtawi_sweets_website/static/src/img/content/anabtawi_team.jpg" class="img-fluid rounded shadow-sm" alt="فريق حلويات عنبتاوي - Anabtawi Sweets Team" loading="lazy" style="object-fit: cover; width: 100%; border-radius: 8px;"/>
+        </xpath>
+        <xpath expr="//div[@id='jobs_grid_right']//p[contains(@class, 'mt24')]" position="replace">
+            <p class="mt24 mb8">
+                نحن في عنبتاوي للحلويات نحرص على استقطاب وتطوير الكفاءات المتميزة لصناعة تجربة استثنائية في عالم الحلويات الفاخرة منذ عام 1983.
+            </p>
+        </xpath>
+        <xpath expr="//div[@id='jobs_grid_right']//ul" position="replace">
+            <ul class="list-unstyled text-nowrap">
+                <li><i class="fa fa-comment fa-fw me-2 text-primary"/><span><a href="/contactus">تواصل معنا / Contact Us</a></span></li>
+                <li><i class="fa fa-envelope fa-fw me-2 text-primary"/><span><a href="mailto:info@anabtawisweets.com">info@anabtawisweets.com</a></span></li>
+                <li><i class="fa fa-phone fa-fw me-2 text-primary"/><span class="o_force_ltr"><a href="tel:+962797121121">+962 7 9712 1121</a></span></li>
+                <li><i class="fa fa-map-marker fa-fw me-2 text-primary"/><span>شارع المدينة المنورة، عمّان - الأردن</span></li>
+            </ul>
+        </xpath>
+    </template>
+</odoo>

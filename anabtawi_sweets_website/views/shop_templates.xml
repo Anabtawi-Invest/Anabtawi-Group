@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- 1. Top Category Radio Selector & Rawan-Cake Quick View Modal on /shop -->
+    <template id="anabtawi_shop_categories_bar" inherit_id="website_sale.products" priority="20" name="Anabtawi Shop Categories Bar">
+        <xpath expr="//div[hasclass('o_wsale_products_main_row')]" position="before">
+            <!-- Category Radio Pills Bar (Inspired by Rawan Cake) -->
+            <div class="col-12 mb-3">
+                <div class="anabtawi-category-radio-container py-2">
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        <!-- All Categories Option -->
+                        <a href="/shop"
+                           t-attf-class="anabtawi-cat-radio-btn d-inline-flex align-items-center gap-2 px-3 py-2 rounded-pill text-decoration-none #{'active' if not category else ''}">
+                            <span class="anabtawi-radio-circle">
+                                <span class="anabtawi-radio-dot"/>
+                            </span>
+                            <span class="anabtawi-radio-label">جميع الحلويات</span>
+                        </a>
+
+                        <!-- Loop through Public Categories -->
+                        <t t-foreach="request.env['product.public.category'].search([('parent_id', '=', False)], order='sequence, id')" t-as="c">
+                            <a t-attf-href="/shop/category/#{slug(c)}"
+                               t-attf-class="anabtawi-cat-radio-btn d-inline-flex align-items-center gap-2 px-3 py-2 rounded-pill text-decoration-none #{'active' if category and category.id == c.id else ''}">
+                                <span class="anabtawi-radio-circle">
+                                    <span class="anabtawi-radio-dot"/>
+                                </span>
+                                <span class="anabtawi-radio-label">
+                                    <t t-esc="c.name"/>
+                                </span>
+                            </a>
+                        </t>
+                    </div>
+                </div>
+            </div>
+        </xpath>
+
+        <!-- Rawan Cake Inspired Luxury Quick View Modal Overlay -->
+        <xpath expr="//div[@id='wrap']" position="inside">
+            <div id="anabtawiQuickViewModal" class="anabtawi-modal-backdrop" style="display: none;">
+                <div class="anabtawi-modal-card" dir="rtl">
+                    <!-- Close button (X) -->
+                    <button type="button" class="anabtawi-modal-close" id="anabtawi_modal_close_btn" aria-label="إغلاق">
+                        <i class="fa fa-times"/>
+                    </button>
+
+                    <div class="anabtawi-modal-grid">
+                        <!-- Right column: Big Square Sweet Image -->
+                        <div class="anabtawi-modal-media-col">
+                            <div class="anabtawi-modal-img-container">
+                                <img id="anabtawi_modal_img" src="" alt="صورة الصنف" class="anabtawi-modal-img"/>
+                            </div>
+                        </div>
+
+                        <!-- Left column: Category, Title, Description, Price, Sizes, Quantity & Cart -->
+                        <div class="anabtawi-modal-details-col">
+                            <div id="anabtawi_modal_categ" class="anabtawi-modal-category">
+                                حلويات فاخرة
+                            </div>
+
+                            <h2 id="anabtawi_modal_title" class="anabtawi-modal-title">
+                                اسم الصنف
+                            </h2>
+
+                            <p id="anabtawi_modal_desc" class="anabtawi-modal-desc">
+                                أشهى أصناف الحلويات الفاخرة المحضرة يومياً بأجود المكونات الطبيعية والسمن البلدي الأصيل.
+                            </p>
+
+                            <!-- Unit Price -->
+                            <div class="anabtawi-modal-price-section">
+                                <span class="anabtawi-modal-price-label">سعر الصنف / Unit Price</span>
+                                <div class="anabtawi-modal-price-val">
+                                    <span id="anabtawi_modal_price">0.00</span>
+                                    <span id="anabtawi_modal_currency" class="anabtawi-modal-currency">JOD</span>
+                                </div>
+                            </div>
+
+                            <!-- Size Selector Section -->
+                            <div class="anabtawi-modal-size-section">
+                                <span class="anabtawi-modal-size-label">الحجم / Size</span>
+                                <div id="anabtawi_modal_sizes_container" class="anabtawi-modal-sizes-pills">
+                                    <!-- Populated dynamically via JS -->
+                                </div>
+                            </div>
+
+                            <!-- Actions Row: Stepper & Add to Cart -->
+                            <div class="anabtawi-modal-actions-section">
+                                <div class="anabtawi-modal-stepper">
+                                    <button type="button" class="anabtawi-stepper-btn" id="anabtawi_qty_minus" aria-label="تقليل">−</button>
+                                    <input type="text" id="anabtawi_modal_qty" value="1" readonly="readonly" class="anabtawi-stepper-val"/>
+                                    <button type="button" class="anabtawi-stepper-btn" id="anabtawi_qty_plus" aria-label="زيادة">+</button>
+                                </div>
+
+                                <button type="button" id="anabtawi_modal_add_btn" class="anabtawi-modal-add-btn">
+                                    <i class="fa fa-shopping-bag me-2"/>
+                                    <span id="anabtawi_modal_add_text">أضف إلى السلة</span>
+                                </button>
+                            </div>
+
+                            <!-- Live Feedback message -->
+                            <div id="anabtawi_modal_feedback" class="anabtawi-modal-feedback" style="display: none;">
+                                <i class="fa fa-check-circle me-1"/> تمت إضافة الصنف إلى سلة المشتريات بنجاح!
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </xpath>
+    </template>
+
+    <!-- 2. Product Card Quick Actions Overlay & Category Tag (Inspired by Rawan Cake) -->
+    <template id="anabtawi_products_item_quickview" inherit_id="website_sale.products_item" priority="20" name="Anabtawi Products Item Quick View">
+        <!-- Quick View Overlay inside image wrapper -->
+        <xpath expr="//div[contains(@t-attf-class, 'oe_product_image')]" position="inside">
+            <div class="anabtawi-quick-actions-overlay">
+                <button type="button"
+                        class="anabtawi-btn-quickview shadow"
+                        t-att-data-product-id="product.product_variant_id.id or product.id"
+                        t-att-data-template-id="product.id"
+                        t-att-data-product-name="product.name"
+                        t-att-data-product-price="product.list_price"
+                        t-att-data-product-currency="website.currency_id.symbol"
+                        t-att-data-product-img="'/web/image/product.template/%s/image_1024' % product.id"
+                        t-att-data-product-url="product_href"
+                        t-att-data-product-categ="product.public_categ_ids[0].name if product.public_categ_ids else 'حلويات فاخرة'"
+                        t-att-data-product-desc="product.description_sale or ''">
+                    <span class="anabtawi-quickview-icon-circle">
+                        <i class="fa fa-eye"/>
+                    </span>
+                    <span class="anabtawi-quickview-text">معاينة سريعة</span>
+                </button>
+            </div>
+        </xpath>
+
+        <!-- Category badge above title -->
+        <xpath expr="//h2[hasclass('o_wsale_products_item_title')]" position="before">
+            <div t-if="product.public_categ_ids" class="anabtawi-card-category-badge mb-1">
+                <span class="badge bg-light text-warning-emphasis fw-semibold" style="font-size: 0.72rem; border: 1px solid rgba(200, 146, 17, 0.25);">
+                    <t t-esc="product.public_categ_ids[0].name"/>
+                </span>
+            </div>
+        </xpath>
+    </template>
+
+    <!-- 3. Product Detail Page Enhancements -->
+    <template id="anabtawi_product_detail" inherit_id="website_sale.product" priority="20" name="Anabtawi Product Detail">
+        <xpath expr="//div[@id='product_details']//form" position="after">
+            <!-- Trust badges for authentic sweets -->
+            <div class="anabtawi-trust-badges mt-4 pt-4 border-top">
+                <div class="row g-3 text-center">
+                    <div class="col-4">
+                        <div class="p-2 rounded-3 bg-light text-dark">
+                            <i class="fa fa-certificate text-warning fa-2x mb-1"/>
+                            <div class="small fw-bold">سمن بلدي 100%</div>
+                            <div class="text-muted" style="font-size: 0.75rem;">جودة وأصالة مضمونة</div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="p-2 rounded-3 bg-light text-dark">
+                            <i class="fa fa-heart text-danger fa-2x mb-1"/>
+                            <div class="small fw-bold">طازج يومياً</div>
+                            <div class="text-muted" style="font-size: 0.75rem;">تحضير طازج ومباشر</div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="p-2 rounded-3 bg-light text-dark">
+                            <i class="fa fa-truck text-primary fa-2x mb-1"/>
+                            <div class="small fw-bold">توصيل سريع</div>
+                            <div class="text-muted" style="font-size: 0.75rem;">لكافة المحافظات</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </xpath>
+    </template>
+</odoo>
