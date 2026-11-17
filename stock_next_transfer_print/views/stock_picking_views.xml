@@ -5,7 +5,7 @@
         <field name="model">stock.picking</field>
         <field name="inherit_id" ref="stock.view_picking_form"/>
         <field name="arch" type="xml">
-            <xpath expr="//button[@name='%(action_report_delivery)d']" position="after">
+            <xpath expr="//button[@name='%(stock.action_report_delivery)d']" position="after">
                 <button
                     name="action_print_next_transfer_operations"
                     string="Print Next Transfer"
