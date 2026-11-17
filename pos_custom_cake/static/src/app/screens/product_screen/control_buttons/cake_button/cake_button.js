@@ -8,15 +8,25 @@ import { ControlButtons } from "@point_of_sale/app/screens/product_screen/contro
 import { makeAwaitable } from "@point_of_sale/app/utils/make_awaitable_dialog";
 import { rpc } from "@web/core/network/rpc";
 import { formatCurrency } from "@web/core/currency";
+import { printAdvanceOrderReceipt } from "@pos_advance_order/js/advance_order_print";
 import { CustomCakeFormPopup } from "./custom_cake_form_popup";
 import { CakeOrdersListPopup } from "./cake_orders_list_popup";
 import { CakePayLaterReceiptPopup } from "./cake_pay_later_receipt_popup";
+import { CakeAdvancePaymentPopup } from "./cake_advance_payment_popup";
+import { CakeCompleteAdvancePopup } from "./cake_complete_advance_popup";
+
+function toNumber(value, fallback = 0) {
+    const num = Number(value);
+    return Number.isFinite(num) ? num : fallback;
+}
 
 patch(ControlButtons.prototype, {
     setup() {
         super.setup();
         this.pos = usePos();
         this.orm = useService("orm");
+        this.printer = useService("printer");
+        this.renderer = useService("renderer");
     },
 
     customCakeButtonClass() {
@@ -161,6 +171,200 @@ patch(ControlButtons.prototype, {
         });
     },
 
+    async _printAdvanceReceipt(receiptData) {
+        return printAdvanceOrderReceipt({
+            printer: this.printer,
+            renderer: this.renderer,
+            receiptData,
+            printOptions: this.pos.printOptions,
+        });
+    },
+
+    _buildCakeAdvanceReceiptData({ result, partner, advancePayload }) {
+        const advance = result?.advance_order || {};
+        const total = toNumber(advance.amount_total, result?.final_price || 0);
+        const advanceAmount = toNumber(advance.advance_amount, advancePayload.advance_amount || 0);
+        const amountTendered = toNumber(
+            advance.amount_tendered,
+            advancePayload.amount_tendered ?? advanceAmount
+        );
+        const changeDue = toNumber(
+            advance.change_amount,
+            Math.max(amountTendered - advanceAmount, 0)
+        );
+        const remainingAmount = toNumber(
+            advance.amount_remaining,
+            Math.max(total - advanceAmount, 0)
+        );
+        return {
+            companyName: this.pos.company?.name || "",
+            posName: this.pos.config?.name || "",
+            reference: advance.name || result?.name || "",
+            date: new Date().toLocaleString(),
+            customerName: partner?.name || result?.partner_name || "",
+            customerPhone: partner?.phone || "",
+            paymentMethod: advancePayload.payment_method_name || "",
+            currencyId: this.pos.currency?.id,
+            total,
+            pledgeAmount: toNumber(advance.pledge_amount, 0),
+            advanceAmount,
+            amountTendered,
+            changeDue,
+            remainingAmount,
+            isRefund: false,
+            lines: [
+                {
+                    product_id: result?.product_id,
+                    name: result?.product_name || "",
+                    qty: 1,
+                    discount: 0,
+                    subtotal: total,
+                },
+            ],
+        };
+    },
+
+    _buildCakeCompletionReceiptData({ result, popupPayload }) {
+        const total = toNumber(result?.amount_total, 0);
+        const advanceAmount = toNumber(result?.advance_amount, 0);
+        const remainingPaid = toNumber(result?.remaining_paid, Math.max(total - advanceAmount, 0));
+        const amountTendered = toNumber(
+            result?.remaining_amount_tendered,
+            popupPayload.amount_tendered ?? remainingPaid
+        );
+        const changeDue = toNumber(
+            result?.remaining_change_amount,
+            popupPayload.change_amount ?? Math.max(amountTendered - remainingPaid, 0)
+        );
+        return {
+            companyName: this.pos.company?.name || "",
+            posName: this.pos.config?.name || "",
+            reference: result?.cake_order_name || result?.name || "",
+            posOrderReference: result?.pos_order_name || "",
+            date: new Date().toLocaleString(),
+            customerName: result?.partner_name || "",
+            customerPhone: result?.partner_phone || "",
+            advancePaymentMethod: result?.advance_payment_method_name || "",
+            paymentMethod: result?.payment_method_name || popupPayload.payment_method_name || "",
+            currencyId: this.pos.currency?.id,
+            total,
+            advanceAmount,
+            remainingPaid,
+            amountTendered,
+            changeDue,
+            pledgeAmount: toNumber(result?.pledge_amount, 0),
+            remainingAmount: 0,
+            isRefund: false,
+            isCompletion: true,
+            lines: (result?.lines || []).map((line) => ({
+                name: line.name || "",
+                qty: toNumber(line.qty, 0),
+                discount: toNumber(line.discount, 0),
+                subtotal: toNumber(line.subtotal, 0),
+                isPledgeLine: !!line.is_pledge_line,
+            })),
+            pledgeLines: (result?.pledge_lines || []).map((line) => ({
+                name: line.name || "",
+                qty: toNumber(line.qty, 0),
+                subtotal: toNumber(line.subtotal, 0),
+            })),
+        };
+    },
+
+    async _handleCakePayAdvance(popupResult) {
+        const advancePayload = await makeAwaitable(this.dialog, CakeAdvancePaymentPopup, {
+            pos: this.pos,
+            cakeTotal: popupResult.prices?.final_price || 0,
+            partnerName: popupResult.partner?.name || "",
+        });
+        if (!advancePayload) {
+            return;
+        }
+
+        const payload = {
+            ...popupResult.payload,
+            advance_amount: advancePayload.advance_amount,
+            amount_tendered: advancePayload.amount_tendered,
+            payment_method_id: advancePayload.payment_method_id,
+            from_pos_config_id: this.pos.config.id,
+            deposit_pos_session_id: this.pos.session?.id,
+        };
+
+        const result = await rpc("/pos/custom_cake/create_order_with_advance", payload);
+        const moLabel = result?.production_name ? _t("MO: %s", result.production_name) : "";
+        this.notification.add(
+            _t("Cake advance saved: %s %s", result?.name || "", moLabel).trim(),
+            { type: "success" }
+        );
+        try {
+            const printResult = await this._printAdvanceReceipt(
+                this._buildCakeAdvanceReceiptData({
+                    result,
+                    partner: popupResult.partner,
+                    advancePayload,
+                })
+            );
+            if (!printResult?.printed) {
+                this.notification.add(_t("Cake advance created but receipt printing failed."), {
+                    type: "warning",
+                });
+            }
+        } catch (printError) {
+            const printMessage =
+                printError?.message === "POPUP_BLOCKED"
+                    ? _t("Please allow pop-ups to print the advance receipt.")
+                    : printError?.body ||
+                      printError?.message ||
+                      _t("Cake advance created but receipt printing failed.");
+            this.notification.add(printMessage, { type: "warning" });
+        }
+    },
+
+    async _handleCakeCompleteAdvance(order) {
+        const popupPayload = await makeAwaitable(this.dialog, CakeCompleteAdvancePopup, {
+            pos: this.pos,
+            order,
+        });
+        if (!popupPayload?.order_id) {
+            return;
+        }
+        const result = await rpc("/pos/custom_cake/complete_advance", {
+            order_id: popupPayload.order_id,
+            pos_config_id: this.pos.config.id,
+            payment_method_id: popupPayload.payment_method_id,
+            amount_tendered: popupPayload.amount_tendered,
+        });
+        this.notification.add(_t("Cake advance completed successfully."), { type: "success" });
+        try {
+            const receiptPayload =
+                result && typeof result === "object" && (result.name || result.cake_order_name)
+                    ? result
+                    : null;
+            if (receiptPayload) {
+                const printResult = await this._printAdvanceReceipt(
+                    this._buildCakeCompletionReceiptData({
+                        result: receiptPayload,
+                        popupPayload,
+                    })
+                );
+                if (!printResult?.printed) {
+                    this.notification.add(
+                        _t("Cake advance completed but receipt printing failed."),
+                        { type: "warning" }
+                    );
+                }
+            }
+        } catch (printError) {
+            const printMessage =
+                printError?.message === "POPUP_BLOCKED"
+                    ? _t("Please allow pop-ups to print the completion receipt.")
+                    : printError?.body ||
+                      printError?.message ||
+                      _t("Cake advance completed but receipt printing failed.");
+            this.notification.add(printMessage, { type: "warning" });
+        }
+    },
+
     async onClickCustomCake() {
         if (!this.isCustomCakeEnabled()) {
             this.notification.add(_t("Custom Cake is not enabled on this POS."), { type: "warning" });
@@ -175,6 +379,11 @@ patch(ControlButtons.prototype, {
         }
 
         try {
+            if (popupResult.action === "pay_advance") {
+                await this._handleCakePayAdvance(popupResult);
+                return;
+            }
+
             const result = await rpc("/pos/custom_cake/create_order", popupResult.payload);
 
             if (popupResult.action === "pay_later") {
@@ -231,6 +440,11 @@ patch(ControlButtons.prototype, {
         }
 
         try {
+            if (popupResult.order.state === "advance_paid") {
+                await this._handleCakeCompleteAdvance(popupResult.order);
+                return;
+            }
+
             const result = await rpc("/pos/custom_cake/get_order", {
                 order_id: popupResult.order.id,
             });

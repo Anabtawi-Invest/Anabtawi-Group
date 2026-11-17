@@ -35,6 +35,8 @@
                                     <th t-esc="labels.status"/>
                                     <th t-esc="labels.date"/>
                                     <th t-esc="labels.finalPrice"/>
+                                    <th t-esc="labels.advance"/>
+                                    <th t-esc="labels.remaining"/>
                                 </tr>
                             </thead>
                             <tbody>
@@ -44,10 +46,13 @@
                                         <td t-esc="order.partner_name"/>
                                         <td t-esc="order.pieces"/>
                                         <td>
-                                            <span class="badge bg-info" t-esc="getStateLabel(order.state)"/>
+                                            <span t-att-class="getStateBadgeClass(order.state)"
+                                                  t-esc="getStateLabel(order.state)"/>
                                         </td>
                                         <td t-esc="formatDate(order.date_order)"/>
                                         <td t-esc="formatAmount(order.final_price)"/>
+                                        <td t-esc="formatAmount(order.advance_amount)"/>
+                                        <td t-esc="formatAmount(order.amount_remaining)"/>
                                     </tr>
                                 </t>
                             </tbody>

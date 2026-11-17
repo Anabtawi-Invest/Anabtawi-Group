@@ -3,6 +3,7 @@ from . import cake_category
 from . import cake_size
 from . import pos_cake_image
 from . import pos_cake_order
+from . import pos_advance_order
 from . import pos_config
 from . import pos_order
 from . import mrp_production

@@ -20,6 +20,7 @@ class PosCakeOrder(models.Model):
         [
             ("draft", "Draft"),
             ("waiting_payment", "Waiting for Payment"),
+            ("advance_paid", "Advance Paid"),
             ("paid", "Paid"),
             ("cancelled", "Cancelled"),
         ],
@@ -43,6 +44,25 @@ class PosCakeOrder(models.Model):
     )
     pos_session_id = fields.Many2one("pos.session", string="POS Session", readonly=True)
     pos_order_id = fields.Many2one("pos.order", string="POS Order", readonly=True, copy=False)
+    advance_order_id = fields.Many2one(
+        "pos.advance.order",
+        string="Advance Order",
+        readonly=True,
+        copy=False,
+        index=True,
+    )
+    advance_amount = fields.Monetary(
+        string="Advance Amount",
+        currency_field="currency_id",
+        related="advance_order_id.advance_amount",
+        readonly=True,
+    )
+    amount_remaining = fields.Monetary(
+        string="Remaining Amount",
+        currency_field="currency_id",
+        related="advance_order_id.amount_remaining",
+        readonly=True,
+    )
     user_id = fields.Many2one(
         "res.users",
         string="Cashier",
@@ -286,6 +306,221 @@ class PosCakeOrder(models.Model):
             cake_order.image_ids.write({"production_id": production.id})
         return cake_order._prepare_pos_response()
 
+    def _validate_advance_payment_method(self, pm, from_pos_config):
+        if not pm or not pm.exists():
+            raise ValidationError(_("Invalid POS payment method."))
+        if from_pos_config not in pm.config_ids:
+            raise ValidationError(
+                _("This payment method is not available on the current Point of Sale.")
+            )
+        if pm.type == "pay_later":
+            raise UserError(_("Customer account payments cannot be used for advance deposits."))
+        if pm.payment_method_type and pm.payment_method_type != "none":
+            raise UserError(
+                _("Integrated POS payment methods (terminal / QR) are not supported for advance deposits.")
+            )
+
+    @api.model
+    def create_with_advance_from_pos(self, payload):
+        """Create cake order + linked advance deposit using the standard advance engine."""
+        advance_amount = float(payload.get("advance_amount") or 0.0)
+        amount_tendered = float(payload.get("amount_tendered") or 0.0)
+        payment_method_id = payload.get("payment_method_id")
+        deposit_pos_session_id = payload.get("deposit_pos_session_id")
+        from_pos_config_id = payload.get("from_pos_config_id") or payload.get("pos_config_id")
+
+        if advance_amount <= 0:
+            raise ValidationError(_("Advance amount must be greater than zero."))
+        if not payment_method_id:
+            raise ValidationError(_("Please select a payment method."))
+
+        cake_payload = dict(payload or {})
+        cake_payload["pay_later"] = True
+        result = self.create_from_pos(cake_payload)
+        cake_order = self.sudo().browse(result["id"]).exists()
+        if not cake_order:
+            raise ValidationError(_("Cake order could not be created."))
+
+        rounding = cake_order.currency_id.rounding or 0.01
+        if float_compare(advance_amount, cake_order.final_price, precision_rounding=rounding) >= 0:
+            cake_order.action_cancel()
+            raise ValidationError(
+                _("Advance amount must be less than the cake total. Use Confirm to pay in full.")
+            )
+        if float_is_zero(amount_tendered, precision_rounding=rounding):
+            amount_tendered = advance_amount
+        if float_compare(amount_tendered, advance_amount, precision_rounding=rounding) < 0:
+            cake_order.action_cancel()
+            raise ValidationError(_("Amount tendered cannot be less than the advance amount."))
+
+        from_pos_config = (
+            self.env["pos.config"].sudo().browse(int(from_pos_config_id)).exists()
+        )
+        if not from_pos_config:
+            cake_order.action_cancel()
+            raise ValidationError(_("Invalid POS configuration."))
+        if not from_pos_config.enable_advance_order:
+            cake_order.action_cancel()
+            raise UserError(_("Advance order is not enabled on this Point of Sale."))
+
+        pm = self.env["pos.payment.method"].sudo().browse(int(payment_method_id)).exists()
+        try:
+            self._validate_advance_payment_method(pm, from_pos_config)
+        except (UserError, ValidationError):
+            cake_order.action_cancel()
+            raise
+
+        deposit_session = self.env["pos.session"]
+        if deposit_pos_session_id:
+            deposit_session = (
+                self.env["pos.session"].sudo().browse(int(deposit_pos_session_id)).exists()
+            )
+            if (
+                not deposit_session
+                or deposit_session.state not in ("opened", "closing_control")
+                or deposit_session.rescue
+            ):
+                deposit_session = self.env["pos.session"]
+            elif deposit_session.config_id != from_pos_config:
+                from_pos_config = deposit_session.config_id
+
+        if not deposit_session:
+            deposit_session = (
+                self.env["pos.session"]
+                .sudo()
+                .search(
+                    [
+                        ("config_id", "=", from_pos_config.id),
+                        ("state", "in", ("opened", "closing_control")),
+                        ("rescue", "=", False),
+                    ],
+                    order="id desc",
+                    limit=1,
+                )
+            )
+
+        company = deposit_session.company_id if deposit_session else from_pos_config.company_id
+        # Final cake price is already tax-inclusive and specially rounded; store as a
+        # no-tax advance line so deposit / remaining match the cake total exactly.
+        line_vals = [
+            Command.create(
+                {
+                    "product_id": cake_order.product_id.id,
+                    "product_qty": 1.0,
+                    "price_unit": cake_order.final_price,
+                    "discount": 0.0,
+                    "tax_ids": [Command.set([])],
+                }
+            )
+        ]
+        create_vals = {
+            "partner_id": cake_order.partner_id.id,
+            "company_id": company.id,
+            "pos_config_id": from_pos_config.id,
+            "from_pos_config_id": from_pos_config.id,
+            "picking_date": fields.Datetime.now(),
+            "pos_payment_method_id": pm.id,
+            "advance_amount": advance_amount,
+            "amount_tendered": amount_tendered,
+            "site_service": True,
+            "cake_order_id": cake_order.id,
+            "line_ids": line_vals,
+        }
+        deposit_ctx = {}
+        if deposit_session:
+            deposit_ctx["pos_advance_deposit_session_id"] = deposit_session.id
+
+        try:
+            AdvanceOrder = (
+                self.env["pos.advance.order"]
+                .sudo()
+                .with_context(**deposit_ctx, allowed_company_ids=company.ids)
+                .with_company(company)
+            )
+            advance = AdvanceOrder.create(create_vals)
+            advance.with_context(**deposit_ctx).action_confirm()
+            if advance.advance_amount > 0:
+                advance.with_context(**deposit_ctx).action_create_payment(
+                    deposit_pos_session_id=deposit_session.id if deposit_session else None,
+                )
+                if deposit_session and advance.advance_deposit_move_id:
+                    advance._register_deposit_on_pos_session(deposit_session)
+            cake_order.write(
+                {
+                    "state": "advance_paid",
+                    "advance_order_id": advance.id,
+                }
+            )
+        except Exception:
+            if cake_order.exists() and cake_order.state != "cancelled":
+                cake_order.action_cancel()
+            raise
+
+        response = cake_order._prepare_pos_response()
+        response["advance_order"] = {
+            "id": advance.id,
+            "name": advance.name,
+            "state": advance.state,
+            "amount_total": advance.amount_total,
+            "advance_amount": advance.advance_amount,
+            "amount_tendered": advance.amount_tendered,
+            "change_amount": advance.change_amount,
+            "amount_remaining": advance.amount_remaining,
+            "pledge_amount": advance.pledge_amount,
+        }
+        return response
+
+    @api.model
+    def complete_advance_from_pos(self, payload):
+        """Settle remaining balance for an advance-paid cake via its linked advance order."""
+        order_id = int(payload.get("order_id") or 0)
+        pos_config_id = payload.get("pos_config_id")
+        payment_method_id = payload.get("payment_method_id")
+        amount_tendered = payload.get("amount_tendered")
+
+        cake_order = self.sudo().browse(order_id).exists()
+        if not cake_order:
+            raise ValidationError(_("Cake order not found."))
+        if cake_order.state != "advance_paid":
+            raise ValidationError(_("This cake order is not advance paid."))
+        if not cake_order.advance_order_id:
+            raise ValidationError(_("No advance order is linked to this cake."))
+        if not pos_config_id:
+            raise ValidationError(_("POS configuration is required."))
+        if not payment_method_id:
+            raise ValidationError(_("Please select a payment method."))
+
+        pos_config = self.env["pos.config"].sudo().browse(int(pos_config_id)).exists()
+        if not pos_config:
+            raise ValidationError(_("Invalid POS configuration."))
+
+        pm = self.env["pos.payment.method"].sudo().browse(int(payment_method_id)).exists()
+        if not pm:
+            raise ValidationError(_("Invalid payment method."))
+        if pm not in pos_config.payment_method_ids:
+            raise ValidationError(
+                _("This payment method is not available on the current Point of Sale.")
+            )
+
+        advance = cake_order.advance_order_id
+        tendered = float(amount_tendered) if amount_tendered is not None else None
+        receipt = advance.action_create_remaining_payment(
+            pos_payment_method_id=pm.id,
+            pos_config_id=pos_config.id,
+            amount_tendered=tendered,
+        )
+        if advance.state != "fully_paid":
+            raise UserError(_("Advance order could not be completed."))
+        if cake_order.state != "paid":
+            cake_order.action_mark_paid(advance.remaining_pos_order_id)
+
+        if not isinstance(receipt, dict):
+            receipt = advance._completion_receipt_vals(completion_pm=pm)
+        receipt["cake_order_id"] = cake_order.id
+        receipt["cake_order_name"] = cake_order.name
+        receipt["cake_state"] = cake_order.state
+        return receipt
+
     def _get_manufacturing_picking_type(self):
         self.ensure_one()
         PickingType = self.env["stock.picking.type"].sudo()
@@ -404,6 +639,10 @@ class PosCakeOrder(models.Model):
             "production_name": self.production_id.name or False,
             "date_order": fields.Datetime.to_string(self.date_order),
             "note": self.note or "",
+            "advance_order_id": self.advance_order_id.id or False,
+            "advance_order_name": self.advance_order_id.name or False,
+            "advance_amount": self.advance_amount or 0.0,
+            "amount_remaining": self.amount_remaining or 0.0,
         }
 
     def action_mark_paid(self, pos_order=None):
@@ -421,17 +660,21 @@ class PosCakeOrder(models.Model):
         for order in self:
             if order.state == "paid":
                 raise UserError(_("Paid cake orders cannot be cancelled."))
+            if order.state == "advance_paid":
+                raise UserError(
+                    _("Advance-paid cake orders cannot be cancelled. Refund the advance deposit first.")
+                )
             if order.production_id and order.production_id.state not in ("done", "cancel"):
                 order.production_id.action_cancel()
             order.state = "cancelled"
 
     @api.model
     def search_for_pos(self, query="", limit=50):
-        domain = [("state", "=", "waiting_payment")]
+        domain = [("state", "in", ("waiting_payment", "advance_paid"))]
         if query:
             domain = [
                 "&",
-                ("state", "=", "waiting_payment"),
+                ("state", "in", ("waiting_payment", "advance_paid")),
                 "|",
                 ("name", "ilike", query),
                 ("partner_id.name", "ilike", query),
@@ -448,6 +691,9 @@ class PosCakeOrder(models.Model):
                 "final_price": order.final_price,
                 "product_name": order.product_id.display_name,
                 "note": order.note or "",
+                "advance_order_id": order.advance_order_id.id or False,
+                "advance_amount": order.advance_amount or 0.0,
+                "amount_remaining": order.amount_remaining or 0.0,
             }
             for order in orders
         ]

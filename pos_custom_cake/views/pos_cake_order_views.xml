@@ -13,7 +13,7 @@
                     <button name="action_cancel" string="Cancel" type="object"
                             invisible="state in ('paid', 'cancelled')"/>
                     <field name="state" widget="statusbar"
-                           statusbar_visible="draft,waiting_payment,paid,cancelled"/>
+                           statusbar_visible="draft,waiting_payment,advance_paid,paid,cancelled"/>
                 </header>
                 <sheet>
                     <div class="oe_title">
@@ -34,6 +34,9 @@
                             <field name="pos_config_id"/>
                             <field name="pos_session_id"/>
                             <field name="pos_order_id"/>
+                            <field name="advance_order_id"/>
+                            <field name="advance_amount"/>
+                            <field name="amount_remaining"/>
                             <field name="production_id"/>
                             <field name="upload_session_id" invisible="1"/>
                         </group>
@@ -95,10 +98,13 @@
                 <field name="pieces"/>
                 <field name="state" widget="badge"
                        decoration-info="state == 'waiting_payment'"
+                       decoration-warning="state == 'advance_paid'"
                        decoration-success="state == 'paid'"
                        decoration-muted="state == 'cancelled'"/>
                 <field name="date_order"/>
                 <field name="final_price"/>
+                <field name="advance_amount" optional="hide"/>
+                <field name="amount_remaining" optional="hide"/>
                 <field name="user_id"/>
             </list>
         </field>
@@ -114,6 +120,8 @@
                 <field name="note"/>
                 <filter string="Waiting for Payment" name="waiting_payment"
                         domain="[('state', '=', 'waiting_payment')]"/>
+                <filter string="Advance Paid" name="advance_paid"
+                        domain="[('state', '=', 'advance_paid')]"/>
                 <filter string="Paid" name="paid" domain="[('state', '=', 'paid')]"/>
                 <filter string="Cancelled" name="cancelled" domain="[('state', '=', 'cancelled')]"/>
                 <separator/>

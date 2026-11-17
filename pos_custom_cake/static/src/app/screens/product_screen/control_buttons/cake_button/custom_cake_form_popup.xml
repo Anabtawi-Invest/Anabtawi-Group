@@ -192,6 +192,10 @@
                         t-att-disabled="state.loading ? 'disabled' : undefined">
                     ⏳ <t t-esc="labels.payLater"/>
                 </button>
+                <button class="btn btn-info text-white" t-on-click="payAdvance" type="button"
+                        t-att-disabled="state.loading ? 'disabled' : undefined">
+                    💰 <t t-esc="labels.payAdvance"/>
+                </button>
                 <button class="btn btn-primary" t-on-click="confirm" type="button"
                         t-att-disabled="state.loading ? 'disabled' : undefined">
                     ✅ <t t-esc="labels.confirm"/>
