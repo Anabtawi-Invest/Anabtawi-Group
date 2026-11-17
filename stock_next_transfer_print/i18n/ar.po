@@ -1,0 +1,81 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# 	* stock_next_transfer_print
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 19.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-11-17 11:10+0000\n"
+"PO-Revision-Date: 2026-11-17 11:10+0000\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Language: ar\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=6; plural=n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 "
+"&& n%100<=10 ? 3 : n%100>=11 && n%100<=99 ? 4 : 5;\n"
+
+#. module: stock_next_transfer_print
+#: model:ir.model,name:stock_next_transfer_print.model_stock_print_next_transfer_wizard
+#: model_terms:ir.ui.view,arch_db:stock_next_transfer_print.stock_print_next_transfer_wizard_view_form
+#: model_terms:ir.ui.view,arch_db:stock_next_transfer_print.view_picking_form_print_next_transfer
+msgid "Print Next Transfer"
+msgstr "طباعة التحويل التالي"
+
+#. module: stock_next_transfer_print
+#: code:addons/stock_next_transfer_print/models/stock_picking.py:0
+#, python-format
+msgid "Print Next Transfer"
+msgstr "طباعة التحويل التالي"
+
+#. module: stock_next_transfer_print
+#: model_terms:ir.ui.view,arch_db:stock_next_transfer_print.stock_print_next_transfer_wizard_view_form
+msgid "Print"
+msgstr "طباعة"
+
+#. module: stock_next_transfer_print
+#: model_terms:ir.ui.view,arch_db:stock_next_transfer_print.stock_print_next_transfer_wizard_view_form
+msgid "Close"
+msgstr "إغلاق"
+
+#. module: stock_next_transfer_print
+#: model_terms:ir.ui.view,arch_db:stock_next_transfer_print.stock_print_next_transfer_wizard_view_form
+msgid ""
+"This transfer created more than one next transfer. Choose which Picking "
+"Operations report to print."
+msgstr ""
+"أنشأ هذا التحويل أكثر من تحويل تالٍ. اختر تقرير عمليات الانتقاء الذي تريد "
+"طباعته."
+
+#. module: stock_next_transfer_print
+#: code:addons/stock_next_transfer_print/models/stock_picking.py:0
+#, python-format
+msgid "This transfer has no next transfer to print."
+msgstr "لا يوجد تحويل تالٍ لطباعة تقريره."
+
+#. module: stock_next_transfer_print
+#: model:ir.model,name:stock_next_transfer_print.model_stock_print_next_transfer_wizard_line
+msgid "Print Next Transfer Line"
+msgstr "سطر طباعة التحويل التالي"
+
+#. module: stock_next_transfer_print
+#: model:ir.model.fields,field_description:stock_next_transfer_print.field_stock_print_next_transfer_wizard__line_ids
+msgid "Next Transfers"
+msgstr "التحويلات التالية"
+
+#. module: stock_next_transfer_print
+#: model:ir.model.fields,field_description:stock_next_transfer_print.field_stock_print_next_transfer_wizard_line__picking_type_id
+msgid "Operation Type"
+msgstr "نوع العملية"
+
+#. module: stock_next_transfer_print
+#: model:ir.model.fields,field_description:stock_next_transfer_print.field_stock_print_next_transfer_wizard_line__state
+msgid "Status"
+msgstr "الحالة"
+
+#. module: stock_next_transfer_print
+#: model:ir.model,name:stock_next_transfer_print.model_stock_picking
+msgid "Transfer"
+msgstr "تحويل"
