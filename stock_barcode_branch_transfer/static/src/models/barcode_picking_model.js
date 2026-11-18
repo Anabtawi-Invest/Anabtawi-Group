@@ -360,9 +360,10 @@ patch(BarcodePickingModel.prototype, {
         }
         this._assignBranchLocation(result, barcodeData);
         this._branchPendingRole = null;
-        // Always stop here. A location barcode must not continue into the
-        // product path, or Odoo shows "scan one or more products or a package".
-        barcodeData.stopped = true;
+        if (barcodeData.stopped) {
+            barcodeData.stopped = false;
+            this.trigger?.("playSound", "success");
+        }
         this.trigger?.("update");
     },
 
