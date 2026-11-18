@@ -57,6 +57,17 @@ class HrAttendanceExtraHoursApproval(models.Model):
     decided_on = fields.Datetime(string="Decided On", readonly=True)
 
     @api.model
+    def _backfill_waiting_approvals(self):
+        """Upgrade helper: create waiting approvals for existing to-approve extra hours."""
+        attendances = self.env["hr.attendance"].sudo().search(
+            [
+                ("check_out", "!=", False),
+                ("overtime_status", "=", "to_approve"),
+            ]
+        )
+        return self._ensure_for_attendances(attendances)
+
+    @api.model
     def _ensure_for_attendances(self, attendances):
         """Create one waiting approval for every attendance that has extra hours."""
         attendances = attendances.filtered(

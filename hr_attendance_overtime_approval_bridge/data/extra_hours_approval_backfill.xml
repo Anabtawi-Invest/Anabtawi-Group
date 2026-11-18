@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Runs on module install/upgrade. Safe to repeat: existing records are reused. -->
+    <function model="hr.attendance.extra.hours.approval" name="_backfill_waiting_approvals"/>
+</odoo>
