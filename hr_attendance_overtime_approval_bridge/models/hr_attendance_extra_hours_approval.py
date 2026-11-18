@@ -58,10 +58,14 @@ class HrAttendanceExtraHoursApproval(models.Model):
 
     @api.model
     def _backfill_waiting_approvals(self):
-        """Upgrade helper: create waiting approvals for existing to-approve extra hours."""
+        """Upgrade helper: create waiting approvals from 1 October until now."""
+        today = fields.Date.context_today(self)
+        year = today.year if today.month >= 10 else today.year - 1
+        since = fields.Datetime.to_datetime("%s-10-01 00:00:00" % year)
         attendances = self.env["hr.attendance"].sudo().search(
             [
                 ("check_out", "!=", False),
+                ("check_in", ">=", since),
                 ("overtime_status", "=", "to_approve"),
             ]
         )
