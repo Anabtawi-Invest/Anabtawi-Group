@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="stock_barcode_view_picking_type_form" model="ir.ui.view">
+        <field name="name">stock.picking.type.form.branch.transfer</field>
+        <field name="model">stock.picking.type</field>
+        <field name="inherit_id" ref="stock_barcode.stock_barcode_view_picking_type_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//group[@name='barcode_options']" position="inside">
+                <field name="barcode_override_scanned_locations"
+                       string="Override locations from scan"
+                       help="When enabled, scanning this operation type creates a transfer, then you must scan the source location, then the destination location. Those locations are assigned on the transfer before you scan products. Scanning a different source or destination later is blocked."/>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>
