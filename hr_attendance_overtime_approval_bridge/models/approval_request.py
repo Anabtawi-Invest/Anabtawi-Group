@@ -734,6 +734,9 @@ class ApprovalRequest(models.Model):
         return result
 
     def _cron_convert_pending_weekly_overtime(self):
+        # Extra hours are decided from Extra Hours Approval. The weekly threshold
+        # no longer approves or refuses them at the end of the week.
+        return
         required_weekly_hours = self._get_required_weekly_hours()
         today = fields.Date.context_today(self)
         pending_requests = self.search(

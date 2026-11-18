@@ -11,6 +11,21 @@ class AnabtawiEmployeeAppPWA(http.Controller):
         module_path = os.path.dirname(os.path.dirname(__file__))
         return os.path.join(module_path, "static", "employee_app", *parts)
 
+    @http.route(
+        ["/employee-portal/extra-hours-approval", "/employee-portal/extra-hours-approval/"],
+        type="http", auth="public", website=False, sitemap=False,
+    )
+    def extra_hours_approval(self, **kwargs):
+        with open(self._static_path("extra_hours_approval.html"), "r", encoding="utf-8") as file:
+            html = file.read()
+        return request.make_response(
+            html,
+            headers=[
+                ("Content-Type", "text/html; charset=utf-8"),
+                ("Cache-Control", "no-cache"),
+            ],
+        )
+
     @http.route(["/employee-portal", "/employee-portal/"], type="http", auth="public", website=False, sitemap=False)
     def employee_portal(self, **kwargs):
         with open(self._static_path("index.html"), "r", encoding="utf-8") as file:

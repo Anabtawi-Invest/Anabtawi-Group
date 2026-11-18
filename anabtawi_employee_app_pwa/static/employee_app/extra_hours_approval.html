@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+  <title>Extra hours approval</title>
+  <style>
+    :root { color-scheme: light; --bg:#f6f3ee; --card:#fff; --ink:#1d1a17; --muted:#6e675f; --line:#e6dfd6; --gold:#a6843d; --ok:#1f7a4d; --no:#9d2c2c; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: Georgia, "Times New Roman", serif; background:var(--bg); color:var(--ink); }
+    header { display:flex; align-items:center; gap:12px; padding:16px 18px; background:#1d1a17; color:#fff; }
+    header a { color:#f3e6c4; text-decoration:none; font-family: Arial, sans-serif; font-size:14px; }
+    h1 { margin:0; font-size:20px; font-weight:600; }
+    main { padding:16px; max-width:720px; margin:0 auto; }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px 16px; margin-bottom:12px; }
+    .name { font-size:18px; }
+    .meta { color:var(--muted); font-family: Arial, sans-serif; font-size:14px; margin-top:4px; }
+    .hours { margin-top:8px; font-size:22px; color:var(--gold); }
+    .actions { display:flex; gap:8px; margin-top:12px; }
+    button { flex:1; border:0; border-radius:10px; padding:12px 10px; font-family: Arial, sans-serif; font-size:15px; }
+    .approve { background:var(--ok); color:#fff; }
+    .refuse { background:#fff; color:var(--no); border:1px solid var(--no); }
+    .empty, .error { font-family: Arial, sans-serif; color:var(--muted); padding:24px 4px; }
+    .error { color:var(--no); }
+  </style>
+</head>
+<body>
+  <header>
+    <a id="back" href="/employee-portal">Back</a>
+    <h1 id="title">Extra hours approval</h1>
+  </header>
+  <main id="list"></main>
+  <script>
+    const copy = {
+      en: { title: "Extra hours approval", back: "Back", empty: "No extra hours are waiting for your approval.", hours: "Extra hours", approve: "Approve", refuse: "Refuse", error: "The employee app session was not found. Open the employee app and sign in again.", failed: "The request could not be updated." },
+      ar: { title: "موافقة الساعات الإضافية", back: "رجوع", empty: "لا توجد ساعات إضافية بانتظار موافقتك.", hours: "الساعات الإضافية", approve: "موافقة", refuse: "رفض", error: "جلسة تطبيق الموظف غير موجودة. افتح التطبيق وسجّل الدخول مرة أخرى.", failed: "تعذر تحديث الطلب." }
+    };
+    const lang = localStorage.getItem("anabtawi_language_v1") === "ar" ? "ar" : "en";
+    const t = copy[lang];
+    document.documentElement.lang = lang;
+    document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
+    document.getElementById("title").textContent = t.title;
+    document.getElementById("back").textContent = t.back;
+    const list = document.getElementById("list");
+
+    function sessionToken() {
+      try {
+        const raw = localStorage.getItem("anabtawi_session_v1");
+        return raw ? JSON.parse(raw).token : "";
+      } catch (error) {
+        return "";
+      }
+    }
+
+    async function api(path, options) {
+      const token = sessionToken();
+      if (!token) throw new Error(t.error);
+      const response = await fetch(path, {
+        method: options && options.method ? options.method : "GET",
+        headers: {
+          Accept: "application/json",
+          Authorization: "Bearer " + token,
+          "Content-Type": "application/json"
+        },
+        body: options && options.body ? JSON.stringify(options.body) : undefined
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.message || t.failed);
+      return data;
+    }
+
+    function card(record) {
+      const node = document.createElement("article");
+      node.className = "card";
+      node.innerHTML = '<div class="name"></div><div class="meta"></div><div class="hours"></div><div class="actions"><button class="approve" type="button"></button><button class="refuse" type="button"></button></div>';
+      node.querySelector(".name").textContent = record.employee_name || "";
+      node.querySelector(".meta").textContent = record.date || "";
+      node.querySelector(".hours").textContent = t.hours + ": " + (record.extra_hours_display || "");
+      const approve = node.querySelector(".approve");
+      const refuse = node.querySelector(".refuse");
+      approve.textContent = t.approve;
+      refuse.textContent = t.refuse;
+      approve.addEventListener("click", () => decide(record.id, "approve", node));
+      refuse.addEventListener("click", () => decide(record.id, "refuse", node));
+      return node;
+    }
+
+    async function decide(id, decision, node) {
+      node.querySelectorAll("button").forEach((button) => { button.disabled = true; });
+      try {
+        await api("/anabtawi/mobile/extra-hours/decide", { method: "POST", body: { id: id, decision: decision } });
+        node.remove();
+        if (!list.children.length) showEmpty();
+      } catch (error) {
+        node.querySelectorAll("button").forEach((button) => { button.disabled = false; });
+        alert(error.message || t.failed);
+      }
+    }
+
+    function showEmpty() {
+      list.innerHTML = '<p class="empty"></p>';
+      list.querySelector("p").textContent = t.empty;
+    }
+
+    async function load() {
+      try {
+        const data = await api("/anabtawi/mobile/extra-hours/pending");
+        list.innerHTML = "";
+        (data.records || []).forEach((record) => list.appendChild(card(record)));
+        if (!list.children.length) showEmpty();
+      } catch (error) {
+        list.innerHTML = '<p class="error"></p>';
+        list.querySelector("p").textContent = error.message || t.failed;
+      }
+    }
+    load();
+  </script>
+</body>
+</html>

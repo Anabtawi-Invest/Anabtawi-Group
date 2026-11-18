@@ -11,12 +11,6 @@
             <xpath expr="//field[@name='linked_overtime_ids']/list" position="inside">
                 <field name="eligible_overtime" column_invisible="1"/>
             </xpath>
-            <xpath expr="//button[@name='action_approve_overtime']" position="attributes">
-                <attribute name="invisible">not is_manager or overtime_status not in ['to_approve', 'refused'] or not overtime_status or not eligible_overtime</attribute>
-            </xpath>
-            <xpath expr="//field[@name='linked_overtime_ids']/list/button[@name='action_approve']" position="attributes">
-                <attribute name="invisible">not is_manager or status not in ['to_approve', 'refused'] or not eligible_overtime</attribute>
-            </xpath>
         </field>
     </record>
 
@@ -27,9 +21,6 @@
         <field name="arch" type="xml">
             <xpath expr="//list" position="inside">
                 <field name="eligible_overtime" column_invisible="1"/>
-            </xpath>
-            <xpath expr="//list/button[@name='action_approve_overtime' and @icon='fa-check']" position="attributes">
-                <attribute name="invisible">not is_manager or overtime_status not in ['to_approve', 'refused'] or not eligible_overtime</attribute>
             </xpath>
         </field>
     </record>

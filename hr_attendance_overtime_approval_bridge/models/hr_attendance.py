@@ -3,7 +3,8 @@
 from datetime import timedelta
 import logging
 
-from odoo import api, fields, models
+from odoo import _, api, fields, models
+from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
 
@@ -11,6 +12,15 @@ _logger = logging.getLogger(__name__)
 class HrAttendance(models.Model):
     _inherit = "hr.attendance"
 
+    extra_hours_approval_state = fields.Selection(
+        selection=[
+            ("waiting", "Waiting manager approval"),
+            ("approved", "Approved"),
+            ("refused", "Refused by manager"),
+        ],
+        string="Extra Hours Approval",
+        compute="_compute_extra_hours_approval_state",
+    )
     overtime_authorization_request_id = fields.Many2one(
         "approval.request",
         string="Overtime Authorization Request",
@@ -22,6 +32,39 @@ class HrAttendance(models.Model):
         copy=False,
         readonly=True,
     )
+
+    def _compute_extra_hours_approval_state(self):
+        approvals = self.env["hr.attendance.extra.hours.approval"].search(
+            [("attendance_id", "in", self.ids)]
+        )
+        state_by_attendance = {
+            approval.attendance_id.id: approval.state for approval in approvals
+        }
+        for attendance in self:
+            attendance.extra_hours_approval_state = state_by_attendance.get(
+                attendance.id, False
+            )
+
+    def _require_extra_hours_manager_approval(self):
+        approvals = self.env["hr.attendance.extra.hours.approval"]
+        approvals._ensure_for_attendances(self)
+        self.invalidate_recordset(["extra_hours_approval_state"])
+        blocked = self.filtered(
+            lambda att: att.overtime_status and att.extra_hours_approval_state != "approved"
+        )
+        if not blocked:
+            return
+        if all(att.extra_hours_approval_state == "refused" for att in blocked):
+            raise UserError(_("The manager refused these extra hours."))
+        raise UserError(_("Extra hours are waiting for manager approval."))
+
+    def action_approve_overtime(self):
+        self._require_extra_hours_manager_approval()
+        return super().action_approve_overtime()
+
+    def action_refuse_overtime(self):
+        self._require_extra_hours_manager_approval()
+        return super().action_refuse_overtime()
 
     @api.depends("check_in", "check_out", "employee_id")
     def _compute_overtime_status(self):

@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="hr_attendance_extra_hours_approval_view_list" model="ir.ui.view">
+        <field name="name">hr.attendance.extra.hours.approval.list</field>
+        <field name="model">hr.attendance.extra.hours.approval</field>
+        <field name="arch" type="xml">
+            <list string="Extra Hours Approval" create="0" edit="0" delete="0">
+                <field name="date"/>
+                <field name="employee_id" widget="many2one_avatar_employee"/>
+                <field name="manager_id" widget="many2one_avatar_employee"/>
+                <field name="extra_hours" widget="float_time"/>
+                <field name="state" widget="badge"
+                    decoration-warning="state == 'waiting'"
+                    decoration-success="state == 'approved'"
+                    decoration-danger="state == 'refused'"/>
+                <field name="attendance_id" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="hr_attendance_extra_hours_approval_view_form" model="ir.ui.view">
+        <field name="name">hr.attendance.extra.hours.approval.form</field>
+        <field name="model">hr.attendance.extra.hours.approval</field>
+        <field name="arch" type="xml">
+            <form string="Extra Hours Approval" create="0" edit="0" delete="0">
+                <header>
+                    <button name="action_manager_approve" type="object" string="Approve"
+                        class="btn-primary" invisible="state != 'waiting'"/>
+                    <button name="action_manager_refuse" type="object" string="Refuse"
+                        class="btn-secondary" invisible="state != 'waiting'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="waiting,approved,refused"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="employee_id"/>
+                            <field name="manager_id"/>
+                            <field name="date"/>
+                        </group>
+                        <group>
+                            <field name="extra_hours" widget="float_time"/>
+                            <field name="attendance_id"/>
+                            <field name="decided_by_id"/>
+                            <field name="decided_on"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="hr_attendance_extra_hours_approval_view_search" model="ir.ui.view">
+        <field name="name">hr.attendance.extra.hours.approval.search</field>
+        <field name="model">hr.attendance.extra.hours.approval</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="employee_id"/>
+                <field name="manager_id"/>
+                <filter name="waiting" string="Waiting manager approval" domain="[('state', '=', 'waiting')]"/>
+                <filter name="approved" string="Approved" domain="[('state', '=', 'approved')]"/>
+                <filter name="refused" string="Refused by manager" domain="[('state', '=', 'refused')]"/>
+                <group>
+                    <filter name="group_manager" string="Manager" context="{'group_by': 'manager_id'}"/>
+                    <filter name="group_employee" string="Employee" context="{'group_by': 'employee_id'}"/>
+                    <filter name="group_state" string="Status" context="{'group_by': 'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_hr_attendance_extra_hours_approval" model="ir.actions.act_window">
+        <field name="name">Extra Hours Approval</field>
+        <field name="res_model">hr.attendance.extra.hours.approval</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_waiting': 1}</field>
+    </record>
+
+    <menuitem
+        id="menu_hr_attendance_extra_hours_approval"
+        name="Extra Hours Approval"
+        parent="hr_attendance.menu_hr_attendance_root"
+        action="action_hr_attendance_extra_hours_approval"
+        sequence="15"
+        groups="hr_attendance.group_hr_attendance_officer"/>
+</odoo>

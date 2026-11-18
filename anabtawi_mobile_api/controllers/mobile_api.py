@@ -900,6 +900,65 @@ class AnabtawiMobileAPI(http.Controller):
             "state": approval.request_status,
         } for approval in approvals]})
 
+    def _extra_hours_payload(self, approval):
+        hours = approval.extra_hours or 0.0
+        minutes_total = int(round(abs(hours) * 60))
+        return {
+            "id": approval.id,
+            "employee_id": approval.employee_id.id,
+            "employee_name": approval.employee_id.name or "",
+            "date": fields.Date.to_string(approval.date) if approval.date else None,
+            "extra_hours": round(hours, 4),
+            "extra_hours_display": "%02d:%02d" % (minutes_total // 60, minutes_total % 60),
+            "state": approval.state,
+        }
+
+    @http.route(
+        "/anabtawi/mobile/extra-hours/pending",
+        type="http", auth="public", methods=["GET"], csrf=False,
+    )
+    def extra_hours_pending(self, **kwargs):
+        employee, _user, _token, error = self._require_employee()
+        if error:
+            return error
+        approvals = request.env["hr.attendance.extra.hours.approval"].sudo().search(
+            [
+                ("manager_id", "=", employee.id),
+                ("state", "=", "waiting"),
+            ],
+            order="date desc, id desc",
+            limit=50,
+        )
+        return _json({
+            "status": "ok",
+            "records": [self._extra_hours_payload(approval) for approval in approvals],
+        })
+
+    @http.route(
+        "/anabtawi/mobile/extra-hours/decide",
+        type="http", auth="public", methods=["POST"], csrf=False,
+    )
+    def extra_hours_decide(self, **kwargs):
+        employee, user, _token, error = self._require_employee()
+        if error:
+            return error
+        data = _payload()
+        try:
+            approval_id = int(data.get("id") or 0)
+        except (TypeError, ValueError):
+            return _error("invalid_request", _("A valid request is required."), 422)
+        decision = (data.get("decision") or "").strip()
+        if decision not in ("approve", "refuse"):
+            return _error("invalid_request", _("Choose approve or refuse."), 422)
+        approval = request.env["hr.attendance.extra.hours.approval"].sudo().browse(approval_id).exists()
+        if not approval or approval.manager_id != employee:
+            return _error("not_found", _("This extra hours request is not assigned to you."), 404)
+        try:
+            approval._decide("approved" if decision == "approve" else "refused", user)
+        except (UserError, ValidationError) as exc:
+            return _error("validation_error", exc.args[0] if exc.args else str(exc), 422)
+        return _json({"status": "ok", "record": self._extra_hours_payload(approval)})
+
     @http.route(
             "/anabtawi/mobile/payslips/list",
             type="http", auth="public", methods=["GET"], csrf=False,

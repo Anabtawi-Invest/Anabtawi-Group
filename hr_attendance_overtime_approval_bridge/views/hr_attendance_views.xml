@@ -1,5 +1,69 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+    <record id="hr_attendance_view_form_extra_hours_approval" model="ir.ui.view">
+        <field name="name">hr.attendance.form.extra.hours.approval</field>
+        <field name="model">hr.attendance</field>
+        <field name="inherit_id" ref="hr_attendance.hr_attendance_view_form"/>
+        <field name="priority">99</field>
+        <field name="arch" type="xml">
+            <xpath expr="//button[@name='action_refuse_overtime']" position="after">
+                <field name="extra_hours_approval_state" nolabel="1" widget="badge"
+                    invisible="not extra_hours_approval_state"
+                    decoration-warning="extra_hours_approval_state == 'waiting'"
+                    decoration-success="extra_hours_approval_state == 'approved'"
+                    decoration-danger="extra_hours_approval_state == 'refused'"/>
+            </xpath>
+            <xpath expr="//button[@name='action_approve_overtime' and contains(@class, 'oe_stat_button')]" position="attributes">
+                <attribute name="invisible">not is_manager or overtime_status not in ['to_approve', 'refused'] or not overtime_status or extra_hours_approval_state != 'approved'</attribute>
+            </xpath>
+            <xpath expr="//button[@name='action_refuse_overtime' and contains(@class, 'oe_stat_button')]" position="attributes">
+                <attribute name="invisible">not is_manager or overtime_status not in ['to_approve', 'approved'] or not overtime_status or extra_hours_approval_state != 'approved'</attribute>
+            </xpath>
+            <xpath expr="//field[@name='linked_overtime_ids']/list/button[@name='action_approve']" position="attributes">
+                <attribute name="invisible">not is_manager or status not in ['to_approve', 'refused'] or parent.extra_hours_approval_state != 'approved'</attribute>
+            </xpath>
+            <xpath expr="//field[@name='linked_overtime_ids']/list/button[@name='action_refuse']" position="attributes">
+                <attribute name="invisible">not is_manager or status not in ['to_approve', 'approved'] or parent.extra_hours_approval_state != 'approved'</attribute>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_attendance_tree_extra_hours_approval" model="ir.ui.view">
+        <field name="name">hr.attendance.list.extra.hours.approval</field>
+        <field name="model">hr.attendance</field>
+        <field name="inherit_id" ref="hr_attendance.view_attendance_tree"/>
+        <field name="priority">99</field>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='validated_overtime_hours']" position="after">
+                <field name="extra_hours_approval_state" optional="show" widget="badge"
+                    decoration-warning="extra_hours_approval_state == 'waiting'"
+                    decoration-success="extra_hours_approval_state == 'approved'"
+                    decoration-danger="extra_hours_approval_state == 'refused'"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_attendance_tree_management_extra_hours_approval" model="ir.ui.view">
+        <field name="name">hr.attendance.list.management.extra.hours.approval</field>
+        <field name="model">hr.attendance</field>
+        <field name="inherit_id" ref="hr_attendance.view_attendance_tree_management"/>
+        <field name="priority">99</field>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='validated_overtime_hours']" position="after">
+                <field name="extra_hours_approval_state" widget="badge"
+                    decoration-warning="extra_hours_approval_state == 'waiting'"
+                    decoration-success="extra_hours_approval_state == 'approved'"
+                    decoration-danger="extra_hours_approval_state == 'refused'"/>
+            </xpath>
+            <xpath expr="//list/button[@name='action_approve_overtime' and contains(@class, 'oe_stat_button')]" position="attributes">
+                <attribute name="invisible">not is_manager or overtime_status not in ['to_approve', 'refused'] or extra_hours_approval_state != 'approved'</attribute>
+            </xpath>
+            <xpath expr="//list/button[@name='action_refuse_overtime' and contains(@class, 'oe_stat_button')]" position="attributes">
+                <attribute name="invisible">not is_manager or overtime_status not in ['to_approve', 'approved'] or extra_hours_approval_state != 'approved'</attribute>
+            </xpath>
+        </field>
+    </record>
+
     <record id="hr_attendance_view_form_overtime_bridge" model="ir.ui.view">
         <field name="name">hr.attendance.form.overtime.bridge</field>
         <field name="model">hr.attendance</field>
