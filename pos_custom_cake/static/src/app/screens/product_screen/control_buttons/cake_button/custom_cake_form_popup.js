@@ -157,6 +157,7 @@ export class CustomCakeFormPopup extends Component {
             finalSellingPrice: _t("Final Selling Price"),
             cancel: _t("Cancel"),
             payLater: _t("Pay Later"),
+            payAdvance: _t("Pay Advance"),
             confirm: _t("Confirm"),
             searchProduct: _t("Search product..."),
             noProductsFound: _t("No products match your search."),
@@ -460,6 +461,19 @@ export class CustomCakeFormPopup extends Component {
         }
         this.props.getPayload({
             action: "pay_later",
+            payload: this._buildPayload(true),
+            prices: { ...this.priceSummary },
+            partner: this.state.partner,
+        });
+        this.props.close();
+    }
+
+    payAdvance() {
+        if (!this._validate()) {
+            return;
+        }
+        this.props.getPayload({
+            action: "pay_advance",
             payload: this._buildPayload(true),
             prices: { ...this.priceSummary },
             partner: this.state.partner,

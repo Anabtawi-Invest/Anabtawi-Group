@@ -22,6 +22,16 @@ class PosCustomCakeController(http.Controller):
         payload = data if isinstance(data, dict) else kwargs
         return request.env["pos.cake.order"].create_from_pos(payload)
 
+    @http.route("/pos/custom_cake/create_order_with_advance", type="jsonrpc", auth="user")
+    def create_order_with_advance(self, data=None, **kwargs):
+        payload = data if isinstance(data, dict) else kwargs
+        return request.env["pos.cake.order"].create_with_advance_from_pos(payload)
+
+    @http.route("/pos/custom_cake/complete_advance", type="jsonrpc", auth="user")
+    def complete_advance(self, data=None, **kwargs):
+        payload = data if isinstance(data, dict) else kwargs
+        return request.env["pos.cake.order"].complete_advance_from_pos(payload)
+
     @http.route("/pos/custom_cake/search_orders", type="jsonrpc", auth="user")
     def search_orders(self, data=None, **kwargs):
         payload = data if isinstance(data, dict) else kwargs

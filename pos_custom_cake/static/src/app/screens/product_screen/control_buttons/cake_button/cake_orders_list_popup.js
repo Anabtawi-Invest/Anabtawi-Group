@@ -36,13 +36,15 @@ export class CakeOrdersListPopup extends Component {
     get labels() {
         return {
             searchPlaceholder: _t("Search by customer name or order number..."),
-            noOrders: _t("No cake orders waiting for payment."),
+            noOrders: _t("No open cake orders."),
             orderNumber: _t("Order Number"),
             customer: _t("Customer"),
             cakePieces: _t("Cake Pieces"),
             status: _t("Status"),
             date: _t("Date"),
             finalPrice: _t("Final Price"),
+            advance: _t("Advance"),
+            remaining: _t("Remaining"),
             close: _t("Close"),
         };
     }
@@ -65,11 +67,25 @@ export class CakeOrdersListPopup extends Component {
     getStateLabel(state) {
         const labels = {
             waiting_payment: _t("Waiting for Payment"),
+            advance_paid: _t("Advance Paid"),
             paid: _t("Paid"),
             cancelled: _t("Cancelled"),
             draft: _t("Draft"),
         };
         return labels[state] || state;
+    }
+
+    getStateBadgeClass(state) {
+        if (state === "advance_paid") {
+            return "badge bg-warning text-dark";
+        }
+        if (state === "waiting_payment") {
+            return "badge bg-info";
+        }
+        if (state === "paid") {
+            return "badge bg-success";
+        }
+        return "badge bg-secondary";
     }
 
     async _searchOrders() {
