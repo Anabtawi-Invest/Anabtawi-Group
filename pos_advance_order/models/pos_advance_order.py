@@ -1766,7 +1766,11 @@ class PosAdvanceOrder(models.Model):
 
             same_session_completion = order._is_advance_deposited_in_session(session)
             deposit_pm = False
-            payouts = [(pm, remaining)]
+            # Record cash-in as amount tendered, then return change as a negative
+            # payment so net cash = remaining and total payments = order total.
+            # Wrong: remaining(5) + change(-2) + advance(5) = 8 vs total 10.
+            # Right: tendered(7) + change(-2) + advance(5) = 10.
+            payouts = [(pm, remaining_tendered)]
             if not float_is_zero(remaining_change, precision_rounding=rounding):
                 payouts.append((pm, -remaining_change))
             if not float_is_zero(advance_part, precision_rounding=rounding):
