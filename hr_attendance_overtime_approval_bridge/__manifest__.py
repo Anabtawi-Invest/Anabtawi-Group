@@ -20,7 +20,6 @@
         "views/extra_hours_approval_views.xml",
         "views/hr_employee_views.xml",
         "views/portal_templates.xml",
-        "data/extra_hours_approval_backfill.xml",
     ],
     "installable": True,
     "application": False,
