@@ -22,22 +22,52 @@ patch(BarcodePickingModel.prototype, {
         return value || false;
     },
 
-    _setBarcodeMany2one(record, fieldName, id, name) {
+    _cacheLocation(id) {
+        if (!id || typeof this.cache?.getRecord !== "function") {
+            return null;
+        }
+        try {
+            return this.cache.getRecord("stock.location", id, false);
+        } catch {
+            return null;
+        }
+    },
+
+    /**
+     * Picking records store a location id. Line records store the full
+     * location, including parent_path, which the barcode line template reads.
+     */
+    _setBarcodeMany2one(record, fieldName, id, name, scannedLocation) {
         if (!record) {
             return;
         }
-        const sample = record.location_id ?? record.location_dest_id ?? record.product_id;
         const current = record[fieldName];
-        if (
-            Array.isArray(sample) ||
-            Array.isArray(current) ||
-            (sample && typeof sample === "object") ||
-            (current && typeof current === "object")
-        ) {
-            record[fieldName] = id ? [id, name || ""] : false;
+        if (!current || typeof current !== "object" || Array.isArray(current)) {
+            record[fieldName] = id || false;
             return;
         }
-        record[fieldName] = id || false;
+        const scanned = scannedLocation && this._barcodeId(scannedLocation) === id
+            ? scannedLocation
+            : null;
+        const cached = scanned?.parent_path ? scanned : this._cacheLocation(id);
+        const next = cached ? { ...cached } : { ...current, id: id || false };
+        next.id = id || false;
+        next.display_name = cached?.display_name || name || current.display_name || "";
+        if (typeof next.parent_path !== "string") {
+            next.parent_path = current.id === id && typeof current.parent_path === "string"
+                ? current.parent_path
+                : "";
+        }
+        record[fieldName] = next;
+    },
+
+    _isSublocation(childLocation, parentLocation) {
+        const childPath = childLocation?.parent_path;
+        const parentPath = parentLocation?.parent_path;
+        if (typeof childPath !== "string" || typeof parentPath !== "string") {
+            return false;
+        }
+        return super._isSublocation(childLocation, parentLocation);
     },
 
     _branchScannedLocation(barcodeData) {
@@ -203,17 +233,20 @@ patch(BarcodePickingModel.prototype, {
                 continue;
             }
             seen.add(record);
+            const scanned = barcodeData?.location;
             this._setBarcodeMany2one(
                 record,
                 "location_id",
                 result.location_id,
-                result.location_name
+                result.location_name,
+                scanned
             );
             this._setBarcodeMany2one(
                 record,
                 "location_dest_id",
                 result.location_dest_id,
-                result.location_dest_name
+                result.location_dest_name,
+                scanned
             );
             this._setBarcodeMany2one(
                 record,
@@ -266,7 +299,7 @@ patch(BarcodePickingModel.prototype, {
                 continue;
             }
             const alreadyDirty = Boolean(line.dirty);
-            this._setBarcodeMany2one(line, fieldName, locationId, locationName);
+            this._setBarcodeMany2one(line, fieldName, locationId, locationName, location);
             const virtualLine = !line.id || String(line.id).startsWith("virtual");
             if (alreadyDirty || virtualLine || line === this.selectedLine) {
                 this._markBranchLineDirty(line);
