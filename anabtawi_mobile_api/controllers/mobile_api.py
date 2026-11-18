@@ -921,11 +921,16 @@ class AnabtawiMobileAPI(http.Controller):
         employee, _user, _token, error = self._require_employee()
         if error:
             return error
+        data = _payload()
+        employee_name = (kwargs.get("employee") or data.get("employee") or "").strip()
+        domain = [
+            ("manager_id", "=", employee.id),
+            ("state", "=", "waiting"),
+        ]
+        if employee_name:
+            domain.append(("employee_id.name", "ilike", employee_name))
         approvals = request.env["hr.attendance.extra.hours.approval"].sudo().search(
-            [
-                ("manager_id", "=", employee.id),
-                ("state", "=", "waiting"),
-            ],
+            domain,
             order="date desc, id desc",
             limit=50,
         )

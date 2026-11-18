@@ -11,6 +11,17 @@
     header { display:flex; align-items:center; gap:12px; padding:16px 18px; background:#1d1a17; color:#fff; }
     header a { color:#f3e6c4; text-decoration:none; font-family: Arial, sans-serif; font-size:14px; }
     h1 { margin:0; font-size:20px; font-weight:600; }
+    .toolbar { padding:12px 16px 0; max-width:720px; margin:0 auto; }
+    .search {
+      width:100%;
+      border:1px solid var(--line);
+      border-radius:12px;
+      padding:12px 14px;
+      font-family: Arial, sans-serif;
+      font-size:15px;
+      background:var(--card);
+      color:var(--ink);
+    }
     main { padding:16px; max-width:720px; margin:0 auto; }
     .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px 16px; margin-bottom:12px; }
     .name { font-size:18px; }
@@ -29,11 +40,36 @@
     <a id="back" href="/employee-portal">Back</a>
     <h1 id="title">Extra hours approval</h1>
   </header>
+  <div class="toolbar">
+    <input id="search" class="search" type="search" autocomplete="off"/>
+  </div>
   <main id="list"></main>
   <script>
     const copy = {
-      en: { title: "Extra hours approval", back: "Back", empty: "No extra hours are waiting for your approval.", hours: "Extra hours", approve: "Approve", refuse: "Refuse", error: "The employee app session was not found. Open the employee app and sign in again.", failed: "The request could not be updated." },
-      ar: { title: "موافقة الساعات الإضافية", back: "رجوع", empty: "لا توجد ساعات إضافية بانتظار موافقتك.", hours: "الساعات الإضافية", approve: "موافقة", refuse: "رفض", error: "جلسة تطبيق الموظف غير موجودة. افتح التطبيق وسجّل الدخول مرة أخرى.", failed: "تعذر تحديث الطلب." }
+      en: {
+        title: "Extra hours approval",
+        back: "Back",
+        search: "Search employee",
+        empty: "No extra hours are waiting for your approval.",
+        emptySearch: "No employees match this search.",
+        hours: "Extra hours",
+        approve: "Approve",
+        refuse: "Refuse",
+        error: "The employee app session was not found. Open the employee app and sign in again.",
+        failed: "The request could not be updated."
+      },
+      ar: {
+        title: "موافقة الساعات الإضافية",
+        back: "رجوع",
+        search: "بحث عن موظف",
+        empty: "لا توجد ساعات إضافية بانتظار موافقتك.",
+        emptySearch: "لا يوجد موظفون مطابقون لهذا البحث.",
+        hours: "الساعات الإضافية",
+        approve: "موافقة",
+        refuse: "رفض",
+        error: "جلسة تطبيق الموظف غير موجودة. افتح التطبيق وسجّل الدخول مرة أخرى.",
+        failed: "تعذر تحديث الطلب."
+      }
     };
     const lang = localStorage.getItem("anabtawi_language_v1") === "ar" ? "ar" : "en";
     const t = copy[lang];
@@ -42,6 +78,11 @@
     document.getElementById("title").textContent = t.title;
     document.getElementById("back").textContent = t.back;
     const list = document.getElementById("list");
+    const searchInput = document.getElementById("search");
+    searchInput.placeholder = t.search;
+    let records = [];
+    let searchTimer = null;
+    let activeQuery = "";
 
     function sessionToken() {
       try {
@@ -85,35 +126,51 @@
       return node;
     }
 
+    function render(items) {
+      list.innerHTML = "";
+      items.forEach((record) => list.appendChild(card(record)));
+      if (!list.children.length) showEmpty(Boolean(activeQuery));
+    }
+
     async function decide(id, decision, node) {
       node.querySelectorAll("button").forEach((button) => { button.disabled = true; });
       try {
         await api("/anabtawi/mobile/extra-hours/decide", { method: "POST", body: { id: id, decision: decision } });
+        records = records.filter((record) => record.id !== id);
         node.remove();
-        if (!list.children.length) showEmpty();
+        if (!list.querySelector(".card")) showEmpty(Boolean(activeQuery));
       } catch (error) {
         node.querySelectorAll("button").forEach((button) => { button.disabled = false; });
         alert(error.message || t.failed);
       }
     }
 
-    function showEmpty() {
+    function showEmpty(fromSearch) {
       list.innerHTML = '<p class="empty"></p>';
-      list.querySelector("p").textContent = t.empty;
+      list.querySelector("p").textContent = fromSearch ? t.emptySearch : t.empty;
     }
 
-    async function load() {
+    async function load(query) {
+      activeQuery = (query || "").trim();
       try {
-        const data = await api("/anabtawi/mobile/extra-hours/pending");
-        list.innerHTML = "";
-        (data.records || []).forEach((record) => list.appendChild(card(record)));
-        if (!list.children.length) showEmpty();
+        const path = activeQuery
+          ? "/anabtawi/mobile/extra-hours/pending?employee=" + encodeURIComponent(activeQuery)
+          : "/anabtawi/mobile/extra-hours/pending";
+        const data = await api(path);
+        records = data.records || [];
+        render(records);
       } catch (error) {
         list.innerHTML = '<p class="error"></p>';
         list.querySelector("p").textContent = error.message || t.failed;
       }
     }
-    load();
+
+    searchInput.addEventListener("input", () => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => load(searchInput.value), 250);
+    });
+
+    load("");
   </script>
 </body>
 </html>
