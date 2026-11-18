@@ -118,8 +118,8 @@ class PfrAdvanceWizard(models.TransientModel):
             'name': _("Salary Advance Adjustments"),
             'type': 'ir.actions.act_window',
             'res_model': 'hr.salary.attachment',
-            'view_mode': 'tree,form',
-            'views': [(False, 'tree'), (False, 'form')],
+            'view_mode': 'list,form',
+            'views': [(False, 'list'), (False, 'form')],
             'domain': domain,
             'context': dict(self.env.context),
         }
