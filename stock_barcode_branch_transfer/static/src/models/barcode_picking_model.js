@@ -1,15 +1,11 @@
 import BarcodePickingModel from "@stock_barcode/models/barcode_picking_model";
 import { rpc } from "@web/core/network/rpc";
+import { _t } from "@web/core/l10n/translation";
 import { patch } from "@web/core/utils/patch";
 
 patch(BarcodePickingModel.prototype, {
     _branchLocationOverrideEnabled() {
-        if (!this.config?.barcode_override_scanned_locations) {
-            return false;
-        }
-        // Odoo barcode config often stores this as true, not "mandatory".
-        const sourceMode = this.config.restrict_scan_source_location;
-        return sourceMode === true || sourceMode === "mandatory";
+        return Boolean(this.config?.barcode_override_scanned_locations);
     },
 
     _barcodeId(value) {
@@ -20,6 +16,48 @@ patch(BarcodePickingModel.prototype, {
             return value.id || false;
         }
         return value || false;
+    },
+
+    _branchSourceLockedId() {
+        return this._barcodeId(this.record?.barcode_locked_source_location_id);
+    },
+
+    _branchDestLockedId() {
+        if (!this.record?.barcode_dest_locked_by_scan) {
+            return false;
+        }
+        return this._barcodeId(this.record?.barcode_locked_dest_location_id);
+    },
+
+    _branchLocationsReady() {
+        return Boolean(this._branchSourceLockedId() && this._branchDestLockedId());
+    },
+
+    /**
+     * Default Stock on the transfer is not a scanned lock. Clear it so the
+     * barcode screen asks for source, then destination, then products.
+     */
+    _branchSyncScanPrompts() {
+        if (!this._branchLocationOverrideEnabled() || !this.lastScanned) {
+            return;
+        }
+        const sourceId = this._branchSourceLockedId();
+        const destId = this._branchDestLockedId();
+        if (!sourceId) {
+            this.lastScanned.sourceLocation = false;
+            this.lastScanned.destLocation = false;
+            return;
+        }
+        if (!this.lastScanned.sourceLocation || this._barcodeId(this.lastScanned.sourceLocation) !== sourceId) {
+            this.lastScanned.sourceLocation = this._cacheLocation(sourceId) || this.lastScanned.sourceLocation;
+        }
+        if (!destId) {
+            this.lastScanned.destLocation = false;
+            return;
+        }
+        if (!this.lastScanned.destLocation || this._barcodeId(this.lastScanned.destLocation) !== destId) {
+            this.lastScanned.destLocation = this._cacheLocation(destId) || this.lastScanned.destLocation;
+        }
     },
 
     _cacheLocation(id) {
@@ -91,84 +129,25 @@ patch(BarcodePickingModel.prototype, {
         return Array.isArray(lines) ? lines : [];
     },
 
-    _lineQtyDone(line) {
-        if (!line) {
-            return 0;
-        }
-        if (typeof this.getQtyDone === "function") {
-            return this.getQtyDone(line) || 0;
-        }
-        return line.qty_done || line.quantity || 0;
-    },
-
-    _branchBarcodeInfoClass() {
-        try {
-            return this.barcodeInfo?.class || "";
-        } catch {
-            return "";
-        }
-    },
-
-    _expectsDestinationScan() {
-        const mode = this.config?.restrict_scan_dest_location;
-        if (!mode || mode === "no" || mode === false) {
-            return false;
-        }
-        const infoClass = this._branchBarcodeInfoClass();
-        if (infoClass.includes("dest")) {
-            return true;
-        }
-        if (
-            infoClass.includes("src") ||
-            infoClass.includes("source") ||
-            infoClass.includes("product") ||
-            infoClass.includes("lot") ||
-            infoClass.includes("serial") ||
-            infoClass.includes("pack")
-        ) {
-            return false;
-        }
-        if (mode !== "mandatory" && mode !== true) {
-            return infoClass.includes("validate");
-        }
-        const line = this.selectedLine || this.lastScannedLine;
-        return Boolean(line && this._lineQtyDone(line) > 0 && !this.lastScanned?.destLocation);
-    },
-
-    _branchProductWasScanned() {
-        return this._branchLines().some((line) => Boolean(line?.product_id));
-    },
-
-    _destLockConfirmed() {
-        return Boolean(this.record?.barcode_dest_locked_by_scan);
-    },
-
     _branchScanRole(location, forcedRole) {
         if (forcedRole === "source" || forcedRole === "dest") {
             return forcedRole;
         }
-        const lockedSourceId = this._barcodeId(this.record?.barcode_locked_source_location_id);
-        const lockedDestId = this._destLockConfirmed()
-            ? this._barcodeId(this.record?.barcode_locked_dest_location_id)
-            : false;
+        const lockedSourceId = this._branchSourceLockedId();
+        const lockedDestId = this._branchDestLockedId();
         if (!lockedSourceId) {
             return "source";
-        }
-        if (lockedDestId && location.id === lockedDestId && location.id !== lockedSourceId) {
-            return "dest";
         }
         if (location.id === lockedSourceId && location.id !== lockedDestId) {
             return "source";
         }
-        // The screen often still says "scan another product" after the source
-        // is locked. A different location at that point is the destination.
-        if (
-            location.id !== lockedSourceId &&
-            (this._expectsDestinationScan() || this._branchProductWasScanned() || lockedDestId)
-        ) {
+        if (!lockedDestId) {
             return "dest";
         }
-        return "source";
+        if (location.id === lockedDestId) {
+            return "dest";
+        }
+        return "dest";
     },
 
     _rpcErrorMessage(error) {
@@ -260,6 +239,9 @@ patch(BarcodePickingModel.prototype, {
                 result.locked_dest_location_id,
                 result.locked_dest_location_name
             );
+            if (result.role === "dest") {
+                record.barcode_dest_locked_by_scan = true;
+            }
         }
         if (result.role === "dest") {
             barcodeData.destLocation = barcodeData.location;
@@ -282,6 +264,7 @@ patch(BarcodePickingModel.prototype, {
         if (result.role === "source") {
             if (this.lastScanned) {
                 this.lastScanned.sourceLocation = location;
+                this.lastScanned.destLocation = false;
             }
             try {
                 this.location = location;
@@ -360,20 +343,23 @@ patch(BarcodePickingModel.prototype, {
         }
         this._assignBranchLocation(result, barcodeData);
         this._branchPendingRole = null;
-        // Always stop here. A location barcode must not continue into the
-        // product path, or Odoo shows "scan one or more products or a package".
+        // A location barcode must not continue into the product path.
         barcodeData.stopped = true;
         this.trigger?.("update");
     },
 
-    async _processLocation(barcodeData) {
-        const result = await this._runBranchLocationOverride(barcodeData);
-        if (result === false) {
-            return;
-        }
+    async _processBranchLocationByRole(barcodeData, result) {
+        const role = result?.role || this._branchPendingRole;
         const restoreNotifications = result ? this._suppressBranchLocationWarnings() : () => {};
         try {
-            await super._processLocation(...arguments);
+            if (role === "dest" && typeof super._processLocationDestination === "function") {
+                if (!barcodeData.destLocation) {
+                    barcodeData.destLocation = barcodeData.location;
+                }
+                await super._processLocationDestination(barcodeData);
+            } else if (typeof super._processLocationSource === "function") {
+                await super._processLocationSource(barcodeData);
+            }
         } catch (error) {
             if (result) {
                 barcodeData.stopped = true;
@@ -382,15 +368,116 @@ patch(BarcodePickingModel.prototype, {
             }
         } finally {
             restoreNotifications();
-            this._branchPendingRole = null;
         }
         await this._finishBranchLocationOverride(barcodeData, result);
     },
 
+    _getDefaultMessageType() {
+        this._branchSyncScanPrompts();
+        if (this._branchLocationOverrideEnabled()) {
+            if (!this._branchSourceLockedId()) {
+                return "scan_src";
+            }
+            if (!this._branchDestLockedId()) {
+                return "scan_dest";
+            }
+        }
+        return super._getDefaultMessageType(...arguments);
+    },
+
+    get barcodeInfo() {
+        this._branchSyncScanPrompts();
+        const info = super.barcodeInfo;
+        if (!this._branchLocationOverrideEnabled() || !info) {
+            return info;
+        }
+        if (!this._branchSourceLockedId()) {
+            return {
+                ...info,
+                class: "scan_src",
+                icon: "sign-out",
+                message: _t("Scan the source location"),
+            };
+        }
+        if (!this._branchDestLockedId()) {
+            return {
+                ...info,
+                class: "scan_dest",
+                icon: "sign-in",
+                message: _t("Scan the destination location"),
+            };
+        }
+        return info;
+    },
+
+    _checkBarcode(barcodeData) {
+        this._branchSyncScanPrompts();
+        if (this._branchLocationOverrideEnabled()) {
+            const location = this._branchScannedLocation(barcodeData);
+            const hasProductOrPackage = Boolean(
+                barcodeData?.product
+                || barcodeData?.package
+                || barcodeData?.packaging
+                || barcodeData?.lot
+                || barcodeData?.lotName
+            );
+            if (!this._branchSourceLockedId()) {
+                if (!location && hasProductOrPackage) {
+                    return {
+                        title: _t("Source location required"),
+                        message: _t("Scan the source location before scanning products."),
+                        error: true,
+                    };
+                }
+            } else if (!this._branchDestLockedId()) {
+                if (!location && hasProductOrPackage) {
+                    return {
+                        title: _t("Destination location required"),
+                        message: _t("Scan the destination location before scanning products."),
+                        error: true,
+                    };
+                }
+            }
+        }
+        return super._checkBarcode(...arguments);
+    },
+
+    _setLocationFromBarcode(result, location) {
+        if (this._branchLocationOverrideEnabled()) {
+            if (!this._branchSourceLockedId()) {
+                result.location = location;
+                return result;
+            }
+            if (!this._branchDestLockedId()) {
+                result.destLocation = location;
+                result.location = location;
+                return result;
+            }
+        }
+        return super._setLocationFromBarcode(...arguments);
+    },
+
+    async _processLocation(barcodeData) {
+        if (!this._branchLocationOverrideEnabled()) {
+            return super._processLocation(...arguments);
+        }
+        const result = await this._runBranchLocationOverride(barcodeData);
+        if (result === false) {
+            return;
+        }
+        if (!result) {
+            return super._processLocation(...arguments);
+        }
+        await this._processBranchLocationByRole(barcodeData, result);
+    },
+
     async _processLocationSource(barcodeData) {
+        if (!this._branchLocationOverrideEnabled()) {
+            return super._processLocationSource(...arguments);
+        }
         if (
-            this._branchPendingRole === "dest" &&
-            typeof super._processLocationDestination === "function"
+            this._branchPendingRole === "dest"
+            && typeof super._processLocationDestination === "function"
         ) {
             return super._processLocationDestination(...arguments);
         }
@@ -400,59 +487,31 @@ patch(BarcodePickingModel.prototype, {
         if (result === false) {
             return;
         }
-        if (
-            result?.role === "dest" &&
-            typeof super._processLocationDestination === "function"
-        ) {
-            const restoreDestNotifications = this._suppressBranchLocationWarnings();
-            try {
-                await super._processLocationDestination(...arguments);
-            } catch (error) {
-                barcodeData.stopped = true;
-            } finally {
-                restoreDestNotifications();
-            }
-            await this._finishBranchLocationOverride(barcodeData, result);
+        if (result) {
+            await this._processBranchLocationByRole(barcodeData, result);
             return;
         }
-        const restoreNotifications = result ? this._suppressBranchLocationWarnings() : () => {};
-        try {
-            if (typeof super._processLocationSource === "function") {
-                await super._processLocationSource(...arguments);
-            }
-        } catch (error) {
-            if (result) {
-                barcodeData.stopped = true;
-            } else {
-                throw error;
-            }
-        } finally {
-            restoreNotifications();
+        if (typeof super._processLocationSource === "function") {
+            return super._processLocationSource(...arguments);
         }
-        await this._finishBranchLocationOverride(barcodeData, result);
     },
 
     async _processLocationDestination(barcodeData) {
+        if (!this._branchLocationOverrideEnabled()) {
+            return super._processLocationDestination(...arguments);
+        }
         const result = this._branchPendingRole
             ? null
             : await this._runBranchLocationOverride(barcodeData, "dest");
         if (result === false) {
             return;
         }
-        const restoreNotifications = result ? this._suppressBranchLocationWarnings() : () => {};
-        try {
-            if (typeof super._processLocationDestination === "function") {
-                await super._processLocationDestination(...arguments);
-            }
-        } catch (error) {
-            if (result) {
-                barcodeData.stopped = true;
-            } else {
-                throw error;
-            }
-        } finally {
-            restoreNotifications();
+        if (result) {
+            await this._processBranchLocationByRole(barcodeData, result);
+            return;
         }
-        await this._finishBranchLocationOverride(barcodeData, result);
+        if (typeof super._processLocationDestination === "function") {
+            return super._processLocationDestination(...arguments);
+        }
     },
 });

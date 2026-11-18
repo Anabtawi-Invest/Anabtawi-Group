@@ -33,11 +33,7 @@ class StockPicking(models.Model):
 
     def _branch_location_override_enabled(self):
         self.ensure_one()
-        picking_type = self.picking_type_id
-        return bool(
-            picking_type.barcode_override_scanned_locations
-            and picking_type.restrict_scan_source_location == "mandatory"
-        )
+        return bool(self.picking_type_id.barcode_override_scanned_locations)
 
     def _branch_location_mismatch_message(self, role, location):
         if role == "dest":
@@ -95,33 +91,26 @@ class StockPicking(models.Model):
         if lines:
             lines.with_context(skip_branch_location_check=True).write({field_name: location.id})
 
-    def _branch_product_was_scanned(self):
-        """True once the transfer has a product line.
-
-        Done quantity is not required. Demand-only barcode lines still mean
-        the source step is finished and the next location is the destination.
-        """
-        self.ensure_one()
-        return bool(self.move_line_ids.filtered(
-            lambda line: line.state not in ("done", "cancel") and line.product_id
-        ))
-
     def _resolve_branch_scan_role(self, location, role):
-        """Keep the first location as source. The next different one is the destination."""
+        """Force order: first location = source, second = destination."""
         self.ensure_one()
         source = self.barcode_locked_source_location_id
-        dest = self.barcode_locked_dest_location_id if self.barcode_dest_locked_by_scan else self.env["stock.location"]
+        dest = (
+            self.barcode_locked_dest_location_id
+            if self.barcode_dest_locked_by_scan
+            else self.env["stock.location"]
+        )
         if not source:
             return "source"
         if location and location == source and location != dest:
             return "source"
-        if location and dest and location == dest:
+        if not dest:
             return "dest"
-        if location and location != source and (
-            role == "dest" or self._branch_product_was_scanned() or dest
-        ):
+        if location and location == dest:
             return "dest"
-        return "source" if role != "dest" else "dest"
+        if role in ("source", "dest"):
+            return role
+        return "dest"
 
     def _lock_branch_location(self, role, location):
         """Lock and override the picking location from the first accepted scan."""
@@ -132,7 +121,7 @@ class StockPicking(models.Model):
             if role == "dest"
             else self.barcode_locked_source_location_id
         )
-        # A destination copied onto the line from the operation type is not a scan.
+        # A destination copied from the operation type is not a scan lock.
         if role == "dest" and locked and not self.barcode_dest_locked_by_scan:
             locked = self.env["stock.location"]
         if locked and locked != location:
@@ -168,20 +157,3 @@ class StockPicking(models.Model):
         location = self.env["stock.location"].browse(location_id).exists()
         role = self._resolve_branch_scan_role(location, role)
         return self._lock_branch_location(role, location)
-
-    def _apply_branch_location_from_line(self, role, location):
-        """Fallback when barcode wrote a line location before JS could lock the picking."""
-        self.ensure_one()
-        if not location or not self._branch_location_override_enabled():
-            return
-        locked = (
-            self.barcode_locked_dest_location_id
-            if role == "dest"
-            else self.barcode_locked_source_location_id
-        )
-        if locked:
-            if location != locked:
-                raise UserError(self._branch_location_mismatch_message(role, locked))
-            return
-        # First concrete line location becomes the locked override for that role.
-        self._lock_branch_location(role, location)
