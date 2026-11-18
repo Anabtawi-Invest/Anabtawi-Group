@@ -1,6 +1,6 @@
 {
     "name": "Stock Next Transfer Print",
-    "version": "19.0.1.2.0",
+    "version": "19.0.1.3.0",
     "category": "Inventory/Inventory",
     "summary": "Print the Picking Operations report of the next transfer",
     "author": "Anabtawi",
