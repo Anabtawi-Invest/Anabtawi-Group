@@ -9,6 +9,9 @@ class HrAttendanceExtraHoursApproval(models.Model):
     _order = "date desc, id desc"
     _rec_name = "employee_id"
 
+    # Extra hours under 45 minutes are refused automatically and skip manager approval.
+    MIN_MANAGER_EXTRA_HOURS = 0.75
+
     _attendance_unique = models.Constraint(
         "unique(attendance_id)",
         "An extra hours approval already exists for this attendance.",
@@ -89,6 +92,7 @@ class HrAttendanceExtraHoursApproval(models.Model):
         existing = self.sudo().search([("attendance_id", "in", attendances.ids)])
         by_attendance = {approval.attendance_id.id: approval for approval in existing}
         created = self.browse()
+        kept = self.browse()
         for attendance in attendances:
             matched = lines.filtered(
                 lambda line, attendance=attendance: line.employee_id == attendance.employee_id
@@ -100,6 +104,9 @@ class HrAttendanceExtraHoursApproval(models.Model):
             if float_compare(hours, 0.0, precision_digits=2) <= 0:
                 continue
             current = by_attendance.get(attendance.id)
+            if float_compare(hours, self.MIN_MANAGER_EXTRA_HOURS, precision_digits=2) < 0:
+                self._auto_refuse_below_threshold(matched, current)
+                continue
             if current:
                 if (
                     current.state == "waiting"
@@ -115,9 +122,22 @@ class HrAttendanceExtraHoursApproval(models.Model):
                     }
                 )
                 created |= current
+            kept |= current
             if current.state == "waiting":
                 self._hold_lines_for_manager(matched)
-        return existing | created
+        return kept
+
+    @api.model
+    def _auto_refuse_below_threshold(self, lines, approval=None):
+        """Refuse short extra hours before they reach Extra Hours Approval."""
+        pending_lines = lines.filtered(lambda line: line.status != "refused")
+        if pending_lines:
+            pending_lines.sudo().with_context(
+                skip_overtime_approval_gate=True,
+                skip_all_overtime_approval_checks=True,
+            ).write({"status": "refused"})
+        if approval and approval.state == "waiting":
+            approval.sudo().unlink()
 
     @api.model
     def _hold_lines_for_manager(self, lines):
