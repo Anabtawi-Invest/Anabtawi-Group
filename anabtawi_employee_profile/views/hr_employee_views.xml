@@ -24,7 +24,7 @@
                 <field name="profile_contract_start_date" readonly="1"/>
                 <field name="profile_contract_end_date" readonly="1"
                        invisible="profile_employment_status == 'active' and not profile_contract_end_date"/>
-                <field name="departure_date" string="Termination Date"
+                <field name="departure_date" string="Termination Date" readonly="1"
                        invisible="profile_employment_status != 'terminated'"/>
             </xpath>
             <xpath expr="//page[@name='personal_information']" position="after">
