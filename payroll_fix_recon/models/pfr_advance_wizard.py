@@ -1333,7 +1333,7 @@ class PfrAdvanceWizard(models.TransientModel):
                     company_bank_acc = str(b.acc_number).replace(' ', '')
                     break
 
-        transfer_date_str = (self.date_cutoff or fields.Date.today()).strftime('%d/%m/%Y')
+        transfer_date_str = fields.Date.context_today(self).strftime('%d/%m/%Y')
         desc_str = f"SALARY ADVANCE {self.date_cutoff.strftime('%m %Y')}" if self.date_cutoff else "SALARY ADVANCE"
         company_currency = company.currency_id.name or 'JOD'
 
@@ -1357,8 +1357,9 @@ class PfrAdvanceWizard(models.TransientModel):
             # Col 2: Beneficiary Account / IBAN
             acc_number = (getattr(bank, 'acc_number', '') or '').replace(' ', '') if bank else ''
 
-            # Col 3: Beneficiary Name
-            holder = (getattr(bank, 'acc_holder_name', '') or getattr(emp, 'legal_name', '') or emp.name or '').strip()
+            # Col 3: Beneficiary Name — employee name (English). Bank holder
+            # and legal name are often Arabic, so they are not used here.
+            holder = (emp.with_context(lang='en_US').name or '').strip()
 
             # Col 4: Bank Identifier Code (BIC)
             bic = (getattr(bank, 'bank_bic', '') or '') if bank else ''
@@ -1368,9 +1369,8 @@ class PfrAdvanceWizard(models.TransientModel):
             # Col 5: From code (e.g. '13')
             code_13 = '13'
 
-            # Col 6: Bank Form Number / Date (DD/MM/YYYY)
-            f_form_no = self._employee_field_by_label('Bank Form Number')
-            date_val = (emp[f_form_no] if f_form_no and emp[f_form_no] else '') or transfer_date_str
+            # Col 6: Transfer date (today, DD/MM/YYYY)
+            date_val = transfer_date_str
 
             # Col 7: Currency
             curr = (bank.currency_id.name if bank and getattr(bank, 'currency_id', False) else company_currency) or 'JOD'
