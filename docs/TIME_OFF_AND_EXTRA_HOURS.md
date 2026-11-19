@@ -6,36 +6,13 @@ Audience: implementors, functional consultants, and support engineers configurin
 
 ---
 
-## 1. Modules involved
+## 1. Time Off (Leave)
 
-| Area | Module technical name | Role |
-|---|---|---|
-| Employee App UI | `anabtawi_employee_app_pwa` | PWA at `/employee-portal` |
-| Employee App API | `anabtawi_mobile_api` | Mobile/API endpoints for leave, overtime, extra hours |
-| Portal / App leave types | `portal_leaves` | Settings list of leave types shown in portal/app |
-| Portal attendance | `portal_check_in` | Check-in/out and related overtime authorization hooks |
-| Extra Hours Approval | `hr_attendance_overtime_approval_bridge` | Manager unlock step + Approvals bridge for pre-auth OT |
-| Weekly hours setting | `hr_attendance_weekly_overtime_eligibility` | Required weekly hours (still used for some OT gates, **not** for attendance Approve/Refuse visibility) |
-| Credited extra hours | `extra_hours_enhancement` | Rates / credited hours for payroll balances |
-| Payroll overtime | `anabtawi_payroll_overtime` | Paying overtime from payslip inputs |
-
-Install/upgrade order for Extra Hours Approval work:
-
-1. `hr_attendance_weekly_overtime_eligibility`
-2. `hr_attendance_overtime_approval_bridge`
-3. `anabtawi_mobile_api`
-4. `anabtawi_employee_app_pwa`
-
----
-
-## 2. Time Off (Leave)
-
-### 2.1 Where employees request leave
+### 1.1 Where employees request leave
 
 - Employee App: `/employee-portal` → **Request leave**
-- Portal leave pages from `portal_leaves` (same type rules)
 
-### 2.2 Which leave types appear
+### 1.2 Which leave types appear
 
 Configured in backend:
 
@@ -57,17 +34,7 @@ Important:
 - Saving the list on company A does not help employees of company B.
 - Paid / Sick types that require allocation will stay hidden until the employee has an approved allocation with remaining days/hours.
 
-### 2.3 API used by the app
-
-- `GET /anabtawi/mobile/leaves/balances` — types + balances for the logged-in employee
-- `POST /anabtawi/mobile/leaves/create` — create a leave request
-- `GET /anabtawi/mobile/leaves/list` — employee’s leave history
-
-Eligibility is resolved by:
-
-`res.company._anabtawi_leave_types_for_employee(employee)` in `portal_leaves`.
-
-### 2.4 Implementor checklist (Time Off)
+### 1.3 Implementor checklist (Time Off)
 
 1. Add the intended leave types under **Employee Portal / App** settings for the correct company.
 2. For types that require allocation, create and approve allocations for the employee.
@@ -77,7 +44,7 @@ Eligibility is resolved by:
 
 ---
 
-## 3. Extra Hours — end-to-end process
+## 2. Extra Hours — end-to-end process
 
 There are **two different overtime concepts**. Do not mix them.
 
@@ -117,9 +84,6 @@ Manager is the employee’s **Manager** field (`hr.employee.parent_id`), not Att
 - Record model: `hr.attendance.extra.hours.approval`
 - Backend menu: **Attendances → Extra Hours Approval**
 - Employee App page: `/employee-portal/extra-hours-approval` (also from home **Extra hours**)
-- API:
-  - `GET /anabtawi/mobile/extra-hours/pending` (optional `?employee=name`)
-  - `POST /anabtawi/mobile/extra-hours/decide` with `{ "id": ..., "decision": "approve"|"refuse" }`
 
 Manager actions:
 
@@ -151,7 +115,7 @@ Until the officer approves, **Worked Extra** may show a value while **Extra Hour
 
 ---
 
-## 4. Status fields — how to read them
+## 3. Status fields — how to read them
 
 On `hr.attendance`:
 
@@ -170,7 +134,7 @@ Typical healthy path for ≥ 45 minutes:
 
 ---
 
-## 5. Employee App URLs
+## 4. Employee App URLs
 
 | Page | URL |
 |---|---|
@@ -181,14 +145,14 @@ Search on Extra Hours Approval filters pending requests by employee name.
 
 ---
 
-## 6. Setup requirements (Extra Hours)
+## 5. Setup requirements (Extra Hours)
 
 For the manager flow to work:
 
 1. Employee has **Manager** (`parent_id`) set to another employee.
 2. That manager employee has a related user (portal is OK) and can log into the Employee App.
 3. Company attendance overtime validation is typically **Approved by Manager** for lines to stay pending.
-4. Modules above are installed and upgraded on the database.
+4. Required Extra Hours / Employee App modules are installed and upgraded on the database.
 
 Optional / related:
 
@@ -197,49 +161,7 @@ Optional / related:
 
 ---
 
-## 7. Shell helpers (implementors)
-
-Create/update Extra Hours Approval for attendances from 1 October until now (manual only; **not** run on module upgrade):
-
-```python
-env.cr.rollback()
-from odoo import fields
-model = env["hr.attendance.extra.hours.approval"]
-since = fields.Datetime.to_datetime("2026-10-01 00:00:00")
-attendances = env["hr.attendance"].sudo().search([
-    ("check_out", "!=", False),
-    ("check_in", ">=", since),
-    ("overtime_status", "=", "to_approve"),
-])
-print("attendances:", len(attendances))
-created = model._ensure_for_attendances(attendances)
-env.cr.commit()
-print("done", len(created))
-```
-
-Clean waiting approvals under 45 minutes:
-
-```python
-env.cr.rollback()
-Approval = env["hr.attendance.extra.hours.approval"].sudo()
-waiting = Approval.search([("state", "=", "waiting"), ("extra_hours", "<", 0.75)])
-print("to clean:", len(waiting))
-for approval in waiting:
-    Approval._auto_refuse_below_threshold(approval.attendance_id.linked_overtime_ids, approval)
-env.cr.commit()
-print("done")
-```
-
-Or call the built-in helper (October → now, includes 45-minute rule):
-
-```python
-env["hr.attendance.extra.hours.approval"]._backfill_waiting_approvals()
-env.cr.commit()
-```
-
----
-
-## 8. Troubleshooting
+## 6. Troubleshooting
 
 ### Leave balances show “No available leave types”
 
@@ -268,44 +190,4 @@ env.cr.commit()
 ### Old under-45 records still in manager app
 
 - Created before the 45-minute rule
-- Run the cleanup shell script above after the latest code is deployed
-
----
-
-## 9. Design decisions (current)
-
-1. Extra Hours Approval is a **custom menu/model**, not the Approvals app, so portal managers can decide.
-2. Manager source is **employee Manager (`parent_id`)**.
-3. Threshold is **total attendance extra hours**, not per line.
-4. Module upgrades **do not** auto-backfill historical Extra Hours Approval records (removed for performance). Use shell when needed.
-5. Pre-authorization overtime via Approvals remains available for request-before-work scenarios.
-
----
-
-## 10. Quick process diagram
-
-```text
-Employee checks out
-        |
-        v
-Extra hours computed on attendance
-        |
-        +-- total < 45 min ----> auto refuse overtime lines (stop)
-        |
-        +-- total >= 45 min --> Extra Hours Approval = Waiting
-                                    |
-                                    v
-                         Manager approves/refuses
-                         (Employee App or Attendances menu)
-                                    |
-                 +------------------+------------------+
-                 |                                     |
-                 v                                     v
-           Approved                              Refused by manager
-                 |                                     |
-                 v                                     v
-   Attendance Approve/Refuse appear            buttons stay hidden
-                 |
-                 v
-        Officer validates Extra Hours
-```
+- Re-process those attendances after the latest code is deployed so under-45 totals are auto-refused and waiting records are cleared
