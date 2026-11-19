@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="report_payment_receipt_document_check_due_date" inherit_id="account.report_payment_receipt_document">
+        <xpath expr="//div[@name='date']" position="inside">
+            <div class="col-6" t-if="o.check_date">
+                <span>Due Date</span>: <span t-field="o.check_date"/>
+            </div>
+        </xpath>
+    </template>
+</odoo>

@@ -68,3 +68,8 @@ msgstr "الجمعة"
 #: code:addons/check_payment_entry_date/models/account_payment.py:0
 msgid "You cannot cash a check on this day."
 msgstr "لا يمكنك صرف شيك في هذا اليوم."
+
+#. module: check_payment_entry_date
+#: model_terms:ir.ui.view,arch_db:check_payment_entry_date.report_payment_receipt_document_check_due_date
+msgid "Due Date"
+msgstr "تاريخ الاستحقاق"
