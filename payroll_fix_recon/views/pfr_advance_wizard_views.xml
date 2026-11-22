@@ -15,7 +15,8 @@
                             class="btn btn-sm btn-outline-primary" icon="fa-refresh"/>
                 </div>
                 <group string="Previous Advance Runs (Log &amp; Re-export)">
-                    <field name="history_batch" widget="selection" placeholder="Select a past completed run from the log..."/>
+                    <field name="history_batch" widget="selection" class="pfr_history_select"
+                           placeholder="Select a past completed run from the log..."/>
                     <div>
                         <button name="action_load_history" type="object" string="Load Past Run"
                                 class="btn btn-secondary me-2" invisible="not history_batch" icon="fa-history"/>

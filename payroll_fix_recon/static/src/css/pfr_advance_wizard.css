@@ -1,0 +1,6 @@
+.pfr_history_select .o_select_menu_menu,
+.pfr_history_select .dropdown-menu,
+.o_select_menu_menu:has(.pfr_history_select_item) {
+    max-height: 240px !important;
+    overflow-y: auto !important;
+}

@@ -28,6 +28,11 @@
     ],
     'pre_init_hook': 'pre_init_hook',
     'post_init_hook': 'post_init_hook',
+    'assets': {
+        'web.assets_backend': [
+            'payroll_fix_recon/static/src/css/pfr_advance_wizard.css',
+        ],
+    },
     'installable': True,
     'application': False,
     'auto_install': False,
