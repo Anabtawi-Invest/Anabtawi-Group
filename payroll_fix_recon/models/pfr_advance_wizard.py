@@ -50,17 +50,18 @@ class PfrAdvanceWizard(models.TransientModel):
                                      help="Choose a previously completed advance run to view or re-download.")
     journal_id = fields.Many2one(
         'account.journal', string="Payment Journal",
-        domain="[('company_id', '=', company_id), ('type', 'in', ('bank', 'cash', 'general'))]",
+        check_company=True,
+        domain="[('type', 'in', ('bank', 'cash', 'general'))]",
         help="Journal used to post the mid-month advance payment (Bank, Cash, or Miscellaneous).")
     advance_account_id = fields.Many2one(
         'account.account', string="Advance Account",
-        domain="[('company_id', '=', company_id), ('deprecated', '=', False)]",
+        check_company=True,
         help="Asset/Receivable account (e.g. Employee Salary Advances) debited at mid-month and cleared by the month-end payslip.")
     credit_account_id = fields.Many2one(
         'account.account', string="Credit Account",
-        domain="[('company_id', '=', company_id), ('deprecated', '=', False)]",
+        check_company=True,
         help="Bank/Cash/Clearing account credited for the advance payout (defaults to the Journal's default account).")
-    move_id = fields.Many2one('account.move', string="Advance Journal Entry", readonly=True)
+    move_id = fields.Many2one('account.move', string="Advance Journal Entry", readonly=True, check_company=True)
 
     @api.onchange('company_id')
     def _onchange_company_id(self):
