@@ -31,7 +31,7 @@
                                domain="[('company_id', 'in', [False, company_id]), ('parent_id', '=', False)]"
                                options="{'no_create': True}"/>
                         <field name="department_ids" widget="many2many_tags"
-                               domain="[('company_id', 'in', [False, company_id]), ('parent_id', '!=', False)] if not main_department_ids else [('company_id', 'in', [False, company_id]), ('id', 'child_of', main_department_ids), ('id', 'not in', main_department_ids)]"
+                               domain="[('company_id', 'in', [False, company_id]), ('parent_id', '!=', False), ('parent_id.parent_id', '=', False)] if not main_department_ids else [('company_id', 'in', [False, company_id]), ('parent_id', 'in', main_department_ids)]"
                                options="{'no_create': True}"/>
                         <field name="date_cutoff"/>
                         <field name="advance_percent"/>

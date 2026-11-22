@@ -99,10 +99,9 @@ class PfrAdvanceWizard(models.TransientModel):
     @api.onchange('main_department_ids')
     def _onchange_main_department_ids(self):
         if self.main_department_ids and self.department_ids:
-            allowed = self.env['hr.department'].search([
-                ('id', 'child_of', self.main_department_ids.ids),
-            ])
-            self.department_ids = self.department_ids & allowed
+            self.department_ids = self.department_ids.filtered(
+                lambda d: d.parent_id in self.main_department_ids
+            )
 
     @api.model
     def _default_input_type(self):
