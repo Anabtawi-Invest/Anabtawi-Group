@@ -22,6 +22,25 @@ except ImportError:
     openpyxl = None
 
 
+class PfrAdvanceBatch(models.Model):
+    _name = 'pfr.advance.batch'
+    _description = 'Mid-month Advance Batch Log'
+    _order = 'id desc'
+
+    name = fields.Char(string="Batch Name", required=True, index=True)
+    company_id = fields.Many2one('res.company', string="Company", required=True, default=lambda self: self.env.company, index=True)
+    date_cutoff = fields.Date(string="Cut-off Date")
+    move_id = fields.Many2one('account.move', string="Journal Entry", readonly=True)
+    reversal_move_id = fields.Many2one('account.move', string="Reversal Entry", readonly=True)
+    payment_state = fields.Selection([
+        ('unpaid', 'Unpaid'),
+        ('paid', 'Paid'),
+        ('reversed', 'Reversed'),
+    ], string="Payment Status", default='unpaid', required=True)
+    paid_date = fields.Date(string="Paid Date", readonly=True)
+    paid_by = fields.Many2one('res.users', string="Paid By", readonly=True)
+
+
 class PfrAdvanceWizard(models.TransientModel):
     _name = 'pfr.advance.wizard'
     _description = 'Payroll Fix Recon - Mid-month Advance'
@@ -49,32 +68,23 @@ class PfrAdvanceWizard(models.TransientModel):
     history_batch = fields.Selection(selection='_get_history_batches', string="Past Advance Run",
                                      help="Choose a previously completed advance run to view or re-download.")
     journal_id = fields.Many2one(
-        'account.journal', string="Payment Journal",
-        check_company=True,
-        domain="[('type', 'in', ('bank', 'cash', 'general'))]",
-        help="Journal used to post the mid-month advance payment (Bank, Cash, or Miscellaneous).")
+        related='company_id.pfr_advance_journal_id', string="Journal", readonly=True)
     advance_account_id = fields.Many2one(
-        'account.account', string="Advance Account",
-        check_company=True,
-        help="Asset/Receivable account (e.g. Employee Salary Advances) debited at mid-month and cleared by the month-end payslip.")
+        related='company_id.pfr_advance_debit_account_id', string="Debit Account", readonly=True)
     credit_account_id = fields.Many2one(
-        'account.account', string="Credit Account",
-        check_company=True,
-        help="Bank/Cash/Clearing account credited for the advance payout (defaults to the Journal's default account).")
-    move_id = fields.Many2one('account.move', string="Advance Journal Entry", readonly=True, check_company=True)
+        related='company_id.pfr_advance_credit_account_id', string="Credit Account", readonly=True)
+    batch_id = fields.Many2one('pfr.advance.batch', string="Advance Batch", readonly=True)
+    move_id = fields.Many2one(related='batch_id.move_id', string="Advance Journal Entry", readonly=True)
+    move_state = fields.Selection(related='move_id.state', string="Journal State", readonly=True)
+    reversal_move_id = fields.Many2one(related='batch_id.reversal_move_id', string="Reversal Entry", readonly=True)
+    payment_state = fields.Selection(related='batch_id.payment_state', string="Payment Status", readonly=True)
+    paid_date = fields.Date(related='batch_id.paid_date', string="Paid Date", readonly=True)
+    paid_by = fields.Many2one(related='batch_id.paid_by', string="Paid By", readonly=True)
 
     @api.onchange('company_id')
     def _onchange_company_id(self):
         if self.company_id:
             self.employee_ids = [(5, 0, 0)]
-            self.journal_id = False
-            self.advance_account_id = False
-            self.credit_account_id = False
-
-    @api.onchange('journal_id')
-    def _onchange_journal_id(self):
-        if self.journal_id and self.journal_id.default_account_id:
-            self.credit_account_id = self.journal_id.default_account_id
 
     @api.model
     def _default_input_type(self):
@@ -301,7 +311,11 @@ class PfrAdvanceWizard(models.TransientModel):
                 'note': _("Loaded from: %s", self.history_batch),
             }))
 
-        self.write({'line_ids': lines, 'state': 'done'})
+        batch = self.env['pfr.advance.batch'].sudo().search([
+            ('name', '=', self.history_batch),
+            ('company_id', '=', company.id),
+        ], limit=1)
+        self.write({'line_ids': lines, 'state': 'done', 'batch_id': batch.id if batch else False})
         return self._reopen()
 
     @api.depends('date_cutoff')
@@ -601,25 +615,47 @@ class PfrAdvanceWizard(models.TransientModel):
             if 'company_id' in fields_:
                 vals['company_id'] = line.employee_id.company_id.id or (self.company_id or self.env.company).id
             Attachment.create(vals)
-        if self.journal_id and self.advance_account_id:
-            self._create_advance_journal_entry(lines, marker)
+        batch = self._get_or_create_batch(marker)
+        self._create_advance_journal_entry(lines, marker, batch=batch, post=False)
         self.state = 'done'
         return self._reopen()
 
-    def _create_advance_journal_entry(self, lines, marker):
-        """Create and post one balanced Journal Entry for the mid-month advance batch."""
+    def _get_or_create_batch(self, marker):
         self.ensure_one()
-        if self.move_id:
-            return self.move_id
-        if not self.journal_id:
-            raise UserError(_("Please select a Payment Journal first."))
-        if not self.advance_account_id:
-            raise UserError(_("Please select an Advance Account (e.g. Employee Salary Advances) first."))
-        credit_account = self.credit_account_id or self.journal_id.default_account_id
-        if not credit_account:
-            raise UserError(_("Please set a Credit Account or configure a Default Account on the selected Journal."))
-
+        if self.batch_id:
+            return self.batch_id
         company = self.company_id or self.env.company
+        Batch = self.env['pfr.advance.batch'].sudo()
+        batch = Batch.search([('name', '=', marker), ('company_id', '=', company.id)], limit=1)
+        if not batch:
+            batch = Batch.create({
+                'name': marker,
+                'company_id': company.id,
+                'date_cutoff': self.date_cutoff,
+                'payment_state': 'unpaid',
+            })
+        self.batch_id = batch.id
+        return batch
+
+    def _create_advance_journal_entry(self, lines, marker, batch=None, post=False):
+        """Create a balanced Journal Entry (Draft by default) for the mid-month advance batch."""
+        self.ensure_one()
+        company = self.company_id or self.env.company
+        journal = company.pfr_advance_journal_id
+        debit_account = company.pfr_advance_debit_account_id
+        credit_account = company.pfr_advance_credit_account_id or (journal.default_account_id if journal else False)
+        if not journal or not debit_account or not credit_account:
+            raise UserError(_(
+                "Please configure Mid-Month Advance Accounting (Journal, Debit Account, and Credit Account) "
+                "in Payroll -> Configuration -> Settings first."
+            ))
+
+        batch = batch or self._get_or_create_batch(marker)
+        if batch.move_id and batch.payment_state != 'reversed':
+            if post and batch.move_id.state == 'draft':
+                batch.move_id.action_post()
+            return batch.move_id
+
         currency = company.currency_id
         line_vals = []
         total_amt = 0.0
@@ -631,7 +667,7 @@ class PfrAdvanceWizard(models.TransientModel):
             partner = line.employee_id.sudo().work_contact_id
             line_vals.append((0, 0, {
                 'name': f"{marker} - {line.employee_id.name}",
-                'account_id': self.advance_account_id.id,
+                'account_id': debit_account.id,
                 'partner_id': partner.id if partner else False,
                 'debit': amt,
                 'credit': 0.0,
@@ -650,24 +686,83 @@ class PfrAdvanceWizard(models.TransientModel):
         move = self.env['account.move'].sudo().create({
             'move_type': 'entry',
             'date': self.date_cutoff or fields.Date.context_today(self),
-            'journal_id': self.journal_id.id,
+            'journal_id': journal.id,
             'company_id': company.id,
             'ref': marker,
             'line_ids': line_vals,
         })
-        move.action_post()
-        self.move_id = move.id
+        if post:
+            move.action_post()
+        batch.write({
+            'move_id': move.id,
+            'reversal_move_id': False,
+            'payment_state': 'unpaid' if batch.payment_state == 'reversed' else batch.payment_state,
+        })
         return move
 
-    def action_create_journal_entry(self):
+    def action_post_journal_entry(self):
         self.ensure_one()
-        if self.move_id:
-            return self.action_view_journal_entry()
-        lines = self.line_ids.filtered(lambda l: l.selected and l.advance > 0)
-        if not lines:
-            raise UserError(_("No selected advance lines to post."))
         marker = self.history_batch or self._marker()
-        self._create_advance_journal_entry(lines, marker)
+        batch = self._get_or_create_batch(marker)
+        if batch.move_id and batch.payment_state != 'reversed':
+            if batch.move_id.state == 'draft':
+                batch.move_id.action_post()
+        else:
+            lines = self.line_ids.filtered(lambda l: l.selected and l.advance > 0)
+            if not lines:
+                raise UserError(_("No selected advance lines to post."))
+            self._create_advance_journal_entry(lines, marker, batch=batch, post=True)
+        return self._reopen()
+
+    def action_mark_paid(self):
+        self.ensure_one()
+        marker = self.history_batch or self._marker()
+        batch = self._get_or_create_batch(marker)
+        if not batch.move_id or batch.payment_state == 'reversed':
+            lines = self.line_ids.filtered(lambda l: l.selected and l.advance > 0)
+            if not lines:
+                raise UserError(_("No selected advance lines to post."))
+            self._create_advance_journal_entry(lines, marker, batch=batch, post=True)
+        elif batch.move_id.state == 'draft':
+            batch.move_id.action_post()
+        batch.write({
+            'payment_state': 'paid',
+            'paid_date': fields.Date.context_today(self),
+            'paid_by': self.env.user.id,
+        })
+        return self._reopen()
+
+    def action_reverse_journal(self):
+        self.ensure_one()
+        if not self.batch_id or not self.batch_id.move_id:
+            raise UserError(_("No Journal Entry found to reverse."))
+        move = self.batch_id.move_id.sudo()
+        if move.state != 'posted':
+            raise UserError(_("Only a posted Journal Entry can be reversed."))
+        rev_lines = []
+        for ml in move.line_ids:
+            rev_lines.append((0, 0, {
+                'name': _("Reversal of %s", ml.name or move.name),
+                'account_id': ml.account_id.id,
+                'partner_id': ml.partner_id.id if ml.partner_id else False,
+                'debit': ml.credit,
+                'credit': ml.debit,
+            }))
+        rev_move = self.env['account.move'].sudo().create({
+            'move_type': 'entry',
+            'date': fields.Date.context_today(self),
+            'journal_id': move.journal_id.id,
+            'company_id': move.company_id.id,
+            'ref': _("Reversal of %s", move.name or move.ref or ''),
+            'line_ids': rev_lines,
+        })
+        rev_move.action_post()
+        self.batch_id.sudo().write({
+            'reversal_move_id': rev_move.id,
+            'payment_state': 'reversed',
+            'paid_date': False,
+            'paid_by': False,
+        })
         return self._reopen()
 
     def action_view_journal_entry(self):
@@ -738,10 +833,16 @@ class PfrAdvanceWizard(models.TransientModel):
         sh = wb.add_worksheet("Advance Audit")
         sh.set_landscape()
         sh.write(0, 0, _("Odoo Payroll Report - Mid-month Advance Audit (%s)") % self.date_cutoff, title)
+        pay_status = dict(self.env['pfr.advance.batch']._fields['payment_state'].selection).get(
+            self.payment_state, _('Unpaid')
+        ) if self.batch_id else _('Unpaid')
         meta = [(_("Period From"), format_date(self.env, self.month_start)),
                 (_("Cut-off Date"), format_date(self.env, self.date_cutoff)),
                 (_("Advance %"), "%.2f" % self.advance_percent),
                 (_("Deduct As"), self.input_type_id.name or ""),
+                (_("Payment Status"), pay_status),
+                (_("Paid Date"), format_date(self.env, self.paid_date) if self.paid_date else "-"),
+                (_("Journal Entry"), self.move_id.name if self.move_id else "-"),
                 (_("Generated By"), self.env.user.name or "System"),
                 (_("Generated On"), fields.Datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
                 (_("Source System"), "Odoo 19 Payroll")]
