@@ -118,8 +118,8 @@ class PfrAdvanceWizard(models.TransientModel):
             'name': _("Salary Advance Adjustments"),
             'type': 'ir.actions.act_window',
             'res_model': 'hr.salary.attachment',
-            'view_mode': 'list,form',
-            'views': [(False, 'list'), (False, 'form')],
+            'view_mode': 'tree,form',
+            'views': [(False, 'tree'), (False, 'form')],
             'domain': domain,
             'context': dict(self.env.context),
         }
@@ -259,8 +259,8 @@ class PfrAdvanceWizard(models.TransientModel):
 
             lines.append((0, 0, {
                 'employee_id': emp.id,
-                'start_date': emp_start_dates.get(emp.id, False),
-                'worked_days': self._audit_attendance_days(L, d_from, d_to),
+                'start_date': self._get_employee_start_date(emp),
+                'worked_days': float(L.count('WORK') + L.count('PHD')),
                 'rest_days': float(L.count('REST')),
                 'absent_days': float(L.count('ABSENT')),
                 'sick_leave_days': round(sick_days, 2),
@@ -298,90 +298,6 @@ class PfrAdvanceWizard(models.TransientModel):
         if self.batch_name and self.batch_name.strip():
             return f"{base} - {self.batch_name.strip()}"
         return base
-
-    def _audit_attendance_days(self, ledger, d_from, d_to):
-        """Attendance Days for the advance audit, using the PayRun Audit rule.
-
-        Paid ledger days count: attendance, rest and public holidays as a full day,
-        and paid leave weighted by its pay %. Work Injury is a full day even when
-        its pay % is 7.5. Absent, lateness, unpaid, out of contract, overtime and
-        travel suspension do not count. The paid total is capped at the period
-        length; Extra Hours days are added after that cap.
-        """
-        att_days = extra_days = 0.0
-        for bucket in set(ledger.days.values()):
-            days = float(ledger.count(bucket))
-            if bucket in ('WORK', 'REST', 'PH', 'PHD'):
-                att_days += days
-                continue
-            if bucket in ('OUT', 'ABSENT', 'UNPAID'):
-                continue
-            wet = ledger.kind_types.get(bucket)
-            if self._audit_skip_attendance(wet):
-                continue
-            factor = 1.0 if self._audit_is_work_injury(wet) else self._audit_pay_factor(wet)
-            if self._audit_is_extra_hours_days(wet):
-                extra_days += days * factor
-            else:
-                att_days += days * factor
-        if d_from and d_to:
-            att_days = min(att_days, float((d_to - d_from).days + 1))
-        return round(att_days + extra_days, 2)
-
-    def _audit_pay_factor(self, wet):
-        if not wet or 'pfr_pay_percent' not in wet._fields:
-            return 1.0
-        return wet._pfr_pay_factor()
-
-    def _audit_type_bits(self, wet):
-        code = (wet.code or '').strip().upper()
-        disp = (getattr(wet, 'display_code', '') or '').strip().upper()
-        text = f"{wet.name or ''} {getattr(wet, 'display_code', '') or ''}".lower()
-        return code, disp, text
-
-    def _audit_is_work_injury(self, wet):
-        if not wet:
-            return False
-        code, disp, text = self._audit_type_bits(wet)
-        return (
-            code in ('WORK_INJURY', 'INJURY', 'WI', 'WIP')
-            or disp in ('WORK_INJURY', 'INJURY', 'WI', 'WIP')
-            or 'work injury' in text
-            or 'إصابة عمل' in text
-            or 'اصابة عمل' in text
-        )
-
-    def _audit_is_extra_hours_days(self, wet):
-        if not wet:
-            return False
-        code, disp, text = self._audit_type_bits(wet)
-        code = code.replace(' ', '_').replace('-', '_')
-        disp = disp.replace(' ', '_').replace('-', '_')
-        return (
-            code in ('EXTRA_HOURS_DAYS', 'EXTRAHOURSDAY')
-            or disp in ('EXTRA_HOURS_DAYS', 'EXTRAHOURSDAY')
-            or 'extra hours day' in text
-        )
-
-    def _audit_skip_attendance(self, wet):
-        """True for day types the PayRun Audit leaves out of Attendance Days."""
-        if not wet or self._audit_is_extra_hours_days(wet):
-            return False
-        code, disp, text = self._audit_type_bits(wet)
-        codes = {code, disp}
-        if 'TSD' in codes or 'travel suspension' in text:
-            return True
-        if codes & {'ABS', 'ABSENT'} or any(k in text for k in ('absent', 'absence', 'غياب')):
-            return True
-        if codes & {'LAT', 'LATE', 'LATENESS'} or 'lateness' in text or 'تأخير' in text:
-            return True
-        if codes & {'OUT', 'OUTCON', 'OUT_OF_CONTRACT'} or any(k in text for k in ('out of contract', 'خارج العقد')):
-            return True
-        if codes & {'OVERTIME', 'EXTRA', 'EXTRA_HOURS', 'OT', 'OTW', 'OTR', 'PHO',
-                    'LEAVEUNPAID', 'UN_PAID', 'UNPAID', 'UNP', 'LEAVE500', 'SICKLEAVE0'} \
-                or any(k in text for k in ('overtime', 'extra', 'unpaid', 'بدون راتب', 'غير مدفوع')):
-            return True
-        return False
 
     def _earned_to_date(self, emp, d_from, d_to):
         """(ledger, earned, deduction, paid_days, daily wage) of one employee for d_from..d_to."""
@@ -570,8 +486,8 @@ class PfrAdvanceWizard(models.TransientModel):
 
             lines.append((0, 0, {
                 'employee_id': emp.id,
-                'start_date': emp_start_dates.get(emp.id, False),
-                'worked_days': self._audit_attendance_days(L, d_from, d_to),
+                'start_date': self._get_employee_start_date(emp),
+                'worked_days': float(L.count('WORK') + L.count('PHD')),
                 'rest_days': float(L.count('REST')),
                 'absent_days': float(L.count('ABSENT')),
                 'sick_leave_days': round(sick_days, 2),
@@ -692,7 +608,11 @@ class PfrAdvanceWizard(models.TransientModel):
                                 'num_format': '#,##0.00'})
         head = wb.add_format({'bold': True, 'font_color': '#FFFFFF', 'bg_color': '#1F497D', 'border': 1,
                               'align': 'center', 'valign': 'vcenter', 'text_wrap': True, 'font_size': 10})
+        head_alw = wb.add_format({'bold': True, 'font_color': '#375623', 'bg_color': '#E2EFDA', 'border': 1,
+                                  'align': 'center', 'valign': 'vcenter', 'font_size': 11})
         head_bal = wb.add_format({'bold': True, 'font_color': '#203764', 'bg_color': '#D9E1F2', 'border': 1,
+                                  'align': 'center', 'valign': 'vcenter', 'font_size': 11})
+        head_ded = wb.add_format({'bold': True, 'font_color': '#FFFFFF', 'bg_color': '#C00000', 'border': 1,
                                   'align': 'center', 'valign': 'vcenter', 'font_size': 11})
         head_comp = wb.add_format({'bold': True, 'font_color': '#FFFFFF', 'bg_color': '#203764', 'border': 1,
                                    'align': 'center', 'valign': 'vcenter', 'font_size': 11})
@@ -739,12 +659,16 @@ class PfrAdvanceWizard(models.TransientModel):
 
         info = [(_("Employee ID"), 14), (_("Employee Name"), 28), (_("Department"), 22),
                 (_("Job Title / Position"), 22), (_("Start Date"), 14), (_("Monthly Wage"), 14), (_("Daily Wage"), 12)]
-        att = [(_("Attendance Days"), 15)]
+        att = [(_("Attendance Days"), 15), (_("Rest Days"), 11), (_("Absent Days"), 12)]
+        lves = [(_("Sick Leave (Days)"), 15), (_("Annual Leave (Days)"), 16), (_("Other Paid Leaves"), 16)]
         bals = [(_("Annual Leave Bal (Days)"), 20), (_("Extra Hours Bal (Hrs)"), 20), (_("Paid Leave Bal (Days)"), 20)]
-        adv = [(_("Advance"), 14), (_("Included"), 10), (_("Note"), 34)]
+        earn = [(_("Paid Days"), 11), (_("Gross (Paid + Absent)"), 18), (_("Absent Deduction"), 16)]
+        adv = [(_("Earned to Date"), 14), (_("Advance"), 14), (_("Included"), 10), (_("Note"), 34)]
         groups = [(_("EMPLOYEE"), info, head),
-                  (_("ATTENDANCE"), att, head),
+                  (_("ATTENDANCE & ABSENCE"), att, head),
+                  (_("LEAVES IN PERIOD"), lves, head_alw),
                   (_("BALANCES"), bals, head_bal),
+                  (_("EARNINGS & DEDUCTIONS"), earn, head_ded),
                   (_("ADVANCE"), adv, head_comp)]
 
         r_group, r_head, r0 = 11, 12, 13
@@ -772,15 +696,20 @@ class PfrAdvanceWizard(models.TransientModel):
             name = emp.sudo().legal_name or emp.sudo().name or "N/A"
             job_title = (emp.job_id.sudo().name if emp.job_id else False) or "N/A"
             s_date_str = format_date(self.env, line.start_date) if line.start_date else ""
+            gross_earned = ((line.paid_days or 0.0) + (line.absent_days or 0.0)) * (line.daily_wage or 0.0)
             vals = [emp_id, name, dept, job_title, s_date_str, line.wage, line.daily_wage,
-                    line.worked_days,
+                    line.worked_days, line.rest_days, line.absent_days,
+                    line.sick_leave_days, line.annual_leave_days, line.other_paid_leave_days,
                     line.annual_leave_balance, line.extra_hours_balance, line.paid_leave_balance,
-                    line.advance if line.selected else 0.0,
+                    line.paid_days, gross_earned, line.deduction,
+                    line.earned, line.advance if line.selected else 0.0,
                     _("Yes") if line.selected else _("No"), line.note or ""]
             fmts = [center, left, left, left, center, num, num3,
-                    num,
                     num, num, num,
-                    num, center, left]
+                    num, num, num,
+                    num, num, num,
+                    num, num, num3,
+                    num, num, center, left]
             for c, (v, f) in enumerate(zip(vals, fmts)):
                 if isinstance(v, (int, float)):
                     sh.write_number(row, c, v, f)
@@ -1333,7 +1262,7 @@ class PfrAdvanceWizard(models.TransientModel):
                     company_bank_acc = str(b.acc_number).replace(' ', '')
                     break
 
-        transfer_date_str = fields.Date.context_today(self).strftime('%d/%m/%Y')
+        transfer_date_str = (self.date_cutoff or fields.Date.today()).strftime('%d/%m/%Y')
         desc_str = f"SALARY ADVANCE {self.date_cutoff.strftime('%m %Y')}" if self.date_cutoff else "SALARY ADVANCE"
         company_currency = company.currency_id.name or 'JOD'
 
@@ -1357,9 +1286,8 @@ class PfrAdvanceWizard(models.TransientModel):
             # Col 2: Beneficiary Account / IBAN
             acc_number = (getattr(bank, 'acc_number', '') or '').replace(' ', '') if bank else ''
 
-            # Col 3: Beneficiary Name — employee name (English). Bank holder
-            # and legal name are often Arabic, so they are not used here.
-            holder = (emp.with_context(lang='en_US').name or '').strip()
+            # Col 3: Beneficiary Name
+            holder = (getattr(bank, 'acc_holder_name', '') or getattr(emp, 'legal_name', '') or emp.name or '').strip()
 
             # Col 4: Bank Identifier Code (BIC)
             bic = (getattr(bank, 'bank_bic', '') or '') if bank else ''
@@ -1369,8 +1297,9 @@ class PfrAdvanceWizard(models.TransientModel):
             # Col 5: From code (e.g. '13')
             code_13 = '13'
 
-            # Col 6: Transfer date (today, DD/MM/YYYY)
-            date_val = transfer_date_str
+            # Col 6: Bank Form Number / Date (DD/MM/YYYY)
+            f_form_no = self._employee_field_by_label('Bank Form Number')
+            date_val = (emp[f_form_no] if f_form_no and emp[f_form_no] else '') or transfer_date_str
 
             # Col 7: Currency
             curr = (bank.currency_id.name if bank and getattr(bank, 'currency_id', False) else company_currency) or 'JOD'
