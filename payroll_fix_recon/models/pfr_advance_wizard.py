@@ -48,11 +48,32 @@ class PfrAdvanceWizard(models.TransientModel):
                              help="Optional note or batch name (e.g. Batch 2, Plant Workers).")
     history_batch = fields.Selection(selection='_get_history_batches', string="Past Advance Run",
                                      help="Choose a previously completed advance run to view or re-download.")
+    journal_id = fields.Many2one(
+        'account.journal', string="Payment Journal",
+        domain="[('company_id', '=', company_id), ('type', 'in', ('bank', 'cash', 'general'))]",
+        help="Journal used to post the mid-month advance payment (Bank, Cash, or Miscellaneous).")
+    advance_account_id = fields.Many2one(
+        'account.account', string="Advance Account",
+        domain="[('company_id', '=', company_id), ('deprecated', '=', False)]",
+        help="Asset/Receivable account (e.g. Employee Salary Advances) debited at mid-month and cleared by the month-end payslip.")
+    credit_account_id = fields.Many2one(
+        'account.account', string="Credit Account",
+        domain="[('company_id', '=', company_id), ('deprecated', '=', False)]",
+        help="Bank/Cash/Clearing account credited for the advance payout (defaults to the Journal's default account).")
+    move_id = fields.Many2one('account.move', string="Advance Journal Entry", readonly=True)
 
     @api.onchange('company_id')
     def _onchange_company_id(self):
         if self.company_id:
             self.employee_ids = [(5, 0, 0)]
+            self.journal_id = False
+            self.advance_account_id = False
+            self.credit_account_id = False
+
+    @api.onchange('journal_id')
+    def _onchange_journal_id(self):
+        if self.journal_id and self.journal_id.default_account_id:
+            self.credit_account_id = self.journal_id.default_account_id
 
     @api.model
     def _default_input_type(self):
@@ -579,8 +600,87 @@ class PfrAdvanceWizard(models.TransientModel):
             if 'company_id' in fields_:
                 vals['company_id'] = line.employee_id.company_id.id or (self.company_id or self.env.company).id
             Attachment.create(vals)
+        if self.journal_id and self.advance_account_id:
+            self._create_advance_journal_entry(lines, marker)
         self.state = 'done'
         return self._reopen()
+
+    def _create_advance_journal_entry(self, lines, marker):
+        """Create and post one balanced Journal Entry for the mid-month advance batch."""
+        self.ensure_one()
+        if self.move_id:
+            return self.move_id
+        if not self.journal_id:
+            raise UserError(_("Please select a Payment Journal first."))
+        if not self.advance_account_id:
+            raise UserError(_("Please select an Advance Account (e.g. Employee Salary Advances) first."))
+        credit_account = self.credit_account_id or self.journal_id.default_account_id
+        if not credit_account:
+            raise UserError(_("Please set a Credit Account or configure a Default Account on the selected Journal."))
+
+        company = self.company_id or self.env.company
+        currency = company.currency_id
+        line_vals = []
+        total_amt = 0.0
+        for line in lines:
+            amt = currency.round(line.advance)
+            if amt <= 0:
+                continue
+            total_amt += amt
+            partner = line.employee_id.sudo().work_contact_id
+            line_vals.append((0, 0, {
+                'name': f"{marker} - {line.employee_id.name}",
+                'account_id': self.advance_account_id.id,
+                'partner_id': partner.id if partner else False,
+                'debit': amt,
+                'credit': 0.0,
+            }))
+        total_amt = currency.round(total_amt)
+        if total_amt <= 0 or not line_vals:
+            raise UserError(_("No positive advance lines to post."))
+
+        line_vals.append((0, 0, {
+            'name': marker,
+            'account_id': credit_account.id,
+            'debit': 0.0,
+            'credit': total_amt,
+        }))
+
+        move = self.env['account.move'].sudo().create({
+            'move_type': 'entry',
+            'date': self.date_cutoff or fields.Date.context_today(self),
+            'journal_id': self.journal_id.id,
+            'company_id': company.id,
+            'ref': marker,
+            'line_ids': line_vals,
+        })
+        move.action_post()
+        self.move_id = move.id
+        return move
+
+    def action_create_journal_entry(self):
+        self.ensure_one()
+        if self.move_id:
+            return self.action_view_journal_entry()
+        lines = self.line_ids.filtered(lambda l: l.selected and l.advance > 0)
+        if not lines:
+            raise UserError(_("No selected advance lines to post."))
+        marker = self.history_batch or self._marker()
+        self._create_advance_journal_entry(lines, marker)
+        return self._reopen()
+
+    def action_view_journal_entry(self):
+        self.ensure_one()
+        if not self.move_id:
+            raise UserError(_("No Journal Entry has been created for this run yet."))
+        return {
+            'name': _("Advance Journal Entry"),
+            'type': 'ir.actions.act_window',
+            'res_model': 'account.move',
+            'view_mode': 'form',
+            'res_id': self.move_id.id,
+            'target': 'current',
+        }
 
     # ------------------------------------------------------------------
     # Excel export (same look as the PayRun Audit)

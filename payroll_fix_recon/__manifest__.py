@@ -11,6 +11,7 @@
         'hr_attendance',
         'hr_work_entry',
         'hr_holidays',
+        'account',
         'employee_salary_payment_method',
         'anabtawi_employee_profile',
     ],
