@@ -57,6 +57,14 @@ class PfrAdvanceWizard(models.TransientModel):
         help="Payslip input the month-end slip deducts the advance with (e.g. Company loan).")
     employee_ids = fields.Many2many('hr.employee', string="Employees",
                                     help="Leave empty for every active employee with a wage.")
+    main_department_ids = fields.Many2many(
+        'hr.department', 'pfr_adv_wiz_main_dept_rel', 'wizard_id', 'department_id',
+        string="Main Departments",
+        help="Optional: filter by one or more main departments (e.g. Factory, Retail).")
+    department_ids = fields.Many2many(
+        'hr.department', 'pfr_adv_wiz_sub_dept_rel', 'wizard_id', 'department_id',
+        string="Sub-Departments",
+        help="Optional: filter by one or more sub-departments under the selected main departments.")
     line_ids = fields.One2many('pfr.advance.wizard.line', 'wizard_id', string="Preview")
     state = fields.Selection([('draft', 'Draft'), ('calculated', 'Calculated'), ('done', 'Done')], default='draft')
     total_advance = fields.Float(string="Total Advance", compute='_compute_total')
@@ -84,7 +92,17 @@ class PfrAdvanceWizard(models.TransientModel):
     @api.onchange('company_id')
     def _onchange_company_id(self):
         if self.company_id:
+            self.main_department_ids = [(5, 0, 0)]
+            self.department_ids = [(5, 0, 0)]
             self.employee_ids = [(5, 0, 0)]
+
+    @api.onchange('main_department_ids')
+    def _onchange_main_department_ids(self):
+        if self.main_department_ids and self.department_ids:
+            allowed = self.env['hr.department'].search([
+                ('id', 'child_of', self.main_department_ids.ids),
+            ])
+            self.department_ids = self.department_ids & allowed
 
     @api.model
     def _default_input_type(self):
@@ -385,6 +403,9 @@ class PfrAdvanceWizard(models.TransientModel):
             domain = [('active', '=', True)]
             if company:
                 domain.append(('company_id', '=', company.id))
+            dept_filter = self.department_ids or self.main_department_ids
+            if dept_filter:
+                domain.append(('department_id', 'child_of', dept_filter.ids))
             if 'salary_payment_method' in self.env['hr.employee']._fields:
                 domain.append(('salary_payment_method', '=', 'two_payments'))
             if 'profile_employment_status' in self.env['hr.employee']._fields:

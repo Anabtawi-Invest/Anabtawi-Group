@@ -27,6 +27,12 @@
                 <group string="Advance Parameters" invisible="state == 'done'">
                     <group>
                         <field name="company_id" options="{'no_create': True, 'no_open': True}"/>
+                        <field name="main_department_ids" widget="many2many_tags"
+                               domain="[('company_id', 'in', [False, company_id]), ('parent_id', '=', False)]"
+                               options="{'no_create': True}"/>
+                        <field name="department_ids" widget="many2many_tags"
+                               domain="[('company_id', 'in', [False, company_id]), ('parent_id', '!=', False)] if not main_department_ids else [('company_id', 'in', [False, company_id]), ('id', 'child_of', main_department_ids), ('id', 'not in', main_department_ids)]"
+                               options="{'no_create': True}"/>
                         <field name="date_cutoff"/>
                         <field name="advance_percent"/>
                         <field name="batch_name"/>
@@ -34,7 +40,9 @@
                     </group>
                     <group>
                         <field name="month_start"/>
-                        <field name="employee_ids" widget="many2many_tags" domain="[('company_id', '=', company_id), ('salary_payment_method', '=', 'two_payments'), '|', ('profile_employment_status', '=', False), ('profile_employment_status', '=', 'active')]" options="{'no_create': True}"/>
+                        <field name="employee_ids" widget="many2many_tags"
+                               domain="[('company_id', '=', company_id), ('salary_payment_method', '=', 'two_payments'), '|', ('profile_employment_status', '=', False), ('profile_employment_status', '=', 'active')] + ([('department_id', 'child_of', department_ids)] if department_ids else ([('department_id', 'child_of', main_department_ids)] if main_department_ids else []))"
+                               options="{'no_create': True}"/>
                         <field name="total_advance"/>
                     </group>
                 </group>
