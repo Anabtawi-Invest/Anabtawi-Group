@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_stock_location_qty_on_date_wizard_form" model="ir.ui.view">
+        <field name="name">stock.location.qty.on.date.wizard.form</field>
+        <field name="model">stock.location.qty.on.date.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Location Quantity on Hand">
+                <group>
+                    <group string="Date">
+                        <field name="stock_date"/>
+                    </group>
+                    <group string="Filters">
+                        <field name="all_locations"/>
+                        <field name="location_id"
+                               invisible="all_locations"
+                               required="not all_locations"
+                               options="{'no_create': True}"/>
+                        <field name="all_products"/>
+                        <field name="product_ids"
+                               widget="many2many_tags"
+                               invisible="all_products"
+                               required="not all_products"
+                               options="{'no_create': True}"/>
+                    </group>
+                </group>
+                <footer>
+                    <button name="action_export_xlsx"
+                            type="object"
+                            string="Download Excel"
+                            class="btn-primary"/>
+                    <button string="Cancel" special="cancel" class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_stock_location_qty_on_date_wizard" model="ir.actions.act_window">
+        <field name="name">Location Quantity on Hand</field>
+        <field name="res_model">stock.location.qty.on.date.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <menuitem id="menu_stock_location_qty_on_date"
+              name="Location Quantity on Hand"
+              parent="stock.menu_warehouse_report"
+              action="action_stock_location_qty_on_date_wizard"
+              sequence="47"
+              groups="stock.group_stock_user"/>
+
+</odoo>
