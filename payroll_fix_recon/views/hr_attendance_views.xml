@@ -39,10 +39,13 @@
         <field name="inherit_id" ref="hr_attendance.view_attendance_tree"/>
         <field name="priority">99</field>
         <field name="arch" type="xml">
+            <xpath expr="//field[@name='worked_hours']" position="attributes">
+                <attribute name="sum">Total Worked</attribute>
+            </xpath>
             <xpath expr="//field[@name='worked_hours']" position="after">
-                <field name="net_worked_hours" widget="float_time" optional="show" string="Net Worked Hours"/>
-                <field name="daily_undertime_hours" widget="float_time" optional="show" string="Daily Lateness"/>
-                <field name="daily_overtime_hours" widget="float_time" optional="show" string="Daily Extra Hours"/>
+                <field name="net_worked_hours" widget="float_time" optional="show" string="Net Worked Hours" sum="Total Net"/>
+                <field name="daily_undertime_hours" widget="float_time" optional="show" string="Daily Lateness" sum="Total Lateness"/>
+                <field name="daily_overtime_hours" widget="float_time" optional="show" string="Daily Extra Hours" sum="Total Extra"/>
                 <button name="action_approve_factory_overtime" type="object" icon="fa-check text-success"
                         title="Approve Extra Hours"
                         invisible="daily_overtime_hours &lt; 0.75 or overtime_status == 'approved'"/>
@@ -60,10 +63,13 @@
         <field name="inherit_id" ref="hr_attendance.view_attendance_tree_management"/>
         <field name="priority">99</field>
         <field name="arch" type="xml">
+            <xpath expr="//field[@name='worked_hours']" position="attributes">
+                <attribute name="sum">Total Worked</attribute>
+            </xpath>
             <xpath expr="//field[@name='worked_hours']" position="after">
-                <field name="net_worked_hours" widget="float_time" optional="show" string="Net Worked Hours"/>
-                <field name="daily_undertime_hours" widget="float_time" optional="show" string="Daily Lateness"/>
-                <field name="daily_overtime_hours" widget="float_time" optional="show" string="Daily Extra Hours"/>
+                <field name="net_worked_hours" widget="float_time" optional="show" string="Net Worked Hours" sum="Total Net"/>
+                <field name="daily_undertime_hours" widget="float_time" optional="show" string="Daily Lateness" sum="Total Lateness"/>
+                <field name="daily_overtime_hours" widget="float_time" optional="show" string="Daily Extra Hours" sum="Total Extra"/>
             </xpath>
         </field>
     </record>

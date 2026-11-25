@@ -31,6 +31,7 @@ class PfrAdvanceBatch(models.Model):
     company_id = fields.Many2one('res.company', string="Company", required=True, default=lambda self: self.env.company, index=True)
     date_cutoff = fields.Date(string="Cut-off Date")
     move_id = fields.Many2one('account.move', string="Journal Entry", readonly=True)
+    move_state = fields.Selection(related='move_id.state', string="Journal State", readonly=True)
     reversal_move_id = fields.Many2one('account.move', string="Reversal Entry", readonly=True)
     payment_state = fields.Selection([
         ('unpaid', 'Unpaid'),
@@ -39,6 +40,85 @@ class PfrAdvanceBatch(models.Model):
     ], string="Payment Status", default='unpaid', required=True)
     paid_date = fields.Date(string="Paid Date", readonly=True)
     paid_by = fields.Many2one('res.users', string="Paid By", readonly=True)
+
+    def action_view_journal_entry(self):
+        self.ensure_one()
+        if not self.move_id:
+            raise UserError(_("No Journal Entry has been created for this batch yet."))
+        return {
+            'name': _("Advance Journal Entry"),
+            'type': 'ir.actions.act_window',
+            'res_model': 'account.move',
+            'view_mode': 'form',
+            'res_id': self.move_id.id,
+            'target': 'current',
+        }
+
+    def action_post_journal_entry(self):
+        for batch in self:
+            if not batch.move_id:
+                raise UserError(_("No Journal Entry found for batch %s.", batch.name))
+            if batch.move_id.state == 'draft':
+                batch.move_id.sudo().action_post()
+        return True
+
+    def action_mark_paid(self):
+        for batch in self:
+            if not batch.move_id:
+                raise UserError(_("No Journal Entry found for batch %s.", batch.name))
+            if batch.move_id.state == 'draft':
+                batch.move_id.sudo().action_post()
+            batch.sudo().write({
+                'payment_state': 'paid',
+                'paid_date': fields.Date.context_today(self),
+                'paid_by': self.env.user.id,
+            })
+        return True
+
+    def action_reverse_journal(self):
+        for batch in self:
+            if not batch.move_id:
+                raise UserError(_("No Journal Entry found to reverse."))
+            move = batch.move_id.sudo()
+            if move.state != 'posted':
+                raise UserError(_("Only a posted Journal Entry can be reversed."))
+            rev_lines = []
+            for ml in move.line_ids:
+                rev_lines.append((0, 0, {
+                    'name': _("Reversal of %s", ml.name or move.name),
+                    'account_id': ml.account_id.id,
+                    'partner_id': ml.partner_id.id if ml.partner_id else False,
+                    'debit': ml.credit,
+                    'credit': ml.debit,
+                }))
+            rev_move = self.env['account.move'].sudo().create({
+                'move_type': 'entry',
+                'date': fields.Date.context_today(self),
+                'journal_id': move.journal_id.id,
+                'company_id': move.company_id.id,
+                'ref': _("Reversal of %s", move.name or move.ref or ''),
+                'line_ids': rev_lines,
+            })
+            rev_move.action_post()
+            batch.sudo().write({
+                'reversal_move_id': rev_move.id,
+                'payment_state': 'reversed',
+                'paid_date': False,
+                'paid_by': False,
+            })
+        return True
+
+    def action_view_salary_attachments(self):
+        self.ensure_one()
+        return {
+            'name': _("Salary Advance Adjustments"),
+            'type': 'ir.actions.act_window',
+            'res_model': 'hr.salary.attachment',
+            'view_mode': 'list,form',
+            'views': [(False, 'list'), (False, 'form')],
+            'domain': [('description', '=', self.name)],
+            'context': dict(self.env.context),
+        }
 
 
 class PfrAdvanceWizard(models.TransientModel):

@@ -19,6 +19,7 @@
                                     title="Preview"
                                     aria-label="Preview"
                                     invisible="not document_file"/>
+                            <field name="file_location" optional="show"/>
                             <field name="expiry_date"/>
                         </list>
                     </field>

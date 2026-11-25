@@ -33,6 +33,7 @@ class HrHealthEmployeeDocument(models.Model):
     )
     document_file = fields.Binary(string='File', attachment=True)
     document_filename = fields.Char(string='Filename')
+    file_location = fields.Char(string='File Location')
     probation_start_date = fields.Date(string='Probation Start Date')
     expiry_date = fields.Date(string='Expiry Date')
 
@@ -157,7 +158,7 @@ class HrHealthEmployeeDocument(models.Model):
         """
         if self.env.context.get('skip_documents_sync'):
             return
-        Document = self.env['documents.document'].sudo()
+        Document = self.env['documents.document'].sudo().with_context(bin_size=False)
         for record in self:
             if not record.document_file:
                 continue
@@ -169,19 +170,19 @@ class HrHealthEmployeeDocument(models.Model):
                     record.id,
                 )
                 continue
-            field_attachment = record._get_document_file_attachment()
+            field_attachment = record._get_document_file_attachment().with_context(bin_size=False)
             if not field_attachment or not field_attachment.datas:
                 continue
 
             doc_name = record._documents_unique_name(folder, record._documents_display_name())
             # Detached copy: Binary field attachment is overwritten in place on re-upload.
-            documents_attachment = field_attachment.with_context(no_document=True).copy({
+            documents_attachment = field_attachment.with_context(no_document=True, bin_size=False).copy({
                 'name': doc_name,
                 'res_model': False,
                 'res_id': False,
                 'res_field': False,
             })
-            Document.create({
+            doc = Document.create({
                 'name': doc_name,
                 'type': 'binary',
                 'folder_id': folder.id,
@@ -189,6 +190,8 @@ class HrHealthEmployeeDocument(models.Model):
                 'company_id': record.employee_id.company_id.id,
                 'partner_id': record.employee_id.work_contact_id.id or False,
             })
+            # Compute & flush is_multipage while bin_size=False, before web_save runs web_read(bin_size=True).
+            doc.flush_recordset(['is_multipage'])
 
     def _sync_probation_expiry_date(self):
         probation_docs = self.filtered('document_type_id.is_probation_document')
