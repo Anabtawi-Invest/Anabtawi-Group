@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_purchase_approval_email" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.purchase.approval.email</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="purchase.res_config_settings_view_form_purchase"/>
+        <field name="arch" type="xml">
+            <xpath expr="//setting[@id='automatic_lock_confirmed_orders']" position="after">
+                <setting id="purchase_approval_email_from"
+                         string="Purchase Approval Sender"
+                         help="From address used when an approver is asked to approve a purchase order. Use an address on the alias domain.">
+                    <field name="purchase_approval_email_from" placeholder="purchases@yourdomain.com"/>
+                </setting>
+            </xpath>
+        </field>
+    </record>
+</odoo>

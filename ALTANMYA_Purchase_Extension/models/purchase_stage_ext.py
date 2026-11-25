@@ -1,5 +1,9 @@
-from odoo import api, fields, models, tools
-from datetime import date, datetime,timedelta
+from datetime import date, datetime, timedelta
+
+from markupsafe import Markup
+
+from odoo import _, api, fields, models, tools
+from odoo.tools import email_normalize
 
 
 
@@ -183,6 +187,7 @@ class TanmyaPurchaseExt(models.Model):
                     'res_model_id': rec_id.id,
                     'res_id': self.id
                 })
+                self._send_purchase_approval_email(rec_next.user)
 
 
     def action_decline(self):
@@ -231,6 +236,48 @@ class TanmyaPurchaseExt(models.Model):
 
 
 
+    def _send_purchase_approval_email(self, user):
+        """Email one approver when the purchase order becomes theirs to approve."""
+        self.ensure_one()
+        if not user:
+            return
+        sender = email_normalize(
+            self.env["ir.config_parameter"].sudo().get_param("altanmya_purchase.approval_email_from") or ""
+        )
+        recipient = email_normalize(user.email or user.partner_id.email or "")
+        if not sender or not recipient:
+            return
+        stage = self._get_current_stage()
+        base_url = self.env["ir.config_parameter"].sudo().get_param("web.base.url", "").rstrip("/")
+        link = "%s/web#id=%s&model=purchase.order&view_type=form" % (base_url, self.id)
+        body = Markup(
+            "<p>%s</p>"
+            "<p>%s</p>"
+            "<ul>"
+            "<li><strong>%s</strong> %s</li>"
+            "<li><strong>%s</strong> %s</li>"
+            "</ul>"
+            '<p><a href="%s">%s</a></p>'
+        ) % (
+            _("Hello %s,") % (user.name or ""),
+            _("A purchase order is waiting for your approval."),
+            _("Order"),
+            self.name or "",
+            _("Stage"),
+            stage.name or self.state or "",
+            link,
+            link,
+        )
+        self.env["mail.mail"].sudo().create({
+            "subject": _("Purchase approval required: %s") % (self.name or ""),
+            "body_html": body,
+            "email_from": sender,
+            "email_to": recipient,
+            "model": "purchase.order",
+            "res_id": self.id,
+            "auto_delete": True,
+        }).send()
+
     def _get_current_stage(self):
         """Resolve stage by code within this PO's purchase type (codes are reused)."""
         domain = [('code', '=', self.state)]
@@ -263,6 +310,7 @@ class TanmyaPurchaseExt(models.Model):
                             'res_model_id': rec_id.id,
                             'res_id': self.id
                         })
+                        self._send_purchase_approval_email(self.env['res.users'].browse(usrs[1]))
                     else:
                         uorder = uorder+1
                         if uorder==1:
@@ -281,6 +329,7 @@ class TanmyaPurchaseExt(models.Model):
                                 'res_model_id': rec_id.id,
                                 'res_id': self.id
                             })
+                            self._send_purchase_approval_email(self.env['res.users'].browse(usrs[1]))
                         else:
                             self.env['tanmya.purchase.order.pending'].create({
                                 'user': usrs[1],

@@ -69,9 +69,11 @@ class tanmya_PurchaseStage(models.Model):
                         if user in approved_users:
                             continue
                         rec = current.filtered(lambda p, u=user: p.user == u)[:1]
+                        notify = False
                         if rec:
                             if rec.status != 'waiting':
                                 rec.write({'status': 'waiting'})
+                                notify = True
                         else:
                             Pending.create({
                                 'user': user.id,
@@ -80,7 +82,10 @@ class tanmya_PurchaseStage(models.Model):
                                 'status': 'waiting',
                                 'userorder': 0,
                             })
+                            notify = True
                         self._ensure_approve_activity(Activity, model_id, po, user)
+                        if notify:
+                            po._send_purchase_approval_email(user)
                 else:
                     self.env.cr.execute("""
                         SELECT res_users_id
@@ -94,8 +99,11 @@ class tanmya_PurchaseStage(models.Model):
                         status = 'waiting' if index == 1 else 'queue'
                         user = self.env['res.users'].browse(uid)
                         rec = current.filtered(lambda p, u=uid: p.user.id == u)[:1]
+                        notify = False
                         if rec:
                             if rec.status != status or rec.userorder != index:
+                                if status == 'waiting' and rec.status != 'waiting':
+                                    notify = True
                                 rec.write({'status': status, 'userorder': index})
                         else:
                             Pending.create({
@@ -105,8 +113,11 @@ class tanmya_PurchaseStage(models.Model):
                                 'status': status,
                                 'userorder': index,
                             })
+                            notify = status == 'waiting'
                         if status == 'waiting':
                             self._ensure_approve_activity(Activity, model_id, po, user)
+                        if notify:
+                            po._send_purchase_approval_email(user)
 
     def _ensure_approve_activity(self, activity_model, model_id, po, user):
         has_act = activity_model.search_count([
