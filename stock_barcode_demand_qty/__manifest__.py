@@ -1,6 +1,6 @@
 {
     "name": "Stock Barcode Demand Quantity",
-    "version": "19.0.1.3.5",
+    "version": "19.0.1.3.6",
     "category": "Inventory/Inventory",
     "summary": "Branch demand and factory quantity on the same barcode transfer",
     "author": "Anabtawi",
