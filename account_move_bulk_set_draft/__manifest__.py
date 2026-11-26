@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Account Move - Bulk Set to Draft",
-    "version": "19.0.3.0.0",
+    "version": "19.0.3.0.1",
     "author":"Anabtawi",
     "category": "Accounting",
     "summary": "Adds a list-view server action to set selected journal entries/invoices to draft.",
