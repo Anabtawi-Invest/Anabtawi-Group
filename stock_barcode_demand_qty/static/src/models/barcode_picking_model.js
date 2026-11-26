@@ -1,9 +1,22 @@
 import BarcodePickingModel from "@stock_barcode/models/barcode_picking_model";
+import { rpc } from "@web/core/network/rpc";
 import { patch } from "@web/core/utils/patch";
 
 patch(BarcodePickingModel.prototype, {
     _demandQtyMode() {
         return Boolean(this.config?.barcode_show_demand_qty);
+    },
+
+    _demandLocked() {
+        return Boolean(this.record?.barcode_demand_locked);
+    },
+
+    _branchDemandOpen() {
+        return this._demandQtyMode() && !this._demandLocked();
+    },
+
+    _factoryQtyOpen() {
+        return this._demandQtyMode() && this._demandLocked();
     },
 
     _lineDoneQty(line) {
@@ -146,13 +159,41 @@ patch(BarcodePickingModel.prototype, {
 
     _getMoveLineData(id) {
         const smlData = super._getMoveLineData(...arguments);
-        if (this.config.barcode_show_demand_qty && smlData.demand_qty) {
-            smlData.reserved_uom_qty = smlData.demand_qty;
+        if (this._demandQtyMode()) {
+            smlData.reserved_uom_qty = smlData.demand_qty || 0;
             if (!smlData.picked) {
                 smlData.qty_done = 0;
             }
         }
         return smlData;
+    },
+
+    getQtyDemand(line) {
+        if (this._demandQtyMode()) {
+            return line?.demand_qty || 0;
+        }
+        return super.getQtyDemand(...arguments);
+    },
+
+    getIncrementQuantity(line) {
+        if (this._branchDemandOpen()) {
+            return 1;
+        }
+        return super.getIncrementQuantity(...arguments);
+    },
+
+    lineIsFaulty(line) {
+        if (this._demandQtyMode()) {
+            return false;
+        }
+        return super.lineIsFaulty(...arguments);
+    },
+
+    _shouldCreateLineOnExceed(line) {
+        if (this._factoryQtyOpen()) {
+            return false;
+        }
+        return super._shouldCreateLineOnExceed(...arguments);
     },
 
     displayLineQtyDemand(line) {
@@ -164,27 +205,74 @@ patch(BarcodePickingModel.prototype, {
 
     _getNewLineDefaultContext() {
         const context = super._getNewLineDefaultContext(...arguments);
-        if (this.config.barcode_show_demand_qty) {
+        if (this._branchDemandOpen()) {
             context.default_qty_done = 0;
             delete context.force_fullfil_quantity;
         }
         return context;
     },
 
-    _createCommandVals(line) {
-        const values = super._createCommandVals(...arguments);
-        if (this.config.barcode_show_demand_qty) {
-            values.demand_qty = line.demand_qty || line.reserved_uom_qty || 0;
-            if (!(line.qty_done > 0)) {
-                values.quantity = 0;
-                values.qty_done = 0;
-                values.picked = false;
-            }
+    _getNewLineDefaultValues(fieldsParams) {
+        const values = super._getNewLineDefaultValues(...arguments);
+        if (this._factoryQtyOpen()) {
+            values.demand_qty = 0;
+            values.picked = true;
+        }
+        if (this._branchDemandOpen()) {
+            values.qty_done = 0;
+            values.picked = false;
         }
         return values;
     },
 
+    _getFieldToWrite() {
+        const fields = super._getFieldToWrite(...arguments);
+        if (this._demandQtyMode() && !fields.includes("demand_qty")) {
+            fields.push("demand_qty");
+        }
+        return fields;
+    },
+
+    _createCommandVals(line) {
+        const values = super._createCommandVals(...arguments);
+        if (!this._demandQtyMode()) {
+            return values;
+        }
+        if (this._demandLocked()) {
+            values.demand_qty = line.demand_qty || 0;
+            values.quantity = line.qty_done || 0;
+            values.picked = Boolean(line.picked || line.qty_done > 0);
+            return values;
+        }
+        values.demand_qty = line.demand_qty || 0;
+        values.quantity = 0;
+        values.qty_done = 0;
+        values.picked = false;
+        return values;
+    },
+
     async updateLine(line, args) {
+        if (
+            this._branchDemandOpen() &&
+            !this._applyScanToDemand &&
+            args &&
+            typeof args === "object" &&
+            typeof args.qty_done === "number" &&
+            args.qty_done !== 0
+        ) {
+            const base = line.demand_qty || 0;
+            this._setLineDemand(line, Math.max(0, base + args.qty_done));
+            args = { ...args, qty_done: 0 };
+        }
+        if (
+            this._factoryQtyOpen() &&
+            args &&
+            typeof args === "object" &&
+            typeof args.qty_done === "number" &&
+            args.qty_done !== 0
+        ) {
+            line.picked = true;
+        }
         if (
             this._applyScanToDemand &&
             args &&
@@ -193,14 +281,14 @@ patch(BarcodePickingModel.prototype, {
         ) {
             return super.updateLine(line, this._scanArgsAsDemand(line, args));
         }
-        return super.updateLine(...arguments);
+        return super.updateLine(line, args);
     },
 
     async processBarcode() {
         if (typeof super.processBarcode !== "function") {
             return;
         }
-        if (!this._demandQtyMode() || this._applyScanToDemand) {
+        if (!this._branchDemandOpen() || this._applyScanToDemand) {
             return super.processBarcode(...arguments);
         }
         return this._duringDemandScan(() => super.processBarcode(...arguments));
@@ -210,7 +298,7 @@ patch(BarcodePickingModel.prototype, {
         if (typeof super._processBarcode !== "function") {
             return;
         }
-        if (!this._demandQtyMode() || this._applyScanToDemand) {
+        if (!this._branchDemandOpen() || this._applyScanToDemand) {
             return super._processBarcode(...arguments);
         }
         return this._duringDemandScan(() => super._processBarcode(...arguments));
@@ -230,5 +318,88 @@ patch(BarcodePickingModel.prototype, {
         }
         await this._beforeDemandScanSave();
         return super._save(...arguments);
+    },
+
+    get displayValidateButton() {
+        if (this._branchDemandOpen()) {
+            return false;
+        }
+        return super.displayValidateButton;
+    },
+
+    get displayConfirmDemandButton() {
+        return Boolean(
+            this._branchDemandOpen() &&
+            this.config?.barcode_can_confirm_demand &&
+            !this.isDone &&
+            !this.isCancelled
+        );
+    },
+
+    get displayEditDemandButton() {
+        return Boolean(
+            this._factoryQtyOpen() &&
+            this.config?.barcode_can_confirm_demand &&
+            !this.isDone &&
+            !this.isCancelled &&
+            !this._factoryHasEnteredQty()
+        );
+    },
+
+    get displayDemandConfirmMessage() {
+        return Boolean(this._branchDemandOpen() && !this.isDone && !this.isCancelled);
+    },
+
+    _factoryHasEnteredQty() {
+        const lines = Array.isArray(this.currentState?.lines) ? this.currentState.lines : [];
+        return lines.some((line) => line && line.product_id && line.picked);
+    },
+
+    _demandErrorMessage(error) {
+        const dataMessage = error?.data?.message;
+        if (typeof dataMessage === "string" && dataMessage) {
+            return dataMessage;
+        }
+        const argument = error?.data?.arguments?.[0];
+        if (typeof argument === "string" && argument) {
+            return argument;
+        }
+        if (typeof error?.message === "string" && error.message) {
+            return error.message;
+        }
+        return "تعذر تنفيذ العملية";
+    },
+
+    async _reloadDemandTransfer() {
+        const { route, params } = this.getActionRefresh(this.resId);
+        const result = await rpc(route, params);
+        await this.refreshCache(result.data.records);
+        this.trigger?.("update");
+    },
+
+    async confirmDemand() {
+        if (!this.displayConfirmDemandButton) {
+            return;
+        }
+        try {
+            await this.save();
+            await this.orm.call("stock.picking", "action_barcode_confirm_demand", [[this.resId]]);
+            await this._reloadDemandTransfer();
+        } catch (error) {
+            this.notification(this._demandErrorMessage(error), { type: "danger" });
+        }
+    },
+
+    async editDemand() {
+        if (!this.displayEditDemandButton) {
+            return;
+        }
+        try {
+            await this.save();
+            await this.orm.call("stock.picking", "action_barcode_edit_demand", [[this.resId]]);
+            await this._reloadDemandTransfer();
+        } catch (error) {
+            this.notification(this._demandErrorMessage(error), { type: "danger" });
+        }
     },
 });

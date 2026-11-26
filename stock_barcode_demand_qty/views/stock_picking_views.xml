@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_picking_form_barcode_demand" model="ir.ui.view">
+        <field name="name">stock.picking.form.barcode.demand</field>
+        <field name="model">stock.picking</field>
+        <field name="inherit_id" ref="stock.view_picking_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <button
+                    name="action_barcode_confirm_demand"
+                    string="تأكيد الكمية المطلوبة"
+                    type="object"
+                    groups="stock_barcode_demand_qty.group_barcode_demand_confirm"
+                    invisible="barcode_demand_locked or not barcode_show_demand_qty or state in ('done', 'cancel')"/>
+                <button
+                    name="action_barcode_edit_demand"
+                    string="تعديل الكمية المطلوبة"
+                    type="object"
+                    groups="stock_barcode_demand_qty.group_barcode_demand_confirm"
+                    invisible="not barcode_demand_locked or not barcode_show_demand_qty or state in ('done', 'cancel')"/>
+            </xpath>
+            <xpath expr="//field[@name='origin']" position="after">
+                <field name="barcode_show_demand_qty" invisible="1"/>
+                <field
+                    name="barcode_demand_locked"
+                    invisible="not barcode_show_demand_qty"
+                    readonly="1"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

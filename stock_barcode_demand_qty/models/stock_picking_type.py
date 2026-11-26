@@ -12,4 +12,7 @@ class StockPickingType(models.Model):
     def _get_barcode_config(self):
         config = super()._get_barcode_config()
         config["barcode_show_demand_qty"] = self.barcode_show_demand_qty
+        config["barcode_can_confirm_demand"] = self.env.user.has_group(
+            "stock_barcode_demand_qty.group_barcode_demand_confirm"
+        )
         return config

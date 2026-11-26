@@ -13,6 +13,9 @@ class StockMoveLine(models.Model):
     show_barcode_demand_qty = fields.Boolean(
         related="picking_type_id.barcode_show_demand_qty",
     )
+    barcode_demand_locked = fields.Boolean(
+        related="picking_id.barcode_demand_locked",
+    )
 
     def _sync_demand_qty_to_move(self):
         lines = self.filtered(
@@ -25,6 +28,13 @@ class StockMoveLine(models.Model):
                 line.move_id.product_uom,
                 rounding_method="HALF-UP",
             )
+
+    def _picking_from_vals(self, vals):
+        if vals.get("picking_id"):
+            return self.env["stock.picking"].browse(vals["picking_id"])
+        if vals.get("move_id"):
+            return self.env["stock.move"].browse(vals["move_id"]).picking_id
+        return self.env["stock.picking"]
 
     def _picking_type_from_vals(self, vals):
         picking = (
@@ -61,6 +71,11 @@ class StockMoveLine(models.Model):
         picking_type = self._picking_type_from_vals(vals)
         if not picking_type or not picking_type.barcode_show_demand_qty:
             return
+        picking = self._picking_from_vals(vals)
+        if picking and picking.barcode_demand_locked:
+            if not self.env.context.get("allow_demand_qty_write"):
+                vals["demand_qty"] = 0.0
+            return
         demand_qty = vals.get("demand_qty") or self._scanned_qty_without_demand(vals)
         if not demand_qty:
             return
@@ -78,31 +93,31 @@ class StockMoveLine(models.Model):
         return lines
 
     def write(self, vals):
-        res = super().write(vals)
-        if "demand_qty" in vals:
-            self._sync_demand_qty_to_move()
-            stray_done = self.filtered(
-                lambda line: line.show_barcode_demand_qty
-                and line.demand_qty
-                and not line.picked
-                and line.quantity
+        if (
+            "demand_qty" in vals
+            and not self.env.context.get("allow_demand_qty_write")
+        ):
+            locked = self.filtered(
+                lambda line: line.show_barcode_demand_qty and line.picking_id.barcode_demand_locked
             )
-            if stray_done:
-                stray_done.with_context(preserve_state=True).write(
-                    {"quantity": 0, "picked": False}
-                )
+            if locked:
+                safe_vals = {key: value for key, value in vals.items() if key != "demand_qty"}
+                if safe_vals:
+                    super(StockMoveLine, locked).write(safe_vals)
+                rest = self - locked
+                if rest:
+                    super(StockMoveLine, rest).write(vals)
+                    if not self.env.context.get("skip_demand_sync"):
+                        rest._sync_demand_qty_to_move()
+                return True
+        res = super().write(vals)
+        if "demand_qty" in vals and not self.env.context.get("skip_demand_sync"):
+            self._sync_demand_qty_to_move()
         return res
-
-    def read(self, fields=None, load="_classic_read"):
-        data = super().read(fields, load)
-        if fields and "demand_qty" in fields:
-            for line, vals in zip(self, data):
-                if not vals.get("demand_qty") and line.quantity and not line.picked:
-                    vals["demand_qty"] = line.quantity
-        return data
 
     def _get_fields_stock_barcode(self):
         return super()._get_fields_stock_barcode() + [
             "demand_qty",
             "show_barcode_demand_qty",
+            "barcode_demand_locked",
         ]
