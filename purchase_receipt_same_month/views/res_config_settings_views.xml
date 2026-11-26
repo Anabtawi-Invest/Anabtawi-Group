@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_purchase_receipt_same_month" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.purchase.receipt.same.month</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="purchase.res_config_settings_view_form_purchase"/>
+        <field name="arch" type="xml">
+            <xpath expr="//setting[@id='automatic_lock_confirmed_orders']" position="after">
+                <setting id="purchase_receipt_same_month"
+                         string="Block Receipts Outside Purchase Order Month"
+                         company_dependent="1"
+                         help="An incoming receipt can be validated only when its validation date is in the same month and year as the purchase order confirmation date.">
+                    <field name="purchase_receipt_same_month"/>
+                </setting>
+            </xpath>
+        </field>
+    </record>
+</odoo>

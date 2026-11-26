@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="group_purchase_receipt_other_month" model="res.groups">
+        <field name="name">Allow Receipt Outside Purchase Order Month</field>
+        <field name="sequence">30</field>
+        <field name="comment">Can allow validating receipts in a month other than the purchase order month, on a specific purchase order.</field>
+        <field name="privilege_id" ref="purchase.res_groups_privilege_purchase"/>
+        <field name="implied_ids" eval="[(4, ref('purchase.group_purchase_user'))]"/>
+    </record>
+</odoo>
