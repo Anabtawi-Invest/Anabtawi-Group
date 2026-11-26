@@ -11,13 +11,11 @@ class HrEmployee(models.Model):
     _inherit = 'hr.employee'
 
     def write(self, vals):
-        # 1. Detect if profile_employment_status is being set to 'terminated'
+        # When profile status becomes terminated: unlink user, clear OTP, close contract.
+        # Do not force active=True — HR may still archive via Employee Termination.
         is_terminating = vals.get('profile_employment_status') == 'terminated'
 
         if is_terminating:
-            # Always ensure employee remains active in the Employees module
-            vals['active'] = True
-
             for employee in self:
                 # A. Unlink the related user
                 if employee.user_id:
@@ -51,25 +49,12 @@ class HrEmployee(models.Model):
                         if update_vals:
                             v.sudo().write(update_vals)
 
-        # In case active was attempted to be set to False for an employee with status 'terminated'
-        if vals.get('active') is False:
-            if any(emp.profile_employment_status == 'terminated' for emp in self):
-                vals['active'] = True
-
-        res = super().write(vals)
-
-        # Post-write guarantee: if employee is terminated, ensure active is True
-        for employee in self:
-            if employee.profile_employment_status == 'terminated' and not employee.active:
-                super(HrEmployee, employee.sudo()).write({'active': True})
-
-        return res
+        return super().write(vals)
 
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
             if vals.get('profile_employment_status') == 'terminated':
-                vals['active'] = True
                 vals['user_id'] = False
                 if 'employee_password' in vals:
                     vals['employee_password'] = False
