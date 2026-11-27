@@ -5,13 +5,20 @@
             <field name="name">Talabat Reviews</field>
             <field name="sequence">56</field>
         </record>
+        <record id="privilege_talabat_reviews" model="res.groups.privilege">
+            <field name="name">Talabat Reviews</field>
+            <field name="category_id" ref="module_category_talabat_reviews"/>
+            <field name="sequence">10</field>
+        </record>
         <record id="group_talabat_reviews_user" model="res.groups">
             <field name="name">User</field>
-            <field name="category_id" ref="module_category_talabat_reviews"/>
+            <field name="sequence">10</field>
+            <field name="privilege_id" ref="privilege_talabat_reviews"/>
         </record>
         <record id="group_talabat_reviews_manager" model="res.groups">
             <field name="name">Manager</field>
-            <field name="category_id" ref="module_category_talabat_reviews"/>
+            <field name="sequence">20</field>
+            <field name="privilege_id" ref="privilege_talabat_reviews"/>
             <field name="implied_ids" eval="[(4, ref('group_talabat_reviews_user'))]"/>
             <field name="user_ids" eval="[(4, ref('base.user_root')), (4, ref('base.user_admin'))]"/>
         </record>
