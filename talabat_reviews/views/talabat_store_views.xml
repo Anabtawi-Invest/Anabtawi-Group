@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_talabat_store_list" model="ir.ui.view">
+        <field name="name">talabat.store.list</field>
+        <field name="model">talabat.store</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="vendor_id"/>
+                <field name="pos_config_id"/>
+                <field name="store_rating"/>
+                <field name="review_count"/>
+                <field name="one_star_count"/>
+                <field name="last_sync_at"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_talabat_sync_now" model="ir.actions.server">
+        <field name="name">Sync Talabat Reviews Now</field>
+        <field name="model_id" ref="model_talabat_store"/>
+        <field name="binding_model_id" ref="model_talabat_store"/>
+        <field name="binding_view_types">list</field>
+        <field name="state">code</field>
+        <field name="code">model.action_sync_reviews_now()</field>
+        <field name="groups_id" eval="[(4, ref('talabat_reviews.group_talabat_reviews_manager'))]"/>
+    </record>
+
+    <record id="view_talabat_store_form" model="ir.ui.view">
+        <field name="name">talabat.store.form</field>
+        <field name="model">talabat.store</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_open_reviews" type="object" class="oe_stat_button" icon="fa-star">
+                            <field name="review_ids_count" widget="statinfo" string="Reviews"/>
+                        </button>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="vendor_id"/>
+                            <field name="pos_config_id"/>
+                            <field name="active"/>
+                        </group>
+                        <group>
+                            <field name="store_rating"/>
+                            <field name="review_count"/>
+                            <field name="one_star_count"/>
+                            <field name="last_sync_at"/>
+                        </group>
+                    </group>
+                    <group string="Star breakdown">
+                        <field name="star_5_count"/>
+                        <field name="star_4_count"/>
+                        <field name="star_3_count"/>
+                        <field name="star_2_count"/>
+                        <field name="star_1_count"/>
+                    </group>
+                    <group string="Summary">
+                        <field name="summary_text" nolabel="1" colspan="2"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_talabat_store" model="ir.actions.act_window">
+        <field name="name">Talabat Stores</field>
+        <field name="res_model">talabat.store</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

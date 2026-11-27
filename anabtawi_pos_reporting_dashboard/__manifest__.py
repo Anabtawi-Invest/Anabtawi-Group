@@ -18,6 +18,7 @@
         "hr_attendance",
         "portal_check_in",
         "ceo_main_dashboard",
+        "talabat_reviews",
     ],
     "data": [
         "security/security_groups.xml",

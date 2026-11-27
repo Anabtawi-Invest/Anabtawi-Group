@@ -82,6 +82,9 @@
                     <button t-if="state.canSeeTransfers" type="button" class="btn" t-att-class="state.view === 'transfers' ? 'btn-primary' : 'btn-outline-primary'" t-on-click="() => this.setView('transfers')">
                         <i class="fa fa-exchange me-1"/> Transfers
                     </button>
+                    <button t-if="state.canSeeReviews" type="button" class="btn" t-att-class="state.view === 'reviews' ? 'btn-primary' : 'btn-outline-primary'" t-on-click="() => this.setView('reviews')">
+                        <i class="fa fa-star me-1"/> Reviews
+                    </button>
                 </div>
 
                 <t t-if="state.canSeeProducts &amp;&amp; state.view === 'products'">
@@ -496,6 +499,140 @@
                                 </tbody>
                             </table>
                         </div>
+                    </t>
+                </t>
+                <t t-elif="state.canSeeReviews &amp;&amp; state.view === 'reviews'">
+                    <t t-if="state.reviewsLoading">
+                        <div class="text-center p-5">
+                            <div class="spinner-border text-primary" role="status"/>
+                            <p class="mt-3 text-muted">Loading Talabat reviews…</p>
+                        </div>
+                    </t>
+                    <t t-else="">
+                        <div t-if="reviews.error" class="alert alert-warning" role="alert">
+                            <t t-esc="reviews.error"/>
+                        </div>
+                        <div class="o_product_summary mb-3">
+                            <span class="badge bg-light text-dark border me-2"><t t-esc="reviews.summary.store_count || 0"/> stores</span>
+                            <span class="badge bg-primary me-2">Avg rating <t t-esc="reviews.summary.chain_avg_rating || 0"/></span>
+                            <span class="badge bg-info me-2">Reviews <t t-esc="reviews.summary.total_reviews || 0"/></span>
+                            <span class="badge bg-danger me-2">1-star <t t-esc="reviews.summary.one_star_count || 0"/> (<t t-esc="reviews.summary.one_star_share || 0"/>%)</span>
+                            <span class="badge bg-warning text-dark me-2">Awaiting reply <t t-esc="reviews.summary.awaiting_reply || 0"/></span>
+                            <span t-if="reviews.summary.last_sync_at" class="badge bg-secondary me-2">Last sync <t t-esc="reviews.summary.last_sync_at"/></span>
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <div class="border rounded p-3 h-100">
+                                    <div class="fw-semibold mb-2 text-danger">Products in low ratings (1–2★)</div>
+                                    <t t-if="!(reviews.low_products || []).length">
+                                        <div class="text-muted small">No order-line products synced for low reviews yet.</div>
+                                    </t>
+                                    <t t-foreach="reviews.low_products" t-as="prod" t-key="prod.product_name">
+                                        <div class="d-flex align-items-center gap-2 mb-1">
+                                            <div class="flex-grow-1 text-truncate" t-att-title="prod.product_name"><t t-esc="prod.product_name"/></div>
+                                            <div class="progress flex-grow-1" style="height: 8px; max-width: 140px;">
+                                                <div class="progress-bar bg-danger" role="progressbar" t-att-style="'width:' + reviewBarWidth(prod.qty)"/>
+                                            </div>
+                                            <div class="small text-muted" style="min-width: 2.5rem;"><t t-esc="prod.qty"/></div>
+                                        </div>
+                                    </t>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="border rounded p-3 h-100">
+                                    <div class="fw-semibold mb-2 text-success">Products in top ratings (4–5★)</div>
+                                    <t t-if="!(reviews.high_products || []).length">
+                                        <div class="text-muted small">No order-line products synced for top reviews yet.</div>
+                                    </t>
+                                    <t t-foreach="reviews.high_products" t-as="prod" t-key="'h-' + prod.product_name">
+                                        <div class="d-flex align-items-center gap-2 mb-1">
+                                            <div class="flex-grow-1 text-truncate" t-att-title="prod.product_name"><t t-esc="prod.product_name"/></div>
+                                            <div class="progress flex-grow-1" style="height: 8px; max-width: 140px;">
+                                                <div class="progress-bar bg-success" role="progressbar" t-att-style="'width:' + reviewBarWidth(prod.qty)"/>
+                                            </div>
+                                            <div class="small text-muted" style="min-width: 2.5rem;"><t t-esc="prod.qty"/></div>
+                                        </div>
+                                    </t>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="table-responsive o_product_table_wrap mb-3">
+                            <table class="table table_branch_data align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>Branch / store</th>
+                                        <th class="text-end">Store rating</th>
+                                        <th class="text-end">No. of reviews</th>
+                                        <th class="text-end">1-star ratings</th>
+                                        <th class="text-end">5-star</th>
+                                        <th class="text-end">Awaiting reply</th>
+                                        <th>POS branch</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr t-foreach="reviews.branches" t-as="row" t-key="row.store_id"
+                                        class="clickable_row"
+                                        t-att-class="state.selectedReviewStoreId === row.store_id ? 'table-active' : ''"
+                                        t-on-click="() => this.openReviewStore(row.store_id)"
+                                        style="cursor: pointer;">
+                                        <td class="fw-semibold"><t t-esc="row.branch_name"/></td>
+                                        <td class="text-end"><t t-esc="row.store_rating"/></td>
+                                        <td class="text-end"><t t-esc="row.review_count"/></td>
+                                        <td class="text-end text-danger"><t t-esc="row.one_star_count"/></td>
+                                        <td class="text-end text-success"><t t-esc="row.five_star_count"/></td>
+                                        <td class="text-end"><t t-esc="row.awaiting_reply"/></td>
+                                        <td><t t-esc="row.config_name || '—'"/></td>
+                                    </tr>
+                                    <tr t-if="!(reviews.branches || []).length">
+                                        <td colspan="7" class="text-center text-muted p-4">No Talabat stores to show.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <t t-if="state.selectedReviewStoreId">
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <h5 class="mb-0">Reviews — <t t-esc="reviews.selected_store_name"/></h5>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" t-on-click="clearReviewStore">Back to all stores</button>
+                            </div>
+                            <div class="table-responsive o_product_table_wrap">
+                                <table class="table table_branch_data align-middle">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th class="text-center">Stars</th>
+                                            <th>Order #</th>
+                                            <th>Comment</th>
+                                            <th>Products</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr t-foreach="reviews.detail" t-as="rev" t-key="rev.id">
+                                            <td class="text-nowrap"><t t-esc="rev.review_datetime"/></td>
+                                            <td class="text-center"><t t-esc="rev.rating"/>★</td>
+                                            <td><t t-esc="rev.order_number"/></td>
+                                            <td style="max-width: 360px; white-space: normal;"><t t-esc="rev.comment"/></td>
+                                            <td style="max-width: 220px; white-space: normal;">
+                                                <t t-foreach="rev.products" t-as="p" t-key="p.product_name">
+                                                    <div class="small"><t t-esc="p.product_name"/> × <t t-esc="p.quantity"/></div>
+                                                </t>
+                                                <span t-if="!(rev.products || []).length" class="text-muted">—</span>
+                                            </td>
+                                            <td>
+                                                <span t-if="rev.awaiting_reply" class="badge bg-warning text-dark">Awaiting reply</span>
+                                                <span t-if="rev.can_dispute" class="badge bg-danger">Dispute</span>
+                                            </td>
+                                        </tr>
+                                        <tr t-if="!(reviews.detail || []).length">
+                                            <td colspan="6" class="text-center text-muted p-4">No reviews in this date range for this store.</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </t>
                     </t>
                 </t>
                 <t t-elif="state.canSeeTransfers &amp;&amp; state.view === 'transfers'">

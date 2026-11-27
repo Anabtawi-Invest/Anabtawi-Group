@@ -1,0 +1,8 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_talabat_store_user,talabat.store.user,model_talabat_store,group_talabat_reviews_user,1,0,0,0
+access_talabat_review_user,talabat.review.user,model_talabat_review,group_talabat_reviews_user,1,0,0,0
+access_talabat_review_line_user,talabat.review.line.user,model_talabat_review_line,group_talabat_reviews_user,1,0,0,0
+access_talabat_store_manager,talabat.store.manager,model_talabat_store,group_talabat_reviews_manager,1,1,1,1
+access_talabat_review_manager,talabat.review.manager,model_talabat_review,group_talabat_reviews_manager,1,1,1,1
+access_talabat_review_line_manager,talabat.review.line.manager,model_talabat_review_line,group_talabat_reviews_manager,1,1,1,1
+access_talabat_import_wizard_manager,talabat.import.wizard.manager,model_talabat_import_wizard,group_talabat_reviews_manager,1,1,1,1

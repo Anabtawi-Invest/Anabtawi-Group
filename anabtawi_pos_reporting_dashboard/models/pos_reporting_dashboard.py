@@ -3681,3 +3681,163 @@ class PosReportingDashboard(models.TransientModel):
             },
         }
 
+    def _check_reviews_dashboard_access(self):
+        if not self.env.user.has_group("anabtawi_pos_reporting_dashboard.group_pos_dashboard_reviews"):
+            raise AccessError(_("You are not allowed to view the Reviews section of the POS dashboard."))
+
+    @api.model
+    def get_reviews_dashboard_data(self, date_from=None, date_to=None, config_ids=None, store_id=None):
+        """Talabat reviews KPIs per branch + product charts + optional store drill-down."""
+        self._check_reviews_dashboard_access()
+        period = self._parse_period(date_from, date_to)
+        _dt_start, _dt_end, start_str, end_str = self._period_bounds(period)
+        all_configs = self._get_report_configs()
+        configs = self._get_report_configs(config_ids)
+
+        ICP = self.env["ir.config_parameter"].sudo()
+        sync_status = ICP.get_param("talabat_reviews.sync_status", "")
+        sync_message = ICP.get_param("talabat_reviews.sync_message", "")
+        last_sync_at = ICP.get_param("talabat_reviews.last_sync_at", "")
+
+        Store = self.env["talabat.store"].sudo()
+        Review = self.env["talabat.review"].sudo()
+        Line = self.env["talabat.review.line"].sudo()
+
+        if config_ids:
+            store_domain = [
+                ("active", "=", True),
+                ("pos_config_id", "in", configs.ids),
+            ]
+        else:
+            store_domain = [("active", "=", True)]
+
+        stores = Store.search(store_domain, order="name")
+        review_date_domain = [
+            ("review_datetime", ">=", start_str),
+            ("review_datetime", "<", end_str),
+        ]
+
+        branch_rows = []
+        total_reviews = 0
+        total_one_star = 0
+        total_awaiting = 0
+        rating_sum = 0.0
+        rating_n = 0
+
+        for store in stores:
+            period_reviews = Review.search([
+                ("store_id", "=", store.id),
+            ] + review_date_domain)
+            period_count = len(period_reviews)
+            one_star = len(period_reviews.filtered(lambda r: r.rating == 1))
+            five_star = len(period_reviews.filtered(lambda r: r.rating == 5))
+            awaiting = len(period_reviews.filtered(lambda r: r.awaiting_reply))
+            if period_count:
+                avg = sum(period_reviews.mapped("rating")) / float(period_count)
+            else:
+                avg = store.store_rating or 0.0
+            total_reviews += period_count
+            total_one_star += one_star
+            total_awaiting += awaiting
+            if period_count:
+                rating_sum += avg * period_count
+                rating_n += period_count
+            branch_rows.append({
+                "store_id": store.id,
+                "vendor_id": store.vendor_id,
+                "branch_name": store.name,
+                "config_id": store.pos_config_id.id or False,
+                "config_name": store.pos_config_id.name or "",
+                "store_rating": round(avg, 1) if period_count else round(store.store_rating or 0.0, 1),
+                "review_count": period_count if period_count else store.review_count,
+                "one_star_count": one_star if period_count else store.one_star_count,
+                "five_star_count": five_star,
+                "awaiting_reply": awaiting,
+                "period_review_count": period_count,
+            })
+
+        chain_avg = round(rating_sum / rating_n, 1) if rating_n else (
+            round(sum(stores.mapped("store_rating")) / len(stores), 1) if stores else 0.0
+        )
+        one_star_share = round((total_one_star * 100.0 / total_reviews), 1) if total_reviews else 0.0
+
+        # Product charts from order lines linked to reviews in period
+        if stores:
+            line_domain = [
+                ("store_id", "in", stores.ids),
+                ("review_datetime", ">=", start_str),
+                ("review_datetime", "<", end_str),
+            ]
+            lines = Line.search(line_domain)
+        else:
+            lines = Line.browse()
+        low_counter = defaultdict(float)
+        high_counter = defaultdict(float)
+        for line in lines:
+            name = (line.product_name or "").strip()
+            if not name:
+                continue
+            qty = line.quantity or 1.0
+            if line.rating <= 2:
+                low_counter[name] += qty
+            elif line.rating >= 4:
+                high_counter[name] += qty
+
+        def _top(counter, limit=10):
+            items = sorted(counter.items(), key=lambda kv: kv[1], reverse=True)[:limit]
+            return [{"product_name": n, "qty": round(q, 2)} for n, q in items]
+
+        detail_reviews = []
+        selected_store = False
+        if store_id:
+            selected_store = Store.browse(int(store_id))
+            if selected_store.exists():
+                for rev in Review.search([
+                    ("store_id", "=", selected_store.id),
+                ] + review_date_domain, order="review_datetime desc, id desc", limit=200):
+                    detail_reviews.append({
+                        "id": rev.id,
+                        "review_datetime": fields.Datetime.to_string(rev.review_datetime),
+                        "rating": rev.rating,
+                        "order_number": rev.order_number,
+                        "comment": rev.comment or "",
+                        "awaiting_reply": rev.awaiting_reply,
+                        "can_dispute": rev.can_dispute,
+                        "products": [
+                            {"product_name": l.product_name, "quantity": l.quantity}
+                            for l in rev.line_ids
+                        ],
+                    })
+
+        error = ""
+        if not stores:
+            error = _(
+                "No Talabat stores found. Install/sync Talabat Reviews, map each store to a POS branch, "
+                "then run Sync or Import JSON."
+            )
+        elif sync_status in ("session_expired", "error"):
+            error = sync_message or _("Talabat sync needs attention.")
+
+        return {
+            "date_from": period["date_from"].isoformat(),
+            "date_to": period["date_to"].isoformat(),
+            "all_branches": [{"id": c.id, "name": c.name} for c in all_configs],
+            "summary": {
+                "store_count": len(stores),
+                "chain_avg_rating": chain_avg,
+                "total_reviews": total_reviews,
+                "one_star_count": total_one_star,
+                "one_star_share": one_star_share,
+                "awaiting_reply": total_awaiting,
+                "last_sync_at": last_sync_at,
+                "sync_status": sync_status,
+            },
+            "branches": branch_rows,
+            "low_products": _top(low_counter),
+            "high_products": _top(high_counter),
+            "selected_store_id": selected_store.id if selected_store else False,
+            "selected_store_name": selected_store.name if selected_store else "",
+            "reviews": detail_reviews,
+            "error": error,
+        }
+

@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_talabat_reviews" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.talabat.reviews</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app string="Talabat Reviews" name="talabat_reviews" groups="talabat_reviews.group_talabat_reviews_manager">
+                    <block title="Partner portal sync">
+                        <setting string="Daily sync" help="Cron runs every 24 hours when enabled. Requires a valid session cookie (login uses 2FA).">
+                            <field name="talabat_sync_enabled"/>
+                        </setting>
+                        <setting string="Login email" help="Optional reference only; automated password+2FA login is not reliable.">
+                            <field name="talabat_login_email"/>
+                        </setting>
+                        <setting string="Session cookie" help="Paste Cookie header from a logged-in partner-app.talabat.com browser tab.">
+                            <field name="talabat_session_cookie" password="True"/>
+                        </setting>
+                        <setting string="Sync status">
+                            <div class="content-group">
+                                <div class="row mt16">
+                                    <label for="talabat_sync_status" class="col-lg-3"/>
+                                    <field name="talabat_sync_status" class="col-lg-9"/>
+                                </div>
+                                <div class="row">
+                                    <label for="talabat_last_sync_at" class="col-lg-3"/>
+                                    <field name="talabat_last_sync_at" class="col-lg-9"/>
+                                </div>
+                                <div class="row">
+                                    <label for="talabat_sync_message" class="col-lg-3"/>
+                                    <field name="talabat_sync_message" class="col-lg-9"/>
+                                </div>
+                                <div class="mt16">
+                                    <button name="action_talabat_sync_now" type="object" string="Sync now" class="btn-primary"/>
+                                </div>
+                            </div>
+                        </setting>
+                    </block>
+                </app>
+            </xpath>
+        </field>
+    </record>
+</odoo>

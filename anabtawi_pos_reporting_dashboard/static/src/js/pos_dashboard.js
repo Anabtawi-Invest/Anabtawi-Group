@@ -29,8 +29,11 @@ export class PosReportingDashboard extends Component {
             loading: true,
             canSeeProducts: false,
             canSeeTransfers: false,
+            canSeeReviews: false,
             view: "branches",
             productLoading: false,
+            reviewsLoading: false,
+            selectedReviewStoreId: false,
             productFilter: "all",
             productSearch: "",
             productSortKey: "qty",
@@ -94,6 +97,7 @@ export class PosReportingDashboard extends Component {
                         transferSortOrder: this.state.transferSortOrder,
                         transferPage: this.state.transferPage,
                         transferPageSize: this.state.transferPageSize,
+                        selectedReviewStoreId: this.state.selectedReviewStoreId,
                         compare_date_from_a: this.state.compare_date_from_a,
                         compare_date_to_a: this.state.compare_date_to_a,
                         compare_date_from_b: this.state.compare_date_from_b,
@@ -136,6 +140,18 @@ export class PosReportingDashboard extends Component {
             _searchTimer: null,
         });
 
+        this.reviews = useState({
+            loadedKey: "",
+            summary: {},
+            branches: [],
+            low_products: [],
+            high_products: [],
+            selected_store_id: false,
+            selected_store_name: "",
+            detail: [],
+            error: "",
+        });
+
         this.compare = useState({
             loadedKey: "",
             summary: {},
@@ -166,10 +182,16 @@ export class PosReportingDashboard extends Component {
             this.state.canSeeTransfers = await user.hasGroup(
                 "anabtawi_pos_reporting_dashboard.group_pos_dashboard_transfers"
             );
+            this.state.canSeeReviews = await user.hasGroup(
+                "anabtawi_pos_reporting_dashboard.group_pos_dashboard_reviews"
+            );
             if (!this.state.canSeeProducts && (this.state.view === "products" || this.state.view === "category_profit" || this.state.view === "compare")) {
                 this.state.view = "branches";
             }
             if (!this.state.canSeeTransfers && this.state.view === "transfers") {
+                this.state.view = "branches";
+            }
+            if (!this.state.canSeeReviews && this.state.view === "reviews") {
                 this.state.view = "branches";
             }
             await this.fetchDashboardData();
@@ -225,14 +247,20 @@ export class PosReportingDashboard extends Component {
             await this.fetchTransferData();
             return;
         }
+        if (this.state.view === "reviews") {
+            await this.fetchReviewsData();
+            return;
+        }
         if (this.state.view === "compare") {
             await this.fetchCompareData();
             return;
         }
         this.products.loadedKey = "";
         this.transfers.loadedKey = "";
+        this.reviews.loadedKey = "";
         this.compare.loadedKey = "";
-        this.state.loading = true;        try {
+        this.state.loading = true;
+        try {
             const strFrom = this.state.date_from;
             const strTo = this.state.date_to;
 
@@ -306,16 +334,95 @@ export class PosReportingDashboard extends Component {
         if (view === "transfers" && !this.state.canSeeTransfers) {
             return;
         }
+        if (view === "reviews" && !this.state.canSeeReviews) {
+            return;
+        }
         this.state.view = view;
         if ((view === "products" || view === "category_profit") && this.products.loadedKey !== this._filterKey()) {
             this.fetchProductData();
         } else if (view === "transfers" && this.transfers.loadedKey !== this._filterKey()) {
             this.fetchTransferData();
+        } else if (view === "reviews" && this.reviews.loadedKey !== this._reviewsFilterKey()) {
+            this.fetchReviewsData();
         } else if (view === "compare" && this.compare.loadedKey !== this._compareFilterKey()) {
             this.fetchCompareData();
         } else if (view === "branches" && !(this.data.branches || []).length) {
             this.fetchDashboardData();
         }
+    }
+
+    _reviewsFilterKey() {
+        return [
+            this._filterKey(),
+            this.state.selectedReviewStoreId || "",
+        ].join("|");
+    }
+
+    async fetchReviewsData() {
+        this.state.reviewsLoading = true;
+        this.state.loading = false;
+        this.reviews.error = "";
+        try {
+            const res = await this.orm.call(
+                "pos.reporting.dashboard",
+                "get_reviews_dashboard_data",
+                [],
+                {
+                    date_from: this.state.date_from,
+                    date_to: this.state.date_to,
+                    config_ids: this.state.config_ids || [],
+                    store_id: this.state.selectedReviewStoreId || false,
+                }
+            );
+            this.reviews.summary = res.summary || {};
+            this.reviews.branches = res.branches || [];
+            this.reviews.low_products = res.low_products || [];
+            this.reviews.high_products = res.high_products || [];
+            this.reviews.selected_store_id = res.selected_store_id || false;
+            this.reviews.selected_store_name = res.selected_store_name || "";
+            this.reviews.detail = res.reviews || [];
+            this.reviews.error = res.error || "";
+            this.reviews.loadedKey = this._reviewsFilterKey();
+            if (res.all_branches && res.all_branches.length) {
+                this.data.all_branches = res.all_branches;
+            }
+            this.data.date_from = res.date_from || this.state.date_from;
+            this.data.date_to = res.date_to || this.state.date_to;
+        } catch (error) {
+            console.error("Failed to load reviews dashboard", error);
+            const serverMsg =
+                (error && error.data && (error.data.message || error.data.debug)) ||
+                (error && error.message) ||
+                "";
+            this.reviews.error = serverMsg
+                ? `Reviews did not load: ${String(serverMsg).split("\n")[0]}`
+                : "Reviews did not load.";
+        } finally {
+            this.state.reviewsLoading = false;
+        }
+    }
+
+    openReviewStore(storeId) {
+        this.state.selectedReviewStoreId = storeId || false;
+        this.fetchReviewsData();
+    }
+
+    clearReviewStore() {
+        this.state.selectedReviewStoreId = false;
+        this.fetchReviewsData();
+    }
+
+    maxReviewProductQty() {
+        const lows = this.reviews.low_products || [];
+        const highs = this.reviews.high_products || [];
+        const all = [...lows, ...highs].map((p) => Number(p.qty) || 0);
+        return Math.max(1, ...all);
+    }
+
+    reviewBarWidth(qty) {
+        const max = this.maxReviewProductQty();
+        const n = Number(qty) || 0;
+        return `${Math.max(4, Math.round((n / max) * 100))}%`;
     }
 
     setComparePreset(which, preset) {

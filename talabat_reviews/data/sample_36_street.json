@@ -1,0 +1,102 @@
+{
+  "stores": [
+    {
+      "vendor_id": "TB_JO;629658",
+      "name": "Al Anabtawi Sweets, 36 Street,60th St.",
+      "store_rating": 3.8,
+      "review_count": 25,
+      "one_star_count": 16,
+      "star_5_count": 7,
+      "star_4_count": 0,
+      "star_3_count": 1,
+      "star_2_count": 1,
+      "star_1_count": 16,
+      "summary_text": "Based on a small number of recent reviews, customers report that food arrives cold and items are missing from orders. Feedback also suggests concerns regarding the freshness of products and the overall quality of the food.",
+      "reviews": [
+        {
+          "order_number": "4739020875",
+          "review_datetime": "11/23/2026 07:37 AM",
+          "rating": 1,
+          "comment": "منتجات قديمه تم بيعها لنا",
+          "can_dispute": true,
+          "lines": [
+            {"product_name": "كنافة خشنة", "quantity": 1},
+            {"product_name": "معمول مد", "quantity": 1}
+          ]
+        },
+        {
+          "order_number": "4705205387",
+          "review_datetime": "11/07/2026 09:35 PM",
+          "rating": 1,
+          "comment": "عنصر مفقود",
+          "can_dispute": true,
+          "lines": [{"product_name": "قطر", "quantity": 1}]
+        },
+        {
+          "order_number": "4702983844",
+          "review_datetime": "11/07/2026 11:45 AM",
+          "rating": 1,
+          "comment": "مش زاكي و مامته معلق أسوأ تجربه",
+          "can_dispute": true,
+          "lines": [{"product_name": "كنافة", "quantity": 1}]
+        },
+        {
+          "order_number": "3922509229",
+          "review_datetime": "10/06/2026 01:56 PM",
+          "rating": 1,
+          "comment": "اجا بارد",
+          "can_dispute": true,
+          "lines": [{"product_name": "كنافة", "quantity": 1}]
+        },
+        {
+          "order_number": "3912853987",
+          "review_datetime": "09/24/2026 07:47 PM",
+          "rating": 1,
+          "comment": "لكنافا بارده مو زاكيه",
+          "can_dispute": true,
+          "lines": [{"product_name": "كنافة", "quantity": 1}]
+        },
+        {
+          "order_number": "3869161381",
+          "review_datetime": "09/14/2026 09:47 PM",
+          "rating": 5,
+          "comment": "ممتاز",
+          "can_dispute": false,
+          "lines": [{"product_name": "كنافة نابلسية", "quantity": 1}]
+        },
+        {
+          "order_number": "3875801021",
+          "review_datetime": "09/09/2026 11:32 PM",
+          "rating": 5,
+          "comment": "بس خففها قطر شوي بتطلع 10/10 طعم رهيب من ازكى الكنافة اللي اكلتها في الاردن",
+          "can_dispute": false,
+          "lines": [{"product_name": "كنافة", "quantity": 1}, {"product_name": "قطر", "quantity": 1}]
+        },
+        {
+          "order_number": "3827957958",
+          "review_datetime": "08/16/2026 12:07 PM",
+          "rating": 1,
+          "comment": "كنافة سيئه جدا جدا اسوء كنافة بذوقها بحياتي ومش حاط معاها قطر",
+          "can_dispute": true,
+          "lines": [{"product_name": "كنافة", "quantity": 1}]
+        },
+        {
+          "order_number": "3616626509",
+          "review_datetime": "05/09/2026 01:53 PM",
+          "rating": 5,
+          "comment": "رائع",
+          "can_dispute": false,
+          "lines": [{"product_name": "رز بحليب", "quantity": 1}]
+        },
+        {
+          "order_number": "3608799254",
+          "review_datetime": "05/05/2026 05:32 PM",
+          "rating": 5,
+          "comment": "تجربتي كانت اكثر من رائعة",
+          "can_dispute": false,
+          "lines": [{"product_name": "بقلاوة", "quantity": 1}]
+        }
+      ]
+    }
+  ]
+}

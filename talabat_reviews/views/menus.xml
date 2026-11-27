@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_talabat_reviews_root"
+              name="Talabat Reviews"
+              parent="point_of_sale.menu_point_root"
+              sequence="90"
+              groups="talabat_reviews.group_talabat_reviews_user"/>
+
+    <menuitem id="menu_talabat_stores"
+              name="Stores"
+              parent="menu_talabat_reviews_root"
+              action="action_talabat_store"
+              sequence="10"/>
+
+    <menuitem id="menu_talabat_reviews"
+              name="Reviews"
+              parent="menu_talabat_reviews_root"
+              action="action_talabat_review"
+              sequence="20"/>
+
+    <menuitem id="menu_talabat_import"
+              name="Import JSON"
+              parent="menu_talabat_reviews_root"
+              action="action_talabat_import_wizard"
+              sequence="30"
+              groups="talabat_reviews.group_talabat_reviews_manager"/>
+
+    <menuitem id="menu_talabat_settings"
+              name="Sync Settings"
+              parent="menu_talabat_reviews_root"
+              action="base_setup.action_general_configuration"
+              sequence="90"
+              groups="talabat_reviews.group_talabat_reviews_manager"/>
+</odoo>
