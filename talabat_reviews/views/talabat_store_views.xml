@@ -23,7 +23,6 @@
         <field name="binding_view_types">list</field>
         <field name="state">code</field>
         <field name="code">model.action_sync_reviews_now()</field>
-        <field name="groups_id" eval="[(4, ref('talabat_reviews.group_talabat_reviews_manager'))]"/>
     </record>
 
     <record id="view_talabat_store_form" model="ir.ui.view">
