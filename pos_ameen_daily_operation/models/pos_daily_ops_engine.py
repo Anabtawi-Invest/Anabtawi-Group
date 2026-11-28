@@ -1,4 +1,3 @@
-from collections import defaultdict
 from datetime import datetime, time, timedelta
 
 import pytz
@@ -123,14 +122,14 @@ class PosDailyOpsEngine(models.AbstractModel):
 
     @api.model
     def _get_non_product_sales_order_ids(self, sessions):
-        """POS orders that are advance deposit/refund only.
+        """POS orders that are advance deposit/refund or pledge-return refunds.
 
         Their Cash/Visa payments are real money (kept in Total POS Income / ``sales``)
-        but they are not product sales, so product KPIs must skip them entirely.
+        but they are not product sales, so product KPIs must skip them.
 
-        Mixed product+pledge tickets are handled separately via
-        ``_get_order_pledge_amounts`` so only the pledge share is removed from
-        channel KPIs.
+        Pledge *receive* links (``pos.advance.order.pledge.pos_order_id``) must NOT
+        exclude the sale: رهن is posted as a separate liability move and is not in
+        ``pos.payment`` / ``amount_total`` (see pos_pledge_order deposit move).
         """
         if not sessions:
             return frozenset()
@@ -148,47 +147,14 @@ class PosDailyOpsEngine(models.AbstractModel):
             order_ids.update(advances.mapped('advance_pos_order_id').ids)
             order_ids.update(advances.mapped('refund_advance_pos_order_id').ids)
 
+        # Pledge return refund tickets only — receive orders keep their product payments.
+        if 'pos.advance.order.pledge' in self.env:
+            pledges = self.env['pos.advance.order.pledge'].sudo().search([
+                ('return_pos_order_id', 'in', orders.ids),
+            ])
+            order_ids.update(pledges.mapped('return_pos_order_id').ids)
+
         return frozenset(oid for oid in order_ids if oid)
-
-    @api.model
-    def _get_order_pledge_amounts(self, sessions):
-        """``{pos.order id: pledge amount}`` for receive/return tickets in ``sessions``.
-
-        Used to strip only the رهن share from Cash/Visa/Debt/… KPIs while keeping
-        the product share (and the full amount in Total POS Income).
-        """
-        if not sessions or 'pos.advance.order.pledge' not in self.env:
-            return {}
-        orders = self._get_orders(sessions)
-        if not orders:
-            return {}
-        order_id_set = set(orders.ids)
-        pledges = self.env['pos.advance.order.pledge'].sudo().search([
-            '|',
-            ('pos_order_id', 'in', orders.ids),
-            ('return_pos_order_id', 'in', orders.ids),
-        ])
-        amounts = defaultdict(float)
-        for pledge in pledges:
-            amount = abs(self._pledge_amount(pledge) or 0.0)
-            if not amount:
-                continue
-            if pledge.pos_order_id.id in order_id_set:
-                amounts[pledge.pos_order_id.id] += amount
-            if pledge.return_pos_order_id.id in order_id_set:
-                amounts[pledge.return_pos_order_id.id] += amount
-        return dict(amounts)
-
-    @api.model
-    def _payment_pledge_share(self, payment, pledge_amount, order_total):
-        """How much of ``pledge_amount`` sits on this payment (same sign as the payment)."""
-        amount = payment.amount or 0.0
-        total = abs(order_total or 0.0)
-        pledge = abs(pledge_amount or 0.0)
-        if not amount or total <= 0.0005 or pledge <= 0.0005:
-            return 0.0
-        share = pledge * abs(amount) / total
-        return -share if amount < 0 else share
 
     @api.model
     def _get_channel(self, payment_method):

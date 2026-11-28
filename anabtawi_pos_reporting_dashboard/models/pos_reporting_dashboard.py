@@ -330,15 +330,13 @@ class PosReportingDashboard(models.TransientModel):
             branch["gift_amount"] += float(gift_amount or 0.0)
             branch["gift_line_count"] += gift_line_count or 0
 
-    def _get_paying_orders(self, sessions, non_product_order_ids=None, pledge_amounts=None):
-        """{pos.order: income} for orders whose product income payments are above zero
-        (hospitality-only, refund, zero-total gift and advance orders excluded;
-        pledge share removed from mixed tickets)."""
+    def _get_paying_orders(self, sessions, non_product_order_ids=None):
+        """{pos.order: income} for orders whose income payments are above zero
+        (hospitality-only, refund, zero-total gift, advance and pledge-return
+        refund orders excluded). Pledge *receive* sales stay included."""
         engine = self.env["pos.daily.ops.engine"]
         if non_product_order_ids is None:
             non_product_order_ids = engine._get_non_product_sales_order_ids(sessions)
-        if pledge_amounts is None:
-            pledge_amounts = engine._get_order_pledge_amounts(sessions)
         order_income = defaultdict(float)
         for pay in engine._get_payments(sessions):
             order = pay.pos_order_id
@@ -346,16 +344,7 @@ class PosReportingDashboard(models.TransientModel):
                 continue
             if engine._is_in_sales(pay.payment_method_id):
                 order_income[order] += pay.amount or 0.0
-        result = {}
-        for order, income in order_income.items():
-            pledge = pledge_amounts.get(order.id) or 0.0
-            if income > 0:
-                income = max(0.0, income - pledge)
-            elif income < 0:
-                income = min(0.0, income + pledge)
-            if abs(income) > 0.0005:
-                result[order] = income
-        return result
+        return {order: income for order, income in order_income.items() if income > 0.0005}
 
     @staticmethod
     def _avg_basket(values):
@@ -366,11 +355,10 @@ class PosReportingDashboard(models.TransientModel):
         return round(product_sales / values["paying_order_count"], 3)
 
     def _subtract_non_product_channel_payments(self, sessions, branch_data, non_product_order_ids):
-        """Remove advance deposit/refund payments from channel buckets only.
+        """Remove advance / pledge-return refund payments from channel buckets only.
 
         ``sales`` / Total POS Income stays inclusive of that cash.
-        Pledge shares on mixed tickets are handled by
-        ``_subtract_order_pledge_channel_payments``.
+        Pledge *receive* sales are not excluded: رهن is outside ``pos.payment``.
         """
         if not sessions or not non_product_order_ids:
             return
@@ -396,74 +384,6 @@ class PosReportingDashboard(models.TransientModel):
                 values[key] -= amount
         for values in branch_data.values():
             values["online_sales"] = sum(values.get(channel, 0.0) for channel in DELIVERY_CHANNELS)
-
-    def _subtract_order_pledge_channel_payments(self, sessions, branch_data, pledge_amounts):
-        """Remove only the رهن share of mixed tickets from channel buckets.
-
-        ``sales`` / Total POS Income stays inclusive of the pledge cash.
-        """
-        if not sessions or not pledge_amounts:
-            return
-        engine = self.env["pos.daily.ops.engine"]
-        session_ids = set(sessions.ids)
-        orders = self.env["pos.order"].sudo().browse(list(pledge_amounts.keys()))
-        for order in orders:
-            values = branch_data.get(order.config_id.id)
-            if values is None:
-                continue
-            pledge_amt = pledge_amounts.get(order.id) or 0.0
-            total = order.amount_total or 0.0
-            if pledge_amt <= 0.0005 or abs(total) <= 0.0005:
-                continue
-            for pay in order.payment_ids:
-                if pay.session_id.id not in session_ids:
-                    continue
-                bucket = engine._get_bucket(pay.payment_method_id)
-                if bucket in ("hospitality", "advance_applied"):
-                    continue
-                share = engine._payment_pledge_share(pay, pledge_amt, total)
-                if not share:
-                    continue
-                key = "other_sales" if bucket == "none" else bucket
-                if key in values:
-                    values[key] -= share
-        for values in branch_data.values():
-            values["online_sales"] = sum(values.get(channel, 0.0) for channel in DELIVERY_CHANNELS)
-
-    def _subtract_order_pledge_from_order_metrics(self, sessions, branch_data, pledge_amounts):
-        """Strip the رهن share from untaxed / VAT / paying-order metrics."""
-        if not sessions or not pledge_amounts:
-            return
-        engine = self.env["pos.daily.ops.engine"]
-        session_ids = set(sessions.ids)
-        orders = self.env["pos.order"].sudo().browse(list(pledge_amounts.keys()))
-        for order in orders:
-            values = branch_data.get(order.config_id.id)
-            if values is None:
-                continue
-            pledge_amt = pledge_amounts.get(order.id) or 0.0
-            total = order.amount_total or 0.0
-            if pledge_amt <= 0.0005 or abs(total) <= 0.0005:
-                continue
-            product_income = 0.0
-            for pay in order.payment_ids:
-                if pay.session_id.id not in session_ids:
-                    continue
-                if not engine._is_in_sales(pay.payment_method_id):
-                    continue
-                share = engine._payment_pledge_share(pay, pledge_amt, total)
-                if not share:
-                    continue
-                untaxed_full, tax_full = self._payment_tax_split(pay)
-                ratio = abs(share) / abs(pay.amount or 0.0) if pay.amount else 0.0
-                untaxed_share = untaxed_full * ratio
-                tax_share = tax_full * ratio
-                values["untaxed_sales"] -= untaxed_share
-                values["tax_amount"] -= tax_share
-                values[self._channel_untaxed_key(pay.payment_method_id)] -= untaxed_share
-                product_income += (pay.amount or 0.0) - share
-            if abs(product_income) <= 0.0005 and values.get("paying_order_count"):
-                values["paying_order_count"] = max(0, values["paying_order_count"] - 1)
 
     def _get_session_expenses(self, sessions):
         """POS expenses created in the period's sessions (same day rule as sales)."""
@@ -689,7 +609,6 @@ class PosReportingDashboard(models.TransientModel):
         sessions = engine._get_sessions(period, configs)
         figures = engine._compute_branch_figures(period, configs, sessions=sessions)
         non_product_order_ids = engine._get_non_product_sales_order_ids(sessions)
-        pledge_amounts = engine._get_order_pledge_amounts(sessions)
 
         def _empty_branch_dict():
             return {**engine._empty_figures(), **DASHBOARD_EXTRA_KEYS}
@@ -698,15 +617,13 @@ class PosReportingDashboard(models.TransientModel):
         for cfg_id, values in figures.items():
             branch_data[cfg_id].update(values)
 
-        # Channel Cash/Visa/… without advance deposits; Total POS Income (sales) stays full.
+        # Channel Cash/Visa/… without advance / pledge-return refunds; Total POS Income stays full.
+        # Pledge receive sales stay in channels (رهن is a separate liability move).
         self._subtract_non_product_channel_payments(sessions, branch_data, non_product_order_ids)
-        # Mixed product+pledge tickets: strip only the رهن share from channels.
-        self._subtract_order_pledge_channel_payments(sessions, branch_data, pledge_amounts)
 
         # Tax, discounts, gifts and order counts. Same rules as the old per-record
         # loops, aggregated in SQL so a range longer than a month still returns.
         self._accumulate_order_metrics(sessions, branch_data, non_product_order_ids)
-        self._subtract_order_pledge_from_order_metrics(sessions, branch_data, pledge_amounts)
 
         # Open time of the sessions; a session still open counts until now.
         now = fields.Datetime.now()
@@ -919,24 +836,6 @@ class PosReportingDashboard(models.TransientModel):
                         continue
                     day = day_totals[engine._to_local_date(session.start_at)]
                     day[bucket] -= amount or 0.0
-            if pledge_amounts:
-                session_ids = set(sessions.ids)
-                for order in self.env["pos.order"].sudo().browse(list(pledge_amounts.keys())):
-                    pledge_amt = pledge_amounts.get(order.id) or 0.0
-                    total = order.amount_total or 0.0
-                    if pledge_amt <= 0.0005 or abs(total) <= 0.0005:
-                        continue
-                    for pay in order.payment_ids:
-                        if pay.session_id.id not in session_ids:
-                            continue
-                        bucket = engine._get_bucket(pay.payment_method_id)
-                        if bucket not in ("cash", "visa"):
-                            continue
-                        share = engine._payment_pledge_share(pay, pledge_amt, total)
-                        if not share:
-                            continue
-                        day = day_totals[engine._to_local_date(pay.session_id.start_at)]
-                        day[bucket] -= share
 
         trend_days = []
         curr_date = period["date_from"]
@@ -3177,8 +3076,8 @@ class PosReportingDashboard(models.TransientModel):
 
         vals_list = []
         non_product_order_ids = engine._get_non_product_sales_order_ids(sessions)
-        pledge_amounts = engine._get_order_pledge_amounts(sessions)
-        # Total POS Income keeps pledge/advance money; product sales KPIs do not.
+        # Total POS Income keeps advance / pledge-return money; product KPIs do not.
+        # Pledge *receive* sales stay in product KPIs (رهن is outside pos.payment).
         product_only_metrics = (
             "cash_sales", "visa_sales", "employee_debt", "online_sales",
             "untaxed_sales", "tax_amount", "avg_basket",
@@ -3195,24 +3094,8 @@ class PosReportingDashboard(models.TransientModel):
                 bucket = engine._get_bucket(pm)
                 cfg = pay.session_id.config_id
                 amt = pay.amount or 0.0
-                untaxed_amt, tax_amt = self._payment_tax_split(pay)
-                if (
-                    metric_type in product_only_metrics
-                    and po
-                    and po.id in pledge_amounts
-                    and abs(po.amount_total or 0.0) > 0.0005
-                ):
-                    pledge_share = engine._payment_pledge_share(
-                        pay, pledge_amounts[po.id], po.amount_total
-                    )
-                    if pledge_share:
-                        ratio = abs(pledge_share) / abs(amt) if amt else 0.0
-                        amt -= pledge_share
-                        untaxed_amt *= (1.0 - ratio)
-                        tax_amt *= (1.0 - ratio)
-                        if abs(amt) <= 0.0005:
-                            continue
 
+                untaxed_amt, tax_amt = self._payment_tax_split(pay)
                 order_disc = 0.0
                 if po and po.amount_total:
                     order_disc = self._order_discount(po) * amt / po.amount_total
@@ -3247,16 +3130,6 @@ class PosReportingDashboard(models.TransientModel):
                 if po and po.id in non_product_order_ids:
                     continue
                 untaxed_amt, tax_amt = self._payment_tax_split(pay)
-                amt = pay.amount or 0.0
-                if po and po.id in pledge_amounts and abs(po.amount_total or 0.0) > 0.0005:
-                    pledge_share = engine._payment_pledge_share(
-                        pay, pledge_amounts[po.id], po.amount_total
-                    )
-                    if pledge_share and amt:
-                        ratio = abs(pledge_share) / abs(amt)
-                        amt -= pledge_share
-                        untaxed_amt *= (1.0 - ratio)
-                        tax_amt *= (1.0 - ratio)
                 if (untaxed_amt if metric_type == "untaxed_sales" else tax_amt) == 0.0:
                     continue
                 cfg = pay.session_id.config_id
@@ -3268,7 +3141,7 @@ class PosReportingDashboard(models.TransientModel):
                     "payment_method_id": pm.id,
                     "pos_order_id": po.id or False,
                     "report_type": "pos_sales",
-                    "amount": amt,
+                    "amount": pay.amount or 0.0,
                     "untaxed_amount": untaxed_amt,
                     "tax_amount": tax_amt,
                     "partner_id": po.partner_id.id if po else False,
@@ -3299,9 +3172,7 @@ class PosReportingDashboard(models.TransientModel):
                     })
 
         elif metric_type == "avg_basket":
-            for order, income in self._get_paying_orders(
-                sessions, non_product_order_ids, pledge_amounts
-            ).items():
+            for order, income in self._get_paying_orders(sessions, non_product_order_ids).items():
                 cfg = order.config_id
                 vals_list.append({
                     "name": order.name or _("POS Order"),
