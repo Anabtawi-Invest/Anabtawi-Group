@@ -332,7 +332,8 @@ class PosReportingDashboard(models.TransientModel):
 
     def _get_paying_orders(self, sessions, non_product_order_ids=None):
         """{pos.order: income} for orders whose income payments are above zero
-        (hospitality-only, refund, zero-total gift, pledge and advance orders excluded)."""
+        (hospitality-only, refund, zero-total gift, advance and pledge-return
+        refund orders excluded). Pledge *receive* sales stay included."""
         engine = self.env["pos.daily.ops.engine"]
         if non_product_order_ids is None:
             non_product_order_ids = engine._get_non_product_sales_order_ids(sessions)
@@ -354,9 +355,10 @@ class PosReportingDashboard(models.TransientModel):
         return round(product_sales / values["paying_order_count"], 3)
 
     def _subtract_non_product_channel_payments(self, sessions, branch_data, non_product_order_ids):
-        """Remove pledge/advance payments from channel buckets only.
+        """Remove advance / pledge-return refund payments from channel buckets only.
 
         ``sales`` / Total POS Income stays inclusive of that cash.
+        Pledge *receive* sales are not excluded: رهن is outside ``pos.payment``.
         """
         if not sessions or not non_product_order_ids:
             return
@@ -615,7 +617,8 @@ class PosReportingDashboard(models.TransientModel):
         for cfg_id, values in figures.items():
             branch_data[cfg_id].update(values)
 
-        # Channel Cash/Visa/… without pledge & advance; Total POS Income (sales) stays full.
+        # Channel Cash/Visa/… without advance / pledge-return refunds; Total POS Income stays full.
+        # Pledge receive sales stay in channels (رهن is a separate liability move).
         self._subtract_non_product_channel_payments(sessions, branch_data, non_product_order_ids)
 
         # Tax, discounts, gifts and order counts. Same rules as the old per-record
@@ -1121,7 +1124,7 @@ class PosReportingDashboard(models.TransientModel):
         does not uses the product's current Cost (``standard_price``) times
         the quantity, converted into the order currency.
 
-        ``exclude_order_ids`` skips pledge/advance (non-product) orders when set.
+        ``exclude_order_ids`` skips advance / pledge-return refund (non-product) orders when set.
         """
         if not sessions:
             return {}
@@ -3073,7 +3076,8 @@ class PosReportingDashboard(models.TransientModel):
 
         vals_list = []
         non_product_order_ids = engine._get_non_product_sales_order_ids(sessions)
-        # Total POS Income keeps pledge/advance money; product sales KPIs do not.
+        # Total POS Income keeps advance / pledge-return money; product KPIs do not.
+        # Pledge *receive* sales stay in product KPIs (رهن is outside pos.payment).
         product_only_metrics = (
             "cash_sales", "visa_sales", "employee_debt", "online_sales",
             "untaxed_sales", "tax_amount", "avg_basket",

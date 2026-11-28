@@ -122,10 +122,14 @@ class PosDailyOpsEngine(models.AbstractModel):
 
     @api.model
     def _get_non_product_sales_order_ids(self, sessions):
-        """POS orders that are pledge receive/return or advance deposit/refund.
+        """POS orders that are advance deposit/refund or pledge-return refunds.
 
         Their Cash/Visa payments are real money (kept in Total POS Income / ``sales``)
         but they are not product sales, so product KPIs must skip them.
+
+        Pledge *receive* links (``pos.advance.order.pledge.pos_order_id``) must NOT
+        exclude the sale: رهن is posted as a separate liability move and is not in
+        ``pos.payment`` / ``amount_total`` (see pos_pledge_order deposit move).
         """
         if not sessions:
             return frozenset()
@@ -143,13 +147,11 @@ class PosDailyOpsEngine(models.AbstractModel):
             order_ids.update(advances.mapped('advance_pos_order_id').ids)
             order_ids.update(advances.mapped('refund_advance_pos_order_id').ids)
 
+        # Pledge return refund tickets only — receive orders keep their product payments.
         if 'pos.advance.order.pledge' in self.env:
             pledges = self.env['pos.advance.order.pledge'].sudo().search([
-                '|',
-                ('pos_order_id', 'in', orders.ids),
                 ('return_pos_order_id', 'in', orders.ids),
             ])
-            order_ids.update(pledges.mapped('pos_order_id').ids)
             order_ids.update(pledges.mapped('return_pos_order_id').ids)
 
         return frozenset(oid for oid in order_ids if oid)
