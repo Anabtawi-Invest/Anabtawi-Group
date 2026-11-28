@@ -21,22 +21,68 @@ class BaseEmployee(models.AbstractModel):
     leave_manager_id = fields.Many2one(domain="[('company_ids', 'in', company_id)]")
 
     def write(self, vals):
-        if 'leave_manager_id' in vals or 'department_approver_id' in vals:
+        # Setting Manager / Time Off Approver must not force Time Off Responsible
+        # (that group implies Role / User and breaks portal managers).
+        if any(k in vals for k in ('leave_manager_id', 'department_approver_id', 'parent_id')):
             self = self.with_context(skip_adding_hr_responsible=True)
-        res = super(BaseEmployee, self).write(vals)
-        return res
+        return super(BaseEmployee, self).write(vals)
 
 
 class Users(models.Model):
     _inherit = 'res.users'
 
     def write(self, vals):
-        time_off_group = self.env.ref('hr_holidays.group_hr_holidays_responsible')
-        if ('groups_id' in vals and 'skip_adding_hr_responsible' in self._context
-                and vals.get('groups_id')[0][1] == time_off_group.id):
-            del vals['groups_id']
-        res = super(Users, self).write(vals)
-        return res
+        vals = dict(vals)
+        group_field = next((f for f in ('group_ids', 'groups_id') if f in vals), None)
+        if group_field:
+            time_off_group = self.env.ref(
+                'hr_holidays.group_hr_holidays_responsible', raise_if_not_found=False
+            )
+            if time_off_group:
+                skip = self.env.context.get('skip_adding_hr_responsible')
+                # Never promote a portal user to Time Off Responsible (implies Role / User).
+                block_for_portal = any(user.share for user in self)
+                if skip or block_for_portal:
+                    filtered = []
+                    for command in (vals.get(group_field) or []):
+                        if (
+                            isinstance(command, (list, tuple))
+                            and len(command) >= 2
+                            and command[0] == 4
+                            and command[1] == time_off_group.id
+                        ):
+                            continue
+                        filtered.append(command)
+                    if filtered:
+                        vals[group_field] = filtered
+                    else:
+                        vals.pop(group_field, None)
+        return super(Users, self).write(vals)
+
+
+class ResGroups(models.Model):
+    _inherit = 'res.groups'
+
+    def write(self, vals):
+        # hr.employee create() adds leave managers via group.user_ids — skip portal users.
+        responsible = self.env.ref(
+            'hr_holidays.group_hr_holidays_responsible', raise_if_not_found=False
+        )
+        if responsible and responsible in self and vals.get('user_ids'):
+            vals = dict(vals)
+            users = self.env['res.users']
+            filtered = []
+            for command in vals['user_ids']:
+                if (
+                    isinstance(command, (list, tuple))
+                    and len(command) >= 2
+                    and command[0] == 4
+                    and users.browse(command[1]).share
+                ):
+                    continue
+                filtered.append(command)
+            vals['user_ids'] = filtered
+        return super().write(vals)
 
 
 class HrLeaveType(models.Model):
