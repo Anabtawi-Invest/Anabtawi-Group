@@ -8,6 +8,7 @@
         <field name="arch" type="xml">
             <field name="picking_id" position="after">
                 <field name="show_barcode_demand_qty" invisible="1"/>
+                <field name="barcode_demand_locked" invisible="1"/>
             </field>
             <xpath expr="//div[@name='quantity']" position="before">
                 <div name="demand_quantity" class="row my-2" invisible="not show_barcode_demand_qty">
@@ -15,24 +16,24 @@
                         <div class="text-black-50 mb-1 fs-5">
                             <label for="demand_qty" string="الكمية المطلوبة من المصنع" class="p-0"/>
                         </div>
-                        <field name="demand_qty" class="text-end"
+                        <field name="demand_qty" class="text-end" readonly="barcode_demand_locked"
                             options="{'type': 'number'}" placeholder="الكمية المطلوبة من المصنع"/>
                     </div>
                 </div>
-                <div name="demand_digipad" class="row" invisible="not show_barcode_demand_qty or (tracking == 'serial' and (not hide_lot_name or not hide_lot))">
+                <div name="demand_digipad" class="row" invisible="not show_barcode_demand_qty or barcode_demand_locked or (tracking == 'serial' and (not hide_lot_name or not hide_lot))">
                     <widget name="digipad" field_to_edit="demand_qty"/>
                 </div>
             </xpath>
             <xpath expr="//div[@name='quantity']" position="attributes">
-                <attribute name="invisible">show_barcode_demand_qty</attribute>
+                <attribute name="invisible">show_barcode_demand_qty and not barcode_demand_locked</attribute>
             </xpath>
             <xpath expr="//div[@name='quantity']/div[@class='col']/field[@name='qty_done']" position="before">
                 <div class="text-black-50 mb-1 fs-5">
                     <label for="qty_done" string="Quantity Done" class="p-0"/>
                 </div>
             </xpath>
-            <xpath expr="//widget[@name='digipad']" position="attributes">
-                <attribute name="invisible">show_barcode_demand_qty or (tracking == 'serial' and (not hide_lot_name or not hide_lot))</attribute>
+            <xpath expr="//div[@name='digipad']/widget[@name='digipad']" position="attributes">
+                <attribute name="invisible">(show_barcode_demand_qty and not barcode_demand_locked) or (tracking == 'serial' and (not hide_lot_name or not hide_lot))</attribute>
             </xpath>
             <xpath expr="//div[@name='quantity']/div[hasclass('col-3')]" position="attributes">
                 <attribute name="invisible">1</attribute>

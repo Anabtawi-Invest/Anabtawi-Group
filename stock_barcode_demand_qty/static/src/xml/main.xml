@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-inherit="stock_barcode.MainComponent" t-inherit-mode="extension">
+        <xpath expr="//footer[hasclass('o_barcode_control')]" position="before">
+            <div t-if="env.model.displayDemandConfirmMessage" class="alert alert-info m-2 mb-0">
+                امسح المنتجات لإدخال الكمية المطلوبة من المصنع، ثم أكّد الطلب.
+            </div>
+        </xpath>
+        <xpath expr="//footer[hasclass('o_barcode_control')]//button[hasclass('o_add_line')]" position="after">
+            <button t-if="env.model.displayConfirmDemandButton" t-on-click="() => env.model.confirmDemand()"
+                class="o_confirm_demand btn btn-primary flex-grow-1">
+                تأكيد الكمية المطلوبة
+            </button>
+            <button t-if="env.model.displayEditDemandButton" t-on-click="() => env.model.editDemand()"
+                class="o_edit_demand btn btn-secondary flex-grow-1">
+                تعديل الكمية المطلوبة
+            </button>
+        </xpath>
+    </t>
+</templates>
